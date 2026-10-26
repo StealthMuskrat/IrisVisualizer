@@ -406,7 +406,8 @@ public final class EditorApp extends Application {
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored style is a snippet or unsupported value (read-only)."); return; }
         ImGui.textWrapped(NoiseStyleFields.contextDescription(target));
         ImGui.textWrapped("Expression and image-map settings can override the base style. Those, cache and fracture settings remain read-only.");
-        ImGui.textWrapped("Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
+        ImGui.textWrapped(target.terrain() ? "Terrain styles require positive cellular zoom even when cellular frequency is zero."
+                : "Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
             ImGui.textWrapped("Absent style uses " + NoiseStyleFields.contextDefault(target) + ". Enable it explicitly before changing style settings.");
             if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefault(target) + ")")) enableStyle(target, "style");
@@ -437,7 +438,7 @@ public final class EditorApp extends Application {
                     }
                 }
             } else {
-                ImGui.textWrapped(NoiseStyleFields.constraints(field));
+                ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
                 ImGui.inputText("Value", input); drafts.update(key, token, input.get());
                 if (ImGui.button("Apply")) {
@@ -515,7 +516,7 @@ public final class EditorApp extends Application {
             }
             return;
         }
-        ImGui.textWrapped("Absent fields keep Iris defaults. Density and fissure style objects remain read-only.");
+        ImGui.textWrapped("Absent fields keep Iris defaults. Density and fissure styles use terrain-specific bounds; snippets stay read-only.");
         for (String field : Terrain3DFields.EDITABLE) {
             String token = profile.token(field), key = "terrain3D#"+field;
             ImGui.pushID(key); ImGui.text(field);
@@ -542,6 +543,12 @@ public final class EditorApp extends Application {
                 }
             }
             ImGui.popID();
+        }
+        for (String field : NoiseStyleFields.TERRAIN_FIELDS) {
+            if (ImGui.treeNode(field+" settings")) {
+                drawStyleFields(profile,NoiseStyleFields.Target.terrain(field));
+                ImGui.treePop();
+            }
         }
     }
     private void drawBiomeGenerators(LosslessJson document) {

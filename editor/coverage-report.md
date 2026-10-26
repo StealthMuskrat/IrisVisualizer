@@ -14,7 +14,7 @@ Direct nonstatic/nontransient private fields in eleven pinned source classes onl
 | region | 27 | 19 | 13 | 8 |
 | noise | 15 | 14 | 14 | 1 |
 | noiseStyle | 10 | 5 | 5 | 5 |
-| terrain3D | 14 | 12 | 12 | 2 |
+| terrain3D | 14 | 14 | 14 | 0 |
 
 ## dimension
 
@@ -58,4 +58,4 @@ Unclassified: `cacheSize`, `expression`, `fracture`, `imageMap`, `multiplier`.
 
 ## terrain3D
 
-Unclassified: `crackStyle`, `densityStyle`.
+Unclassified: none.

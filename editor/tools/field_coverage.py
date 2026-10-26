@@ -57,6 +57,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['noise'].update(editable(java_dir, 'NoiseStyleFields', 'OBJECT_FIELDS'))
     implemented['noiseStyle'] = set(editable(java_dir, 'NoiseStyleFields'))
     implemented['terrain3D'] = set(editable(java_dir, 'Terrain3DFields'))
+    implemented['terrain3D'].update(editable(java_dir, 'NoiseStyleFields', 'TERRAIN_FIELDS'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']

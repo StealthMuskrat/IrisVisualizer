@@ -559,6 +559,14 @@
     "fluidFade": {
       "classification": "generation",
       "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "densityStyle": {
+      "classification": "generation",
+      "reason": "Bounded terrain density/fissure style editing with source-derived SIMPLEX defaults and terrain-specific native style bounds; nested fractures and other unsupported fields remain read-only."
+    },
+    "crackStyle": {
+      "classification": "generation",
+      "reason": "Bounded terrain density/fissure style editing with source-derived SIMPLEX defaults and terrain-specific native style bounds; nested fractures and other unsupported fields remain read-only."
     }
   }
 }
