@@ -299,6 +299,14 @@ public final class EditorApp extends Application {
     public static void main(String[] args) {
         if (!System.getProperty("os.name").startsWith("Windows") || !System.getProperty("os.arch").equals("amd64") || Runtime.version().feature() != 25)
             throw new IllegalStateException("Iris Visualizer requires Windows x64 and Java 25. Install the runtime separately.");
+        if (args.length == 1 && args[0].equals("--check-installation")) {
+            ImGui.createContext();
+            try {
+                if (DimensionFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
+                System.out.println("PASS: packaged ImGui context, field definitions and GLFW " + glfwGetVersionString());
+            } finally { ImGui.destroyContext(); }
+            return;
+        }
         launch(new EditorApp());
     }
 }

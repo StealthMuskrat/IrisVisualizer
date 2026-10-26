@@ -29,3 +29,28 @@ jobs:
           if ((Get-FileHash generated-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-fields.properties).Hash) { throw 'Pinned Iris field definitions differ' }
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes
+      - name: Build Windows x64 package
+        run: gradle -p editor --no-daemon windowsZip
+      - name: Verify launcher runtime check and missing-runtime message
+        shell: pwsh
+        run: |
+          $launcher = Join-Path $PWD 'editor/build/windows/IrisVisualizer/Start-IrisVisualizer.ps1'
+          $pwsh = (Get-Command pwsh).Source
+          & $pwsh -NoProfile -File $launcher -CheckRuntime
+          if ($LASTEXITCODE -ne 0) { throw 'Valid Java 25 x64 runtime rejected' }
+          & $pwsh -NoProfile -File $launcher -CheckInstallation
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged ImGui/GLFW installation check failed' }
+          $originalPath = $env:PATH
+          $originalJavaHome = $env:JAVA_HOME
+          try {
+            $env:JAVA_HOME = Join-Path $PWD 'missing-java-runtime'
+            $env:PATH = Join-Path $env:SystemRoot 'System32'
+            $output = (& $pwsh -NoProfile -File $launcher -CheckRuntime 2>&1 | Out-String)
+            if ($LASTEXITCODE -eq 0 -or $output -notmatch 'Java 25 x64 runtime was not found') { throw 'Missing runtime was not clearly rejected' }
+          } finally { $env:PATH = $originalPath; $env:JAVA_HOME = $originalJavaHome }
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IrisVisualizer-windows-x64
+          path: editor/build/distributions/IrisVisualizer-windows-x64.zip
+          if-no-files-found: error
