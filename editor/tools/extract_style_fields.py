@@ -65,6 +65,24 @@ ROOTS = {
 }
 
 
+def cellular_rules(source):
+    method = re.search(r'private CNG createNoCache\([^\{]*\)\s*\{(.*?)CNG cng = null;',source,re.DOTALL)
+    helper = re.search(r'private static void requirePositiveFinite\([^)]*\)\s*\{(.*?)\n    \}',source,re.DOTALL)
+    if not method or not helper:
+        raise ValueError('Missing native cellular validation')
+    guards = re.sub(r'\s+','',method.group(1))
+    positive = re.sub(r'\s+','',helper.group(1))
+    if 'if(!Double.isFinite(cellularFrequency)||cellularFrequency<0D){thrownewIllegalArgumentException("cellularFrequencymustbefiniteandnonnegative");}' not in guards:
+        raise ValueError('Changed native cellular frequency validation')
+    if 'if(cellularFrequency>0D){requirePositiveFinite("cellularZoom",cellularZoom);}' not in guards:
+        raise ValueError('Changed native cellular zoom activation rule')
+    if positive != 'if(!Double.isFinite(value)||value<=0D||!Double.isFinite(1D/value)){thrownewIllegalArgumentException(field+"mustbefiniteandpositive");}':
+        raise ValueError('Changed native finite positive reciprocal validation')
+    return {'cellularFrequency.minimum':'0.0',
+            'cellularFrequency.runtimeRule':'finiteNonnegative',
+            'cellularZoom.runtimeRule':'positiveFiniteReciprocalWhenActive'}
+
+
 def extract(noise, style, enum, root_sources=None):
     noise_text, style_text, enum_text = (value.decode('utf-8') for value in (noise, style, enum))
     contextual = re.search(r'private IrisGeneratorStyle style = NoiseStyle\.([A-Z][A-Z0-9_]*)\.style\(\);', noise_text)
@@ -86,7 +104,7 @@ def extract(noise, style, enum, root_sources=None):
     if not help_match:
         raise ValueError('Changed style description')
     values['style.description'] = json.loads(help_match.group(1))
-    for name in ['zoom', 'exponent']:
+    for name in ['zoom', 'exponent', 'cellularFrequency', 'cellularZoom']:
         match = re.search(r'((?:    @[^\n]+\n)+)    private (double) '+name+r' = ([^;]+);', style_text)
         if not match:
             raise ValueError('Changed official style field: '+name)
@@ -98,6 +116,7 @@ def extract(noise, style, enum, root_sources=None):
             bound = re.search('@'+annotation+r'\(([^)]+)\)', annotations)
             if bound:
                 values[name+'.'+key] = str(float(bound.group(1)))
+    values.update(cellular_rules(style_text))
     for group, raw in (root_sources or {}).items():
         if group not in ROOTS:
             raise ValueError('Unsupported style root group')

@@ -41,7 +41,7 @@ final class NoiseStyleTests {
                 rejects(() -> NoiseStyleFields.editText(PATH,original,target,"zoom",invalid));
             for (String invalid : List.of("0.01561", "64.01", "NaN"))
                 rejects(() -> NoiseStyleFields.editText(PATH,original,target,"exponent",invalid));
-            for (String field : List.of("expression","imageMap","fracture","cacheSize","cellularZoom","cellularFrequency","multiplier"))
+            for (String field : List.of("expression","imageMap","fracture","cacheSize","multiplier"))
                 rejects(() -> NoiseStyleFields.enable(PATH,original,target,field));
             rejects(() -> NoiseStyleFields.editStyle(PATH,original,target,"not-a-style"));
             rejects(() -> NoiseStyleFields.editText(PATH,original,target,"style","2"));

@@ -11,7 +11,26 @@ style = b'''    @Description("Base style")
     @MaxNumber(64)
     @Description("Exponent")
     private double exponent = 1;
+    @Description("Frequency")
+    private double cellularFrequency = 0;
+    @Description("Cell zoom")
+    private double cellularZoom = 1;
     public IrisGeneratorStyle(NoiseStyle s) { this.style = s; }
+    private CNG createNoCache(RNG rng) {
+        if (!Double.isFinite(cellularFrequency) || cellularFrequency < 0D) {
+            throw new IllegalArgumentException("cellularFrequency must be finite and nonnegative");
+        }
+        if (cellularFrequency > 0D) {
+            requirePositiveFinite("cellularZoom", cellularZoom);
+        }
+        CNG cng = null;
+        return cng;
+    }
+    private static void requirePositiveFinite(String field, double value) {
+        if (!Double.isFinite(value) || value <= 0D || !Double.isFinite(1D / value)) {
+            throw new IllegalArgumentException(field + " must be finite and positive");
+        }
+    }
 '''
 enum = b'''public enum NoiseStyle {
     @Description("Iris") IRIS(rng -> nested(")", (rng))),
@@ -23,6 +42,7 @@ assert enum_choices(enum.decode()) == {'IRIS':'Iris', 'FLAT':'Flat'}
 result = extract(noise, style, enum).decode('ascii')
 assert 'noiseDefault=IRIS\n' in result and 'objectDefault=FLAT\n' in result
 assert 'choices=IRIS,FLAT\n' in result and 'zoom.minimum=1e-05\n' in result
+assert 'cellularFrequency.minimum=0.0\n' in result and 'cellularZoom.runtimeRule=positiveFiniteReciprocalWhenActive\n' in result
 
 
 def rejects(noise_source=noise, style_source=style, enum_source=enum):
@@ -41,6 +61,10 @@ rejects(enum_source=enum.replace(b'new IrisGeneratorStyle(this)', b'new IrisGene
 rejects(noise_source=noise.replace(b'NoiseStyle.IRIS.style()', b'new IrisGeneratorStyle()'))
 rejects(style_source=style.replace(b'NoiseStyle.FLAT', b'NoiseStyle.MISSING'))
 rejects(style_source=style.replace(b'this.style = s;', b'this.style = NoiseStyle.FLAT;'))
+rejects(style_source=style.replace(b'cellularFrequency < 0D', b'cellularFrequency <= 0D'))
+rejects(style_source=style.replace(b'cellularFrequency > 0D', b'cellularFrequency >= 0D'))
+rejects(style_source=style.replace(b' || !Double.isFinite(1D / value)', b''))
+rejects(style_source=style.replace(b'value <= 0D', b'value < 0D'))
 print('PASS: noise enum boundaries, defaults and factory assumptions reject changed declarations')
 
 roots = {group: ''.join('    @Description("Placement")\n    private IrisGeneratorStyle '+name+' = NoiseStyle.IRIS.style();\n' for name in names).encode() for group,names in ROOTS.items()}

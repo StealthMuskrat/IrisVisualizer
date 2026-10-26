@@ -7,7 +7,7 @@ import java.util.Properties;
 
 /** Bounded controls on source-audited style objects; no factories or noise algorithms run. */
 public final class NoiseStyleFields {
-    public static final List<String> EDITABLE = List.of("style", "zoom", "exponent");
+    public static final List<String> EDITABLE = List.of("style", "zoom", "exponent", "cellularFrequency", "cellularZoom");
     public static final List<String> OBJECT_FIELDS = List.of("style");
     public static final List<String> DIMENSION_FIELDS = List.of("regionStyle", "continentalStyle", "landBiomeStyle", "shoreBiomeStyle", "seaBiomeStyle", "caveBiomeStyle");
     public static final List<String> BIOME_FIELDS = List.of("childStyle");
@@ -39,6 +39,9 @@ public final class NoiseStyleFields {
                 for (String field : group.equals("dimensions") ? DIMENSION_FIELDS : BIOME_FIELDS)
                     if (!CHOICES.contains(DEFINITIONS.getProperty(group+"."+field+".default", "")))
                         throw new IOException("Missing pinned contextual style default");
+            if (!"finiteNonnegative".equals(DEFINITIONS.getProperty("cellularFrequency.runtimeRule"))
+                    || !"positiveFiniteReciprocalWhenActive".equals(DEFINITIONS.getProperty("cellularZoom.runtimeRule")))
+                throw new IOException("Missing pinned cellular validation rules");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static List<String> choices() { return CHOICES; }
@@ -49,7 +52,8 @@ public final class NoiseStyleFields {
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
     public static String constraints(String field) {
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
-        return "Finite number" + (min == null ? "" : ", minimum " + min) + (max == null ? "" : ", maximum " + max);
+        return "Finite number" + (min == null ? "" : ", minimum " + min) + (max == null ? "" : ", maximum " + max)
+                + (field.equals("cellularZoom") ? "; positive zoom required while cellular frequency > 0" : "");
     }
     public static String defaultToken(String field) {
         if (!EDITABLE.contains(field) || field.equals("style")) throw new IllegalArgumentException("Not a style scalar");
@@ -69,8 +73,12 @@ public final class NoiseStyleFields {
                 if (field.equals("style")) return seeded;
                 container = new LosslessJson(seeded);
             }
-            return container.objectEdit(target.objectField(), style -> field.equals("style")
-                    ? style.enableStringPath("style", objectDefault()) : style.enable(field, defaultToken(field)), false);
+            return container.objectEdit(target.objectField(), style -> {
+                if (field.equals("style")) return style.enableStringPath("style",objectDefault());
+                String token = defaultToken(field);
+                validateCellularChange(style,field,Double.parseDouble(token));
+                return style.enable(field,token);
+            }, false);
         }, true);
     }
     public static byte[] editStyle(String path, byte[] original, NoiseFields.Target target, String value) {
@@ -91,7 +99,26 @@ public final class NoiseStyleFields {
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
         if (!Double.isFinite(value) || (min != null && value < Double.parseDouble(min)) || (max != null && value > Double.parseDouble(max)))
             throw new IllegalArgumentException("Value violates pinned Iris style constraints");
-        return editContainer(original, target, container -> container.objectEdit(target.objectField(), style -> style.number(field, value), false), false);
+        return editContainer(original, target, container -> container.objectEdit(target.objectField(), style -> {
+            validateCellularChange(style,field,value);
+            return style.number(field,value);
+        }, false), false);
+    }
+    private static double numericOrDefault(LosslessJson style, String field) {
+        String token = style.token(field);
+        try { return Double.parseDouble(token == null ? defaultToken(field) : token); }
+        catch (NumberFormatException mismatch) { throw new IllegalArgumentException("Stored "+field+" must be numeric",mismatch); }
+    }
+    private static void validateCellularChange(LosslessJson style, String field, double value) {
+        if (!field.equals("cellularFrequency") && !field.equals("cellularZoom")) return;
+        double frequency = field.equals("cellularFrequency") ? value : numericOrDefault(style,"cellularFrequency");
+        if (!Double.isFinite(frequency) || frequency < 0)
+            throw new IllegalArgumentException("Cellular frequency must be finite and nonnegative");
+        if (frequency > 0) {
+            double zoom = field.equals("cellularZoom") ? value : numericOrDefault(style,"cellularZoom");
+            if (!Double.isFinite(zoom) || zoom <= 0 || !Double.isFinite(1D/zoom))
+                throw new IllegalArgumentException("Cellular zoom must be positive and large enough for a finite reciprocal while frequency > 0");
+        }
     }
     private static byte[] editContainer(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
         return target.noise() == null ? operation.apply(new LosslessJson(original)) : NoiseFields.editObject(original, target.noise(), operation, create);
