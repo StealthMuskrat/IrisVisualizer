@@ -53,6 +53,15 @@ jobs:
           python editor/tools/extract_generator_fields.py IrisGenerator.java IrisInterpolator.java generated-generator.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-generator.properties).Hash -ne (Get-FileHash editor/src/main/resources/generator-fields.properties).Hash) { throw 'Pinned generator definitions differ' }
+      - name: Verify pinned interpolation methods
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/VolmLib/210705c5ab1321dc74b86b48457fd6d5e0452944/shared/src/main/java/art/arcane/volmlib/util/interpolation/InterpolationMethod.java' -OutFile InterpolationMethod.java
+          python editor/tools/test_interpolation_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_interpolation_fields.py IrisInterpolator.java InterpolationMethod.java generated-interpolation.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-interpolation.properties).Hash -ne (Get-FileHash editor/src/main/resources/interpolation-fields.properties).Hash) { throw 'Pinned interpolation definitions differ' }
       - name: Verify pinned region field definitions
         shell: pwsh
         run: |

@@ -41,9 +41,11 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented = {group: set(path for path in paths if '.' not in path) for group, paths in ui.items()}
     implemented['generator'].update(editable(java_dir, 'CompositeNoise'))
     implemented['generator'].update(editable(java_dir, 'NoiseFields', 'OBJECT_FIELDS'))
+    implemented['generator'].update(editable(java_dir, 'InterpolationFields', 'OBJECT_FIELDS'))
     for group in ['importedStructures', 'importedFeatures']:
         implemented[group] = {path.split('.', 1)[1] for path in ui['dimension'] if path.startswith(group + '.')}
     implemented['interpolator'] = {path.split('.', 1)[1] for path in ui['generator'] if path.startswith('interpolator.')}
+    implemented['interpolator'].update(editable(java_dir, 'InterpolationFields'))
     implemented['noise'] = set(editable(java_dir, 'NoiseFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
