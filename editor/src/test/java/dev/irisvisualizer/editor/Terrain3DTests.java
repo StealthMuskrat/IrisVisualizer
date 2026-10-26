@@ -86,6 +86,6 @@ final class Terrain3DTests {
         workspace.replace("biomes/starter.json",bytes("{\"terrain3D\":\"snippet\"}"));
         workspace.save(temp.resolve("terrain-profile"));
         check(new LosslessJson(PackWorkspace.open(temp.resolve("terrain-profile")).read("biomes/starter.json")).token("terrain3D").equals("\"snippet\""));
-        check(FieldCoverage.fields("terrain3D").size()==14 && FieldCoverage.fields("terrain3D").stream().filter(FieldCoverage.Field::implemented).count()==12);
+        check(FieldCoverage.fields("terrain3D").size()==14 && FieldCoverage.fields("terrain3D").stream().filter(FieldCoverage.Field::implemented).count()==14);
     }
 }

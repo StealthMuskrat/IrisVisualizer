@@ -49,6 +49,21 @@ def extract(biome, terrain):
                 if annotated != actual:
                     raise ValueError('Native and annotation bounds differ: '+name)
                 values[name+'.'+key] = str(annotated)
+    for name in ['densityStyle','crackStyle']:
+        declaration = re.search(r'@Description\(("(?:[^"\\]|\\.)*")\)\s+private IrisGeneratorStyle '+name+r' = new IrisGeneratorStyle\(NoiseStyle\.([A-Z][A-Z0-9_]*)\);',text)
+        if not declaration or not re.search(r'validateStyle\('+name+r',\s*"'+name+r'",\s*0\);',text):
+            raise ValueError('Changed terrain style default/validation binding: '+name)
+        values[name+'.default'] = declaration.group(2)
+        values[name+'.description'] = json.loads(declaration.group(1))
+    for name in ['zoom','cellularFrequency','cellularZoom','exponent']:
+        getter = 'get'+name[0].upper()+name[1:]
+        bound = re.search(r'requireRange\(path\s*\+\s*"\.'+name+r'",\s*style\.'+getter+r'\(\),\s*([^,]+),\s*([^)]+)\);',text)
+        if not bound:
+            raise ValueError('Changed terrain-specific style bounds: '+name)
+        for index,key in enumerate(['minimum','maximum']):
+            token = bound.group(index+1).strip()
+            values['style.'+name+'.'+key] = str(sys.float_info.max) if token == 'Double.MAX_VALUE' else str(Decimal(token.removesuffix('D')))
+    values['style.runtimeRule'] = 'nativeTerrainRanges'
     return ''.join(key+'='+value.replace('\\','\\\\').replace('\n','\\n').replace('\r','\\r')+'\n' for key,value in values.items()).encode('ascii')
 
 

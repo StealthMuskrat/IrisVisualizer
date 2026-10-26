@@ -15,6 +15,7 @@ public final class Terrain3DFields {
             if (input == null) throw new IOException("Missing pinned terrain definitions");
             DEFINITIONS.load(input);
             if (!"null".equals(DEFINITIONS.getProperty("profileDefault"))) throw new IOException("Unsupported terrain profile default");
+            if (!"nativeTerrainRanges".equals(DEFINITIONS.getProperty("style.runtimeRule"))) throw new IOException("Missing pinned terrain style bounds");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     private static void authorize(String path) {
@@ -25,6 +26,11 @@ public final class Terrain3DFields {
     }
     public static String description() { return DEFINITIONS.getProperty("description",""); }
     public static String description(String field) { return DEFINITIONS.getProperty(field+".description",""); }
+    public static String styleDefault(String field) {
+        if (!List.of("densityStyle","crackStyle").contains(field)) throw new IllegalArgumentException("Unsupported terrain style");
+        return DEFINITIONS.getProperty(field+".default");
+    }
+    static String styleBound(String field, String bound) { return DEFINITIONS.getProperty("style."+field+"."+bound); }
     public static boolean booleanField(String field) { return "boolean".equals(DEFINITIONS.getProperty(field+".type")); }
     public static String defaultToken(String field) {
         if (!EDITABLE.contains(field)) throw new IllegalArgumentException("Terrain field is read-only");
