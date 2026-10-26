@@ -22,6 +22,16 @@ public final class StarterPack {
         files.put("generators/flat.json", template("generator.json").getBytes(StandardCharsets.UTF_8));
         return PackWorkspace.newPack(files);
     }
+    static byte[] resourceTemplate(String base, String name) throws IOException {
+        String file = switch (base) {
+            case "dimensions" -> "dimension.json";
+            case "regions" -> "region.json";
+            case "biomes" -> "biome.json";
+            case "generators" -> "generator.json";
+            default -> throw new IOException("No pinned template for this resource type");
+        };
+        return template(file).replace("%s", normalizeName(name)).getBytes(StandardCharsets.UTF_8);
+    }
     private static String template(String name) throws IOException {
         try (var input = StarterPack.class.getResourceAsStream("/starter/" + name)) {
             if (input == null) throw new IOException("Missing pinned starter template: " + name);
