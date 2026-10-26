@@ -6,6 +6,16 @@ public final class WorkspaceTests {
  public static void main(String[] args) throws Exception {
   Path temp=Files.createTempDirectory("iris-editor-test-");
   try {
+   String json="{\r\n  \"fluidHeight\" : 50, \"unknown\": {\"fluidHeight\":999}, \"dimensionAngleDeg\": 69, \"text\":\"escaped \\\" quote\"\r\n}";
+   byte[] edited=DimensionFields.edit("dimensions/overworld.json",json.getBytes(),"fluidHeight",63);
+   check(new String(edited).equals(json.replace(" : 50", " : 63")));
+   check(new LosslessJson(edited).token("unknown").equals("{\"fluidHeight\":999}"));
+   check(new LosslessJson("{}".getBytes()).token("fluidHeight")==null);
+   rejects(()->DimensionFields.edit("dimensions/overworld.json",json.getBytes(),"unknown",3));
+   rejects(()->DimensionFields.edit("dimensions/overworld.json",json.getBytes(),"fluidHeight",1.5));
+   rejects(()->DimensionFields.edit("dimensions/overworld.json",json.getBytes(),"fluidHeight",2000));
+   rejects(()->new LosslessJson("{\"x\":1,\"x\":2}".getBytes()));
+   rejects(()->new LosslessJson("{\"x\": [1,]}".getBytes()));
    Path pack=Files.createDirectory(temp.resolve("pack"));Files.createDirectories(pack.resolve("biomes"));Files.createDirectories(pack.resolve("empty"));
    byte[] invalid="{invalid unknown\r\n".getBytes();byte[] binary={0,1,-1,0};
    Files.write(pack.resolve("biomes/a.json"),invalid);Files.write(pack.resolve("asset.iob"),binary);
@@ -21,4 +31,5 @@ public final class WorkspaceTests {
   } finally {try(var paths=Files.walk(temp)){for(Path p:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(p);}}
  }
  private static void check(boolean value){if(!value)throw new AssertionError();}
+ private static void rejects(Runnable operation){try{operation.run();}catch(IllegalArgumentException expected){return;}throw new AssertionError("Invalid edit accepted");}
 }

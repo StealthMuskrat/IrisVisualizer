@@ -18,5 +18,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.1'
+      - name: Verify source-derived field definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimension.java' -OutFile IrisDimension.java
+          python editor/tools/extract_dimension_fields.py IrisDimension.java generated-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-fields.properties).Hash) { throw 'Pinned Iris field definitions differ' }
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes

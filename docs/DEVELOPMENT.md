@@ -28,3 +28,5 @@ Follow the attached specification. Work in larger milestone batches, implementin
 A failed feasibility check must stay visible. If complete standalone generation requires substantial reimplementation, report that boundary and obtain direction under specification §4. Do not substitute a custom generator or silently omit generation features.
 
 The user authorized editor development while unsupported previews stay disabled. The editor workspace/shell is now underway; the renderer remains pending native readiness. The supplied UI images are general design guidance and do not establish generation or rendering parity.
+
+Editor track authorized: desktop shell/workspace implemented; initial lossless dimension field controls and pinned definition extraction implemented. Full schema coverage and audited resource editing remain in progress. Unsupported previews stay disabled.
