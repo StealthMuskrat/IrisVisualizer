@@ -166,7 +166,9 @@ final class NativeIntegratedStructureProof {
                 if (!(nativeBlock instanceof ModdedBlockState actual)) throw new IllegalStateException("Non-native palette state");
                 return handles.computeIfAbsent(actual.handle(), state -> {
                     var handle = mock(NativeBlockState.class);
-                    when(handle.placementHandle()).thenReturn(CraftBlockData.fromData(state));
+                    var craft = mock(CraftBlockData.class);
+                    when(craft.getState()).thenReturn(state);
+                    when(handle.placementHandle()).thenReturn(craft);
                     return handle;
                 });
             }).when(policy).paletteBlock(any(), any(), anyInt(), anyInt(), anyInt());
