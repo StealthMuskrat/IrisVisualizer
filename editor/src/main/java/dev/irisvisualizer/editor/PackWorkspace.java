@@ -8,6 +8,7 @@ import java.util.zip.*;
 /** UI-owned, byte-preserving pack data. Preview validation has no authority over file operations. */
 public final class PackWorkspace {
     private final NavigableMap<String, byte[]> files = new TreeMap<>();
+    private final Set<String> changedDirectories = new HashSet<>();
     private final Set<String> created = new HashSet<>();
     private long resourceRevision;
     private final Set<String> changed = new HashSet<>();
@@ -42,6 +43,20 @@ public final class PackWorkspace {
             files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target); throw failure;
         }
         changed.add(target); created.add(target); resourceRevision++; return target;
+    }
+    public String createSubfolder(String parent, String name) throws IOException {
+        if (!ResourceTypes.folderFamily(parent)) throw new IOException("Subfolders are supported only inside regions, biomes, generators, objects and images; dimensions must stay flat");
+        if (name == null || !name.matches("[a-z0-9_-]+")) throw new IOException("Use lowercase letters, digits, _ or - for a subfolder name");
+        boolean parentExists = directories.contains(parent) || files.keySet().stream().anyMatch(path -> path.startsWith(parent + "/"));
+        if (!parentExists) throw new IOException("Parent folder is not in this workspace");
+        String target = safe(parent + "/" + name);
+        if (directories.contains(target) || files.keySet().stream().anyMatch(path -> path.startsWith(target + "/")))
+            throw new IOException("Folder already exists: " + target);
+        if (directories.size() + files.size() >= MAX_FILES) throw new IOException("Too many pack entries");
+        directories.add(target);
+        try { validatePaths(); }
+        catch (IOException failure) { directories.remove(target); throw failure; }
+        changedDirectories.add(target); resourceRevision++; return target;
     }
     public static PackWorkspace open(Path root) throws IOException {
         root = root.toRealPath();
@@ -92,7 +107,7 @@ public final class PackWorkspace {
     public boolean changed(String path) { return changed.contains(path); }
     public int size(String path) { return Objects.requireNonNull(files.get(path), "Unknown resource").length; }
     public byte[] read(String path) { return Objects.requireNonNull(files.get(path), "Unknown resource").clone(); }
-    public boolean dirty() { return !changed.isEmpty(); }
+    public boolean dirty() { return !changed.isEmpty() || !changedDirectories.isEmpty(); }
     public Path directory() { return directory; }
     /** The schema/policy editor must authorize changes before using this internal byte-storage API. */
     public void replace(String path, byte[] data) throws IOException {
@@ -134,7 +149,7 @@ public final class PackWorkspace {
         }
         directory = target.toRealPath();
         for (var entry : files.entrySet()) savedHashes.put(entry.getKey(), hash(entry.getValue()));
-        changed.clear(); created.clear();
+        changed.clear(); created.clear(); changedDirectories.clear();
     }
     public void exportZip(Path archive) throws IOException { exportZip(archive, false); }
     public void exportZip(Path archive, boolean replaceExisting) throws IOException {
