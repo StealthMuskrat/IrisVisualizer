@@ -25,6 +25,11 @@ public final class LosslessJson {
         String next = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
         return (text.substring(0, span.start()) + next + text.substring(span.end())).getBytes(StandardCharsets.UTF_8);
     }
+    public String stringToken(String field) {
+        Span span = root.get(field);
+        if (span == null) return null;
+        at = span.start(); return string();
+    }
     byte[] stringValue(String field, String value) {
         Span span = root.get(field);
         if (span == null) throw new IllegalArgumentException("String field is absent");
