@@ -32,3 +32,5 @@ The user authorized editor development while unsupported previews stay disabled.
 Editor track authorized: desktop shell/workspace implemented; initial lossless dimension field controls and pinned definition extraction implemented. Full schema coverage and audited resource editing remain in progress. Unsupported previews stay disabled.
 
 Editor field-control verification: Windows run 40378433658 passed compilation, workspace/edit contracts and regeneration of the two pinned source-derived field definitions at cb79133c33af836b1c7171b9983a152bd46837fb. Visual GUI verification and broader schema coverage remain pending; previews remain unavailable.
+
+Editor navigation batch: hierarchical searchable resources, per-resource dirty markers, Save/Discard/Cancel for close/replacement, and visibly disabled preview controls. Pure workspace/resource-index tests pass locally. Windows run 40379021579 passed compilation, workspace/edit/resource-index contracts and pinned definition regeneration at 470a9b0c22d66d352c296499ef19019d141aec68. No preview backend is invoked.

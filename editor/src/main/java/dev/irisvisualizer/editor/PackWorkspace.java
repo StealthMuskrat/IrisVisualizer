@@ -60,6 +60,8 @@ public final class PackWorkspace {
         result.validatePaths(); return result;
     }
     public Set<String> paths() { return Collections.unmodifiableSet(files.navigableKeySet()); }
+    public Set<String> directories() { return Collections.unmodifiableSet(directories); }
+    public boolean changed(String path) { return changed.contains(path); }
     public byte[] read(String path) { return Objects.requireNonNull(files.get(path), "Unknown resource").clone(); }
     public boolean dirty() { return !changed.isEmpty(); }
     public Path directory() { return directory; }
