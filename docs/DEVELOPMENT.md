@@ -8,7 +8,7 @@ Follow the attached specification. Keep batches small, with one concrete deliver
 | 2 — verified | Windows storage compatibility and cleanup | 17 contract assertions, 32 chunk runs with repeatability, source integrity and native boundary checks |
 | 3 — verified | Native registry/terrain feasibility fixture | 35,723 states; full-height 128 × 128 terrain; fresh-JVM repeatability; no history directory |
 | 4a — verified | Real Overworld native context and world-preview readiness gate | 12 regions/378 biomes; typed ancient-city reference; 96 MiB index allocation; 24 contract assertions; preview correctly blocked |
-| 4b.1 — implemented, verification pending | Real Overworld native structure starts and references | Configured ancient-city piece NBT, ownership, full radius-eight origin halo, no history and cleanup |
+| 4b.1 — verified | Real Overworld native structure starts and references | Two ancient-city start NBT comparisons, ownership, 289-origin halo, missing-origin rejection, no history and cleanup |
 | 4b.2 | Complete native world context and Overworld comparison | Finish native block-placement/feature phases, confirm total memory budgets and compare an independent native baseline |
 | 5 | Typed preview context, in-memory isolation and generation scheduler | Latest-edit result, one active task, at most 10 polls/second, bounded caches |
 | 6 | Lossless pack directory and ZIP workspace | Unknown/invalid data and asset preservation; untouched bytes; no file history |

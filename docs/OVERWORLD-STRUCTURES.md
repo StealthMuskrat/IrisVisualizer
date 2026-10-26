@@ -28,4 +28,10 @@ The full terrain height stays unchanged. The earlier 96 MiB index allocation rem
 
 ## Verification status
 
-Windows integration verification is pending for this batch. Passing this probe will establish only native start planning, ownership and references. Native piece block placement, complete placed-feature execution, an independent backend comparison and total memory validation remain required before faithful full-world previews.
+[Windows x64/Java 25 verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40360484125) for executable code commit `ef969e74f5dfa9414ff47040b95478f120264a98`.
+
+Both ancient-city starts contained native pieces and matched complete NBT from direct official factory calls. Ownership fingerprints matched. All 289 halo origins were planned; the missing corner was rejected without publishing references, and the complete grid retained the city origin reference. The additional positive-coordinate city was also retained in the report. Source bytes and the explicit configuration fixture were unchanged, no history router or directory was created, resources closed, and disposable data was deleted. All 24 contract assertions passed locally and on Windows.
+
+The audit still reports four blockers and `previewAllowed=false`; native parity remains `NOT_TESTED`. This result establishes native start planning, ownership and references. Native piece block placement, complete placed-feature execution, an independent backend comparison and total memory validation remain required before faithful full-world previews.
+
+All five Windows suites passed: core repeatability, native boundaries, full-size native fixture, Overworld context audit and real Overworld structure planning.
