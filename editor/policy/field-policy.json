@@ -225,6 +225,10 @@
     "children": {
       "classification": "generation",
       "reason": "Controls child-biome placement through explicit exact-file links; source-default empty lists and documented cycles are preserved."
+    },
+    "terrain3D": {
+      "classification": "generation",
+      "reason": "Optional volumetric terrain profile with explicit activation and bounded scalar editing; nested density and fissure styles remain read-only."
     }
   },
   "generator": {
@@ -505,6 +509,56 @@
     "cellularZoom": {
       "classification": "generation",
       "reason": "Controls cellular noise sampling with source-verified finite/nonnegative frequency and conditionally positive finite-reciprocal zoom constraints."
+    }
+  },
+  "terrain3D": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "amplitude": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "horizontalScale": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "verticalScale": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "crackDepth": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "crackWidth": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "crackScale": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "minimumSlope": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "slopeFade": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "fluidClearance": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
+    },
+    "fluidFade": {
+      "classification": "generation",
+      "reason": "Controls biome volumetric displacement, fissures, slope/fluid gating or exact deterministic seed; bounds are checked against native validation."
     }
   }
 }

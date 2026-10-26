@@ -86,6 +86,15 @@ jobs:
           python editor/tools/extract_style_fields.py IrisNoiseGenerator.java IrisGeneratorStyle.java NoiseStyle.java generated-styles.properties IrisDimension.java IrisBiome.java
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-styles.properties).Hash -ne (Get-FileHash editor/src/main/resources/style-fields.properties).Hash) { throw 'Pinned noise style definitions differ' }
+      - name: Verify pinned 3D terrain profile definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisTerrain3D.java' -OutFile IrisTerrain3D.java
+          python editor/tools/test_terrain3d_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_terrain3d_fields.py IrisBiome.java IrisTerrain3D.java generated-terrain3d.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-terrain3d.properties).Hash -ne (Get-FileHash editor/src/main/resources/terrain3d-fields.properties).Hash) { throw 'Pinned terrain definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
