@@ -1,5 +1,16 @@
 // Adds integration sources to the official probe module without editing Iris sources.
 gradle.projectsEvaluated {
+    if (gradle.rootProject.name == 'VolmLib') {
+        def root = System.getenv('IRIS_VISUALIZER_ROOT')
+        if (!root) throw new GradleException('Use scripts/Test-Feasibility.ps1')
+        def shared = gradle.rootProject.project(':shared')
+        // Compile one official Windows I/O helper from a later revision, keeping the native API pinned.
+        shared.sourceSets.main.java.exclude('art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java')
+        shared.tasks.named('compileJava').configure {
+            source(new File(root, 'compatibility/volmlib/src/main/java/art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java'))
+        }
+        return
+    }
     // Init scripts also run for buildSrc and included builds; touch only the Iris root.
     if (gradle.rootProject.name != 'Iris') return
     def root = System.getenv('IRIS_VISUALIZER_ROOT')

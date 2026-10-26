@@ -17,6 +17,19 @@ foreach ($name in @('iris', 'volmlib', 'pack')) {
     if ($LASTEXITCODE -ne 0 -or $remote -ne $source.repository) { throw "Unexpected origin in $directory" }
     $dirty = & git -C $directory status --porcelain
     if ($LASTEXITCODE -ne 0 -or $dirty) { throw "Refusing to change a modified checkout: $directory" }
+    if ($name -eq 'pack') {
+        # Keep read-only Git object files outside the generation input. The official probe copies input attributes.
+        $metadata = Join-Path $work 'pack-repository'
+        if (Test-Path -LiteralPath (Join-Path $directory '.git') -PathType Container) {
+            if (Test-Path -LiteralPath $metadata) { throw "Refusing to overwrite existing checkout metadata: $metadata" }
+            Invoke-Checked git @('-C', $directory, 'init', '--separate-git-dir', $metadata)
+        }
+        $actualMetadata = & git -C $directory rev-parse --absolute-git-dir
+        if ($LASTEXITCODE -ne 0 -or [System.IO.Path]::GetFullPath($actualMetadata) -ne $metadata -or
+            -not (Test-Path -LiteralPath (Join-Path $directory '.git') -PathType Leaf)) {
+            throw "Pack checkout metadata must be outside the generation input at $metadata"
+        }
+    }
     Invoke-Checked git @('-C', $directory, 'config', 'core.autocrlf', 'false')
     Invoke-Checked git @('-C', $directory, 'fetch', '--depth=1', 'origin', $source.revision)
     Invoke-Checked git @('-C', $directory, 'checkout', '--detach', $source.revision)

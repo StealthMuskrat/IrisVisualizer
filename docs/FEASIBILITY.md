@@ -1,6 +1,6 @@
 # Standalone feasibility gate
 
-Inspection date: 2026-10-26. **The official core generated eight full-height Overworld chunks on Windows. The overall probe failed during shutdown, so repeatability and native parity remain unverified.**
+Inspection date: 2026-10-26. **Windows core generation, fresh-session repeatability, cleanup and the selected native boundary checks passed. Native parity and full-preview cache budgets remain unverified.**
 
 ## Pinned inputs
 
@@ -10,9 +10,10 @@ Inspection date: 2026-10-26. **The official core generated eight full-height Ove
 | Iris source | c3359e0a16438b1bb8468901c6171dcefdf63f7f |
 | Minecraft target | 26.3 |
 | VolmLib source candidate | 210705c5ab1321dc74b86b48457fd6d5e0452944 |
+| Official Windows I/O helper | 0eb8a9282cd549e437ddd7ca0457a7ab79917a5f |
 | Latest Overworld pack | 2e85a52133ad1206c88cad2f50b6f622bea60cb9 |
 
-The initial VolmLib candidate selected by source date failed Windows compilation: Iris requires `intersectsInfluenceRect`, `surfaceAdjustment` and `surfaceCutY`. The corrected pin is the upstream commit titled "Synced structure volume surface API", committed immediately after the Iris release commit. It supplies these methods but has not yet been verified against a released Iris binary. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
+The initial VolmLib candidate selected by source date failed Windows compilation: Iris requires `intersectsInfluenceRect`, `surfaceAdjustment` and `surfaceCutY`. The API-compatible pin (`210705c`) supplied those methods but exposed a Windows directory-flush failure during shutdown. The current build retains that compatible pin and compiles the single unchanged upstream I/O helper from `0eb8a92`. Its exact SHA-256 is recorded separately. A whole-dependency upgrade was rejected because it changes the native terrain API. The dependency combination has not yet been verified against a released Iris binary. Native comparisons must match both the source revision and compatibility-source hash. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
 
 ## Source findings
 
@@ -55,7 +56,7 @@ The smoke test hashes eight complete-height chunks at each of two seeds, repeate
 
 UTF-8 TSV header: `seed`, `chunkX`, `chunkZ`, `minY`, `maxYExclusive`, `blocksSha256`, `biomesSha256`, separated by tabs. Hash the full chunk in X, then Z, then relative-Y ascending order. Encode each original key/state string as UTF-8 followed by a zero byte. Encode absent data as `<null>`; do not substitute a block or biome. Both hashes are full SHA-256 hex. Absolute Y is `minY + relativeY`.
 
-The native properties file must include matching `irisRevision`, `volmlibRevision`, `packRevision`, `packSha256`, `dimension`, `minY`, `maxYExclusive`, plus `backend=native-iris`, `complete=true` and a nonempty `captureProvenance` describing the capture. These declarations require independent verification; the comparator cannot prove the origin of a user-supplied baseline. Never produce a fake baseline by changing a stub report's backend label.
+The native properties file must include matching `irisRevision`, `volmlibRevision`, `volmlibCompatibilitySha256`, `packRevision`, `packSha256`, `dimension`, `minY`, `maxYExclusive`, plus `backend=native-iris`, `complete=true` and a nonempty `captureProvenance` describing the capture. These declarations require independent verification; the comparator cannot prove the origin of a user-supplied baseline. Never produce a fake baseline by changing a stub report's backend label.
 
 ## Source references
 
@@ -79,3 +80,22 @@ The native properties file must include matching `irisRevision`, `volmlibRevisio
 - Source-pack integrity, peak heap and failure details are emitted in the run's `report.properties`; no native parity or final cache-budget claim is made.
 
 The next small batch should use an upstream dependency revision containing both the required structure-volume API and the Windows atomic-write fix, and keep checkout metadata outside generation inputs. Do not suppress the shutdown error or weaken repeatability checks to make CI pass.
+
+## Batch 2: Windows lifecycle compatibility
+
+This batch compiles the unchanged official `IOWorkerSupport.java` from [the Windows atomic-write fix](https://github.com/VolmitSoftware/VolmLib/commit/0eb8a9282cd549e437ddd7ca0457a7ab79917a5f) alongside the API-compatible `210705c` dependency. The helper is byte-for-byte equal to upstream Git blob `4c6fd0dc792e492a6b5f29357ff2750616659987`; source provenance is recorded in `compatibility/README.md` and `iris.lock.json`. No Iris generation source or algorithms are patched.
+
+Source preparation now places the pack checkout's Git object database at `.work/pack-repository`, outside the generation input. Existing clean, verified test checkouts are migrated with Git's `--separate-git-dir`; conflicting metadata is never overwritten. Resource paths and file contents are unchanged. Checkout metadata location is checked before generation.
+
+Per-session TSVs now record and flush completed chunk hashes as they are generated, preserving useful diagnostics if a later chunk or shutdown fails. Partial output never counts as repeatability or native parity. The failing state and strict shutdown checks remain in place.
+
+[Windows verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40348282580) for code commit `c837d5868c676a233d1b1775bd1c6463e8ff3786`:
+
+- All 17 contract assertions passed on Windows x64/Java 25 and locally, including rejection of missing or mismatched compatibility-source hashes.
+- Both seeds (1337 and -8675309) completed eight full-height chunks and fresh-session repeats: 32 chunk generations total. Block and biome hashes matched within each seed across sessions.
+- Engine shutdown and disposable-workspace cleanup completed, and the source-pack fingerprint remained unchanged.
+- All selected native feature, bootstrap and state test classes passed.
+- All eight block and biome hash rows for the first seed matched the earlier batch-1 generation output. This is an I/O-change regression check, not native parity.
+- The published compatibility helper's Git blob exactly matches upstream (`4c6fd0dc792e492a6b5f29357ff2750616659987`).
+
+Generation used the full configured Y range [-256,512). The smoke test still does not establish 128 × 128 performance, 512 × 512 maps, total engine/native memory bounds, or production native parity. The report continues to state `nativeParity=NOT_TESTED` and `cacheBudgetsConfirmed=false`.

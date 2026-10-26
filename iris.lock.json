@@ -10,7 +10,13 @@
   "volmlib": {
     "repository": "https://github.com/VolmitSoftware/VolmLib.git",
     "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
-    "selection": "First upstream source commit supplying the structure-volume surface API required by the Iris release; release binary stamp not yet verified"
+    "selection": "Iris-compatible native API; a single official Windows filesystem helper is overlaid without changing generation sources",
+    "windowsCompatibility": {
+      "sourceRevision": "0eb8a9282cd549e437ddd7ca0457a7ab79917a5f",
+      "upstreamPath": "shared/src/main/java/art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java",
+      "path": "compatibility/volmlib/src/main/java/art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java",
+      "sha256": "1028a5adaecfca17d7e3f42aa349ae24f9aa1ec490d736e58e5e3fe97920271e"
+    }
   },
   "pack": {
     "repository": "https://github.com/IrisDimensions/overworld.git",
