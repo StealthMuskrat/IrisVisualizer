@@ -31,6 +31,7 @@ public final class VisualizerFeasibility {
         report.setProperty("volmlibCompatibilitySha256", requiredEnvironment("IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256", 64));
         report.setProperty("volmlibTemplateServicesSha256", requiredEnvironment("IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256", 64));
         report.setProperty("nativePieceAdapterSha256", requiredEnvironment("IRIS_VISUALIZER_NATIVE_PIECE_ADAPTER_SHA256", 64));
+        report.setProperty("nativeStructureStageAdapterSha256", requiredEnvironment("IRIS_VISUALIZER_NATIVE_STRUCTURE_STAGE_SHA256", 64));
         report.setProperty("packRevision", requiredEnvironment("IRIS_VISUALIZER_PACK_REVISION"));
         report.setProperty("javaRuntime", System.getProperty("java.runtime.version"));
         report.setProperty("dimension", args[1]);

@@ -31,6 +31,7 @@ $env:IRIS_VISUALIZER_VOLMLIB_REVISION = $lock.volmlib.revision
 $env:IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256 = $compatibilityHash
 $env:IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256 = Get-TemplateServicesHash -Root $root -Lock $lock
 $env:IRIS_VISUALIZER_NATIVE_PIECE_ADAPTER_SHA256 = Get-NativePieceAdapterHash -Root $root -Lock $lock
+$env:IRIS_VISUALIZER_NATIVE_STRUCTURE_STAGE_SHA256 = Get-NativeStructureStageHash -Root $root -Lock $lock
 $env:IRIS_VISUALIZER_PACK_REVISION = $lock.pack.revision
 $arguments = @('--no-daemon', '--max-workers=4', '--console=plain',
     '-p', (Join-Path $work 'iris'), '-I', (Join-Path $root 'gradle/feasibility.init.gradle'),

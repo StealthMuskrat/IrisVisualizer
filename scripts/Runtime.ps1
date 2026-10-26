@@ -42,3 +42,10 @@ function Get-NativePieceAdapterHash {
     if ($hash -ne $Lock.nativePieceAdapter.sha256) { throw 'Native piece dispatcher source hash mismatch.' }
     return $hash
 }
+
+function Get-NativeStructureStageHash {
+    param([string]$Root, $Lock)
+    $hash = (Get-FileHash -LiteralPath (Join-Path $Root $Lock.nativeStructureStageAdapter.path) -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($hash -ne $Lock.nativeStructureStageAdapter.sha256) { throw 'Native structure stage adapter source hash mismatch.' }
+    return $hash
+}

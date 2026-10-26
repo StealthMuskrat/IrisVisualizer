@@ -10,7 +10,7 @@
   "volmlib": {
     "repository": "https://github.com/VolmitSoftware/VolmLib.git",
     "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
-    "selection": "Iris-compatible native API; official Windows I/O helper and explicit native template-service overloads, with terrain calculations retained",
+    "selection": "Iris-compatible native API; official Windows I/O helper and explicit native structure host services, with native algorithms retained",
     "windowsCompatibility": {
       "sourceRevision": "0eb8a9282cd549e437ddd7ca0457a7ab79917a5f",
       "upstreamPath": "shared/src/main/java/art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java",
@@ -19,8 +19,8 @@
     },
     "templateServices": {
       "path": "compatibility/volmlib/template-services.json",
-      "sha256": "e10ab7ce7452001e670082c373f571f475957d19ad854ac65fa7416b9a131127",
-      "scope": "Two parameter-injection overlays; default world-based entry points retained"
+      "sha256": "85701ed351eb94ee344418234ce9cb94b76f98df0f654411ba2b9df608d855d4",
+      "scope": "Three native service-injection overlays; full original entry points and native stage algorithms retained"
     }
   },
   "pack": {
@@ -48,5 +48,10 @@
       "path": "paper-server/patches/sources/net/minecraft/world/level/levelgen/structure/StructureStart.java.patch",
       "blob": "a73e4a06613ead7b5b3503b2b8efe9779067c42a"
     }
+  },
+  "nativeStructureStageAdapter": {
+    "path": "native-engine/src/main/java/dev/irisvisualizer/engine/NativeStructureStage.java",
+    "sha256": "2e24b0227ee34766058b956490386600e2a6bbdd9f62020970a1b1302637d112",
+    "scope": "Official full native structure stage with current-session ownership, native palette states, explicit templates and standalone piece dispatch; features remain separate"
   }
 }

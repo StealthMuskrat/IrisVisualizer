@@ -26,6 +26,7 @@ $env:IRIS_VISUALIZER_VOLMLIB_REVISION = $lock.volmlib.revision
 $env:IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256 = $compatibilityHash
 $env:IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256 = Get-TemplateServicesHash -Root $root -Lock $lock
 $env:IRIS_VISUALIZER_NATIVE_PIECE_ADAPTER_SHA256 = Get-NativePieceAdapterHash -Root $root -Lock $lock
+$env:IRIS_VISUALIZER_NATIVE_STRUCTURE_STAGE_SHA256 = Get-NativeStructureStageHash -Root $root -Lock $lock
 $env:IRIS_VISUALIZER_MINECRAFT_VERSION = $lock.minecraft
 $env:IRIS_VISUALIZER_PACK_REVISION = $lock.pack.revision
 $env:IRIS_VISUALIZER_PACK = Join-Path $work 'pack'
@@ -60,12 +61,15 @@ if ($StructurePlanning -or $StructureBlocks) {
 }
 if ($StructureBlocks) {
     foreach ($expected in @('structureBlockBoundaryAudited=true','structureStageComplete=false','partialBlockResultsDiscarded=true',
-            'structureTerrainMissingService=ServerLevel','terrainGenerationAttempted=false',
+            'structureTerrainMissingService=ServerLevel','terrainGenerationAttempted=true',
             'structureBlockFixture=isolated-air-input-not-generated-terrain',
             'templatePreparationPassed=true','templatePreparationCases=2','templatePreparationHashesMatch=true',
             'templateStandaloneServerWorldUsed=false','templatePreparationResultsDiscarded=true',
             'nativePieceDispatchPassed=true','nativePieceDispatchCases=2','nativePieceDispatchHashesMatch=true',
-            'nativePieceDispatchContractPassed=true','nativePieceStandaloneServerWorldUsed=false','nativePieceResultsDiscarded=true')) {
+            'nativePieceDispatchContractPassed=true','nativePieceStandaloneServerWorldUsed=false','nativePieceResultsDiscarded=true',
+            'integratedNativeStructureStagePassed=true','integratedNativeStructureCases=4','integratedGeneratedTerrainChunks=18',
+            'integratedNativeStiltCases=2','integratedNativeHashesMatch=true','integratedNativeBiomesPreserved=true',
+            'integratedFailureInvalidationPassed=true','integratedResultsDiscarded=true')) {
         if ($report -notmatch ('(?m)^' + [regex]::Escape($expected) + '\r?$')) { throw "Missing block-boundary result: $expected" }
     }
     $boundaries = @(Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'structure-block-boundaries.tsv'))
@@ -83,6 +87,12 @@ if ($StructureBlocks) {
             [int]$_.nonAirBlocks -le 0 -or [int]$_.blockStates -lt 2 -or $_.standaloneSha256 -ne $_.legacySha256
         })) { throw 'Native piece dispatch did not match both original-runtime reference cases.' }
     Write-Host 'PASS: standalone native piece dispatch matches the original inactive-plugin-callback path in isolated full-height chunks. Complete native structures/features remain unverified.'
+    $integrated = @(Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'integrated-native-structures.tsv'))
+    if ($integrated.Count -ne 4 -or ($integrated | Where-Object { $_.standaloneSha256 -ne $_.legacySha256 -or $_.beforeSha256 -eq $_.standaloneSha256 }) -or
+            @($integrated | Where-Object { $_.input -eq 'stilt-gap-fixture' -and [int]$_.paletteLookups -gt 0 }).Count -ne 2) {
+        throw 'Integrated native stage did not verify all generated-terrain and stilt cases.'
+    }
+    Write-Host 'PASS: integrated official native structure stage matches legacy block/biome output on generated Iris terrain and native-stilt cases; failure invalidation passed. Complete world/features remain unverified.'
 } elseif ($report -notmatch '(?m)^structureBlocksPlaced=false\r?$' -and $StructurePlanning) {
     throw 'Planning-only proof unexpectedly placed structure blocks.'
 }
