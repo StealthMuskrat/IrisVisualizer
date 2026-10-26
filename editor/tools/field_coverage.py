@@ -44,6 +44,8 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['generator'].update(editable(java_dir, 'NoiseFields', 'OBJECT_FIELDS'))
     implemented['generator'].update(editable(java_dir, 'InterpolationFields', 'OBJECT_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'BiomeGeneratorLinks', 'LIST_FIELDS'))
+    implemented['dimension'].update(editable(java_dir, 'NoiseStyleFields', 'DIMENSION_FIELDS'))
+    implemented['biome'].update(editable(java_dir, 'NoiseStyleFields', 'BIOME_FIELDS'))
     for group in ['importedStructures', 'importedFeatures']:
         implemented[group] = {path.split('.', 1)[1] for path in ui['dimension'] if path.startswith(group + '.')}
     implemented['interpolator'] = {path.split('.', 1)[1] for path in ui['generator'] if path.startswith('interpolator.')}

@@ -170,6 +170,7 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
+                    drawRootStyles(document, true);
                     List<String> readOnly = DimensionFields.readOnlyPaths(document);
                     if (ImGui.collapsingHeader("Read-only fields (" + readOnly.size() + ")"))
                         for (String path : readOnly) ImGui.textWrapped(path);
@@ -386,22 +387,32 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         if (ImGui.treeNode("Style settings##" + target.draftPrefix())) {
-            drawStyleFields(object, target);
+            drawStyleFields(object, NoiseStyleFields.Target.noise(target));
             ImGui.treePop();
         }
     }
-    private void drawStyleFields(LosslessJson noise, NoiseFields.Target target) {
+    private void drawRootStyles(LosslessJson document, boolean dimension) {
+        if (!ImGui.collapsingHeader("Distribution styles")) return;
+        for (String field : dimension ? NoiseStyleFields.DIMENSION_FIELDS : NoiseStyleFields.BIOME_FIELDS) {
+            if (ImGui.treeNode(field)) {
+                drawStyleFields(document, dimension ? NoiseStyleFields.Target.dimension(field) : NoiseStyleFields.Target.biome(field));
+                ImGui.treePop();
+            }
+        }
+    }
+    private void drawStyleFields(LosslessJson container, NoiseStyleFields.Target target) {
         LosslessJson style;
-        try { style = NoiseStyleFields.object(noise); }
+        try { style = NoiseStyleFields.object(container, target); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored style is a snippet or unsupported value (read-only)."); return; }
+        ImGui.textWrapped(NoiseStyleFields.contextDescription(target));
         ImGui.textWrapped("Expression and image-map settings can override the base style. Those, cellular, cache and fracture settings remain read-only.");
         if (style == null) {
-            ImGui.textWrapped("Absent style uses " + NoiseStyleFields.noiseDefault() + ". Enable it explicitly before changing style settings.");
-            if (ImGui.button("Enable style (" + NoiseStyleFields.noiseDefault() + ")")) enableStyle(target, "style");
+            ImGui.textWrapped("Absent style uses " + NoiseStyleFields.contextDefault(target) + ". Enable it explicitly before changing style settings.");
+            if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefault(target) + ")")) enableStyle(target, "style");
             return;
         }
         for (String field : NoiseStyleFields.EDITABLE) {
-            String token = style.token(field), key = target.draftPrefix() + "style." + field;
+            String token = style.token(field), key = target.draftPrefix() + field;
             ImGui.pushID(key); ImGui.text(field);
             if (ImGui.isItemHovered()) ImGui.setTooltip(NoiseStyleFields.description(field));
             if (token == null) {
@@ -436,7 +447,7 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
     }
-    private void enableStyle(NoiseFields.Target target, String field) {
+    private void enableStyle(NoiseStyleFields.Target target, String field) {
         try { workspace.replace(selected, NoiseStyleFields.enable(selected, workspace.read(selected), target, field)); error = null; }
         catch (Exception failure) { error = failure.getMessage(); }
     }
@@ -475,9 +486,10 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        drawRootStyles(document, false);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawBiomeGenerators(LosslessJson document) {
         ImGui.textWrapped(BiomeGeneratorLinks.description());

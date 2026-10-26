@@ -59,7 +59,13 @@ def enum_choices(source):
     return choices
 
 
-def extract(noise, style, enum):
+ROOTS = {
+    'dimensions': ['regionStyle', 'continentalStyle', 'landBiomeStyle', 'shoreBiomeStyle', 'seaBiomeStyle', 'caveBiomeStyle'],
+    'biomes': ['childStyle'],
+}
+
+
+def extract(noise, style, enum, root_sources=None):
     noise_text, style_text, enum_text = (value.decode('utf-8') for value in (noise, style, enum))
     contextual = re.search(r'private IrisGeneratorStyle style = NoiseStyle\.([A-Z][A-Z0-9_]*)\.style\(\);', noise_text)
     default = re.search(r'private NoiseStyle style = NoiseStyle\.([A-Z][A-Z0-9_]*);', style_text)
@@ -92,8 +98,25 @@ def extract(noise, style, enum):
             bound = re.search('@'+annotation+r'\(([^)]+)\)', annotations)
             if bound:
                 values[name+'.'+key] = str(float(bound.group(1)))
+    for group, raw in (root_sources or {}).items():
+        if group not in ROOTS:
+            raise ValueError('Unsupported style root group')
+        values[group+'.sourceSha256'] = hashlib.sha256(raw).hexdigest()
+        text = raw.decode('utf-8')
+        for name in ROOTS[group]:
+            declaration = re.search(r'((?:    @[^\n]+\n)+)    private IrisGeneratorStyle '+name+r' = NoiseStyle\.([A-Z][A-Z0-9_]*)\.style\(\);', text)
+            if not declaration or declaration.group(2) not in choices:
+                raise ValueError('Changed contextual style default: '+group+'.'+name)
+            help_text = re.search(r'@Description\(("(?:[^"\\]|\\.)*")\)', declaration.group(1))
+            if not help_text:
+                raise ValueError('Missing contextual style description')
+            values[group+'.'+name+'.default'] = declaration.group(2)
+            values[group+'.'+name+'.description'] = json.loads(help_text.group(1))
     return ''.join(key+'='+value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')+'\n' for key, value in values.items()).encode('ascii')
 
 
 if __name__ == '__main__':
-    Path(sys.argv[4]).write_bytes(extract(*(Path(value).read_bytes() for value in sys.argv[1:4])))
+    if len(sys.argv) not in (5, 7):
+        raise ValueError('Expected noise, style, enum, output and optional dimension/biome sources')
+    roots = dict(zip(['dimensions','biomes'], (Path(value).read_bytes() for value in sys.argv[5:])))
+    Path(sys.argv[4]).write_bytes(extract(*(Path(value).read_bytes() for value in sys.argv[1:4]), root_sources=roots))
