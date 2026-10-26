@@ -28,6 +28,7 @@ public final class VisualizerFeasibility {
         report.setProperty("backend", "official-iris-core-with-upstream-stub-platform");
         report.setProperty("irisRevision", requiredEnvironment("IRIS_VISUALIZER_IRIS_REVISION"));
         report.setProperty("volmlibRevision", requiredEnvironment("IRIS_VISUALIZER_VOLMLIB_REVISION"));
+        report.setProperty("volmlibCompatibilitySha256", requiredEnvironment("IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256", 64));
         report.setProperty("packRevision", requiredEnvironment("IRIS_VISUALIZER_PACK_REVISION"));
         report.setProperty("javaRuntime", System.getProperty("java.runtime.version"));
         report.setProperty("dimension", args[1]);
@@ -139,8 +140,11 @@ public final class VisualizerFeasibility {
         }
     }
     private static String requiredEnvironment(String name) {
+        return requiredEnvironment(name, 40);
+    }
+    private static String requiredEnvironment(String name, int length) {
         String value = System.getenv(name);
-        if (value == null || !value.matches("[a-f0-9]{40}")) throw new IllegalArgumentException("Missing pinned " + name);
+        if (value == null || !value.matches("[a-f0-9]{" + length + "}")) throw new IllegalArgumentException("Missing pinned " + name);
         return value;
     }
     private static long peakHeapBytes() {

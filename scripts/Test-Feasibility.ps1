@@ -6,6 +6,11 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $work = (Resolve-Path -LiteralPath $WorkDirectory).Path
 $lockPath = Join-Path $root 'iris.lock.json'
 $lock = Get-Content -Raw -LiteralPath $lockPath | ConvertFrom-Json
+$compatibilityFile = Join-Path $root $lock.volmlib.windowsCompatibility.path
+$compatibilityHash = (Get-FileHash -LiteralPath $compatibilityFile -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($compatibilityHash -ne $lock.volmlib.windowsCompatibility.sha256) {
+    throw 'The Windows compatibility source does not match its pinned SHA-256.'
+}
 foreach ($name in @('iris','volmlib','pack')) {
     $actual = & git -C (Join-Path $work $name) rev-parse HEAD
     if ($LASTEXITCODE -ne 0 -or $actual -ne $lock.$name.revision) { throw "Run Prepare-Sources.ps1: $name revision is not pinned." }
@@ -23,6 +28,7 @@ $env:IRIS_VISUALIZER_REPORT = $report
 $env:IRIS_VISUALIZER_PACK = Join-Path $work 'pack'
 $env:IRIS_VISUALIZER_IRIS_REVISION = $lock.iris.revision
 $env:IRIS_VISUALIZER_VOLMLIB_REVISION = $lock.volmlib.revision
+$env:IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256 = $compatibilityHash
 $env:IRIS_VISUALIZER_PACK_REVISION = $lock.pack.revision
 $arguments = @('--no-daemon', '--max-workers=4', '--console=plain',
     '-p', (Join-Path $work 'iris'), '-I', (Join-Path $root 'gradle/feasibility.init.gradle'),

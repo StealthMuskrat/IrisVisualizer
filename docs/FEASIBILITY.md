@@ -9,10 +9,11 @@ Inspection date: 2026-10-26. **The official core generated eight full-height Ove
 | Iris latest stable release | 4.3.5-26.1.2-26.3 |
 | Iris source | c3359e0a16438b1bb8468901c6171dcefdf63f7f |
 | Minecraft target | 26.3 |
-| VolmLib source candidate | 3b4aebec440b73bbe9007ab7aa2a2db1cefa2508 |
+| VolmLib source candidate | 210705c5ab1321dc74b86b48457fd6d5e0452944 |
+| Official Windows I/O helper | 0eb8a9282cd549e437ddd7ca0457a7ab79917a5f |
 | Latest Overworld pack | 2e85a52133ad1206c88cad2f50b6f622bea60cb9 |
 
-The initial VolmLib candidate selected by source date failed Windows compilation: Iris requires `intersectsInfluenceRect`, `surfaceAdjustment` and `surfaceCutY`. The API-compatible pin (`210705c`) supplied those methods but exposed a Windows directory-flush failure during shutdown. The current pin (`3b4aebe`) merges both the required API and the upstream Windows atomic-write fix. It has not yet been verified against a released Iris binary. This changes the pinned dependency baseline; hashes from the earlier dependency are not an interchangeable native baseline. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
+The initial VolmLib candidate selected by source date failed Windows compilation: Iris requires `intersectsInfluenceRect`, `surfaceAdjustment` and `surfaceCutY`. The API-compatible pin (`210705c`) supplied those methods but exposed a Windows directory-flush failure during shutdown. The current build retains that compatible pin and compiles the single unchanged upstream I/O helper from `0eb8a92`. Its exact SHA-256 is recorded separately. A whole-dependency upgrade was rejected because it changes the native terrain API. The dependency combination has not yet been verified against a released Iris binary. Native comparisons must match both the source revision and compatibility-source hash. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
 
 ## Source findings
 
@@ -55,7 +56,7 @@ The smoke test hashes eight complete-height chunks at each of two seeds, repeate
 
 UTF-8 TSV header: `seed`, `chunkX`, `chunkZ`, `minY`, `maxYExclusive`, `blocksSha256`, `biomesSha256`, separated by tabs. Hash the full chunk in X, then Z, then relative-Y ascending order. Encode each original key/state string as UTF-8 followed by a zero byte. Encode absent data as `<null>`; do not substitute a block or biome. Both hashes are full SHA-256 hex. Absolute Y is `minY + relativeY`.
 
-The native properties file must include matching `irisRevision`, `volmlibRevision`, `packRevision`, `packSha256`, `dimension`, `minY`, `maxYExclusive`, plus `backend=native-iris`, `complete=true` and a nonempty `captureProvenance` describing the capture. These declarations require independent verification; the comparator cannot prove the origin of a user-supplied baseline. Never produce a fake baseline by changing a stub report's backend label.
+The native properties file must include matching `irisRevision`, `volmlibRevision`, `volmlibCompatibilitySha256`, `packRevision`, `packSha256`, `dimension`, `minY`, `maxYExclusive`, plus `backend=native-iris`, `complete=true` and a nonempty `captureProvenance` describing the capture. These declarations require independent verification; the comparator cannot prove the origin of a user-supplied baseline. Never produce a fake baseline by changing a stub report's backend label.
 
 ## Source references
 
@@ -82,7 +83,7 @@ The next small batch should use an upstream dependency revision containing both 
 
 ## Batch 2: Windows lifecycle compatibility
 
-This batch selects upstream VolmLib merge `3b4aebec440b73bbe9007ab7aa2a2db1cefa2508`, which includes both the required structure-volume API and [the Windows atomic-write fix](https://github.com/VolmitSoftware/VolmLib/commit/0eb8a9282cd549e437ddd7ca0457a7ab79917a5f). No Iris generation source or algorithms are patched.
+This batch compiles the unchanged official `IOWorkerSupport.java` from [the Windows atomic-write fix](https://github.com/VolmitSoftware/VolmLib/commit/0eb8a9282cd549e437ddd7ca0457a7ab79917a5f) alongside the API-compatible `210705c` dependency. The helper is byte-for-byte equal to upstream Git blob `4c6fd0dc792e492a6b5f29357ff2750616659987`; source provenance is recorded in `compatibility/README.md` and `iris.lock.json`. No Iris generation source or algorithms are patched.
 
 Source preparation now places the pack checkout's Git object database at `.work/pack-repository`, outside the generation input. Existing clean, verified test checkouts are migrated with Git's `--separate-git-dir`; conflicting metadata is never overwritten. Resource paths and file contents are unchanged. Checkout metadata location is checked before generation.
 
