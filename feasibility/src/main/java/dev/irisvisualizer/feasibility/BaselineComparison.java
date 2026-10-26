@@ -29,7 +29,7 @@ public final class BaselineComparison {
         if (provenance.isBlank()) throw new IllegalArgumentException("Native capture provenance is required");
         if (!"CORE_STUB_REPEATABILITY_PASSED".equals(candidate.getProperty("status")))
             throw new IllegalArgumentException("Candidate probe did not pass repeatability");
-        for (String field : List.of("irisRevision", "volmlibRevision", "volmlibCompatibilitySha256", "volmlibTemplateServicesSha256", "packRevision", "packSha256", "dimension", "minY", "maxYExclusive")) {
+        for (String field : List.of("irisRevision", "volmlibRevision", "volmlibCompatibilitySha256", "volmlibTemplateServicesSha256", "nativePieceAdapterSha256", "packRevision", "packSha256", "dimension", "minY", "maxYExclusive")) {
             String value = candidate.getProperty(field);
             if (value == null || value.isBlank() || !value.equals(baseline.getProperty(field)))
                 throw new IllegalArgumentException("Baseline context mismatch: " + field);

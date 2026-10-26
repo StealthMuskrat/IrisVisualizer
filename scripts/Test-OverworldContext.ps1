@@ -25,6 +25,7 @@ $env:IRIS_VISUALIZER_IRIS_REVISION = $lock.iris.revision
 $env:IRIS_VISUALIZER_VOLMLIB_REVISION = $lock.volmlib.revision
 $env:IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256 = $compatibilityHash
 $env:IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256 = Get-TemplateServicesHash -Root $root -Lock $lock
+$env:IRIS_VISUALIZER_NATIVE_PIECE_ADAPTER_SHA256 = Get-NativePieceAdapterHash -Root $root -Lock $lock
 $env:IRIS_VISUALIZER_MINECRAFT_VERSION = $lock.minecraft
 $env:IRIS_VISUALIZER_PACK_REVISION = $lock.pack.revision
 $env:IRIS_VISUALIZER_PACK = Join-Path $work 'pack'
@@ -62,7 +63,9 @@ if ($StructureBlocks) {
             'structureTerrainMissingService=ServerLevel','terrainGenerationAttempted=false',
             'structureBlockFixture=isolated-air-input-not-generated-terrain',
             'templatePreparationPassed=true','templatePreparationCases=2','templatePreparationHashesMatch=true',
-            'templateStandaloneServerWorldUsed=false','templatePreparationResultsDiscarded=true')) {
+            'templateStandaloneServerWorldUsed=false','templatePreparationResultsDiscarded=true',
+            'nativePieceDispatchPassed=true','nativePieceDispatchCases=2','nativePieceDispatchHashesMatch=true',
+            'nativePieceDispatchContractPassed=true','nativePieceStandaloneServerWorldUsed=false','nativePieceResultsDiscarded=true')) {
         if ($report -notmatch ('(?m)^' + [regex]::Escape($expected) + '\r?$')) { throw "Missing block-boundary result: $expected" }
     }
     $boundaries = @(Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'structure-block-boundaries.tsv'))
@@ -75,6 +78,11 @@ if ($StructureBlocks) {
             [int]$_.carvedBlocks -le 0 -or [int]$_.templateRequests -le 0 -or $_.standaloneSha256 -ne $_.legacySha256
         })) { throw 'Explicit native template preparation did not match both legacy reference cases.' }
     Write-Host 'PASS: standalone native template preparation carved solid fixture blocks identically to the legacy lookup path at negative and positive origins. Complete structure placement remains blocked.'
+    $pieces = @(Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'native-piece-dispatch.tsv'))
+    if ($pieces.Count -ne 2 -or ($pieces | Where-Object {
+            [int]$_.nonAirBlocks -le 0 -or [int]$_.blockStates -lt 2 -or $_.standaloneSha256 -ne $_.legacySha256
+        })) { throw 'Native piece dispatch did not match both original-runtime reference cases.' }
+    Write-Host 'PASS: standalone native piece dispatch matches the original inactive-plugin-callback path in isolated full-height chunks. Complete native structures/features remain unverified.'
 } elseif ($report -notmatch '(?m)^structureBlocksPlaced=false\r?$' -and $StructurePlanning) {
     throw 'Planning-only proof unexpectedly placed structure blocks.'
 }
