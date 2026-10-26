@@ -1,0 +1,10 @@
+plugins { id 'application' }
+repositories { mavenCentral() }
+dependencies { implementation 'io.github.spair:imgui-java-app:1.92.7.1' }
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+application { mainClass = 'dev.irisvisualizer.editor.EditorApp' }
+tasks.register('workspaceTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.irisvisualizer.editor.WorkspaceTests'
+}
