@@ -211,6 +211,14 @@ public final class LosslessJson {
         Span span = root.get(field);
         return splice(span.start(), span.end(), next);
     }
+    /** Explicitly enables an absent or null optional object; other stored types remain untouched. */
+    byte[] enableObject(String field) {
+        String original = token(field);
+        if (original == null) return insertObject(field,"{}");
+        if (!original.equals("null")) throw new IllegalArgumentException("Optional object is already present or has an unsupported type");
+        Span span = root.get(field);
+        return splice(span.start(),span.end(),"{}");
+    }
     byte[] objectArrayEdit(String field, int index, java.util.function.Function<LosslessJson, byte[]> operation) {
         List<LosslessJson> objects = objectArray(field);
         if (index < 0 || index >= objects.size()) throw new IllegalArgumentException("Array index out of range");
