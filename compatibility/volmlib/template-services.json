@@ -1,7 +1,7 @@
 {
   "format": 1,
   "upstreamRevision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
-  "purpose": "Explicit template service injection; native terrain calculations and legacy world lookups retained",
+  "purpose": "Explicit template, ownership, palette and native piece services; full native structure-stage ordering and calculations retained",
   "files": [
     {
       "path": "art/arcane/volmlib/nativelib/v26_3_R1/terrain/NativeStructureTerrainIntegrator.java",
@@ -21,7 +21,7 @@
     {
       "path": "art/arcane/volmlib/nativelib/v26_3_R1/terrain/NativeStructurePostProcessor.java",
       "upstreamSha256": "fc4acebb7f104edce129deee2a64d3e0af7a9fca5d86bfad700802e1edff1939",
-      "patchedSha256": "7685210d933359b69a1c32853c30a3c328101fce439d78a996dbc520dadd2737",
+      "patchedSha256": "d0f4da4214499d43a24e2ead231e9d8f01fb245c74af55b86acb938abc6565c4",
       "edits": [
         {
           "before": "import java.util.List;",
@@ -42,8 +42,51 @@
         {
           "before": "world, area, targets, () -> world.getLevel().getStructureTemplateManager());",
           "after": "world, area, targets, templates);"
+        },
+        {
+          "before": "                             IntBinaryOperator surfaceHeight) {\n        StructureStiltSettings stilt",
+          "after": "                             IntBinaryOperator surfaceHeight) {\n        place(world, structureManager, generator, random, area, chunkPos, structureId, start, decision,\n                paletteBlockResolver, surfaceHeight, StructureStart::placeInChunk);\n    }\n\n    @FunctionalInterface\n    public interface PiecePlacer {\n        void place(StructureStart start, WorldGenLevel world, StructureManager manager, ChunkGenerator generator,\n                   WorldgenRandom random, BoundingBox area, ChunkPos chunk);\n    }\n\n    public static void place(WorldGenLevel world, StructureManager structureManager, ChunkGenerator generator,\n                             WorldgenRandom random, BoundingBox area, ChunkPos chunkPos, String structureId,\n                             StructureStart start, StructurePlacementDecision decision,\n                             NativeStructureTerrainIntegrator.PaletteBlockResolver paletteBlockResolver,\n                             IntBinaryOperator surfaceHeight, PiecePlacer pieces) {\n        StructureStiltSettings stilt"
+        },
+        {
+          "before": "        start.placeInChunk(world, structureManager, generator, random, area, chunkPos);",
+          "after": "        pieces.place(start, world, structureManager, generator, random, area, chunkPos);"
         }
       ]
+    },
+    {
+      "path": "art/arcane/volmlib/nativelib/v26_3_R1/terrain/NativeBukkitStructureStage.java",
+      "edits": [
+        {
+          "before": "import java.util.Objects;",
+          "after": "import java.util.Objects;\nimport java.util.function.Supplier;"
+        },
+        {
+          "before": "    public void placeVanillaStructures(WorldGenLevel world, ChunkAccess chunk, StructureManager structureManager) {\n        if (!structureManager",
+          "after": "    @FunctionalInterface\n    public interface OwnershipResolver<O> {\n        O resolve(String key, Structure structure, StructureStart start);\n    }\n\n    public record StandaloneServices<O>(OwnershipResolver<O> ownership,\n            Supplier<StructureTemplateManager> templates, NativeStructurePostProcessor.PiecePlacer pieces,\n            NativeStructureTerrainIntegrator.PaletteBlockResolver palette) {\n        public StandaloneServices {\n            Objects.requireNonNull(ownership); Objects.requireNonNull(templates);\n            Objects.requireNonNull(pieces); Objects.requireNonNull(palette);\n        }\n    }\n\n    public void placeVanillaStructures(WorldGenLevel world, ChunkAccess chunk, StructureManager structureManager) {\n        placeStandaloneStructures(world, chunk, structureManager, new StandaloneServices<>(\n                (key, structure, start) -> NativeStructureOwnershipRecovery.resolve(\n                        policy.structurePolicy(policy.current()), world.getLevel(), key, structure, start),\n                () -> world.getLevel().getStructureTemplateManager(), StructureStart::placeInChunk, this::resolvePaletteBlock));\n    }\n\n    /** Explicit host services; the existing native stage ordering and error handling are retained. */\n    public void placeStandaloneStructures(WorldGenLevel world, ChunkAccess chunk, StructureManager structureManager,\n                                         StandaloneServices<O> services) {\n        if (!structureManager"
+        },
+        {
+          "before": "                                NativeStructureOwnershipRecovery.resolve(\n                    policy.structurePolicy(policy.current()), world.getLevel(), structureId, structure, start);",
+          "after": "                                services.ownership().resolve(structureId, structure, start);"
+        },
+        {
+          "before": "                        boundedWorld, area, terrainTargets, this::resolvePaletteBlock);",
+          "after": "                        boundedWorld, area, terrainTargets, services.palette(), services.templates());"
+        },
+        {
+          "before": "                                group.structureId(), placement.start(), placement.decision());",
+          "after": "                                group.structureId(), placement.start(), placement.decision(), services);"
+        },
+        {
+          "before": "                                       StructurePlacementDecision decision) {\n        world.setCurrentlyGenerating",
+          "after": "                                       StructurePlacementDecision decision, StandaloneServices<O> services) {\n        world.setCurrentlyGenerating"
+        },
+        {
+          "before": "                    structureId, start, decision, this::resolvePaletteBlock,\n                    policy.surfaceHeight(policy.current()));",
+          "after": "                    structureId, start, decision, services.palette(),\n                    policy.surfaceHeight(policy.current()), services.pieces());"
+        }
+      ],
+      "upstreamSha256": "1770e43f4cc436e6bc5536075639824d5b7d6049eca6f06a9fadfec9c2485c55",
+      "patchedSha256": "4ac6f5bc44d2d5ebfb57b8ce4b8cb1fa7a3b9341ec08aaf4a5c4e379d58e64da"
     }
   ]
 }

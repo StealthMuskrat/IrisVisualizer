@@ -50,6 +50,7 @@ public final class NativeOverworldContextAudit {
         report.setProperty("volmlibCompatibilitySha256", NativeFixtureProof.required("IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256"));
         report.setProperty("volmlibTemplateServicesSha256", NativeFixtureProof.required("IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256"));
         report.setProperty("nativePieceAdapterSha256", NativeFixtureProof.required("IRIS_VISUALIZER_NATIVE_PIECE_ADAPTER_SHA256"));
+        report.setProperty("nativeStructureStageAdapterSha256", NativeFixtureProof.required("IRIS_VISUALIZER_NATIVE_STRUCTURE_STAGE_SHA256"));
         report.setProperty("packRevision", NativeFixtureProof.required("IRIS_VISUALIZER_PACK_REVISION"));
         report.setProperty("packSha256", before);
         report.setProperty("dimension", "overworld");

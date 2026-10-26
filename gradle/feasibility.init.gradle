@@ -78,6 +78,9 @@ gradle.projectsEvaluated {
     def dispatcherSource = new File(root, nativeLock.nativePieceAdapter.path)
     if (java.security.MessageDigest.getInstance('SHA-256').digest(dispatcherSource.bytes).encodeHex().toString() != nativeLock.nativePieceAdapter.sha256)
         throw new GradleException('Native piece dispatcher source hash mismatch')
+    def structureStageSource = new File(root, nativeLock.nativeStructureStageAdapter.path)
+    if (java.security.MessageDigest.getInstance('SHA-256').digest(structureStageSource.bytes).encodeHex().toString() != nativeLock.nativeStructureStageAdapter.sha256)
+        throw new GradleException('Native structure stage adapter source hash mismatch')
     nativeProject.sourceSets.offline.java.srcDir(new File(root, 'native-engine/src/main/java'))
     // Reference-side test double only; never part of the future desktop application.
     nativeProject.dependencies.add('offlineImplementation', 'org.mockito:mockito-core:5.23.0')

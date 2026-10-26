@@ -53,7 +53,7 @@ public final class ContractTests {
         BaselineComparison.compareRows(multiple, List.of(header,multiple.get(2),multiple.get(1)));
 
         Properties candidate = new Properties(), baseline = new Properties();
-        for (String field : List.of("irisRevision","volmlibRevision","volmlibCompatibilitySha256","volmlibTemplateServicesSha256","nativePieceAdapterSha256","packRevision","packSha256","dimension","minY","maxYExclusive")) {
+        for (String field : List.of("irisRevision","volmlibRevision","volmlibCompatibilitySha256","volmlibTemplateServicesSha256","nativePieceAdapterSha256","nativeStructureStageAdapterSha256","packRevision","packSha256","dimension","minY","maxYExclusive")) {
             candidate.setProperty(field, "fixture-" + field);
             baseline.setProperty(field, "fixture-" + field);
         }
@@ -77,6 +77,11 @@ public final class ContractTests {
         baseline.setProperty("nativePieceAdapterSha256", "different-piece-dispatcher");
         rejects(() -> BaselineComparison.compareMetadata(candidate, baseline));
         baseline.setProperty("nativePieceAdapterSha256", candidate.getProperty("nativePieceAdapterSha256"));
+        baseline.remove("nativeStructureStageAdapterSha256");
+        rejects(() -> BaselineComparison.compareMetadata(candidate, baseline));
+        baseline.setProperty("nativeStructureStageAdapterSha256", "different-full-structure-stage");
+        rejects(() -> BaselineComparison.compareMetadata(candidate, baseline));
+        baseline.setProperty("nativeStructureStageAdapterSha256", candidate.getProperty("nativeStructureStageAdapterSha256"));
         baseline.setProperty("backend", "official-iris-core-with-upstream-stub-platform");
         rejects(() -> BaselineComparison.compareMetadata(candidate, baseline));
         baseline.setProperty("backend", "native-iris");

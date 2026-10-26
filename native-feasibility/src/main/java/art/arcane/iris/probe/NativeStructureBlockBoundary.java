@@ -117,6 +117,7 @@ final class NativeStructureBlockBoundary {
         report.setProperty("isolatedPieceStatus", results.get(1).status());
         NativeTemplatePreparationProof.run(context, dimension, List.of(planned, other), output, report);
         NativePieceDispatchProof.run(context, dimension, List.of(planned, other), output, report);
+        NativeIntegratedStructureProof.run(context, dimension, List.of(planned, other), output, report);
     }
 
     static WorldgenRandom decorationRandom(HeadlessTerrainContext context, Structure structure, ChunkPos center) {
