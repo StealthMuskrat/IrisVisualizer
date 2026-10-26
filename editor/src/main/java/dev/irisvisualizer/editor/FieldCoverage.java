@@ -28,7 +28,7 @@ public final class FieldCoverage {
         return switch (base) {
             case "dimensions" -> List.of("dimension", "importedStructures", "importedFeatures");
             case "biomes" -> List.of("biome", "biomeGeneratorLink");
-            case "generators" -> List.of("generator", "interpolator");
+            case "generators" -> List.of("generator", "interpolator", "noise");
             case "regions" -> List.of("region");
             default -> List.of();
         };

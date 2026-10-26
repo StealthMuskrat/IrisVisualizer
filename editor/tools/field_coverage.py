@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in eight pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in nine pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -16,6 +16,7 @@ SOURCES = {
  'generator': 'generation/noise/IrisGenerator.java',
  'interpolator': 'generation/noise/IrisInterpolator.java',
  'region': 'generation/terrain/IrisRegion.java',
+ 'noise': 'generation/noise/IrisNoiseGenerator.java',
 }
 
 def declared_fields(text):
@@ -41,9 +42,10 @@ def run(source_dir, policy_file, java_dir, output_dir):
     for group in ['importedStructures', 'importedFeatures']:
         implemented[group] = {path.split('.', 1)[1] for path in ui['dimension'] if path.startswith(group + '.')}
     implemented['interpolator'] = {path.split('.', 1)[1] for path in ui['generator'] if path.startswith('interpolator.')}
+    implemented['noise'] = set(editable(java_dir, 'NoiseFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in eight pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in nine pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

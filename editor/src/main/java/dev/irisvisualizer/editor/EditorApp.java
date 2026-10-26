@@ -266,7 +266,44 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
-        ImGui.textWrapped("Composite noise, interpolation methods and other fields remain read-only.");
+        if (document.token("composite") != null && ImGui.collapsingHeader("Composite noise entries")) drawNoise(document);
+        ImGui.textWrapped("Noise styles, fracture trees, interpolation methods and other fields remain read-only.");
+    }
+    private void drawNoise(LosslessJson document) {
+        List<LosslessJson> entries;
+        try { entries = document.objectArray("composite"); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Composite contains snippet/non-object entries (read-only)."); return; }
+        for (int index=0;index<entries.size();index++) {
+            if (!ImGui.treeNode("Noise entry " + index)) continue;
+            LosslessJson object = entries.get(index);
+            for (String field : NoiseFields.EDITABLE) {
+                String token = object.token(field), key = "composite#" + index + "." + field;
+                ImGui.pushID(key); ImGui.text(field);
+                if (ImGui.isItemHovered()) ImGui.setTooltip(NoiseFields.description(field));
+                if (token == null) {
+                    if (ImGui.button("Enable (" + NoiseFields.defaultToken(field) + ")")) {
+                        try { workspace.replace(selected, NoiseFields.enable(selected, workspace.read(selected), index, field)); error = null; }
+                        catch (Exception failure) { error = failure.getMessage(); }
+                    }
+                } else if (NoiseFields.booleanField(field)) {
+                    if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored type mismatch (read-only)");
+                    else if (ImGui.checkbox("Enabled", token.equals("true"))) {
+                        try { workspace.replace(selected, NoiseFields.editBoolean(selected, workspace.read(selected), index, field, !token.equals("true"))); error = null; }
+                        catch (Exception failure) { error = failure.getMessage(); }
+                    }
+                } else {
+                    ImGui.textWrapped(NoiseFields.constraints(field));
+                    ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
+                    ImGui.inputText("Value", input); drafts.update(key, token, input.get());
+                    if (ImGui.button("Apply")) {
+                        try { workspace.replace(selected, NoiseFields.editText(selected, workspace.read(selected), index, field, input.get())); drafts.applied(key); values.remove(key); error = null; }
+                        catch (Exception failure) { error = failure.getMessage(); }
+                    }
+                }
+                ImGui.popID();
+            }
+            ImGui.treePop();
+        }
     }
     private void drawBiome(LosslessJson document) {
         for (String field : BiomeFields.EDITABLE) {
@@ -475,7 +512,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
