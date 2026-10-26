@@ -1,0 +1,7 @@
+{
+  "name": "%s",
+  "version": 1,
+  "regions": ["starter"],
+  "logicalHeight": 384,
+  "dimensionHeight": {"min": -64, "max": 320}
+}

@@ -1,0 +1,7 @@
+{
+  "name": "Starter Plains",
+  "layers": [{"palette": [{"block": "minecraft:grass_block"}]}],
+  "generators": [{"generator": "flat", "min": 96, "max": 96}],
+  "derivative": "minecraft:plains",
+  "vanillaDerivative": "minecraft:plains"
+}

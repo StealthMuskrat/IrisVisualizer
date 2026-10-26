@@ -17,6 +17,15 @@ public final class PackWorkspace {
     public static final int MAX_FILES = 100_000;
 
     public static PackWorkspace empty() { return new PackWorkspace(); }
+    static PackWorkspace newPack(Map<String, byte[]> content) throws IOException {
+        PackWorkspace result = empty(); long bytes = 0;
+        for (var entry : content.entrySet()) {
+            bytes += entry.getValue().length;
+            if (bytes > MAX_BYTES) throw new IOException("Pack exceeds workspace limit");
+            String path = safe(entry.getKey()); result.add(path, entry.getValue().clone()); result.changed.add(path);
+        }
+        result.validatePaths(); return result;
+    }
     public static PackWorkspace open(Path root) throws IOException {
         root = root.toRealPath();
         if (!Files.isDirectory(root)) throw new IOException("Select a pack directory");
