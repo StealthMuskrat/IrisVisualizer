@@ -28,3 +28,10 @@ function Invoke-Checked {
     & $Program @Arguments
     if ($LASTEXITCODE -ne 0) { throw "$Program failed with exit code $LASTEXITCODE" }
 }
+
+function Get-TemplateServicesHash {
+    param([string]$Root, $Lock)
+    $hash = (Get-FileHash -LiteralPath (Join-Path $Root $Lock.volmlib.templateServices.path) -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($hash -ne $Lock.volmlib.templateServices.sha256) { throw 'Native template service manifest hash mismatch.' }
+    return $hash
+}

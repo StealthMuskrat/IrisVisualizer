@@ -29,6 +29,7 @@ public final class VisualizerFeasibility {
         report.setProperty("irisRevision", requiredEnvironment("IRIS_VISUALIZER_IRIS_REVISION"));
         report.setProperty("volmlibRevision", requiredEnvironment("IRIS_VISUALIZER_VOLMLIB_REVISION"));
         report.setProperty("volmlibCompatibilitySha256", requiredEnvironment("IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256", 64));
+        report.setProperty("volmlibTemplateServicesSha256", requiredEnvironment("IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256", 64));
         report.setProperty("packRevision", requiredEnvironment("IRIS_VISUALIZER_PACK_REVISION"));
         report.setProperty("javaRuntime", System.getProperty("java.runtime.version"));
         report.setProperty("dimension", args[1]);

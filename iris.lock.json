@@ -10,12 +10,17 @@
   "volmlib": {
     "repository": "https://github.com/VolmitSoftware/VolmLib.git",
     "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
-    "selection": "Iris-compatible native API; a single official Windows filesystem helper is overlaid without changing generation sources",
+    "selection": "Iris-compatible native API; official Windows I/O helper and explicit native template-service overloads, with terrain calculations retained",
     "windowsCompatibility": {
       "sourceRevision": "0eb8a9282cd549e437ddd7ca0457a7ab79917a5f",
       "upstreamPath": "shared/src/main/java/art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java",
       "path": "compatibility/volmlib/src/main/java/art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java",
       "sha256": "1028a5adaecfca17d7e3f42aa349ae24f9aa1ec490d736e58e5e3fe97920271e"
+    },
+    "templateServices": {
+      "path": "compatibility/volmlib/template-services.json",
+      "sha256": "e10ab7ce7452001e670082c373f571f475957d19ad854ac65fa7416b9a131127",
+      "scope": "Two parameter-injection overlays; default world-based entry points retained"
     }
   },
   "pack": {

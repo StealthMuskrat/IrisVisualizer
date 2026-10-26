@@ -24,6 +24,7 @@ $env:IRIS_VISUALIZER_IRIS_VERSION = $lock.iris.version
 $env:IRIS_VISUALIZER_IRIS_REVISION = $lock.iris.revision
 $env:IRIS_VISUALIZER_VOLMLIB_REVISION = $lock.volmlib.revision
 $env:IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256 = $compatibilityHash
+$env:IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256 = Get-TemplateServicesHash -Root $root -Lock $lock
 $env:IRIS_VISUALIZER_MINECRAFT_VERSION = $lock.minecraft
 $env:IRIS_VISUALIZER_PACK_REVISION = $lock.pack.revision
 $env:IRIS_VISUALIZER_PACK = Join-Path $work 'pack'
@@ -59,7 +60,9 @@ if ($StructurePlanning -or $StructureBlocks) {
 if ($StructureBlocks) {
     foreach ($expected in @('structureBlockBoundaryAudited=true','structureStageComplete=false','partialBlockResultsDiscarded=true',
             'structureTerrainMissingService=ServerLevel','terrainGenerationAttempted=false',
-            'structureBlockFixture=isolated-air-input-not-generated-terrain')) {
+            'structureBlockFixture=isolated-air-input-not-generated-terrain',
+            'templatePreparationPassed=true','templatePreparationCases=2','templatePreparationHashesMatch=true',
+            'templateStandaloneServerWorldUsed=false','templatePreparationResultsDiscarded=true')) {
         if ($report -notmatch ('(?m)^' + [regex]::Escape($expected) + '\r?$')) { throw "Missing block-boundary result: $expected" }
     }
     $boundaries = @(Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'structure-block-boundaries.tsv'))
@@ -67,6 +70,11 @@ if ($StructureBlocks) {
             $_.phase -eq 'terrain-preparation' -and $_.status -eq 'BLOCKED' -and $_.missingService -eq 'ServerLevel'
         })) { throw 'Native structure terrain dependency was not captured.' }
     Write-Host 'PASS: real-pack structure block service boundary audited. Isolated partial results are discarded; this does not establish a complete structure stage.'
+    $templates = @(Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'template-preparation.tsv'))
+    if ($templates.Count -ne 2 -or ($templates | Where-Object {
+            [int]$_.carvedBlocks -le 0 -or [int]$_.templateRequests -le 0 -or $_.standaloneSha256 -ne $_.legacySha256
+        })) { throw 'Explicit native template preparation did not match both legacy reference cases.' }
+    Write-Host 'PASS: standalone native template preparation carved solid fixture blocks identically to the legacy lookup path at negative and positive origins. Complete structure placement remains blocked.'
 } elseif ($report -notmatch '(?m)^structureBlocksPlaced=false\r?$' -and $StructurePlanning) {
     throw 'Planning-only proof unexpectedly placed structure blocks.'
 }

@@ -24,6 +24,7 @@ $env:IRIS_VISUALIZER_IRIS_VERSION = $lock.iris.version
 $env:IRIS_VISUALIZER_IRIS_REVISION = $lock.iris.revision
 $env:IRIS_VISUALIZER_VOLMLIB_REVISION = $lock.volmlib.revision
 $env:IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256 = $compatibilityHash
+$env:IRIS_VISUALIZER_VOLMLIB_TEMPLATE_SERVICES_SHA256 = Get-TemplateServicesHash -Root $root -Lock $lock
 $env:IRIS_VISUALIZER_MINECRAFT_VERSION = $lock.minecraft
 $env:IRIS_VISUALIZER_NATIVE_FIXTURE = Join-Path (Join-Path $work 'iris') $lock.nativeFixture.sourcePath
 $env:IRIS_VISUALIZER_NATIVE_FIXTURE_SHA256 = $lock.nativeFixture.sha256
