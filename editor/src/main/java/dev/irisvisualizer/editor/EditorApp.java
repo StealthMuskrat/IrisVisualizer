@@ -6,6 +6,8 @@ import imgui.app.Configuration;
 import imgui.app.WindowGlfw;
 import imgui.flag.ImGuiTreeNodeFlags;
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import org.lwjgl.system.MemoryUtil;
 import java.util.List;
 import imgui.type.ImString;
 import java.util.HashMap;
@@ -19,6 +21,50 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private PackWorkspace imageWorkspace;
+    private String imagePath, imageError;
+    private int imageTexture, imageWidth, imageHeight;
+    private void clearImage() {
+        if (imageTexture != 0) glDeleteTextures(imageTexture);
+        imageTexture = 0; imageError = null;
+    }
+    @Override protected void disposeImGui() { clearImage(); super.disposeImGui(); }
+    private void drawImageAsset() {
+        if (imageWorkspace != workspace || !java.util.Objects.equals(imagePath, selected)) {
+            clearImage(); imageWorkspace = workspace; imagePath = selected;
+            if (AssetImage.supportedPath(selected)) {
+                try {
+                    if (workspace.size(selected) > AssetImage.MAX_ENCODED_BYTES) throw new IllegalArgumentException("Asset image exceeds 16 MiB encoded limit");
+                    AssetImage.Decoded image = AssetImage.decode(workspace.read(selected));
+                    if (image.width() > glGetInteger(GL_MAX_TEXTURE_SIZE) || image.height() > glGetInteger(GL_MAX_TEXTURE_SIZE))
+                        throw new IllegalArgumentException("Image exceeds this GPU's texture size limit");
+                    int previous = glGetInteger(GL_TEXTURE_BINDING_2D), alignment = glGetInteger(GL_UNPACK_ALIGNMENT);
+                    var buffer = MemoryUtil.memAlloc(image.width() * image.height() * 4);
+                    try {
+                        buffer.put(image.rgba()).flip(); imageTexture = glGenTextures();
+                        glBindTexture(GL_TEXTURE_2D, imageTexture); glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width(), image.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+                        if (glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH) != image.width())
+                            throw new IllegalStateException("GPU image allocation failed");
+                        imageWidth = image.width(); imageHeight = image.height();
+                    } finally {
+                        glBindTexture(GL_TEXTURE_2D, previous); glPixelStorei(GL_UNPACK_ALIGNMENT, alignment); MemoryUtil.memFree(buffer);
+                    }
+                } catch (Exception failure) { clearImage(); imageError = failure.getMessage(); }
+            }
+        }
+        if (!AssetImage.supportedPath(selected)) return;
+        ImGui.separator(); ImGui.textWrapped("Read-only image asset — first frame");
+        if (imageError != null) { ImGui.textWrapped(imageError); return; }
+        if (imageTexture != 0) {
+            ImGui.text(imageWidth + " × " + imageHeight + " pixels");
+            float scale = Math.min(1f, Math.min(Math.max(1, ImGui.getContentRegionAvailX()) / imageWidth,
+                    Math.max(1, ImGui.getContentRegionAvailY() - 24) / imageHeight));
+            ImGui.image((long)imageTexture, imageWidth * scale, imageHeight * scale);
+        }
+    }
     private boolean styled, closeRequested;
     private final ImString filter = new ImString(256);
     private String indexedFilter;
@@ -67,14 +113,16 @@ public final class EditorApp extends Application {
         ImGui.beginDisabled();
         ImGui.button("2D preview"); ImGui.sameLine(); ImGui.button("3D preview");
         ImGui.endDisabled();
+        drawImageAsset();
         ImGui.end();
         ImGui.setNextWindowPos(width * .72f, 24); ImGui.setNextWindowSize(width * .28f, height);
         ImGui.begin("Resource inspector");
         if (selected != null) {
             ImGui.text(selected);
             ImGui.textWrapped("Unknown and unclassified fields are read-only.");
-            byte[] bytes = workspace.read(selected);
-            if (DimensionFields.dimension(selected)) {
+            int byteCount = workspace.size(selected);
+            byte[] bytes = selected.endsWith(".json") && byteCount <= 1_000_000 ? workspace.read(selected) : null;
+            if (bytes != null && DimensionFields.dimension(selected)) {
                 try {
                     LosslessJson document = new LosslessJson(bytes);
                     for (String field : DimensionFields.EDITABLE) {
@@ -119,10 +167,13 @@ public final class EditorApp extends Application {
                     ImGui.textWrapped("Apply text changes before saving. Toggles apply immediately.");
                 } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
-            if (selected.endsWith(".json") && bytes.length <= 1_000_000) {
+            if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
                     ImGui.textWrapped(new String(workspace.read(selected), StandardCharsets.UTF_8));
-            } else ImGui.text(bytes.length + " bytes");
+            } else {
+                ImGui.text(byteCount + " bytes");
+                if (selected.endsWith(".json")) ImGui.textWrapped("JSON inspection is limited to 1 MB; original bytes remain saveable/exportable.");
+            }
         }
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
