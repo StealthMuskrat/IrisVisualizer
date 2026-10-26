@@ -1,5 +1,7 @@
 package dev.irisvisualizer.feasibility;
 
+import dev.irisvisualizer.engine.PreviewReadiness;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -70,6 +72,19 @@ public final class ContractTests {
         baseline.setProperty("backend", "native-iris");
         baseline.setProperty("packSha256", "other-pack");
         rejects(() -> BaselineComparison.compareMetadata(candidate, baseline));
+        var nativePlacement = new PreviewReadiness.NativePlacement("dimensions", "overworld",
+                "/structures/0/nativeStructures/0/structure", "minecraft:ancient_city");
+        var blocked = PreviewReadiness.evaluateWorld("overworld", new PreviewReadiness.Capabilities(false, false, false), List.of(nativePlacement));
+        equal(false, blocked.previewAllowed());
+        equal(4, blocked.blockers().size());
+        equal(nativePlacement.propertyPath(), blocked.blockers().stream()
+                .filter(issue -> issue.code() == PreviewReadiness.Code.NATIVE_PLACEMENT_INCOMPLETE).findFirst().orElseThrow().propertyPath());
+        equal(3, PreviewReadiness.evaluateWorld("overworld", new PreviewReadiness.Capabilities(false, false, false), List.of()).blockers().size());
+        equal(List.of(PreviewReadiness.Code.NATIVE_BASELINE_MISSING), PreviewReadiness.evaluateWorld("overworld",
+                new PreviewReadiness.Capabilities(true, false, true), List.of(nativePlacement)).blockers().stream().map(PreviewReadiness.Issue::code).toList());
+        equal(List.of(PreviewReadiness.Code.MEMORY_BUDGET_UNCONFIRMED), PreviewReadiness.evaluateWorld("overworld",
+                new PreviewReadiness.Capabilities(true, true, false), List.of(nativePlacement)).blockers().stream().map(PreviewReadiness.Issue::code).toList());
+        equal(true, PreviewReadiness.evaluateWorld("overworld", new PreviewReadiness.Capabilities(true, true, true), List.of(nativePlacement)).previewAllowed());
         System.out.println("PASS: " + checks + " contract assertions (no native generation or parity claim)");
     }
     private static void equal(Object expected, Object actual) {

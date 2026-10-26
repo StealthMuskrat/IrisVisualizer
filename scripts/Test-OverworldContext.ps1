@@ -1,0 +1,46 @@
+param([string]$WorkDirectory = (Join-Path $PSScriptRoot '../.work'))
+. (Join-Path $PSScriptRoot 'Runtime.ps1')
+$java = Get-Java25
+$env:JAVA_HOME = Split-Path (Split-Path $java -Parent) -Parent
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$work = (Resolve-Path -LiteralPath $WorkDirectory).Path
+$lockPath = Join-Path $root 'iris.lock.json'
+$lock = Get-Content -Raw -LiteralPath $lockPath | ConvertFrom-Json
+foreach ($name in @('iris','volmlib','pack')) {
+    $directory = Join-Path $work $name
+    $actual = & git -C $directory rev-parse HEAD
+    if ($LASTEXITCODE -ne 0 -or $actual -ne $lock.$name.revision) { throw "Unpinned $name checkout. Run Prepare-Sources.ps1." }
+    $dirty = & git -C $directory status --porcelain
+    if ($LASTEXITCODE -ne 0 -or $dirty) { throw "Modified $name checkout; refusing a nonreproducible native audit." }
+}
+$compatibilityHash = (Get-FileHash -LiteralPath (Join-Path $root $lock.volmlib.windowsCompatibility.path) -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($compatibilityHash -ne $lock.volmlib.windowsCompatibility.sha256) { throw 'Windows compatibility source hash mismatch.' }
+$reportRoot = Join-Path $root 'build/overworld-context'
+if (Test-Path -LiteralPath $reportRoot) { throw 'build/overworld-context exists. Remove generated output explicitly before another audit.' }
+$null = New-Item -ItemType Directory -Force -Path $reportRoot
+Copy-Item -LiteralPath $lockPath -Destination (Join-Path $reportRoot 'inputs.lock.json')
+$env:IRIS_VISUALIZER_ROOT = $root
+$env:IRIS_VISUALIZER_IRIS_VERSION = $lock.iris.version
+$env:IRIS_VISUALIZER_IRIS_REVISION = $lock.iris.revision
+$env:IRIS_VISUALIZER_VOLMLIB_REVISION = $lock.volmlib.revision
+$env:IRIS_VISUALIZER_VOLMLIB_COMPATIBILITY_SHA256 = $compatibilityHash
+$env:IRIS_VISUALIZER_MINECRAFT_VERSION = $lock.minecraft
+$env:IRIS_VISUALIZER_PACK_REVISION = $lock.pack.revision
+$env:IRIS_VISUALIZER_PACK = Join-Path $work 'pack'
+$env:IRIS_VISUALIZER_OVERWORLD_REPORT = $reportRoot
+Invoke-Checked (Join-Path $work 'iris/gradlew.bat') @('--no-daemon', '--max-workers=4', '--console=plain',
+    '-p', (Join-Path $work 'iris'), '-I', (Join-Path $root 'gradle/feasibility.init.gradle'),
+    "-PlocalVolmLibDirectory=$(Join-Path $work 'volmlib')", ':adapters:bukkit:nms:v26_3_R1:visualizerOverworldContext')
+$report = Get-Content -Raw -LiteralPath (Join-Path $reportRoot 'report.properties')
+foreach ($expected in @('status=NATIVE_OVERWORLD_CONTEXT_AUDIT_PASSED','previewAllowed=false','sourcePackUnchanged=true','nativeRegistryContractLoaded=true')) {
+    if ($report -notmatch ('(?m)^' + [regex]::Escape($expected) + '\r?$')) { throw "Missing audit result: $expected" }
+}
+$placements = Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'native-placements.tsv')
+if (-not ($placements | Where-Object { $_.structureKey -eq 'minecraft:ancient_city' })) {
+    throw 'Pinned Overworld audit failed to identify its native ancient-city placement.'
+}
+$blockers = Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'preview-blockers.tsv')
+foreach ($code in @('NATIVE_WORLD_INCOMPLETE','NATIVE_PLACEMENT_INCOMPLETE','NATIVE_BASELINE_MISSING','MEMORY_BUDGET_UNCONFIRMED')) {
+    if (-not ($blockers | Where-Object { $_.code -eq $code })) { throw "Missing preview blocker: $code" }
+}
+Write-Host 'PASS: native Overworld context audit and readiness gate. Complete native preview remains blocked; parity is not claimed.'

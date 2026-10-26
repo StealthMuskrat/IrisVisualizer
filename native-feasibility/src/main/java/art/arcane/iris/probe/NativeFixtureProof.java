@@ -236,7 +236,7 @@ public final class NativeFixtureProof {
     private static void update(MessageDigest digest, String key) {
         digest.update(key.getBytes(StandardCharsets.UTF_8)); digest.update((byte) 0);
     }
-    private static void requireNoReports(IrisEngine engine) throws Exception {
+    static void requireNoReports(IrisEngine engine) throws Exception {
         var errors = engine == null ? RealPackProbeSupport.drainReported() : RealPackProbeSupport.settleAndDrain(engine);
         if (!errors.isEmpty()) {
             var failure = new IllegalStateException("Native fixture reported " + errors.size() + " error(s)");
@@ -244,19 +244,21 @@ public final class NativeFixtureProof {
         }
         requireNoServer();
     }
-    private static void requireNoServer() {
+    static void requireNoServer() {
         if (Bukkit.getServer() != null) throw new IllegalStateException("Native fixture must not run a Minecraft server");
     }
-    private static String required(String name) {
+    static String required(String name) {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) throw new IllegalArgumentException("Missing pinned " + name);
         return value;
     }
-    private static void copyFixture(Path source, Path target) throws Exception {
+    static void copyFixture(Path source, Path target) throws Exception {
         try (var paths = Files.walk(source)) {
             for (Path path : paths.toList()) {
+                Path relative = source.relativize(path);
+                if (!relative.toString().isEmpty() && relative.getName(0).toString().equals(".git")) continue;
                 if (Files.isSymbolicLink(path)) throw new IllegalArgumentException("Fixture contains a symlink: " + path);
-                Path destination = target.resolve(source.relativize(path));
+                Path destination = target.resolve(relative);
                 if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) Files.createDirectories(destination);
                 else if (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) Files.copy(path, destination);
                 else throw new IllegalArgumentException("Unsupported fixture file: " + path);
