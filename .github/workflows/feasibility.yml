@@ -53,10 +53,10 @@ jobs:
         if: matrix.suite == 'overworld-context'
         shell: pwsh
         run: ./scripts/Test-OverworldContext.ps1
-      - name: Check real Overworld native structure planning
+      - name: Check real Overworld structure planning and block boundaries
         if: matrix.suite == 'overworld-structures'
         shell: pwsh
-        run: ./scripts/Test-OverworldContext.ps1 -StructurePlanning
+        run: ./scripts/Test-OverworldContext.ps1 -StructureBlocks
       - name: Preserve diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,5 +69,6 @@ jobs:
             build/native-fixture/
             build/overworld-context/
             build/overworld-structures/
+            build/overworld-blocks/
             .work/iris/adapters/bukkit/nms/v26_3_R1/build/reports/tests/
             .work/iris/adapters/bukkit/nms/v26_3_R1/build/test-results/

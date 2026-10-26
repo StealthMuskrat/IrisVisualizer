@@ -40,7 +40,7 @@ final class NativeOverworldStructureProof {
     private NativeOverworldStructureProof() {}
 
     static void run(IrisData data, IrisDimension dimension, HeadlessNativeRuntime runtime,
-                    Path scratch, Path output, Properties report) throws Exception {
+                    Path scratch, Path output, Properties report, boolean auditBlocks) throws Exception {
         report.setProperty("structurePlanningAttempted", "true");
         report.setProperty("structureBlocksPlaced", "false");
         report.setProperty("featuresGenerated", "false");
@@ -109,6 +109,7 @@ final class NativeOverworldStructureProof {
                 report.setProperty("missingOriginHaloRejected", "true");
                 report.setProperty("ancientCityOriginReferenceRetained", "true");
                 report.setProperty("structurePlanningPassed", "true");
+                if (auditBlocks) NativeStructureBlockBoundary.run(context, dimension, first, output, report);
             }
             NativeFixtureProof.requireNoReports(engine);
         }

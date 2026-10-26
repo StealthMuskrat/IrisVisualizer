@@ -29,9 +29,10 @@ public final class NativeOverworldContextAudit {
     private static volatile Object retainedIndexBuffers;
     private NativeOverworldContextAudit() {}
     public static void main(String[] args) throws Exception {
-        if (args.length != 2 && !(args.length == 3 && args[2].equals("structures")))
-            throw new IllegalArgumentException("Expected: pinned-overworld-pack report-directory [structures]");
+        if (args.length != 2 && !(args.length == 3 && List.of("structures", "blocks").contains(args[2])))
+            throw new IllegalArgumentException("Expected: pinned-overworld-pack report-directory [structures|blocks]");
         boolean structures = args.length == 3;
+        boolean blocks = structures && args[2].equals("blocks");
         if (!System.getProperty("os.name").startsWith("Windows") || Runtime.version().feature() != 25
                 || !List.of("amd64", "x86_64").contains(System.getProperty("os.arch")))
             throw new IllegalStateException("Windows x64 and Java 25 are required");
@@ -56,7 +57,7 @@ public final class NativeOverworldContextAudit {
             Path pack = scratch.resolve("pack");
             NativeFixtureProof.copyFixture(source, pack);
             if (!before.equals(PackFingerprint.sha256(pack))) throw new IllegalStateException("Pack data changed while copying the native input");
-            inspect(pack, scratch, output, report, structures);
+            inspect(pack, scratch, output, report, structures, blocks);
             ProbeWorkspaceCleanup.deleteRecursively(scratch);
             if (Files.exists(scratch)) throw new IllegalStateException("Overworld context workspace was not deleted");
             NativeFixtureProof.requireNoServer();
@@ -87,7 +88,7 @@ public final class NativeOverworldContextAudit {
         }
         System.out.println("NATIVE_OVERWORLD_CONTEXT_AUDIT_PASSED previewAllowed=false nativeParity=NOT_TESTED sourcePackUnchanged=true");
     }
-    private static void inspect(Path pack, Path scratch, Path output, Properties report, boolean structures) throws Exception {
+    private static void inspect(Path pack, Path scratch, Path output, Properties report, boolean structures, boolean blocks) throws Exception {
         NativeFixtureProof.requireNoServer();
         try (var workspace = RealPackProbeSupport.openPreparedWorkspace(pack.toFile(), "overworld", "[overworld-context]", false);
              var runtime = new HeadlessNativeRuntime()) {
@@ -136,7 +137,7 @@ public final class NativeOverworldContextAudit {
                 writeDiagnostics(output, nativePlacements, readiness);
                 checkIndexAllocation(dimension, report);
                 retainedIndexBuffers = null;
-                if (structures) NativeOverworldStructureProof.run(data, dimension, runtime, scratch, output, report);
+                if (structures) NativeOverworldStructureProof.run(data, dimension, runtime, scratch, output, report, blocks);
                 System.out.println("[overworld-context] native registry contract loaded; regions=" + regions.size()
                         + " biomes=" + biomes.size() + " nativePlacements=" + nativePlacements.size()
                         + " previewBlockers=" + readiness.blockers().size());
