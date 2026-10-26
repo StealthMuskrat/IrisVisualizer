@@ -3,7 +3,7 @@ package dev.irisvisualizer.editor;
 import java.io.IOException;
 import java.util.*;
 
-/** Audited biome policy. Unknown fields, palette data and references remain read-only. */
+/** Audited biome scalars and generator height ranges; other editing has separate bounded policies. */
 public final class BiomeFields {
     private static final Properties DEFINITIONS = new Properties();
     static {
@@ -46,9 +46,16 @@ public final class BiomeFields {
     }
     public static byte[] generatorRange(String path, byte[] original, int index, double minimum, double maximum) {
         if (!biome(path)) throw new IllegalArgumentException("Resource is read-only");
-        checkNumber("generators.min", minimum); checkNumber("generators.max", maximum);
-        if (minimum > maximum) throw new IllegalArgumentException("Generator minimum must not exceed maximum");
+        validateGeneratorRange(minimum, maximum);
         byte[] next = new LosslessJson(original).objectArrayNumber("generators", index, "min", minimum);
         return new LosslessJson(next).objectArrayNumber("generators", index, "max", maximum);
+    }
+    static void validateGeneratorRange(double minimum, double maximum) {
+        checkNumber("generators.min", minimum); checkNumber("generators.max", maximum);
+        if (minimum > maximum) throw new IllegalArgumentException("Generator minimum must not exceed maximum");
+    }
+    public static String generatorDefault(String field) {
+        if (!Set.of("min", "max").contains(field)) throw new IllegalArgumentException("Not a generator height field");
+        return new java.math.BigDecimal(DEFINITIONS.getProperty("generators."+field+".default")).stripTrailingZeros().toPlainString();
     }
 }

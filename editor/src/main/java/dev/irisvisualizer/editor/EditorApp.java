@@ -475,34 +475,99 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
-        if (document.token("generators") != null && ImGui.collapsingHeader("Generator height ranges")) {
-            try {
-                List<LosslessJson> links = document.objectArray("generators");
-                for (int index=0;index<links.size();index++) {
-                    var link = links.get(index); String key = "generator#" + index;
-                    ImGui.pushID(key); ImGui.textWrapped("Generator " + index + ": " + link.token("generator"));
-                    if (link.token("min") == null || link.token("max") == null) ImGui.textWrapped("Absent range fields remain read-only.");
-                    else {
-                        String minKey = key + ".min", maxKey = key + ".max";
-                        ImString minimum = values.computeIfAbsent(minKey, ignored -> new ImString(link.token("min"), 128));
-                        ImString maximum = values.computeIfAbsent(maxKey, ignored -> new ImString(link.token("max"), 128));
-                        ImGui.inputText("Minimum", minimum); drafts.update(minKey, link.token("min"), minimum.get());
-                        if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description("generators.min"));
-                        ImGui.inputText("Maximum", maximum); drafts.update(maxKey, link.token("max"), maximum.get());
-                        if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description("generators.max"));
-                        if (ImGui.button("Apply height range")) {
-                            try {
-                                workspace.replace(selected, BiomeFields.generatorRange(selected, workspace.read(selected), index, Double.parseDouble(minimum.get()), Double.parseDouble(maximum.get())));
-                                drafts.applied(minKey); drafts.applied(maxKey); values.remove(minKey); values.remove(maxKey); error = null;
-                            } catch (Exception failure) { error = failure.getMessage(); }
-                        }
-                    }
-                    ImGui.popID();
-                }
-            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Generator list contains unsupported non-object entries (read-only)."); }
-        }
+        if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
             for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawBiomeGenerators(LosslessJson document) {
+        ImGui.textWrapped(BiomeGeneratorLinks.description());
+        ImGui.textWrapped("Choose exact in-pack generator files. Aliases and target contents are not checked.");
+        if (document.token("generators") == null) {
+            ImGui.textWrapped("Absent list uses Iris's one default link (" + BiomeGeneratorLinks.defaultGenerator() + "). Enable it explicitly before editing.");
+            if (ImGui.button("Enable default generator list")) {
+                try { commitBiomeGenerators(BiomeGeneratorLinks.enable(selected, workspace.read(selected)), false); }
+                catch (Exception failure) { error = failure.getMessage(); }
+            }
+            return;
+        }
+        List<LosslessJson> links;
+        try { links = document.objectArray("generators"); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Generator list contains unsupported non-object entries (read-only)."); return; }
+        for (int index=0;index<links.size();index++) {
+            var link = links.get(index); String key = "generator#" + index;
+            ImGui.pushID(key); ImGui.text("Link " + index);
+            BiomeGeneratorLinks.Action action = null;
+            if (ImGui.button("Duplicate")) action = BiomeGeneratorLinks.Action.DUPLICATE;
+            ImGui.sameLine(); ImGui.beginDisabled(links.size() <= BiomeGeneratorLinks.minimumEntries());
+            if (ImGui.button("Remove")) action = BiomeGeneratorLinks.Action.REMOVE;
+            ImGui.endDisabled(); ImGui.beginDisabled(index == 0);
+            if (ImGui.button("Move up")) action = BiomeGeneratorLinks.Action.UP;
+            ImGui.endDisabled(); ImGui.sameLine(); ImGui.beginDisabled(index == links.size()-1);
+            if (ImGui.button("Move down")) action = BiomeGeneratorLinks.Action.DOWN;
+            ImGui.endDisabled();
+            if (action != null) {
+                ImGui.popID();
+                try { commitBiomeGenerators(BiomeGeneratorLinks.change(selected, workspace.read(selected), index, action), false); }
+                catch (Exception failure) { error = failure.getMessage(); }
+                return;
+            }
+            try {
+                String current = link.stringToken("generator");
+                String preview = current == null ? "Absent (default: " + BiomeGeneratorLinks.defaultGenerator() + ")" : current.length()>128 ? "Long stored reference" : current;
+                if (ImGui.beginCombo("Generator", preview)) {
+                    for (String choice : BiomeGeneratorLinks.choices(workspace)) {
+                        if (ImGui.selectable(choice, choice.equals(current))) {
+                            try { workspace.replace(selected, BiomeGeneratorLinks.assign(selected, workspace.read(selected), index, workspace, choice)); error = null; }
+                            catch (Exception failure) { error = failure.getMessage(); }
+                        }
+                    }
+                    ImGui.endCombo();
+                }
+            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored generator reference is not a string (read-only)."); }
+            String minimumToken = link.token("min"), maximumToken = link.token("max");
+            String storedMin = minimumToken == null ? BiomeFields.generatorDefault("min") : minimumToken;
+            String storedMax = maximumToken == null ? BiomeFields.generatorDefault("max") : maximumToken;
+            String minKey = key + ".min", maxKey = key + ".max";
+            ImString minimum = values.computeIfAbsent(minKey, ignored -> new ImString(storedMin, 128));
+            ImString maximum = values.computeIfAbsent(maxKey, ignored -> new ImString(storedMax, 128));
+            ImGui.inputText("Minimum", minimum); drafts.update(minKey, storedMin, minimum.get());
+            if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description("generators.min"));
+            ImGui.inputText("Maximum", maximum); drafts.update(maxKey, storedMax, maximum.get());
+            if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description("generators.max"));
+            if (ImGui.button(minimumToken == null || maximumToken == null ? "Apply/enable height range" : "Apply height range")) {
+                try {
+                    workspace.replace(selected, BiomeGeneratorLinks.range(selected, workspace.read(selected), index, Double.parseDouble(minimum.get()), Double.parseDouble(maximum.get())));
+                    drafts.applied(minKey); drafts.applied(maxKey); values.remove(minKey); values.remove(maxKey); error = null;
+                } catch (Exception failure) { error = failure.getMessage(); }
+            }
+            ImGui.popID(); ImGui.separator();
+        }
+        drawNewBiomeGenerator();
+    }
+    private void drawNewBiomeGenerator() {
+        String prefix = "generator#new.";
+        ImGui.pushID(prefix);
+        ImString reference = values.computeIfAbsent(prefix+"ref", ignored -> new ImString(16_384));
+        ImString minimum = values.computeIfAbsent(prefix+"min", ignored -> new ImString(BiomeFields.generatorDefault("min"),128));
+        ImString maximum = values.computeIfAbsent(prefix+"max", ignored -> new ImString(BiomeFields.generatorDefault("max"),128));
+        if (ImGui.beginCombo("New generator", reference.get().isEmpty() ? "Choose resource" : reference.get())) {
+            for (String choice : BiomeGeneratorLinks.choices(workspace)) if (ImGui.selectable(choice,choice.equals(reference.get()))) reference.set(choice);
+            ImGui.endCombo();
+        }
+        ImGui.inputText("New minimum",minimum); ImGui.inputText("New maximum",maximum);
+        drafts.update(prefix+"ref","",reference.get());
+        drafts.update(prefix+"min",BiomeFields.generatorDefault("min"),minimum.get());
+        drafts.update(prefix+"max",BiomeFields.generatorDefault("max"),maximum.get());
+        if (ImGui.button("Add generator link")) {
+            try { commitBiomeGenerators(BiomeGeneratorLinks.add(selected,workspace.read(selected),workspace,reference.get(),Double.parseDouble(minimum.get()),Double.parseDouble(maximum.get())),true); }
+            catch (Exception failure) { error = failure.getMessage(); }
+        }
+        ImGui.popID();
+    }
+    private void commitBiomeGenerators(byte[] next, boolean includesNewForm) throws java.io.IOException {
+        if (drafts.transitionUnder("generator#", () -> discardListDrafts("generator",key -> includesNewForm && key.startsWith("generator#new.")), () -> workspace.replace(selected,next))) {
+            values.keySet().removeIf(key -> key.startsWith("generator#")); error = null;
+        }
     }
     private void drawArray(String field, LosslessJson document) {
         List<String> entries;
@@ -618,8 +683,11 @@ public final class EditorApp extends Application {
         catch (Exception failure) { error = failure.getMessage(); }
     }
     private boolean discardArrayDrafts(String field, String appliedKey) {
+        return discardListDrafts(field, key -> key.equals(appliedKey));
+    }
+    private boolean discardListDrafts(String field, java.util.function.Predicate<String> included) {
         boolean other = values.entrySet().stream().anyMatch(entry -> entry.getKey().startsWith(field + "#")
-                && !entry.getKey().equals(appliedKey) && drafts.contains(entry.getKey()));
+                && !included.test(entry.getKey()) && drafts.contains(entry.getKey()));
         return !other || JOptionPane.showConfirmDialog(null, "This changes list positions and discards other unapplied text in this list. Continue?",
                 "Unapplied text", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
     }
@@ -693,7 +761,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

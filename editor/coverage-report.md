@@ -7,8 +7,8 @@ Direct nonstatic/nontransient private fields in ten pinned source classes only. 
 | dimension | 82 | 33 | 27 | 49 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 14 | 8 | 28 |
-| biomeGeneratorLink | 3 | 2 | 2 | 1 |
+| biome | 42 | 15 | 9 | 27 |
+| biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
 | region | 27 | 19 | 13 | 8 |
@@ -29,11 +29,11 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `caveProfile`, `childStyle`, `children`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `generators`, `layers`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `seaLayers`, `slab`, `structures`, `surfaceLayerFallback`, `surfaceOreReplaceableBlocks`, `terrain3D`, `vanillaDerivative`, `wall`.
+Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `caveProfile`, `childStyle`, `children`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `layers`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `seaLayers`, `slab`, `structures`, `surfaceLayerFallback`, `surfaceOreReplaceableBlocks`, `terrain3D`, `vanillaDerivative`, `wall`.
 
 ## biomeGeneratorLink
 
-Unclassified: `generator`.
+Unclassified: none.
 
 ## generator
 
