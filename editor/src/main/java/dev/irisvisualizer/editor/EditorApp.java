@@ -20,7 +20,11 @@ import java.nio.file.Path;
 /** First editor shell. Unknown/unclassified configuration remains read-only. */
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
-    private String selected, error;
+    private String selected, error, requestedResource;
+    private PackWorkspace referenceWorkspace;
+    private String referencePath;
+    private long referenceRevision = -1;
+    private List<ReferenceDiagnostics.Link> referenceLinks = List.of();
     private PackWorkspace imageWorkspace;
     private String imagePath, imageError;
     private int imageTexture, imageWidth, imageHeight;
@@ -82,6 +86,8 @@ public final class EditorApp extends Application {
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
+        if (requestedResource != null) { selected = requestedResource; requestedResource = null; values.clear(); filter.set(""); }
+
         if (closeRequested) {
             closeRequested = false;
             if (replaceAllowed()) glfwSetWindowShouldClose(((WindowGlfw) getWindow()).getHandle(), true);
@@ -190,8 +196,35 @@ public final class EditorApp extends Application {
                 if (selected.endsWith(".json")) ImGui.textWrapped("JSON inspection is limited to 1 MB; original bytes remain saveable/exportable.");
             }
         }
+        if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+    }
+    private void drawReferences() {
+        String base = ResourceTypes.base(selected);
+        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes").contains(base)
+                || !ImGui.collapsingHeader("Resource links (partial)")) return;
+        if (referenceWorkspace != workspace || referenceRevision != workspace.revision() || !java.util.Objects.equals(referencePath, selected)) {
+            referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
+            referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
+        }
+        ImGui.textWrapped("Checks dimension regions, region biome lists and biome generator links only. Exact files are not validated; Iris aliases and other references are unchecked. Save/Export remain available.");
+        if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
+        for (var link : referenceLinks) {
+            ImGui.textWrapped(link.field() + ": " + link.key());
+            String status = switch (link.state()) {
+                case EXACT_FILE -> "Exact file present (contents unchecked)";
+                case NO_EXACT_FILE -> "No exact file match (aliases unchecked)";
+                case ABSENT_REQUIRED -> "Required reference list is absent";
+                case EMPTY_REQUIRED -> "Required reference list is empty";
+                case UNSUPPORTED -> "Reference inspection unavailable";
+                case INVALID_KEY -> "Unsupported or unsafe resource key";
+            };
+            ImGui.textWrapped(status);
+            if (link.state() == ReferenceDiagnostics.State.EXACT_FILE && ImGui.smallButton("Open##reference-" + link.field())) {
+                if (discardDraftsAllowed()) requestedResource = link.target();
+            }
+        }
     }
     private void drawCoverage() {
         List<String> groups = FieldCoverage.groups(selected);

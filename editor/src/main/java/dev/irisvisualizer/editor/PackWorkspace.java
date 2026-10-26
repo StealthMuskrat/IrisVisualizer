@@ -10,7 +10,7 @@ public final class PackWorkspace {
     private final NavigableMap<String, byte[]> files = new TreeMap<>();
     private final Set<String> changedDirectories = new HashSet<>();
     private final Set<String> created = new HashSet<>();
-    private long resourceRevision;
+    private long resourceRevision, editRevision;
     private final Set<String> changed = new HashSet<>();
     private final Set<String> directories = new TreeSet<>();
     private final Map<String, byte[]> savedHashes = new HashMap<>();
@@ -30,6 +30,7 @@ public final class PackWorkspace {
         result.validatePaths(); return result;
     }
     public long resourceRevision() { return resourceRevision; }
+    public long revision() { return resourceRevision + editRevision; }
     /** Duplicate bytes under the same supported type. No references or file contents are rewritten. */
     public String duplicate(String source, String key) throws IOException {
         if (!files.containsKey(source)) throw new IOException("Unknown resource");
@@ -132,7 +133,7 @@ public final class PackWorkspace {
         if (Arrays.equals(files.get(path), data)) return;
         long total = files.values().stream().mapToLong(value -> value.length).sum() - files.get(path).length + data.length;
         if (total > MAX_BYTES) throw new IOException("Workspace exceeds 512 MiB limit");
-        files.put(path, data.clone()); changed.add(path);
+        files.put(path, data.clone()); changed.add(path); editRevision++;
     }
     public void save(Path target) throws IOException {
         target = target.toAbsolutePath().normalize();
