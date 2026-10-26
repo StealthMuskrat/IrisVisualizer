@@ -107,3 +107,9 @@ The [native fixture proof](NATIVE-FIXTURE.md) passed on Windows in [verification
 The registry contract is bound in memory. No running server or generation-history directory is present, all source bytes remain unchanged, and temporary generation workspaces close and are deleted. The original core and native-boundary suites also remained green.
 
 This clears the representative native-terrain fixture check. It does not clear production Overworld parity, native feature/structure completion, map output or total preview memory/cache confirmation. No custom terrain or noise implementation was introduced.
+
+## Batch 4a: real Overworld native context
+
+The [Overworld context audit](OVERWORLD-CONTEXT.md) passed in [Windows run 40356846358](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40356846358). It loaded the native registries and in-memory contract for 12 regions and 378 biomes, resolved the explicit native ancient-city placement, and exercised the 96 MiB full-height index allocation for a 128 × 128 area at Y = [-256,512). Source bytes and temporary-context cleanup checks passed. All 24 contract assertions and existing generation/native suites remained green.
+
+World preview readiness remains false. The report identifies native world completion, explicit native placement completion, independent backend-build parity evidence and total memory confirmation as separate blockers. The allocation test does not produce terrain and is not proof of total engine/native or mesh-cache bounds. Saving/exporting remains a separate later workflow and must never be gated on these development checks or on per-edit baseline capture.
