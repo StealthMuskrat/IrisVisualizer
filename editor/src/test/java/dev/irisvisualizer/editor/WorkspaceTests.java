@@ -11,6 +11,14 @@ public final class WorkspaceTests {
    var filtered=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json"),List.of(),"A.JSON");
    check(filtered.size()==1 && filtered.get(0).path().equals("dimensions") && filtered.get(0).children().get(0).path().equals("dimensions/a.json"));
    check(ResourceTree.build(List.of("biomes/z.json"),List.of(),"missing").isEmpty());
+   check(FieldCoverage.groups("biomes/nested/test.json").equals(List.of("biome","biomeGeneratorLink")));
+   check(FieldCoverage.groups("asset.iob").isEmpty());
+   var dimensionCoverage=FieldCoverage.fields("dimension");
+   check(dimensionCoverage.stream().anyMatch(field->field.name().equals("name") && field.classification().equals("read-only") && !field.implemented()));
+   check(dimensionCoverage.stream().anyMatch(field->field.name().equals("fluidHeight") && field.classification().equals("generation") && field.implemented() && !field.reason().isEmpty()));
+   check(dimensionCoverage.stream().anyMatch(field->field.classification().equals("unclassified") && !field.implemented()));
+   for(String group:List.of("dimension","biome","generator","region","importedStructures","importedFeatures","interpolator","biomeGeneratorLink"))
+    for(var field:FieldCoverage.fields(group))check(!field.reason().isBlank() && (!field.implemented() || field.classification().equals("generation")));
    var duplicated=StarterPack.create("duplicate_test");
    duplicated.save(temp.resolve("duplicate-pack"));
    byte[] originalBiome=duplicated.read("biomes/starter.json");long revision=duplicated.resourceRevision();

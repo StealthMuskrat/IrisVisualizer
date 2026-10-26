@@ -181,6 +181,7 @@ public final class EditorApp extends Application {
                 try { drawRegion(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            drawCoverage();
             if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
                     ImGui.textWrapped(new String(workspace.read(selected), StandardCharsets.UTF_8));
@@ -191,6 +192,25 @@ public final class EditorApp extends Application {
         }
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+    }
+    private void drawCoverage() {
+        List<String> groups = FieldCoverage.groups(selected);
+        if (groups.isEmpty() || !ImGui.collapsingHeader("Pinned-source field coverage (partial)")) return;
+        ImGui.textWrapped("Direct declared fields in selected source classes only; inherited and other nested schemas are not inventoried. Unclassified/unimplemented fields stay read-only.");
+        for (String group : groups) {
+            var fields = FieldCoverage.fields(group);
+            long unclassified = fields.stream().filter(field -> field.classification().equals("unclassified")).count();
+            long implemented = fields.stream().filter(FieldCoverage.Field::implemented).count();
+            ImGui.textWrapped(group + ": " + implemented + " implemented, " + unclassified + " unclassified / " + fields.size() + " inventoried");
+            if (ImGui.treeNode("Fields##coverage-" + group)) {
+                for (var field : fields) {
+                    String status = field.implemented() ? "editable" : field.classification().equals("generation") ? "generation: control pending" : field.classification();
+                    ImGui.textWrapped(field.name() + ": " + status);
+                    if (ImGui.isItemHovered()) ImGui.setTooltip(field.reason());
+                }
+                ImGui.treePop();
+            }
+        }
     }
     private void drawRegion(LosslessJson document) {
         for (String field : RegionFields.EDITABLE) {
@@ -455,7 +475,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

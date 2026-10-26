@@ -1,0 +1,290 @@
+{
+  "dimension": {
+    "fluidHeight": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "dimensionAngleDeg": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "landChance": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "objectSurfaceSupportBuffer": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "bedrock": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "decorate": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "carvingEnabled": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "postProcessing": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "postProcessingSlabs": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "postProcessingWalls": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "requireObjectSurfaceSupport": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "regions": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain, voxel placement or generation resource selection."
+    },
+    "name": {
+      "classification": "read-only",
+      "reason": "Human-readable metadata; not voxel generation."
+    },
+    "version": {
+      "classification": "read-only",
+      "reason": "Pack upgrade metadata; not voxel generation."
+    },
+    "logicalHeight": {
+      "classification": "read-only",
+      "reason": "Gameplay teleport height; not voxel generation."
+    },
+    "entitySpawners": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "blockDrops": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "loot": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    }
+  },
+  "biome": {
+    "rarity": {
+      "classification": "generation",
+      "reason": "Controls biome distribution, voxel layering, caves or deposits."
+    },
+    "caveMinDepthBelowSurface": {
+      "classification": "generation",
+      "reason": "Controls biome distribution, voxel layering, caves or deposits."
+    },
+    "oreDepositFrequencyMultiplier": {
+      "classification": "generation",
+      "reason": "Controls biome distribution, voxel layering, caves or deposits."
+    },
+    "oreDepositSizeMultiplier": {
+      "classification": "generation",
+      "reason": "Controls biome distribution, voxel layering, caves or deposits."
+    },
+    "lockLayers": {
+      "classification": "generation",
+      "reason": "Controls biome distribution, voxel layering, caves or deposits."
+    },
+    "mergeFloatingChildBiomes": {
+      "classification": "generation",
+      "reason": "Controls biome distribution, voxel layering, caves or deposits."
+    },
+    "name": {
+      "classification": "read-only",
+      "reason": "Human-readable metadata; not voxel generation."
+    },
+    "color": {
+      "classification": "read-only",
+      "reason": "Map visualization color; not voxel generation."
+    },
+    "entitySpawners": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "effects": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "blockDrops": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "loot": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    }
+  },
+  "generator": {
+    "zoom": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "opacity": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "surfaceDetail": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "multiplicitive": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "cellFractureZoom": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "cellFractureShuffle": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "cellFractureHeight": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "cellPercentSize": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "offsetX": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "offsetZ": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    }
+  },
+  "region": {
+    "rarity": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "shoreHeightZoom": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "shoreMinimumWidth": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "landBiomeZoom": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "shoreBiomeZoom": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "seaBiomeZoom": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "caveBiomeZoom": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "landBiomes": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "seaBiomes": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "shoreBiomes": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "caveBiomes": {
+      "classification": "generation",
+      "reason": "Controls region distribution, shoreline shape or biome selection."
+    },
+    "name": {
+      "classification": "read-only",
+      "reason": "Human-readable metadata; not voxel generation."
+    },
+    "color": {
+      "classification": "read-only",
+      "reason": "Map visualization color; not voxel generation."
+    },
+    "entitySpawners": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "effects": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "blockDrops": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "loot": {
+      "classification": "read-only",
+      "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    }
+  },
+  "importedStructures": {
+    "undergroundYShift": {
+      "classification": "generation",
+      "reason": "Controls native structure placement or which sources may generate."
+    },
+    "datapackOverrides": {
+      "classification": "generation",
+      "reason": "Controls native structure placement or which sources may generate."
+    },
+    "disabled": {
+      "classification": "generation",
+      "reason": "Controls native structure placement or which sources may generate."
+    },
+    "disabledExact": {
+      "classification": "generation",
+      "reason": "Controls native structure placement or which sources may generate."
+    }
+  },
+  "importedFeatures": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Controls native placed-feature generation and source filters."
+    },
+    "disabled": {
+      "classification": "generation",
+      "reason": "Controls native placed-feature generation and source filters."
+    },
+    "disabledExact": {
+      "classification": "generation",
+      "reason": "Controls native placed-feature generation and source filters."
+    }
+  },
+  "interpolator": {
+    "horizontalScale": {
+      "classification": "generation",
+      "reason": "Controls generator interpolation sampling scale."
+    }
+  },
+  "biomeGeneratorLink": {
+    "min": {
+      "classification": "generation",
+      "reason": "Controls generated biome height relative to fluid height."
+    },
+    "max": {
+      "classification": "generation",
+      "reason": "Controls generated biome height relative to fluid height."
+    }
+  }
+}

@@ -60,6 +60,16 @@ jobs:
           python editor/tools/extract_region_fields.py IrisRegion.java generated-region.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-region.properties).Hash -ne (Get-FileHash editor/src/main/resources/region-fields.properties).Hash) { throw 'Pinned region definitions differ' }
+      - name: Audit pinned field coverage and editor classifications
+        shell: pwsh
+        run: |
+          python editor/tools/test_field_coverage.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/field_coverage.py . editor/policy/field-policy.json editor/src/main/java/dev/irisvisualizer/editor generated-coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-coverage/field-coverage.properties).Hash -ne (Get-FileHash editor/src/main/resources/field-coverage.properties).Hash) { throw 'Coverage metadata differs' }
+          if ((Get-FileHash generated-coverage/coverage-report.md).Hash -ne (Get-FileHash editor/coverage-report.md).Hash) { throw 'Coverage report differs' }
+          Get-Content generated-coverage/coverage-report.md
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes
       - name: Build Windows x64 package
