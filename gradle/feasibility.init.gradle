@@ -1,5 +1,7 @@
 // Adds integration sources to the official probe module without editing Iris sources.
 gradle.projectsEvaluated {
+    // Init scripts also run for buildSrc and included builds; touch only the Iris root.
+    if (gradle.rootProject.name != 'Iris') return
     def root = System.getenv('IRIS_VISUALIZER_ROOT')
     if (!root) throw new GradleException('Use scripts/Test-Feasibility.ps1')
     def probe = gradle.rootProject.project(':probe')
