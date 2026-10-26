@@ -17,6 +17,7 @@ foreach ($name in @('iris', 'volmlib', 'pack')) {
     if ($LASTEXITCODE -ne 0 -or $remote -ne $source.repository) { throw "Unexpected origin in $directory" }
     $dirty = & git -C $directory status --porcelain
     if ($LASTEXITCODE -ne 0 -or $dirty) { throw "Refusing to change a modified checkout: $directory" }
+    Invoke-Checked git @('-C', $directory, 'config', 'core.autocrlf', 'false')
     Invoke-Checked git @('-C', $directory, 'fetch', '--depth=1', 'origin', $source.revision)
     Invoke-Checked git @('-C', $directory, 'checkout', '--detach', $source.revision)
     $actual = & git -C $directory rev-parse HEAD

@@ -9,10 +9,10 @@ Inspection date: 2026-10-26. **No successful standalone terrain run or native pa
 | Iris latest stable release | 4.3.5-26.1.2-26.3 |
 | Iris source | c3359e0a16438b1bb8468901c6171dcefdf63f7f |
 | Minecraft target | 26.3 |
-| VolmLib source candidate | 3a9e58b102153ee75e118013e2db5c3ba73ee7e8 |
+| VolmLib source candidate | 210705c5ab1321dc74b86b48457fd6d5e0452944 |
 | Latest Overworld pack | 2e85a52133ad1206c88cad2f50b6f622bea60cb9 |
 
-The VolmLib pin is selected by source date, not verified against a released Iris binary. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
+The initial VolmLib candidate selected by source date failed Windows compilation: Iris requires `intersectsInfluenceRect`, `surfaceAdjustment` and `surfaceCutY`. The corrected pin is the upstream commit titled "Synced structure volume surface API", committed immediately after the Iris release commit. It supplies these methods but has not yet been verified against a released Iris binary. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
 
 ## Source findings
 
