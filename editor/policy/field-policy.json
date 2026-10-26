@@ -231,6 +231,18 @@
     "composite": {
       "classification": "generation",
       "reason": "Ordered composite noise list; object-only structural controls preserve nested data and enforce the pinned minimum entry count."
+    },
+    "cliffHeightMin": {
+      "classification": "generation",
+      "reason": "Controls cliff height interpolation; scalar controls enforce source-defined bounds without adding cross-field constraints."
+    },
+    "cliffHeightMax": {
+      "classification": "generation",
+      "reason": "Controls cliff height interpolation; scalar controls enforce source-defined bounds without adding cross-field constraints."
+    },
+    "cliffHeightGenerator": {
+      "classification": "generation",
+      "reason": "Cliff shaping noise object; audited noise scalar controls only, with styles and fracture trees still read-only."
     }
   },
   "region": {

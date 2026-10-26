@@ -29,9 +29,9 @@ def declared_fields(text):
             fields[match.group('name')] = match.group('type')
     return fields
 
-def editable(java_dir, name):
+def editable(java_dir, name, allowlist='EDITABLE'):
     source = (java_dir / (name + '.java')).read_text()
-    match = re.search(r'EDITABLE = List.of\((.*?)\);', source, re.DOTALL)
+    match = re.search(allowlist + r' = List.of\((.*?)\);', source, re.DOTALL)
     if not match: raise ValueError('Missing UI allowlist: ' + name)
     return re.findall(r'"([^"]+)"', match.group(1))
 
@@ -40,6 +40,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     ui = {group: editable(java_dir, cls) for group, cls in [('dimension', 'DimensionFields'), ('biome', 'BiomeFields'), ('generator', 'GeneratorFields'), ('region', 'RegionFields')]}
     implemented = {group: set(path for path in paths if '.' not in path) for group, paths in ui.items()}
     implemented['generator'].update(editable(java_dir, 'CompositeNoise'))
+    implemented['generator'].update(editable(java_dir, 'NoiseFields', 'OBJECT_FIELDS'))
     for group in ['importedStructures', 'importedFeatures']:
         implemented[group] = {path.split('.', 1)[1] for path in ui['dimension'] if path.startswith(group + '.')}
     implemented['interpolator'] = {path.split('.', 1)[1] for path in ui['generator'] if path.startswith('interpolator.')}

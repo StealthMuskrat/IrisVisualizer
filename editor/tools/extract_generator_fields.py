@@ -5,7 +5,7 @@ import re
 import sys
 from pathlib import Path
 lines = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-for path, prefix, names in [(Path(sys.argv[1]), '', ['zoom', 'opacity', 'surfaceDetail', 'multiplicitive', 'cellFractureZoom', 'cellFractureShuffle', 'cellFractureHeight', 'cellPercentSize', 'offsetX', 'offsetZ', 'seed']),
+for path, prefix, names in [(Path(sys.argv[1]), '', ['zoom', 'opacity', 'surfaceDetail', 'multiplicitive', 'cellFractureZoom', 'cellFractureShuffle', 'cellFractureHeight', 'cellPercentSize', 'offsetX', 'offsetZ', 'seed', 'cliffHeightMin', 'cliffHeightMax']),
                             (Path(sys.argv[2]), 'interpolator.', ['horizontalScale'])]:
     source = path.read_bytes()
     lines.append((prefix or 'generator.') + 'sourceSha256=' + hashlib.sha256(source).hexdigest())
@@ -30,4 +30,7 @@ source = Path(sys.argv[1]).read_text()
 composite = re.search(r'@ArrayType\(min = (\d+), type = IrisNoiseGenerator.class\)\s+@Description\("[^"\n]*"\)\s+private KList<IrisNoiseGenerator> composite = new KList<>\(\);', source)
 if not composite: raise ValueError('Changed official composite list definition')
 lines.append('composite.minimumEntries=' + composite.group(1))
+if not re.search(r'private IrisNoiseGenerator cliffHeightGenerator = new IrisNoiseGenerator\(\);', source):
+    raise ValueError('Changed official cliff noise object type/default')
+lines.append('cliffHeightGenerator.type=IrisNoiseGenerator')
 Path(sys.argv[3]).write_bytes(('\n'.join(lines) + '\n').encode('ascii'))

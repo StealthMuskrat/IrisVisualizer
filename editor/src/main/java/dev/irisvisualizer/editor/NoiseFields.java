@@ -3,16 +3,30 @@ package dev.irisvisualizer.editor;
 import java.io.IOException;
 import java.util.*;
 
-/** Audited scalar controls for existing composite noise objects; no noise sampling or preview generation. */
+/** Audited scalar controls for composite entries and the cliff height noise object; no noise sampling or preview generation. */
 public final class NoiseFields {
     private static final Properties DEFINITIONS = new Properties();
     static {
-        try (var input = NoiseFields.class.getResourceAsStream("/noise-fields.properties")) {
-            if (input == null) throw new IOException("Missing pinned generator definitions");
+        try (var input = NoiseFields.class.getResourceAsStream("/noise-fields.properties");
+             var generatorInput = NoiseFields.class.getResourceAsStream("/generator-fields.properties")) {
+            if (input == null || generatorInput == null) throw new IOException("Missing pinned generator definitions");
             DEFINITIONS.load(input);
+            var generator = new Properties(); generator.load(generatorInput);
+            if (!"IrisNoiseGenerator".equals(generator.getProperty("cliffHeightGenerator.type")))
+                throw new IOException("Unsupported pinned cliff noise object type");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static final List<String> EDITABLE = List.of("zoom", "negative", "opacity", "offsetX", "offsetY", "offsetZ", "seed", "parametric", "bezier", "sinCentered", "exponent", "enabled", "octaves");
+    public static final List<String> OBJECT_FIELDS = List.of("cliffHeightGenerator");
+    public record Target(String objectField, int index) {
+        public Target {
+            if (!("composite".equals(objectField) && index >= 0) && !(OBJECT_FIELDS.contains(objectField) && index == -1))
+                throw new IllegalArgumentException("Unsupported noise object target");
+        }
+        public static Target composite(int index) { return new Target("composite", index); }
+        public static Target cliffHeight() { return new Target("cliffHeightGenerator", -1); }
+        public String draftPrefix() { return index < 0 ? objectField + "#" : objectField + "#" + index + "."; }
+    }
     public static boolean generator(String path) { return "generators".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, String field) {
         if (!generator(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Generator field is read-only");
@@ -29,19 +43,34 @@ public final class NoiseFields {
         String token = DEFINITIONS.getProperty(field + ".default");
         return booleanField(field) ? token : new java.math.BigDecimal(token).stripTrailingZeros().toPlainString();
     }
-    public static byte[] enable(String path, byte[] original, int index, String field) { authorize(path, field); return new LosslessJson(original).objectArrayEdit("composite", index, object -> object.enable(field, defaultToken(field))); }
-    public static byte[] editText(String path, byte[] original, int index, String field, String input) {
+    // Existing composite APIs keep their nonnegative index contract.
+    public static byte[] enable(String path, byte[] original, int index, String field) { return enable(path, original, Target.composite(index), field); }
+    public static byte[] editText(String path, byte[] original, int index, String field, String input) { return editText(path, original, Target.composite(index), field, input); }
+    public static byte[] editBoolean(String path, byte[] original, int index, String field, boolean value) { return editBoolean(path, original, Target.composite(index), field, value); }
+    public static byte[] enable(String path, byte[] original, Target target, String field) {
+        authorize(path, field);
+        return editObject(original, target, object -> object.enable(field, defaultToken(field)), true);
+    }
+    public static byte[] editText(String path, byte[] original, Target target, String field, String input) {
         authorize(path, field);
         if (booleanField(field)) throw new IllegalArgumentException("Boolean field requires its toggle");
-        if ("long".equals(DEFINITIONS.getProperty(field + ".type"))) return new LosslessJson(original).objectArrayEdit("composite", index, object -> object.integer(field, Long.parseLong(input)));
+        if ("long".equals(DEFINITIONS.getProperty(field + ".type"))) {
+            long value = Long.parseLong(input);
+            return editObject(original, target, object -> object.integer(field, value), false);
+        }
         double value = Double.parseDouble(input);
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
         if (!Double.isFinite(value) || (min != null && value < Double.parseDouble(min)) || (max != null && value > Double.parseDouble(max)) || ("int".equals(DEFINITIONS.getProperty(field + ".type")) && value != Math.rint(value)))
             throw new IllegalArgumentException("Value violates pinned Iris generator constraints");
-        return new LosslessJson(original).objectArrayEdit("composite", index, object -> object.number(field, value));
+        return editObject(original, target, object -> object.number(field, value), false);
     }
-    public static byte[] editBoolean(String path, byte[] original, int index, String field, boolean value) {
+    public static byte[] editBoolean(String path, byte[] original, Target target, String field, boolean value) {
         authorize(path, field); if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");
-        return new LosslessJson(original).objectArrayEdit("composite", index, object -> object.bool(field, value));
+        return editObject(original, target, object -> object.bool(field, value), false);
+    }
+    private static byte[] editObject(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+        var document = new LosslessJson(original);
+        if (target.index() >= 0) return document.objectArrayEdit(target.objectField(), target.index(), operation);
+        return document.objectEdit(target.objectField(), operation, create);
     }
 }
