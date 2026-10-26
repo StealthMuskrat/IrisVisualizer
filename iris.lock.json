@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "verifiedOn": "2026-10-26",
+  "iris": {
+    "repository": "https://github.com/VolmitSoftware/Iris.git",
+    "version": "4.3.5",
+    "release": "4.3.5-26.1.2-26.3",
+    "revision": "c3359e0a16438b1bb8468901c6171dcefdf63f7f"
+  },
+  "volmlib": {
+    "repository": "https://github.com/VolmitSoftware/VolmLib.git",
+    "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
+    "selection": "First upstream source commit supplying the structure-volume surface API required by the Iris release; release binary stamp not yet verified"
+  },
+  "pack": {
+    "repository": "https://github.com/IrisDimensions/overworld.git",
+    "revision": "2e85a52133ad1206c88cad2f50b6f622bea60cb9",
+    "dimension": "overworld",
+    "selection": "Latest pack at inspection time; compatibility must be established by the probe, never repaired implicitly"
+  },
+  "java": 25,
+  "minecraft": "26.3",
+  "platform": "windows-x64"
+}
