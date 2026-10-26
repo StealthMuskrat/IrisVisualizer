@@ -27,4 +27,17 @@ Original start NBT and chunk statuses must remain unchanged. All generated fixtu
 
 ## Verification status
 
-Local contract and source-overlay checks are in progress; Windows native integration is pending. Native piece placement, features, an independent complete native baseline and total memory validation remain unfinished.
+[Windows x64/Java 25 integration passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40366896998) for executable code commit `d2e8e151062657c1784b6812cf5ea49adca2b00c`.
+
+| Ancient-city origin chunk | Standalone carved blocks | Explicit template requests | Full-height result |
+| --- | ---: | ---: | --- |
+| -99, -21 | 9,616 | 60 | SHA-256 and count match the legacy method |
+| 42, 19 | 9,740 | 73 | SHA-256 and count match the legacy method |
+
+Each comparison covers the target chunk's full 768-block configured height at Y = [-256,512). Both standalone calls succeeded with server getters unavailable. The legacy test double was used only for the reference's template-manager access, with other interactions rejected. Planned NBT/status preservation, no-history assertions, source integrity and cleanup passed. All 26 contract assertions passed locally and on Windows.
+
+The local offline Gradle check also generated the exact pinned source bytes and verified that Java compilation selects each overlay once while excluding its original. Neither upstream source checkout was edited.
+
+The earlier world-based preparation call and native piece call still reproduce their expected `ServerLevel` dependencies. The new overload resolves the template lookup for this tested eroded-carve path; it does not remove the CraftBukkit piece callback dependency or complete other world services. Full-world preview remains blocked. Native piece placement, features, an independent complete native baseline and total memory validation remain unfinished.
+
+All five Windows suites passed: core repeatability, native boundaries, full-size native fixture repeatability, Overworld context and the extended structure/template-service proof.
