@@ -8,4 +8,4 @@ The shell has five File actions, three panels, folder/ZIP storage and JSON inspe
 
 Edits splice only the selected value token. Unknown properties, whitespace, line endings and absent optional fields remain unchanged. Invalid/ambiguous JSON stays inspectable and saveable; structured editing rejects it. Preview errors do not gate save/export.
 
-Workspace and edit contracts pass locally. The previous shell's Windows compilation/workspace CI passed; the new control build is pending. Full official schemas, optional-field enablement, nested/array controls, typed resource operations, image viewing, unsaved-close handling, valid New starter-pack generation, Windows-only distribution packaging and visual verification remain unfinished.
+Workspace and edit contracts pass locally. Windows compilation, workspace/edit contracts and pinned field-definition regeneration passed in run 40378433658. Full official schemas, optional-field enablement, nested/array controls, typed resource operations, image viewing, unsaved-close handling, valid New starter-pack generation, Windows-only distribution packaging and visual verification remain unfinished.
