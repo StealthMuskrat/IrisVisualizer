@@ -1,6 +1,7 @@
 package art.arcane.iris.probe;
 
 import art.arcane.iris.generation.terrain.IrisDimension;
+import art.arcane.iris.generation.runtime.IrisEngine;
 import art.arcane.iris.structure.nativegen.NativeStructureOwnershipRecord;
 import art.arcane.volmlib.nativelib.v26_3_R1.terrain.NativeStructurePostProcessor;
 import art.arcane.volmlib.nativelib.v26_3_R1.terrain.NativeStructureTerrainIntegrator;
@@ -37,6 +38,8 @@ final class NativeStructureBlockBoundary {
                     HeadlessStructurePlanner.PlannedChunk<NativeStructureOwnershipRecord> planned,
                     Path output, Properties report) throws Exception {
         var nativeContext = context.structures();
+        if (!(context.engine() instanceof IrisEngine engine))
+            throw new IllegalArgumentException("The real-pack boundary audit requires its Iris engine");
         report.setProperty("generationAttempted", "true");
         report.setProperty("terrainGenerationAttempted", "false");
         var structure = nativeContext.registries().lookupOrThrow(Registries.STRUCTURE)
@@ -51,7 +54,8 @@ final class NativeStructureBlockBoundary {
                     context.engine().getSeedManager().getSeed());
             if (start == null || !start.isValid() || start.getPieces().isEmpty())
                 throw new IllegalStateException("Ancient-city start did not survive native NBT loading");
-            ChunkPos center = new ChunkPos(start.getPieces().getFirst().getBoundingBox().getCenter());
+            var centerBlock = start.getPieces().getFirst().getBoundingBox().getCenter();
+            ChunkPos center = new ChunkPos(centerBlock.getX() >> 4, centerBlock.getZ() >> 4);
             Fixture fixture = fixture(context, dimension, center);
             BoundingBox area = new BoundingBox(center.getMinBlockX(), context.engine().getMinHeight() + 1,
                     center.getMinBlockZ(), center.getMaxBlockX(), context.engine().getMaxHeight() - 1, center.getMaxBlockZ());
@@ -79,6 +83,7 @@ final class NativeStructureBlockBoundary {
             } catch (RuntimeException failure) {
                 if (!requiresServerLevel(failure)) throw failure;
                 blocked = failure;
+                failure.printStackTrace(System.out);
                 try (var writer = new PrintWriter(Files.newBufferedWriter(output.resolve(phase + "-failure.txt"),
                         StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW))) { failure.printStackTrace(writer); }
             }
@@ -91,7 +96,7 @@ final class NativeStructureBlockBoundary {
             }
             results.add(new Result(phase, blocked == null ? "COMPLETED_ISOLATED" : "BLOCKED",
                     blocked == null ? "" : "ServerLevel", nonAir));
-            NativeFixtureProof.requireNoReports(context.engine());
+            NativeFixtureProof.requireNoReports(engine);
             NativeFixtureProof.requireNoServer();
         }
         if (!saved.equals(original.createTag(context.serialization().structures(), planned.chunk().getPos())))
