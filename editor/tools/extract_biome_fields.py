@@ -27,4 +27,11 @@ for path, prefix, names in [(Path(sys.argv[1]), '', ['rarity', 'caveMinDepthBelo
         for key, value in fields.items():
             escaped = str(value).replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
             lines.append(prefix + name + '.' + key + '=' + escaped)
+biome = Path(sys.argv[1]).read_text()
+link = Path(sys.argv[2]).read_text()
+array = re.search(r'@ArrayType\(min = (\d+), type = IrisBiomeGeneratorLink.class\)\s+@Description\(("(?:[^"\\]|\\.)*")\)\s+private KList<IrisBiomeGeneratorLink> generators = new KList<IrisBiomeGeneratorLink>\(\).qadd\(new IrisBiomeGeneratorLink\(\)\);', biome)
+reference = re.search(r'@RegistryListResource\(IrisGenerator.class\)\s+@Description\(("(?:[^"\\]|\\.)*")\)\s+private String generator = ("(?:[^"\\]|\\.)*");', link)
+if not array or not reference: raise ValueError('Changed official biome generator list/reference default')
+for key, value in [('generators.minimumEntries',array.group(1)),('generators.defaultGenerator',json.loads(reference.group(2))),('generators.description',json.loads(array.group(2))),('generators.referenceDescription',json.loads(reference.group(1)))]:
+    lines.append(key+'='+value.replace('\\','\\\\').replace('\n','\\n').replace('\r','\\r'))
 Path(sys.argv[3]).write_bytes(('\n'.join(lines) + '\n').encode('ascii'))

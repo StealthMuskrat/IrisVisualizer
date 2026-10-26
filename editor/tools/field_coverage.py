@@ -43,6 +43,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['generator'].update(editable(java_dir, 'CompositeNoise'))
     implemented['generator'].update(editable(java_dir, 'NoiseFields', 'OBJECT_FIELDS'))
     implemented['generator'].update(editable(java_dir, 'InterpolationFields', 'OBJECT_FIELDS'))
+    implemented['biome'].update(editable(java_dir, 'BiomeGeneratorLinks', 'LIST_FIELDS'))
     for group in ['importedStructures', 'importedFeatures']:
         implemented[group] = {path.split('.', 1)[1] for path in ui['dimension'] if path.startswith(group + '.')}
     implemented['interpolator'] = {path.split('.', 1)[1] for path in ui['generator'] if path.startswith('interpolator.')}
@@ -51,6 +52,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['noise'].update(editable(java_dir, 'NoiseStyleFields', 'OBJECT_FIELDS'))
     implemented['noiseStyle'] = set(editable(java_dir, 'NoiseStyleFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
+    implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
     report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in ten pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []

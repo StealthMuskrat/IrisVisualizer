@@ -189,6 +189,10 @@
     "childShrinkFactor": {
       "classification": "generation",
       "reason": "Controls terrain layer depth or child biome distribution; annotations supply no additional bounds."
+    },
+    "generators": {
+      "classification": "generation",
+      "reason": "Ordered biome height-generator links; explicit source-default enablement and object-only list operations preserve unrelated content."
     }
   },
   "generator": {
@@ -385,6 +389,10 @@
     "max": {
       "classification": "generation",
       "reason": "Controls generated biome height relative to fluid height."
+    },
+    "generator": {
+      "classification": "generation",
+      "reason": "Exact in-pack generator assignment; unknown or implicit defaults remain unchanged until explicitly edited."
     }
   },
   "noise": {
