@@ -15,5 +15,13 @@ public final class InspectorDrafts {
     public boolean anyUnder(String prefix) { return changed.stream().anyMatch(key -> key.startsWith(prefix)); }
     public void applied(String key) { changed.remove(key); }
     public void clearUnder(String prefix) { changed.removeIf(key -> key.startsWith(prefix)); }
+    @FunctionalInterface public interface Change { void run() throws java.io.IOException; }
+    /** Confirmation alone does not discard text; clear only after the transition succeeds. */
+    public boolean transition(java.util.function.BooleanSupplier allowed, Change change) throws java.io.IOException {
+        if (!allowed.getAsBoolean()) return false;
+        change.run();
+        clear();
+        return true;
+    }
     public void clear() { changed.clear(); }
 }

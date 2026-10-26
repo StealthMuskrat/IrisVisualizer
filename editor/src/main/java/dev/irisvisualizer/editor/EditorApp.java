@@ -20,7 +20,7 @@ import java.nio.file.Path;
 /** First editor shell. Unknown/unclassified configuration remains read-only. */
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
-    private String selected, error, requestedResource;
+    private String selected, error;
     private PackWorkspace referenceWorkspace;
     private String referencePath;
     private long referenceRevision = -1;
@@ -86,11 +86,11 @@ public final class EditorApp extends Application {
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
-        if (requestedResource != null) { selected = requestedResource; requestedResource = null; values.clear(); filter.set(""); }
 
         if (closeRequested) {
             closeRequested = false;
-            if (replaceAllowed()) glfwSetWindowShouldClose(((WindowGlfw) getWindow()).getHandle(), true);
+            try { transition(true, () -> glfwSetWindowShouldClose(((WindowGlfw) getWindow()).getHandle(), true)); }
+            catch (Exception failure) { error = failure.getMessage(); }
         }
         if (!styled) { ImGui.styleColorsLight(); styled = true; }
         if (ImGui.beginMainMenuBar()) {
@@ -222,7 +222,8 @@ public final class EditorApp extends Application {
             };
             ImGui.textWrapped(status);
             if (link.state() == ReferenceDiagnostics.State.EXACT_FILE && ImGui.smallButton("Open##reference-" + link.field())) {
-                if (discardDraftsAllowed()) requestedResource = link.target();
+                try { if (transition(false, () -> { selected = link.target(); filter.set(""); })) break; }
+                catch (Exception failure) { error = failure.getMessage(); }
             }
         }
     }
@@ -456,7 +457,7 @@ public final class EditorApp extends Application {
                 if (expanded) { drawResources(node.children()); ImGui.treePop(); }
             } else if (ImGui.selectable(node.name() + (workspace.changed(node.path()) ? " *" : ""), node.path().equals(selected))) {
                 if (ImGui.getIO().getKeyCtrl()) duplicateResource(node.path());
-                else if (!node.path().equals(selected) && discardDraftsAllowed()) { selected = node.path(); values.clear(); }
+                else if (!node.path().equals(selected)) selectResource(node.path());
             }
             ImGui.popID();
         }
@@ -469,8 +470,7 @@ public final class EditorApp extends Application {
             String key = JOptionPane.showInputDialog(null, "New resource key (omit file extension):", originalKey + "_copy");
             if (key == null) return;
             ResourceTypes.target(source, key); // Validate before asking to discard text drafts.
-            if (!discardDraftsAllowed()) return;
-            selected = workspace.duplicate(source, key); values.clear(); filter.set(""); error = null;
+            transition(false, () -> { selected = workspace.duplicate(source, key); filter.set(""); error = null; });
         } catch (Exception failure) { error = failure.getMessage(); }
     }
     private void createResource(String parent) {
@@ -487,8 +487,8 @@ public final class EditorApp extends Application {
                 if (chosen == null) return;
                 dependency = chosen.toString();
             }
-            if (!discardDraftsAllowed()) return;
-            selected = workspace.createResource(parent, name, dependency); values.clear(); filter.set(""); error = null;
+            String chosenDependency = dependency;
+            transition(false, () -> { selected = workspace.createResource(parent, name, chosenDependency); filter.set(""); error = null; });
         } catch (Exception failure) { error = failure.getMessage(); }
     }
     private void createSubfolder(String parent) {
@@ -498,6 +498,15 @@ public final class EditorApp extends Application {
             if (name == null) return;
             workspace.createSubfolder(parent, name); filter.set(""); error = null;
         } catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
+        boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
+        if (committed) values.clear();
+        return committed;
+    }
+    private void selectResource(String path) {
+        try { transition(false, () -> { selected = path; }); }
+        catch (Exception failure) { error = failure.getMessage(); }
     }
     private boolean discardArrayDrafts(String field, String appliedKey) {
         boolean other = values.entrySet().stream().anyMatch(entry -> entry.getKey().startsWith(field + "#")
@@ -509,7 +518,7 @@ public final class EditorApp extends Application {
         if (!drafts.any()) return true;
         if (JOptionPane.showConfirmDialog(null, "Discard unapplied text? Apply it first to include it in saved pack data.",
                 "Unapplied text", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return false;
-        drafts.clear(); values.clear(); return true;
+        return true;
     }
     private boolean appliedValuesOnlyAllowed() {
         return !drafts.any() || JOptionPane.showConfirmDialog(null, "Save/export applied values only? Unapplied text will stay in the inspector.",
@@ -549,12 +558,15 @@ public final class EditorApp extends Application {
                     String name = JOptionPane.showInputDialog(null, "Pack key (letters a-z, digits, _ or -):", "new_pack");
                     if (name == null) return;
                     PackWorkspace next = StarterPack.create(name);
-                    if (replaceAllowed()) { workspace = next; selected = "dimensions/" + StarterPack.normalizeName(name) + ".json"; values.clear(); }
+                    String dimension = "dimensions/" + StarterPack.normalizeName(name) + ".json";
+                    transition(true, () -> { workspace = next; selected = dimension; });
                 }
                 case "Open", "Import" -> {
-                    if (!replaceAllowed()) return;
                     Path path = choose(action.equals("Open"), false);
-                    if (path != null) { PackWorkspace next = action.equals("Open") ? PackWorkspace.open(path) : PackWorkspace.importZip(path); workspace = next; selected = null; values.clear(); }
+                    if (path != null) transition(true, () -> {
+                        PackWorkspace next = action.equals("Open") ? PackWorkspace.open(path) : PackWorkspace.importZip(path);
+                        workspace = next; selected = null;
+                    });
                 }
                 case "Save" -> { if (!appliedValuesOnlyAllowed() || !saveWorkspace()) return; }
                 case "Export" -> { if (!appliedValuesOnlyAllowed()) return; Path path = choose(false, true); if (path != null) {

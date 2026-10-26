@@ -11,6 +11,17 @@ public final class WorkspaceTests {
    var filtered=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json"),List.of(),"A.JSON");
    check(filtered.size()==1 && filtered.get(0).path().equals("dimensions") && filtered.get(0).children().get(0).path().equals("dimensions/a.json"));
    check(ResourceTree.build(List.of("biomes/z.json"),List.of(),"missing").isEmpty());
+   InspectorDrafts transitionDrafts=new InspectorDrafts();
+   transitionDrafts.update("pending","stored","unapplied");
+   int[] commits={0};
+   check(!transitionDrafts.transition(()->false,()->commits[0]++));
+   check(transitionDrafts.any() && commits[0]==0);
+   rejectsIo(()->transitionDrafts.transition(()->true,()->{throw new java.io.IOException("Open/save/create failed");}));
+   check(transitionDrafts.contains("pending") && commits[0]==0);
+   check(!transitionDrafts.transition(()->{boolean discardConfirmed=true;boolean secondDialogCancelled=true;return discardConfirmed && !secondDialogCancelled;},()->commits[0]++));
+   check(transitionDrafts.any() && commits[0]==0);
+   check(transitionDrafts.transition(()->true,()->{check(transitionDrafts.any());commits[0]++;}));
+   check(!transitionDrafts.any() && commits[0]==1);
    var diagnosed=StarterPack.create("diagnostics");
    long diagnosticRevision=diagnosed.revision();byte[] diagnosticOriginal=diagnosed.read("dimensions/diagnostics.json");
    var initialLinks=ReferenceDiagnostics.inspect(diagnosed,"dimensions/diagnostics.json");
