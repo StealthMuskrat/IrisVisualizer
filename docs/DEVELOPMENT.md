@@ -27,4 +27,4 @@ Follow the attached specification. Work in larger milestone batches, implementin
 
 A failed feasibility check must stay visible. If complete standalone generation requires substantial reimplementation, report that boundary and obtain direction under specification §4. Do not substitute a custom generator or silently omit generation features.
 
-The editor and renderer are pending that gate. The supplied UI images are general design guidance and do not establish generation or rendering parity.
+The user authorized editor development while unsupported previews stay disabled. The editor workspace/shell is now underway; the renderer remains pending native readiness. The supplied UI images are general design guidance and do not establish generation or rendering parity.
