@@ -90,6 +90,9 @@ public final class EditorApp extends Application {
                             if (ImGui.isItemHovered()) ImGui.setTooltip("Insert pinned Iris default: " + DimensionFields.defaultToken(field));
                             continue;
                         }
+                        if (DimensionFields.arrayField(field)) {
+                            drawArray(field, document); continue;
+                        }
                         if (DimensionFields.booleanField(field)) {
                             if (!token.equals("true") && !token.equals("false")) { ImGui.text(field + ": stored type mismatch (read-only)"); continue; }
                             if (ImGui.checkbox(field, token.equals("true"))) {
@@ -116,6 +119,40 @@ public final class EditorApp extends Application {
         }
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+    }
+    private void drawArray(String field, LosslessJson document) {
+        List<String> entries;
+        try { entries = document.stringArrayPath(field); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored value is not a string array (read-only)."); return; }
+        ImGui.pushID(field);
+        ImGui.textWrapped("Registry key syntax only; registry existence is not checked.");
+        for (int index=0;index<entries.size();index++) {
+            ImGui.pushID(index);
+            String key = field + "#" + index;
+            String current = entries.get(index);
+            // Oversized existing items stay byte-preserved and removable, without truncating their input.
+            if (current.length() > 4096) ImGui.textWrapped("Long existing entry (read-only).");
+            else {
+                ImString input = values.computeIfAbsent(key, ignored -> new ImString(current, 16_384));
+                ImGui.inputText("Key", input);
+                if (ImGui.button("Apply")) applyArray(field, index, input.get());
+                ImGui.sameLine();
+            }
+            boolean remove = ImGui.button("Remove");
+            ImGui.popID();
+            if (remove) { applyArray(field, index, null); break; }
+        }
+        String key = field + "#new";
+        ImString input = values.computeIfAbsent(key, ignored -> new ImString(16_384));
+        ImGui.inputText("New key", input);
+        if (ImGui.button("Add")) applyArray(field, entries.size(), input.get());
+        ImGui.popID();
+    }
+    private void applyArray(String field, int index, String value) {
+        try {
+            workspace.replace(selected, DimensionFields.editArray(selected, workspace.read(selected), field, index, value));
+            values.keySet().removeIf(key -> key.startsWith(field + "#")); error = null;
+        } catch (Exception failure) { error = failure.getMessage(); }
     }
     private void drawResources(List<ResourceTree.Node> nodes) {
         for (ResourceTree.Node node : nodes) {

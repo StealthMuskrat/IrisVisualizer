@@ -9,8 +9,8 @@ sources = {
     'dimension': (Path(sys.argv[1]), ['fluidHeight', 'dimensionAngleDeg', 'landChance',
         'objectSurfaceSupportBuffer', 'bedrock', 'decorate', 'carvingEnabled',
         'postProcessing', 'postProcessingSlabs', 'postProcessingWalls', 'requireObjectSurfaceSupport']),
-    'importedStructures': (Path(sys.argv[3]), ['undergroundYShift', 'datapackOverrides']),
-    'importedFeatures': (Path(sys.argv[4]), ['enabled']),
+    'importedStructures': (Path(sys.argv[3]), ['undergroundYShift', 'datapackOverrides', 'disabled', 'disabledExact']),
+    'importedFeatures': (Path(sys.argv[4]), ['enabled', 'disabled', 'disabledExact']),
 }
 
 def escape(value):
@@ -23,7 +23,7 @@ for group, (path, names) in sources.items():
     text = source.decode('utf-8')
     lines.append(group + '.sourceSha256=' + hashlib.sha256(source).hexdigest())
     for name in names:
-        match = re.search(r'((?:    @[^\n]+\n)+)    private (int|double|boolean) ' + name + r' = ([^;]+);', text)
+        match = re.search(r'((?:    @[^\n]+\n)+)    private (int|double|boolean|KList<String>) ' + name + r' = ([^;]+);', text)
         if not match:
             raise ValueError('Official field definition changed: ' + group + '.' + name)
         annotations, kind, default = match.groups()
@@ -31,7 +31,11 @@ for group, (path, names) in sources.items():
         if not description:
             raise ValueError('Missing source description: ' + name)
         fields = {'type': kind, 'description': json.loads(description.group(1))}
-        if kind == 'boolean':
+        if kind == 'KList<String>':
+            if default != 'new KList<>()' or '@ArrayType(type = String.class, min = 1)' not in annotations:
+                raise ValueError('Changed array definition: ' + name)
+            fields.update(type='stringArray', default='[]', prefixes=str(name == 'disabled').lower())
+        elif kind == 'boolean':
             if default not in ('true', 'false'):
                 raise ValueError('Nonliteral boolean default: ' + name)
             fields['default'] = default
