@@ -1,4 +1,4 @@
-param([string]$WorkDirectory = (Join-Path $PSScriptRoot '../.work'))
+param([string]$WorkDirectory = (Join-Path $PSScriptRoot '../.work'), [switch]$StructurePlanning)
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 $java = Get-Java25
 $env:JAVA_HOME = Split-Path (Split-Path $java -Parent) -Parent
@@ -15,8 +15,8 @@ foreach ($name in @('iris','volmlib','pack')) {
 }
 $compatibilityHash = (Get-FileHash -LiteralPath (Join-Path $root $lock.volmlib.windowsCompatibility.path) -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($compatibilityHash -ne $lock.volmlib.windowsCompatibility.sha256) { throw 'Windows compatibility source hash mismatch.' }
-$reportRoot = Join-Path $root 'build/overworld-context'
-if (Test-Path -LiteralPath $reportRoot) { throw 'build/overworld-context exists. Remove generated output explicitly before another audit.' }
+$reportRoot = Join-Path $root $(if ($StructurePlanning) { 'build/overworld-structures' } else { 'build/overworld-context' })
+if (Test-Path -LiteralPath $reportRoot) { throw "$reportRoot exists. Remove generated output explicitly before another audit." }
 $null = New-Item -ItemType Directory -Force -Path $reportRoot
 Copy-Item -LiteralPath $lockPath -Destination (Join-Path $reportRoot 'inputs.lock.json')
 $env:IRIS_VISUALIZER_ROOT = $root
@@ -28,6 +28,7 @@ $env:IRIS_VISUALIZER_MINECRAFT_VERSION = $lock.minecraft
 $env:IRIS_VISUALIZER_PACK_REVISION = $lock.pack.revision
 $env:IRIS_VISUALIZER_PACK = Join-Path $work 'pack'
 $env:IRIS_VISUALIZER_OVERWORLD_REPORT = $reportRoot
+$env:IRIS_VISUALIZER_STRUCTURE_PLANNING = $StructurePlanning.IsPresent.ToString().ToLowerInvariant()
 Invoke-Checked (Join-Path $work 'iris/gradlew.bat') @('--no-daemon', '--max-workers=4', '--console=plain',
     '-p', (Join-Path $work 'iris'), '-I', (Join-Path $root 'gradle/feasibility.init.gradle'),
     "-PlocalVolmLibDirectory=$(Join-Path $work 'volmlib')", ':adapters:bukkit:nms:v26_3_R1:visualizerOverworldContext')
@@ -42,5 +43,16 @@ if (-not ($placements | Where-Object { $_.structureKey -eq 'minecraft:ancient_ci
 $blockers = Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'preview-blockers.tsv')
 foreach ($code in @('NATIVE_WORLD_INCOMPLETE','NATIVE_PLACEMENT_INCOMPLETE','NATIVE_BASELINE_MISSING','MEMORY_BUDGET_UNCONFIRMED')) {
     if (-not ($blockers | Where-Object { $_.code -eq $code })) { throw "Missing preview blocker: $code" }
+}
+if ($StructurePlanning) {
+    foreach ($expected in @('structurePlanningPassed=true','ancientCityFactoryComparisons=2','missingOriginHaloRejected=true',
+            'ancientCityOriginReferenceRetained=true','historyDirectoryAbsent=true','workspaceDeleted=true',
+            'structureBlocksPlaced=false','featuresGenerated=false','nativeParity=NOT_TESTED')) {
+        if ($report -notmatch ('(?m)^' + [regex]::Escape($expected) + '\r?$')) { throw "Missing structure result: $expected" }
+    }
+    $starts = Import-Csv -Delimiter "`t" -LiteralPath (Join-Path $reportRoot 'structure-starts.tsv')
+    $cities = @($starts | Where-Object { $_.structure -eq 'minecraft:ancient_city' -and $_.configuredOwnership -eq 'true' -and [int]$_.pieces -gt 0 })
+    if ($cities.Count -lt 2) { throw 'Native structure proof did not retain both configured ancient cities.' }
+    Write-Host 'PASS: real Overworld native structure starts, ownership, direct factory comparison and radius-eight origin references. Block placement and native features remain unverified.'
 }
 Write-Host 'PASS: native Overworld context audit and readiness gate. Complete native preview remains blocked; parity is not claimed.'
