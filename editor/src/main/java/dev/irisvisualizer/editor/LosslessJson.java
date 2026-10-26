@@ -34,7 +34,7 @@ public final class LosslessJson {
     /** Explicitly inserts one absent numeric/boolean field; existing source text is retained. */
     public byte[] enable(String field, String value) {
         if (root.containsKey(field)) throw new IllegalArgumentException("Field is already present");
-        if (!field.matches("[A-Za-z][A-Za-z0-9]*") || !value.matches("true|false|-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))
+        if (!field.matches("[A-Za-z][A-Za-z0-9]*") || !value.equals("[]") && !value.matches("true|false|-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))
             throw new IllegalArgumentException("Invalid scalar field definition");
         int position;
         String prefix;
@@ -53,6 +53,56 @@ public final class LosslessJson {
     public byte[] numberPath(String path, double value) { return updatePath(path, (doc, field) -> doc.number(field, value), false); }
     public byte[] boolPath(String path, boolean value) { return updatePath(path, (doc, field) -> doc.bool(field, value), false); }
     public byte[] enablePath(String path, String value) { return updatePath(path, (doc, field) -> doc.enable(field, value), true); }
+    private record StringEntry(Span span, String value) {}
+    private List<StringEntry> stringEntries(String field) {
+        Span container = root.get(field);
+        if (container == null) throw new IllegalArgumentException("Absent array must be explicitly enabled first");
+        at = container.start(); require('['); space();
+        List<StringEntry> entries = new ArrayList<>();
+        if (peek() == ']') return entries;
+        do {
+            space(); int start = at; String value = string();
+            entries.add(new StringEntry(new Span(start, at), value));
+            space(); if (peek() == ']') return entries; require(',');
+        } while (true);
+    }
+    public List<String> stringArrayPath(String path) {
+        int dot = path.indexOf('.');
+        if (dot >= 0) {
+            String parent = token(path.substring(0, dot));
+            if (parent == null) throw new IllegalArgumentException("Absent parent");
+            return new LosslessJson(parent.getBytes(StandardCharsets.UTF_8)).stringArrayPath(path.substring(dot + 1));
+        }
+        return stringEntries(path).stream().map(StringEntry::value).toList();
+    }
+    /** index == size appends; null removes an existing item. Unchanged item tokens remain intact. */
+    public byte[] stringArrayPath(String path, int index, String value) {
+        return updatePath(path, (doc, field) -> doc.stringArray(field, index, value), false);
+    }
+    private byte[] stringArray(String field, int index, String value) {
+        List<StringEntry> entries = stringEntries(field); int count = entries.size();
+        if (index < 0 || index > count || (value == null && index == count)) throw new IllegalArgumentException("Array index out of range");
+        if (value != null) {
+            String quoted = quote(value);
+            if (index < count) { Span span = entries.get(index).span(); return splice(span.start(), span.end(), quoted); }
+            int position = count == 0 ? root.get(field).start() + 1 : entries.get(count-1).span().end();
+            return splice(position, position, (count == 0 ? "" : ", ") + quoted);
+        }
+        Span span = entries.get(index).span();
+        if (count == 1) return splice(span.start(), span.end(), "");
+        if (index < count-1) return splice(span.start(), entries.get(index+1).span().start(), "");
+        return splice(entries.get(index-1).span().end(), span.end(), "");
+    }
+    private static String quote(String value) {
+        StringBuilder out = new StringBuilder("\"");
+        for (int i=0;i<value.length();i++) {
+            char c = value.charAt(i);
+            if (c == '\\' || c == '"') out.append('\\').append(c);
+            else if (c < 32) out.append(String.format("\\u%04x", (int)c));
+            else out.append(c);
+        }
+        return out.append('"').toString();
+    }
     private byte[] updatePath(String path, java.util.function.BiFunction<LosslessJson, String, byte[]> operation, boolean create) {
         int dot = path.indexOf('.');
         if (dot < 0) return operation.apply(this, path);

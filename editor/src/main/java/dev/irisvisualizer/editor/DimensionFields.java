@@ -15,16 +15,30 @@ public final class DimensionFields {
     public static final List<String> EDITABLE = List.of("fluidHeight", "dimensionAngleDeg", "landChance", "objectSurfaceSupportBuffer",
             "bedrock", "decorate", "carvingEnabled", "postProcessing", "postProcessingSlabs",
             "postProcessingWalls", "requireObjectSurfaceSupport", "importedStructures.undergroundYShift",
-            "importedStructures.datapackOverrides", "importedFeatures.enabled");
+            "importedStructures.datapackOverrides", "importedFeatures.enabled",
+            "importedStructures.disabled", "importedStructures.disabledExact",
+            "importedFeatures.disabled", "importedFeatures.disabledExact");
     public static boolean dimension(String path) { return path.startsWith("dimensions/") && path.substring(11).indexOf('/') < 0 && path.endsWith(".json"); }
     private static void authorize(String path, String field) {
         if (!dimension(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Field is read-only");
+    }
+    public static boolean arrayField(String field) { return "stringArray".equals(DEFINITIONS.getProperty(field + ".type")); }
+    public static byte[] editArray(String path, byte[] original, String field, int index, String value) {
+        authorize(path, field);
+        if (!arrayField(field)) throw new IllegalArgumentException("Field is not a string array");
+        // Syntax only: registries are not available to this editor. Existing strings remain untouched.
+        if (value != null) {
+            boolean prefixes = "true".equals(DEFINITIONS.getProperty(field + ".prefixes"));
+            String pattern = prefixes ? "[a-z0-9_.-]+:[a-z0-9/._-]*" : "[a-z0-9_.-]+:[a-z0-9/._-]+";
+            if (!value.matches(pattern)) throw new IllegalArgumentException("Enter a lowercase namespace:key" + (prefixes ? " (namespace: is also allowed)" : ""));
+        }
+        return new LosslessJson(original).stringArrayPath(field, index, value);
     }
     public static boolean booleanField(String field) { return "boolean".equals(DEFINITIONS.getProperty(field + ".type")); }
     public static String defaultToken(String field) {
         if (!EDITABLE.contains(field)) throw new IllegalArgumentException("Field is read-only");
         String value = DEFINITIONS.getProperty(field + ".default");
-        return booleanField(field) ? value : new java.math.BigDecimal(value).stripTrailingZeros().toPlainString();
+        return booleanField(field) || arrayField(field) ? value : new java.math.BigDecimal(value).stripTrailingZeros().toPlainString();
     }
     public static byte[] enable(String path, byte[] original, String field) {
         authorize(path, field);
@@ -40,7 +54,7 @@ public final class DimensionFields {
     public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum")); }
     public static byte[] edit(String path, byte[] original, String field, double value) {
         authorize(path, field);
-        if (booleanField(field)) throw new IllegalArgumentException("Boolean field requires true or false");
+        if (booleanField(field) || arrayField(field)) throw new IllegalArgumentException("Field requires its typed control");
         if (!Double.isFinite(value) || value < min(field) || value > max(field)
                 || (DEFINITIONS.getProperty(field + ".type").equals("int") && value != Math.rint(value)))
             throw new IllegalArgumentException("Value violates the pinned Iris field constraints");
