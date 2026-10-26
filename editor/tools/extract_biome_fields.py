@@ -34,4 +34,13 @@ reference = re.search(r'@RegistryListResource\(IrisGenerator.class\)\s+@Descript
 if not array or not reference: raise ValueError('Changed official biome generator list/reference default')
 for key, value in [('generators.minimumEntries',array.group(1)),('generators.defaultGenerator',json.loads(reference.group(2))),('generators.description',json.loads(array.group(2))),('generators.referenceDescription',json.loads(reference.group(1)))]:
     lines.append(key+'='+value.replace('\\','\\\\').replace('\n','\\n').replace('\r','\\r'))
+children = re.search(r'((?:    @[^\n]+\n)+)    private KList<String> children = new KList<>\(\);', biome)
+if not children or '@RegistryListResource(IrisBiome.class)' not in children.group(1):
+    raise ValueError('Changed child biome list/default')
+annotations = children.group(1)
+minimum = re.search(r'@ArrayType\(min = (\d+), type = String.class\)',annotations)
+description = re.search(r'@Description\(("(?:[^"\\]|\\.)*")\)',annotations)
+if not minimum or not description: raise ValueError('Changed child biome annotations')
+for key,value in [('children.default','[]'),('children.required',str('@Required' in annotations).lower()),('children.minimumEntries',minimum.group(1)),('children.description',json.loads(description.group(1)))]:
+    lines.append(key+'='+value.replace('\\','\\\\').replace('\n','\\n').replace('\r','\\r'))
 Path(sys.argv[3]).write_bytes(('\n'.join(lines) + '\n').encode('ascii'))

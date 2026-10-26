@@ -2,7 +2,6 @@ package dev.irisvisualizer.editor;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
@@ -25,10 +24,7 @@ public final class BiomeGeneratorLinks {
         if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Biome generator list is read-only");
     }
     public static List<String> choices(PackWorkspace workspace) {
-        return workspace.paths().stream().filter(path -> GeneratorFields.generator(path))
-                .map(path -> path.substring("generators/".length(), path.length()-5))
-                .filter(key -> !key.isBlank() && Arrays.stream(key.split("/",-1)).noneMatch(part -> part.isEmpty() || part.equals(".") || part.equals("..")))
-                .sorted().toList();
+        return ResourceTypes.referenceKeys(workspace,"generators");
     }
     private static void requireKey(PackWorkspace workspace, String key) {
         if (key == null || !choices(workspace).contains(key)) throw new IllegalArgumentException("Choose an exact generator key present in this pack; aliases and target contents are not checked");

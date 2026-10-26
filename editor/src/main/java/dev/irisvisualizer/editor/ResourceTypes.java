@@ -2,6 +2,17 @@ package dev.irisvisualizer.editor;
 
 /** Supported JSON families and explicitly permitted opaque asset file operations. */
 public final class ResourceTypes {
+    public static boolean referenceKey(String key) {
+        return key != null && !key.isBlank() && !key.contains("\\") && !key.contains(":")
+                && java.util.Arrays.stream(key.split("/",-1)).noneMatch(part -> part.isEmpty() || part.equals(".") || part.equals(".."));
+    }
+    /** Syntax and exact file presence only; no target-content validation or loader alias resolution. */
+    public static java.util.List<String> referenceKeys(PackWorkspace workspace, String family) {
+        if (!java.util.Set.of("dimensions","regions","biomes","generators").contains(family))
+            throw new IllegalArgumentException("Unsupported resource reference family");
+        return workspace.paths().stream().filter(path -> family.equals(base(path)))
+                .map(path -> path.substring(family.length()+1,path.length()-5)).filter(ResourceTypes::referenceKey).sorted().toList();
+    }
     public static String base(String path) {
         if (path == null || !path.endsWith(".json") || path.contains("\\") || path.contains(":")) return null;
         String[] parts = path.split("/", -1);

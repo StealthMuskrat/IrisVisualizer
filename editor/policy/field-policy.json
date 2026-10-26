@@ -221,6 +221,10 @@
     "childStyle": {
       "classification": "generation",
       "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
+    },
+    "children": {
+      "classification": "generation",
+      "reason": "Controls child-biome placement through explicit exact-file links; source-default empty lists and documented cycles are preserved."
     }
   },
   "generator": {

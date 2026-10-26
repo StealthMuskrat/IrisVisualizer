@@ -21,25 +21,29 @@ public final class ReferenceDiagnostics {
                         list(workspace, document, field, "biomes", field.equals("landBiomes"), links);
                 }
                 case "biomes" -> {
-                    if (document.token("generators") == null) {
-                        links.add(new Link("generators", "Implicit defaults not inspected", null, State.UNSUPPORTED)); break;
-                    }
-                    try {
-                        List<LosslessJson> entries = document.objectArray("generators");
-                        for (int index=0;index<entries.size();index++) {
-                            String field = "generators[" + index + "].generator";
-                            try {
-                                String key = entries.get(index).stringToken("generator");
-                                if (key == null) links.add(new Link(field, "Implicit default not inspected", null, State.UNSUPPORTED));
-                                else links.add(link(workspace, field, key, "generators"));
-                            } catch (IllegalArgumentException mismatch) { links.add(new Link(field, "Non-string reference", null, State.UNSUPPORTED)); }
-                        }
-                    } catch (IllegalArgumentException mismatch) { links.add(new Link("generators", "Snippet/mixed/non-object list", null, State.UNSUPPORTED)); }
+                    biomeGenerators(workspace,document,links);
+                    list(workspace,document,"children","biomes",BiomeChildren.required(),links);
                 }
                 default -> { }
             }
         } catch (IllegalArgumentException invalid) { links.add(new Link("JSON", "Invalid/ambiguous JSON", null, State.UNSUPPORTED)); }
         return List.copyOf(links);
+    }
+    private static void biomeGenerators(PackWorkspace workspace, LosslessJson document, List<Link> links) {
+        if (document.token("generators") == null) {
+            links.add(new Link("generators", "Implicit defaults not inspected", null, State.UNSUPPORTED)); return;
+        }
+        try {
+            List<LosslessJson> entries = document.objectArray("generators");
+            for (int index=0;index<entries.size();index++) {
+                String field = "generators[" + index + "].generator";
+                try {
+                    String key = entries.get(index).stringToken("generator");
+                    if (key == null) links.add(new Link(field, "Implicit default not inspected", null, State.UNSUPPORTED));
+                    else links.add(link(workspace, field, key, "generators"));
+                } catch (IllegalArgumentException mismatch) { links.add(new Link(field, "Non-string reference", null, State.UNSUPPORTED)); }
+            }
+        } catch (IllegalArgumentException mismatch) { links.add(new Link("generators", "Snippet/mixed/non-object list", null, State.UNSUPPORTED)); }
     }
     private static void list(PackWorkspace workspace, LosslessJson document, String field, String type, boolean required, List<Link> links) {
         if (document.token(field) == null) {
@@ -53,7 +57,7 @@ public final class ReferenceDiagnostics {
         } catch (IllegalArgumentException mismatch) { links.add(new Link(field, "Non-string or unsupported list", null, State.UNSUPPORTED)); }
     }
     private static Link link(PackWorkspace workspace, String field, String key, String type) {
-        if (key.isEmpty() || key.contains("\\") || key.contains(":") || Arrays.stream(key.split("/", -1)).anyMatch(part -> part.isEmpty() || part.equals(".") || part.equals("..")))
+        if (!ResourceTypes.referenceKey(key))
             return new Link(field, key, null, State.INVALID_KEY);
         String target = type + "/" + key + ".json";
         return new Link(field, key, target, workspace.paths().contains(target) ? State.EXACT_FILE : State.NO_EXACT_FILE);
