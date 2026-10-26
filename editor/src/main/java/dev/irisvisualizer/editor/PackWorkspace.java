@@ -10,6 +10,8 @@ public final class PackWorkspace {
     private final NavigableMap<String, byte[]> files = new TreeMap<>();
     private final Set<String> changed = new HashSet<>();
     private final Set<String> directories = new TreeSet<>();
+    private final Map<String, byte[]> savedHashes = new HashMap<>();
+    private final Set<String> foldedFiles = new HashSet<>();
     private Path directory;
     public static final long MAX_BYTES = 512L * 1024 * 1024;
     public static final int MAX_FILES = 100_000;
@@ -35,7 +37,7 @@ public final class PackWorkspace {
                 } else throw new IOException("Unsupported pack entry: " + path);
             }
         }
-        return result;
+        result.validatePaths(); return result;
     }
     public static PackWorkspace importZip(Path archive) throws IOException {
         PackWorkspace result = empty(); long total = 0;
@@ -76,25 +78,45 @@ public final class PackWorkspace {
     }
     public void save(Path target) throws IOException {
         target = target.toAbsolutePath().normalize();
-        Files.createDirectories(target);
-        if (Files.isSymbolicLink(target)) throw new IOException("Destination is a symbolic link");
-        boolean same = directory != null && target.toRealPath().equals(directory);
+        rejectLinks(target);
+        boolean same = directory != null && Files.exists(target) && target.toRealPath().equals(directory);
         validatePaths();
         for (String key : directories) checkedTarget(target, key);
         for (String key : files.keySet()) checkedTarget(target, key);
+        // Preflight every planned write before creating directories or changing any files.
+        for (String key : directories) if (Files.exists(target.resolve(key)) && !Files.isDirectory(target.resolve(key)))
+            throw new IOException("Destination directory is occupied by a file: " + key);
+        for (String key : files.keySet()) {
+            if (same && !changed.contains(key)) continue;
+            Path file = target.resolve(key);
+            if (Files.exists(file)) {
+                if (!same) throw new IOException("Destination already contains resource: " + key + ". Choose an empty folder.");
+                if (!Files.isRegularFile(file) || !Arrays.equals(savedHashes.get(key), hashFile(file)))
+                    throw new IOException("Resource changed outside the editor: " + key + ". Reopen the pack to review disk changes before saving.");
+            } else if (same) throw new IOException("Resource was removed outside the editor: " + key);
+        }
+        Files.createDirectories(target);
         for (String key : directories) Files.createDirectories(target.resolve(key));
         for (var entry : files.entrySet()) {
             if (same && !changed.contains(entry.getKey())) continue;
             Path file = target.resolve(entry.getKey()); Files.createDirectories(file.getParent());
-            Files.write(file, entry.getValue());
+            Files.write(file, entry.getValue(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            savedHashes.put(entry.getKey(), hash(entry.getValue()));
         }
-        directory = target.toRealPath(); changed.clear();
+        directory = target.toRealPath();
+        for (var entry : files.entrySet()) savedHashes.put(entry.getKey(), hash(entry.getValue()));
+        changed.clear();
     }
-    public void exportZip(Path archive) throws IOException {
+    public void exportZip(Path archive) throws IOException { exportZip(archive, false); }
+    public void exportZip(Path archive, boolean replaceExisting) throws IOException {
         Path destination = archive.toAbsolutePath().normalize();
+        rejectLinks(destination);
         if (directory != null && destination.startsWith(directory)) throw new IOException("Export ZIP outside the open pack directory");
         validatePaths();
-        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destination))) {
+        OpenOption[] options = replaceExisting
+                ? new OpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS}
+                : new OpenOption[]{StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS};
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destination, options))) {
             for (String key : directories) { zip.putNextEntry(new ZipEntry(key + "/")); zip.closeEntry(); }
             for (var entry : files.entrySet()) {
                 zip.putNextEntry(new ZipEntry(entry.getKey())); zip.write(entry.getValue()); zip.closeEntry();
@@ -103,23 +125,49 @@ public final class PackWorkspace {
     }
     private void add(String key, byte[] bytes) throws IOException {
         if (files.size() >= MAX_FILES) throw new IOException("Too many pack files");
-        if (files.keySet().stream().anyMatch(name -> name.equalsIgnoreCase(key))) throw new IOException("Conflicting resource paths: " + key);
-        files.put(key, bytes);
+        if (!foldedFiles.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource paths: " + key);
+        files.put(key, bytes); savedHashes.put(key, hash(bytes));
     }
     private void validatePaths() throws IOException {
-        Set<String> folded = new HashSet<>();
-        for (String key : files.keySet()) folded.add(key.toLowerCase(Locale.ROOT));
-        for (String key : files.keySet()) {
-            for (int slash = key.indexOf('/'); slash >= 0; slash = key.indexOf('/', slash + 1))
-                if (folded.contains(key.substring(0, slash).toLowerCase(Locale.ROOT))) throw new IOException("File/directory path collision: " + key);
+        Map<String, String> spellings = new HashMap<>(); Set<String> folders = new HashSet<>();
+        List<String> all = new ArrayList<>(files.keySet()); all.addAll(directories);
+        for (String key : all) {
+            String[] parts = key.split("/"); String current = "";
+            for (int i=0;i<parts.length;i++) {
+                current += (i == 0 ? "" : "/") + parts[i];
+                String folded = current.toLowerCase(Locale.ROOT), prior = spellings.putIfAbsent(folded, current);
+                if (prior != null && !prior.equals(current)) throw new IOException("Conflicting Windows path spelling: " + current);
+                if (i < parts.length-1 || directories.contains(key)) folders.add(folded);
+            }
         }
-        for (String key : directories) if (folded.contains(key.toLowerCase(Locale.ROOT))) throw new IOException("File/directory path collision: " + key);
+        for (String file : files.keySet()) if (folders.contains(file.toLowerCase(Locale.ROOT)))
+            throw new IOException("File/directory path collision: " + file);
+    }
+    private static byte[] hash(byte[] bytes) {
+        try { return java.security.MessageDigest.getInstance("SHA-256").digest(bytes); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
+    }
+    private static byte[] hashFile(Path path) throws IOException {
+        try {
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
+                byte[] buffer = new byte[8192]; int count;
+                while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+            }
+            return digest.digest();
+        } catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
+    }
+    private static void rejectLinks(Path path) throws IOException {
+        for (Path part = path; part != null; part = part.getParent())
+            if (Files.isSymbolicLink(part)) throw new IOException("Destination contains a symbolic link: " + part);
     }
     private static Path checkedTarget(Path root, String key) throws IOException {
         Path current = root;
         for (String part : key.split("/")) {
             current = current.resolve(part);
             if (Files.isSymbolicLink(current)) throw new IOException("Destination contains a symbolic link: " + current);
+            if (!current.equals(root.resolve(key)) && Files.exists(current) && !Files.isDirectory(current))
+                throw new IOException("Destination path component is not a directory: " + current);
         }
         return current;
     }
