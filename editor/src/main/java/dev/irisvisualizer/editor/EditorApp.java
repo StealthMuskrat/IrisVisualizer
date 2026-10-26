@@ -269,7 +269,7 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
-        ImGui.textWrapped("Other region fields, including shore height ranges, remain read-only.");
+        ImGui.textWrapped("Other region fields remain read-only.");
     }
     private void drawGenerator(LosslessJson document) {
         for (String field : GeneratorFields.EDITABLE) {
@@ -301,6 +301,7 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        if (ImGui.collapsingHeader("Interpolation method")) drawInterpolation(document);
         if (ImGui.collapsingHeader("Cliff height noise")) {
             ImGui.textWrapped("Cliff shaping is active when cliffHeightMax is positive. Enable individual fields to configure its noise.");
             String token = document.token("cliffHeightGenerator");
@@ -308,7 +309,31 @@ public final class EditorApp extends Application {
             catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Cliff noise is a snippet or unsupported value (read-only)."); }
         }
         if (ImGui.collapsingHeader("Composite noise entries")) drawNoise(document);
-        ImGui.textWrapped("Noise styles, fracture trees, interpolation methods and other fields remain read-only.");
+        ImGui.textWrapped("Noise styles, fracture trees and other fields remain read-only.");
+    }
+    private void drawInterpolation(LosslessJson document) {
+        ImGui.textWrapped(InterpolationFields.description());
+        String current;
+        try { current = document.stringPath("interpolator.function"); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored interpolation value is not an editable string/object (read-only)."); return; }
+        if (current == null) {
+            if (ImGui.button("Enable " + InterpolationFields.defaultValue())) {
+                try { workspace.replace(selected, InterpolationFields.enable(selected, workspace.read(selected))); error = null; }
+                catch (Exception failure) { error = failure.getMessage(); }
+            }
+            return;
+        }
+        if (!InterpolationFields.choices().contains(current)) ImGui.textWrapped("Stored method is unrecognized. Choosing a listed method replaces it.");
+        if (ImGui.beginCombo("Method", current.length() > 128 ? "Unrecognized method" : current)) {
+            for (String choice : InterpolationFields.choices()) {
+                if (ImGui.selectable(choice, choice.equals(current))) {
+                    try { workspace.replace(selected, InterpolationFields.edit(selected, workspace.read(selected), choice)); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+                if (ImGui.isItemHovered()) ImGui.setTooltip(InterpolationFields.description(choice));
+            }
+            ImGui.endCombo();
+        }
     }
     private void drawNoise(LosslessJson document) {
         List<LosslessJson> entries;
@@ -386,7 +411,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             } else {
-                ImGui.text("Range: " + BiomeFields.min(field) + " .. " + BiomeFields.max(field));
+                ImGui.textWrapped(BiomeFields.constraints(field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
                 ImGui.inputText("Value", input); drafts.update(key, token, input.get());
                 if (ImGui.button("Apply")) {
@@ -614,7 +639,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

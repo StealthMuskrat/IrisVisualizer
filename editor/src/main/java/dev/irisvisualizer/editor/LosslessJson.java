@@ -72,6 +72,20 @@ public final class LosslessJson {
     public byte[] integerPath(String path, long value) { return updatePath(path, (doc, field) -> doc.integer(field, value), false); }
     public byte[] numberPath(String path, double value) { return updatePath(path, (doc, field) -> doc.number(field, value), false); }
     public byte[] boolPath(String path, boolean value) { return updatePath(path, (doc, field) -> doc.bool(field, value), false); }
+    public byte[] stringPath(String path, String value) { return updatePath(path, (doc, field) -> doc.stringValue(field, value), false); }
+    public String stringPath(String path) {
+        int dot = path.indexOf('.');
+        if (dot < 0) return stringToken(path);
+        String parent = token(path.substring(0, dot));
+        return parent == null ? null : new LosslessJson(parent.getBytes(StandardCharsets.UTF_8)).stringPath(path.substring(dot+1));
+    }
+    public byte[] enableStringPath(String path, String value) {
+        return updatePath(path, (doc, field) -> {
+            var inserted = new LosslessJson(doc.enable(field, "0"));
+            Span span = inserted.root.get(field);
+            return inserted.splice(span.start(), span.end(), quote(value));
+        }, true);
+    }
     public byte[] enablePath(String path, String value) { return updatePath(path, (doc, field) -> doc.enable(field, value), true); }
     private record StringEntry(Span span, String value) {}
     private List<StringEntry> stringEntries(String field) {

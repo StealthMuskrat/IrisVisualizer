@@ -12,7 +12,7 @@ public final class RegionFields {
             DEFINITIONS.load(input);
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
-    public static final List<String> EDITABLE = List.of("rarity", "shoreHeightZoom", "shoreMinimumWidth", "landBiomeZoom", "shoreBiomeZoom", "seaBiomeZoom", "caveBiomeZoom", "landBiomes", "seaBiomes", "shoreBiomes", "caveBiomes");
+    public static final List<String> EDITABLE = List.of("rarity", "shoreHeightZoom", "shoreHeightMin", "shoreHeightMax", "shoreMinimumWidth", "landBiomeZoom", "shoreBiomeZoom", "seaBiomeZoom", "caveBiomeZoom", "landBiomes", "seaBiomes", "shoreBiomes", "caveBiomes");
     public static boolean region(String path) { return "regions".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, String field) {
         if (!region(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Region field is read-only");

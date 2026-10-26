@@ -7,7 +7,7 @@ from pathlib import Path
 source = Path(sys.argv[1]).read_bytes()
 text = source.decode('utf-8')
 lines = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f', 'sourceSha256=' + hashlib.sha256(source).hexdigest()]
-for name in ['rarity', 'shoreHeightZoom', 'shoreMinimumWidth', 'landBiomeZoom', 'shoreBiomeZoom', 'seaBiomeZoom', 'caveBiomeZoom', 'landBiomes', 'seaBiomes', 'shoreBiomes', 'caveBiomes']:
+for name in ['rarity', 'shoreHeightZoom', 'shoreHeightMin', 'shoreHeightMax', 'shoreMinimumWidth', 'landBiomeZoom', 'shoreBiomeZoom', 'seaBiomeZoom', 'caveBiomeZoom', 'landBiomes', 'seaBiomes', 'shoreBiomes', 'caveBiomes']:
     match = re.search(r'((?:    @[^\n]+\n)+)    private (int|double|KList<String>) ' + name + r' = ([^;]+);', text)
     if not match: raise ValueError('Changed region field: ' + name)
     annotations, kind, default = match.groups()

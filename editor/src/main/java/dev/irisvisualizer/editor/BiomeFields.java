@@ -12,15 +12,20 @@ public final class BiomeFields {
             DEFINITIONS.load(input);
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
-    public static final List<String> EDITABLE = List.of("rarity", "caveMinDepthBelowSurface", "oreDepositFrequencyMultiplier", "oreDepositSizeMultiplier", "lockLayers", "mergeFloatingChildBiomes");
+    public static final List<String> EDITABLE = List.of("rarity", "caveMinDepthBelowSurface", "oreDepositFrequencyMultiplier", "oreDepositSizeMultiplier", "lockLayers", "mergeFloatingChildBiomes", "lockLayersMax", "childShrinkFactor");
     public static boolean biome(String path) { return "biomes".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, String field) {
         if (!biome(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Biome field is read-only");
     }
     public static boolean booleanField(String field) { return "boolean".equals(DEFINITIONS.getProperty(field + ".type")); }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
-    public static double min(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".minimum")); }
-    public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum")); }
+    public static double min(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".minimum", "-Infinity")); }
+    public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum", "Infinity")); }
+    public static String constraints(String field) {
+        String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
+        return ("int".equals(DEFINITIONS.getProperty(field + ".type")) ? "Signed 32-bit integer" : "Finite number")
+                + (min == null ? "" : ", minimum " + min) + (max == null ? "" : ", maximum " + max);
+    }
     public static String defaultToken(String field) {
         if (!EDITABLE.contains(field)) throw new IllegalArgumentException("Field is read-only");
         String token = DEFINITIONS.getProperty(field + ".default");
@@ -29,7 +34,7 @@ public final class BiomeFields {
     public static byte[] enable(String path, byte[] original, String field) { authorize(path, field); return new LosslessJson(original).enable(field, defaultToken(field)); }
     private static void checkNumber(String field, double value) {
         if (booleanField(field) || !Double.isFinite(value) || value < min(field) || value > max(field)
-                || ("int".equals(DEFINITIONS.getProperty(field + ".type")) && value != Math.rint(value)))
+                || ("int".equals(DEFINITIONS.getProperty(field + ".type")) && (value != Math.rint(value) || value < Integer.MIN_VALUE || value > Integer.MAX_VALUE)))
             throw new IllegalArgumentException("Value violates pinned Iris biome constraints");
     }
     public static byte[] edit(String path, byte[] original, String field, double value) {

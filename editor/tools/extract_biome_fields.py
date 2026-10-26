@@ -5,7 +5,7 @@ import re
 import sys
 from pathlib import Path
 lines = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-for path, prefix, names in [(Path(sys.argv[1]), '', ['rarity', 'caveMinDepthBelowSurface', 'oreDepositFrequencyMultiplier', 'oreDepositSizeMultiplier', 'lockLayers', 'mergeFloatingChildBiomes']),
+for path, prefix, names in [(Path(sys.argv[1]), '', ['rarity', 'caveMinDepthBelowSurface', 'oreDepositFrequencyMultiplier', 'oreDepositSizeMultiplier', 'lockLayers', 'mergeFloatingChildBiomes', 'lockLayersMax', 'childShrinkFactor']),
                             (Path(sys.argv[2]), 'generators.', ['min', 'max'])]:
     source = path.read_bytes()
     lines.append((prefix or 'biome.') + 'sourceSha256=' + hashlib.sha256(source).hexdigest())
@@ -20,9 +20,10 @@ for path, prefix, names in [(Path(sys.argv[1]), '', ['rarity', 'caveMinDepthBelo
             if default not in ('true', 'false'): raise ValueError('Changed boolean default')
             fields['default'] = default
         else:
-            fields.update(minimum=float(re.search(r'@MinNumber\(([^)]+)\)', annotations).group(1)),
-                          maximum=float(re.search(r'@MaxNumber\(([^)]+)\)', annotations).group(1)),
-                          default=float(default.removesuffix('D')))
+            fields['default'] = float(default.removesuffix('D'))
+            for annotation, key in [('MinNumber', 'minimum'), ('MaxNumber', 'maximum')]:
+                bound = re.search('@' + annotation + r'\(([^)]+)\)', annotations)
+                if bound: fields[key] = float(bound.group(1))
         for key, value in fields.items():
             escaped = str(value).replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
             lines.append(prefix + name + '.' + key + '=' + escaped)

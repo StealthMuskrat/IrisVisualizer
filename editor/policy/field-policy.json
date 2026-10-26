@@ -181,6 +181,14 @@
     "loot": {
       "classification": "read-only",
       "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "lockLayersMax": {
+      "classification": "generation",
+      "reason": "Controls terrain layer depth or child biome distribution; annotations supply no additional bounds."
+    },
+    "childShrinkFactor": {
+      "classification": "generation",
+      "reason": "Controls terrain layer depth or child biome distribution; annotations supply no additional bounds."
     }
   },
   "generator": {
@@ -243,6 +251,10 @@
     "cliffHeightGenerator": {
       "classification": "generation",
       "reason": "Cliff shaping noise object; audited noise scalar controls only, with styles and fracture trees still read-only."
+    },
+    "interpolator": {
+      "classification": "generation",
+      "reason": "Interpolation object with source-derived horizontal scale and enum function controls."
     }
   },
   "region": {
@@ -313,6 +325,14 @@
     "loot": {
       "classification": "read-only",
       "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "shoreHeightMin": {
+      "classification": "generation",
+      "reason": "Controls shoreline height interpolation; only the source-defined minimum is enforced."
+    },
+    "shoreHeightMax": {
+      "classification": "generation",
+      "reason": "Controls shoreline height interpolation; only the source-defined minimum is enforced."
     }
   },
   "importedStructures": {
@@ -351,6 +371,10 @@
     "horizontalScale": {
       "classification": "generation",
       "reason": "Controls generator interpolation sampling scale."
+    },
+    "function": {
+      "classification": "generation",
+      "reason": "Source-derived interpolation method enum; unknown stored strings are preserved until explicitly replaced."
     }
   },
   "biomeGeneratorLink": {

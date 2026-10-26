@@ -7,11 +7,11 @@ Direct nonstatic/nontransient private fields in nine pinned source classes only.
 | dimension | 82 | 33 | 27 | 49 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 12 | 6 | 30 |
+| biome | 42 | 14 | 8 | 28 |
 | biomeGeneratorLink | 3 | 2 | 2 | 1 |
-| generator | 16 | 15 | 15 | 1 |
-| interpolator | 2 | 1 | 1 | 1 |
-| region | 27 | 17 | 11 | 10 |
+| generator | 16 | 16 | 16 | 0 |
+| interpolator | 2 | 2 | 2 | 0 |
+| region | 27 | 19 | 13 | 8 |
 | noise | 15 | 13 | 13 | 2 |
 
 ## dimension
@@ -28,7 +28,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `caveProfile`, `childShrinkFactor`, `childStyle`, `children`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `generators`, `layers`, `lockLayersMax`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `seaLayers`, `slab`, `structures`, `surfaceLayerFallback`, `surfaceOreReplaceableBlocks`, `terrain3D`, `vanillaDerivative`, `wall`.
+Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `caveProfile`, `childStyle`, `children`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `generators`, `layers`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `seaLayers`, `slab`, `structures`, `surfaceLayerFallback`, `surfaceOreReplaceableBlocks`, `terrain3D`, `vanillaDerivative`, `wall`.
 
 ## biomeGeneratorLink
 
@@ -36,15 +36,15 @@ Unclassified: `generator`.
 
 ## generator
 
-Unclassified: `interpolator`.
+Unclassified: none.
 
 ## interpolator
 
-Unclassified: `function`.
+Unclassified: none.
 
 ## region
 
-Unclassified: `caveProfile`, `depositVariants`, `deposits`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `shoreHeightMax`, `shoreHeightMin`, `structures`.
+Unclassified: `caveProfile`, `depositVariants`, `deposits`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `structures`.
 
 ## noise
 
