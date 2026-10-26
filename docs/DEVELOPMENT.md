@@ -7,7 +7,8 @@ Follow the attached specification. Keep batches small, with one concrete deliver
 | 1 — implemented | Pinned official-core feasibility harness and native-boundary report | Windows core generation proved; shutdown issues identified |
 | 2 — verified | Windows storage compatibility and cleanup | 17 contract assertions, 32 chunk runs with repeatability, source integrity and native boundary checks |
 | 3 — verified | Native registry/terrain feasibility fixture | 35,723 states; full-height 128 × 128 terrain; fresh-JVM repeatability; no history directory |
-| 4 | Production native context and current Overworld parity capture/comparison | Same pack bytes, Iris/dependency pins, seeds, coordinates and independent native baseline |
+| 4a — verified | Real Overworld native context and world-preview readiness gate | 12 regions/378 biomes; typed ancient-city reference; 96 MiB index allocation; 24 contract assertions; preview correctly blocked |
+| 4b | Complete native world context and Overworld comparison | Finish native structure/feature phases, confirm total memory budgets and compare an independent native baseline |
 | 5 | Typed preview context, in-memory isolation and generation scheduler | Latest-edit result, one active task, at most 10 polls/second, bounded caches |
 | 6 | Lossless pack directory and ZIP workspace | Unknown/invalid data and asset preservation; untouched bytes; no file history |
 | 7 | Typed resource operations and reference maintenance | Safe create/duplicate/rename/move/delete; dimension-location rules |

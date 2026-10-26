@@ -21,7 +21,7 @@ The declared ancient-city placement is reported with its resource type, resource
 
 ## Readiness policy
 
-`PreviewReadiness.evaluateWorld` accepts backend capabilities and verified evidence, not editable pack flags. It reports separate blockers for incomplete native world generation, explicit native placements requiring that path, a missing independent complete native baseline, and unconfirmed total memory budgets. Its result is immutable.
+`PreviewReadiness.evaluateWorld` accepts backend capabilities and verified build evidence, not editable pack flags. Baseline evidence concerns the pinned backend build and its development comparison suite; it must not require users to capture or approve a new baseline after each pack edit. It reports separate blockers for incomplete native world generation, explicit native placements requiring that path, a missing independent complete native baseline, and unconfirmed total memory budgets. Its result is immutable.
 
 This backend currently supplies all three capabilities as false. The expected real-pack result is `previewAllowed=false`. The audit must identify `minecraft:ancient_city` and keep all four blocker codes visible. File operations and editor workflows have no dependency on this gate; save/export implementation remains a later batch. This code must never be used to require pack changes or validation confirmation before saving.
 
@@ -33,4 +33,16 @@ The audit allocates and touches both 128 × 128/full-configured-height primitive
 
 The pinned offline native path stops at TERRAIN and does not complete all native structure/placed-feature behavior. Some paths need `ServerLevel` or CraftBukkit services, as confirmed by the existing upstream tests. Complete native generation and an independent matching Overworld baseline are required before this readiness gate can allow a faithful world preview. No custom replacement generation or file-history workflow is added here.
 
-Verification: pending Windows CI.
+## Verified result
+
+[Windows verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40356846358) for executable code commit `8665947c9480376bd855eb7bf2bf7b65853c6b74`.
+
+- All 24 contract assertions passed on Windows x64/Java 25 and locally.
+- Native registries and the in-memory generation contract loaded for 12 reachable regions and 378 biomes.
+- The declared `minecraft:ancient_city` reference was found and resolved in the native registry, with its exact dimension/resource field location.
+- Both 128 × 128/full-height index arrays were allocated and touched: 100,663,296 bytes (96 MiB) for Y = [-256,512). This is allocation evidence, not terrain generation or a total-memory measurement.
+- Source bytes were preserved, no world generation was attempted, no server was running, and the native context/workspace closed and was deleted successfully.
+- All four expected blocker codes remained present and `previewAllowed=false`.
+- Core repeatability, native-boundary tests and the native fixture's 35,723 state checks/128 chunk runs also remained green.
+
+The four blockers identify unfinished native world completion, the explicit native placement, missing independent native comparison evidence for the backend build, and unconfirmed total memory budgets. Full native generation and comparison remain the next part of batch 4.

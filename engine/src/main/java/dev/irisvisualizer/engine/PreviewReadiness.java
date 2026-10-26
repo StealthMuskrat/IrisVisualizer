@@ -7,7 +7,10 @@ import java.util.Objects;
 /** World-preview readiness. File operations and editor workflows never depend on this gate. */
 public final class PreviewReadiness {
     private PreviewReadiness() {}
-    /** Capabilities are supplied by the backend and verified evidence, never by editable pack settings. */
+    /**
+     * Capabilities describe the pinned backend build and its verification suite, not each user's pack edit.
+     * No per-edit baseline upload or confirmation is required. These flags never come from pack settings.
+     */
     public record Capabilities(boolean completeNativeWorld, boolean matchingIndependentBaseline,
                                boolean totalMemoryBudgetConfirmed) {}
     public record NativePlacement(String resourceType, String resourceKey, String propertyPath, String structureKey) {
