@@ -34,6 +34,10 @@ gradle.projectsEvaluated {
     }
     def nativeProject = gradle.rootProject.project(':adapters:bukkit:nms:v26_3_R1')
     nativeProject.sourceSets.offline.java.srcDir(new File(root, 'native-feasibility/src/main/java'))
+    // Reuse the pinned official finite WorldGenLevel fixture unchanged; no server is installed.
+    nativeProject.tasks.named('compileOfflineJava').configure {
+        source(nativeProject.file('src/test/java/art/arcane/iris/probe/OfflineFeatureWorld.java'))
+    }
     nativeProject.tasks.register('visualizerNativeFixture', JavaExec) {
         dependsOn(nativeProject.tasks.named('offlineClasses'))
         classpath = nativeProject.sourceSets.offline.runtimeClasspath
@@ -54,7 +58,8 @@ gradle.projectsEvaluated {
         jvmArgs('--add-modules=jdk.incubator.vector', '-Djava.awt.headless=true', '-XX:+ExitOnOutOfMemoryError')
         doFirst {
             args(System.getenv('IRIS_VISUALIZER_PACK'), System.getenv('IRIS_VISUALIZER_OVERWORLD_REPORT'))
-            if (System.getenv('IRIS_VISUALIZER_STRUCTURE_PLANNING') == 'true') args('structures')
+            if (System.getenv('IRIS_VISUALIZER_STRUCTURE_BLOCKS') == 'true') args('blocks')
+            else if (System.getenv('IRIS_VISUALIZER_STRUCTURE_PLANNING') == 'true') args('structures')
         }
     }
 }
