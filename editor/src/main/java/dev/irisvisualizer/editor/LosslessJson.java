@@ -25,6 +25,13 @@ public final class LosslessJson {
         String next = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
         return (text.substring(0, span.start()) + next + text.substring(span.end())).getBytes(StandardCharsets.UTF_8);
     }
+    public byte[] integer(String field, long value) {
+        Span span = root.get(field);
+        if (span == null) throw new IllegalArgumentException("Absent field must be explicitly enabled first");
+        try { new java.math.BigDecimal(token(field)).longValueExact(); }
+        catch (NumberFormatException | ArithmeticException invalid) { throw new IllegalArgumentException("Stored field is not a 64-bit integer", invalid); }
+        return splice(span.start(), span.end(), Long.toString(value));
+    }
     public byte[] bool(String field, boolean value) {
         String old = token(field);
         if (!"true".equals(old) && !"false".equals(old)) throw new IllegalArgumentException("Stored field is not boolean");
@@ -50,6 +57,7 @@ public final class LosslessJson {
         String parent = token(path.substring(0, dot));
         return parent == null ? null : new LosslessJson(parent.getBytes(StandardCharsets.UTF_8)).tokenPath(path.substring(dot + 1));
     }
+    public byte[] integerPath(String path, long value) { return updatePath(path, (doc, field) -> doc.integer(field, value), false); }
     public byte[] numberPath(String path, double value) { return updatePath(path, (doc, field) -> doc.number(field, value), false); }
     public byte[] boolPath(String path, boolean value) { return updatePath(path, (doc, field) -> doc.bool(field, value), false); }
     public byte[] enablePath(String path, String value) { return updatePath(path, (doc, field) -> doc.enable(field, value), true); }

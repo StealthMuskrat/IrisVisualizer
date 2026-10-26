@@ -171,6 +171,10 @@ public final class EditorApp extends Application {
                 try { drawBiome(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && GeneratorFields.generator(selected)) {
+                try { drawGenerator(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
                     ImGui.textWrapped(new String(workspace.read(selected), StandardCharsets.UTF_8));
@@ -181,6 +185,38 @@ public final class EditorApp extends Application {
         }
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+    }
+    private void drawGenerator(LosslessJson document) {
+        for (String field : GeneratorFields.EDITABLE) {
+            String token;
+            try { token = document.tokenPath(field); }
+            catch (IllegalArgumentException mismatch) { ImGui.textWrapped(field + ": parent is not an editable object"); continue; }
+            String key = "noise#" + field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(GeneratorFields.description(field));
+            if (token == null) {
+                if (ImGui.button("Enable (" + GeneratorFields.defaultToken(field) + ")")) {
+                    try { workspace.replace(selected, GeneratorFields.enable(selected, workspace.read(selected), field)); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else if (GeneratorFields.booleanField(field)) {
+                if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored type mismatch (read-only)");
+                else if (ImGui.checkbox("Enabled", token.equals("true"))) {
+                    try { workspace.replace(selected, GeneratorFields.editBoolean(selected, workspace.read(selected), field, !token.equals("true"))); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else {
+                ImGui.textWrapped(GeneratorFields.constraints(field));
+                ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
+                ImGui.inputText("Value", input); drafts.update(key, token, input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected, GeneratorFields.editText(selected, workspace.read(selected), field, input.get())); drafts.applied(key); values.remove(key); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        ImGui.textWrapped("Composite noise, interpolation methods and other fields remain read-only.");
     }
     private void drawBiome(LosslessJson document) {
         for (String field : BiomeFields.EDITABLE) {
@@ -367,7 +403,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
