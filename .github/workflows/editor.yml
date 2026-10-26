@@ -46,6 +46,7 @@ jobs:
             $output = (& $pwsh -NoProfile -File $launcher -CheckRuntime 2>&1 | Out-String)
             if ($LASTEXITCODE -eq 0 -or $output -notmatch 'Java 25 x64 runtime was not found') { throw 'Missing runtime was not clearly rejected' }
           } finally { $env:PATH = $originalPath; $env:JAVA_HOME = $originalJavaHome }
+          exit 0
       - uses: actions/upload-artifact@v4
         with:
           name: IrisVisualizer-windows-x64
