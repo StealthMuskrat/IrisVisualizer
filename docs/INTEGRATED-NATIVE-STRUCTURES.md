@@ -34,4 +34,19 @@ This milestone explicitly isolates the configured ancient-city placement; it doe
 
 The three overlay sources and generated outputs are hash-checked. The standalone stage adapter's source SHA-256 is checked by Gradle/scripts, recorded as `nativeStructureStageAdapterSha256`, and required by native baseline comparison. The earlier dispatcher hash and source/cleanup checks remain in force.
 
-Local verification passed: 30 contract assertions, all three overlay/source hashes and the actual offline Gradle generation/source-selection check. Windows native integration is pending for this larger milestone.
+[Windows x64/Java 25 integrated verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40374527799) for executable code commit `34ab981971a051a5bd7c4946f0a5d1a7ddca3215`.
+
+| Ancient-city origin | Input | Prepared chunks | Native stilt-palette lookups | Comparison |
+| --- | --- | ---: | ---: | --- |
+| -99, -21 | Actual Iris-generated terrain | 9 | 2,816 | All block states and stored biome cells match |
+| -99, -21 | Air-gap/floor fixture | 9 | 8,447 | All block states and stored biome cells match |
+| 42, 19 | Actual Iris-generated terrain | 9 | 69 | All block states and stored biome cells match |
+| 42, 19 | Air-gap/floor fixture | 9 | 8,497 | All block states and stored biome cells match |
+
+The engine generated 18 full-height native terrain chunks in total, reused as identical fresh staging inputs for the corresponding comparisons. All neighborhoods retain Y=[-256,512), with no height reduction. Both injected piece failures propagated through the native exception chain and called deferred-record invalidation exactly once. Original NBT and chunk statuses stayed unchanged; source bytes, no-history assertions, resource closure and scratch deletion passed. No staging result became a world preview.
+
+All 30 contract assertions passed locally and on Windows. The local offline Gradle check also verified exact generation/selection of the three pinned source overlays, excluding original duplicate classes. The standalone palette route uses real native block states; test-only legacy handles expose those same states through the getter expected by the pinned CraftBukkit API.
+
+This verifies the selected ancient-city stage on real generated inputs plus targeted support fixtures. Independent full-world parity, all-world selection/features and total/default-preview memory validation remain unfinished.
+
+All five Windows suites passed: core repeatability, native boundaries, full-size native fixture repeatability, Overworld context and the complete integrated structure proof.

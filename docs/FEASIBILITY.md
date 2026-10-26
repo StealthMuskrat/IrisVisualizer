@@ -149,3 +149,13 @@ At seed 1337, real ancient-city starts at origins (-99,-21) and (42,19) placed 2
 This establishes the tested native piece route on artificial inputs, not an assembled structure stage or complete world parity. Native preparation integration, foundations/stilts, features, remaining world services, independent full-native comparison and total memory checks remain unfinished. World-preview readiness stays blocked.
 
 All five Windows suites passed: core repeatability, native boundaries, full-size native fixture repeatability, Overworld context and the extended structure/template/piece proof.
+
+## Milestone 4c: integrated official native structure stage
+
+The [integrated native structure stage](INTEGRATED-NATIVE-STRUCTURES.md) passed on [Windows x64/Java 25](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40374527799) at code commit `34ab981971a051a5bd7c4946f0a5d1a7ddca3215`. Explicit host-service hooks share the original native stage body, retaining registry/start ordering, write guards, heightmaps, vegetation/surface preparation, native template carving, pieces, foundation/stilt palettes, repairs and finally-path invalidation. The standalone engine binding uses official Iris policy/current-session ownership and native palette states. It neither creates history nor invents missing ownership.
+
+The actual Iris engine generated 18 full-height native terrain chunks around the two configured ancient-city targets. Four comparisons over all prepared chunks matched full block-state and stored-biome digests: both real terrain neighborhoods and both targeted stilt-gap fixtures. Native palette lookups were 2,816/69 on generated terrain and 8,447/8,497 on gap fixtures. Every case retained Y=[-256,512), original NBT/status and identical initial inputs; biome data was preserved. Two injected dispatch failures propagated and triggered the original invalidation path exactly once. Source integrity, no-history, resource closure and scratch cleanup passed. All 30 contract assertions and local overlay source-generation/selection checks passed.
+
+This larger milestone tests the explicitly selected ancient-city stage through the complete native structure pipeline. All-world structure/reference selection, remaining feature/world services, independent full native baseline capture and total/default-preview memory validation remain unfinished. Readiness remains blocked and native parity remains NOT_TESTED.
+
+All five Windows suites passed: core repeatability, native boundaries, full-size native fixture repeatability, Overworld context and the complete integrated structure proof.

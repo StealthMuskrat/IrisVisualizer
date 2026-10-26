@@ -12,7 +12,7 @@ Follow the attached specification. Work in larger milestone batches, implementin
 | 4b.2 — boundary verified | Real-pack structure block service boundary | Both real ancient-city calls reach ServerLevel dependencies before writing blocks; exact failure stacks, unchanged inputs and cleanup |
 | 4b.3a — verified | Explicit native template services | Two native eroded carves without ServerLevel (9,616/9,740 blocks), full-height legacy comparison, 26 assertions and overlay provenance |
 | 4b.3b — verified | Native piece dispatch without plugin callbacks | 2,528/2,240 native blocks, 88/63 states, full-height runtime comparison, dispatch contracts and 28 metadata assertions |
-| 4c — implemented, verification pending | Integrated official native structure stage | Native ordering, terrain preparation, piece placement, palette foundations/stilts, repair and invalidation; generated-terrain and failure-path comparisons |
+| 4c — verified | Integrated official native structure stage | 18 generated chunks; four full-height state/biome comparisons; native palette stilts; two failure invalidation checks; 30 contract assertions |
 | 4d | Complete native world and independent comparison | Finish remaining world/feature services, confirm memory budgets and compare an independent full native baseline |
 | 5 | Typed preview context, in-memory isolation and generation scheduler | Latest-edit result, one active task, at most 10 polls/second, bounded caches |
 | 6 | Lossless pack directory and ZIP workspace | Unknown/invalid data and asset preservation; untouched bytes; no file history |
