@@ -3,6 +3,10 @@ package dev.irisvisualizer.editor;
 import imgui.ImGui;
 import imgui.app.Application;
 import imgui.app.Configuration;
+import imgui.app.WindowGlfw;
+import imgui.flag.ImGuiTreeNodeFlags;
+import static org.lwjgl.glfw.GLFW.*;
+import java.util.List;
 import imgui.type.ImString;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,10 +19,25 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
-    private boolean styled;
+    private boolean styled, closeRequested;
+    private final ImString filter = new ImString(256);
+    private String indexedFilter;
+    private PackWorkspace indexedWorkspace;
+    private List<ResourceTree.Node> resources = List.of();
+    @Override protected void preRun() {
+        long handle = ((WindowGlfw) getWindow()).getHandle();
+        glfwSetWindowCloseCallback(handle, window -> {
+            glfwSetWindowShouldClose(window, false);
+            closeRequested = true;
+        });
+    }
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
+        if (closeRequested) {
+            closeRequested = false;
+            if (replaceAllowed()) glfwSetWindowShouldClose(((WindowGlfw) getWindow()).getHandle(), true);
+        }
         if (!styled) { ImGui.styleColorsLight(); styled = true; }
         if (ImGui.beginMainMenuBar()) {
             if (ImGui.beginMenu("File")) {
@@ -26,20 +45,26 @@ public final class EditorApp extends Application {
                     if (ImGui.menuItem(action)) perform(action);
                 ImGui.endMenu();
             }
+            ImGui.text(workspace.dirty() ? "Unsaved changes" : "Saved / no applied changes");
             ImGui.endMainMenuBar();
         }
         float width = ImGui.getIO().getDisplaySizeX(), height = ImGui.getIO().getDisplaySizeY() - 24;
         ImGui.setNextWindowPos(0, 24); ImGui.setNextWindowSize(width * .24f, height);
         ImGui.begin("Resources");
-        for (String path : workspace.paths()) if (ImGui.selectable(path, path.equals(selected))) { selected = path; values.clear(); }
+        ImGui.inputText("Search", filter);
+        if (indexedWorkspace != workspace || !filter.get().equals(indexedFilter)) {
+            indexedWorkspace = workspace; indexedFilter = filter.get();
+            resources = ResourceTree.build(workspace.paths(), workspace.directories(), indexedFilter);
+        }
+        if (resources.isEmpty()) ImGui.textWrapped(workspace.paths().isEmpty() ? "No resources. Open a pack folder or import a ZIP." : "No matching resources.");
+        drawResources(resources);
         ImGui.end();
         ImGui.setNextWindowPos(width * .24f, 24); ImGui.setNextWindowSize(width * .48f, height);
         ImGui.begin("Visualization");
-        if (ImGui.beginTabBar("Preview modes")) {
-            if (ImGui.beginTabItem("2D")) { ImGui.textWrapped("Preview unavailable: native generation parity is not verified."); ImGui.endTabItem(); }
-            if (ImGui.beginTabItem("3D")) { ImGui.textWrapped("Preview unavailable: native generation parity is not verified."); ImGui.endTabItem(); }
-            ImGui.endTabBar();
-        }
+        ImGui.textWrapped("Preview unavailable: native generation parity is not verified.");
+        ImGui.beginDisabled();
+        ImGui.button("2D preview"); ImGui.sameLine(); ImGui.button("3D preview");
+        ImGui.endDisabled();
         ImGui.end();
         ImGui.setNextWindowPos(width * .72f, 24); ImGui.setNextWindowSize(width * .28f, height);
         ImGui.begin("Resource inspector");
@@ -57,7 +82,7 @@ public final class EditorApp extends Application {
                         ImGui.inputText(field, input);
                         ImGui.sameLine();
                         if (ImGui.button("Apply##" + field)) {
-                            try { workspace.replace(selected, DimensionFields.edit(selected, bytes, field, Double.parseDouble(input.get()))); error = null; }
+                            try { workspace.replace(selected, DimensionFields.edit(selected, workspace.read(selected), field, Double.parseDouble(input.get()))); error = null; }
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
@@ -71,8 +96,39 @@ public final class EditorApp extends Application {
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
     }
+    private void drawResources(List<ResourceTree.Node> nodes) {
+        for (ResourceTree.Node node : nodes) {
+            ImGui.pushID(node.path());
+            if (node.folder()) {
+                if (!filter.get().isBlank()) ImGui.setNextItemOpen(true);
+                if (ImGui.treeNodeEx(node.name(), ImGuiTreeNodeFlags.SpanAvailWidth)) {
+                    drawResources(node.children()); ImGui.treePop();
+                }
+            } else if (ImGui.selectable(node.name() + (workspace.changed(node.path()) ? " *" : ""), node.path().equals(selected))) {
+                selected = node.path(); values.clear();
+            }
+            ImGui.popID();
+        }
+    }
     private boolean replaceAllowed() {
-        return !workspace.dirty() || JOptionPane.showConfirmDialog(null, "Discard unsaved changes?", "Unsaved pack", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION;
+        if (!workspace.dirty()) return true;
+        Object[] choices = {"Save", "Discard", "Cancel"};
+        int choice = JOptionPane.showOptionDialog(null, "Save applied changes before continuing?", "Unsaved pack",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE, null, choices, choices[0]);
+        if (choice == 1) return true;
+        if (choice != 0) return false;
+        return saveWorkspace();
+    }
+    private boolean saveWorkspace() {
+        try {
+            Path path = workspace.directory() == null ? choose(true, true) : workspace.directory();
+            if (path == null) return false;
+            workspace.save(path); error = null; return true;
+        } catch (Exception failure) {
+            error = failure.getMessage();
+            JOptionPane.showMessageDialog(null, error, "Save failed", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
     private Path choose(boolean folder, boolean save) {
         JFileChooser chooser = new JFileChooser();
@@ -89,7 +145,7 @@ public final class EditorApp extends Application {
                     Path path = choose(action.equals("Open"), false);
                     if (path != null) { PackWorkspace next = action.equals("Open") ? PackWorkspace.open(path) : PackWorkspace.importZip(path); workspace = next; selected = null; values.clear(); }
                 }
-                case "Save" -> { Path path = workspace.directory() == null ? choose(true, true) : workspace.directory(); if (path != null) workspace.save(path); }
+                case "Save" -> { if (!saveWorkspace()) return; }
                 case "Export" -> { Path path = choose(false, true); if (path != null) workspace.exportZip(path); }
             }
             error = null;
