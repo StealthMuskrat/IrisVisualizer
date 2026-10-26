@@ -1,6 +1,6 @@
 # Standalone feasibility gate
 
-Inspection date: 2026-10-26. **No successful standalone terrain run or native parity comparison has been recorded yet.**
+Inspection date: 2026-10-26. **The official core generated eight full-height Overworld chunks on Windows. The overall probe failed during shutdown, so repeatability and native parity remain unverified.**
 
 ## Pinned inputs
 
@@ -34,7 +34,7 @@ The pinned upstream native feasibility tests identify specific boundaries:
 | Swamp-hut population | Requires `ServerLevel` |
 | Out-of-bounds writes and unavailable chunk status | Fail explicitly |
 
-These are **source-reviewed upstream assertions**, not tests that have passed in this repository. They make a minimal terrain adapter plausible but do not prove a complete vanilla-compatible adapter. Do not reimplement placement algorithms, run a hidden Minecraft server, or label partial terrain as full parity without a scope decision.
+The selected upstream native feature, bootstrap and state test classes passed on Windows x64/Java 25 in [the verification run](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40343283902). These tests confirm the listed supported paths and explicit limitations; they do not prove complete native generation parity. They make a minimal terrain adapter plausible but do not prove a complete vanilla-compatible adapter. Do not reimplement placement algorithms, run a hidden Minecraft server, or label partial terrain as full parity without a scope decision.
 
 ## Budgets and defaults
 
@@ -65,3 +65,17 @@ The native properties file must include matching `irisRevision`, `volmlibRevisio
 - [Native offline generator and limitations](https://github.com/VolmitSoftware/Iris/blob/c3359e0a16438b1bb8468901c6171dcefdf63f7f/adapters/bukkit/nms/v26_3_R1/src/offline/java/art/arcane/iris/probe/OfflineRegionGenerator.java)
 - [Native feature feasibility tests](https://github.com/VolmitSoftware/Iris/blob/c3359e0a16438b1bb8468901c6171dcefdf63f7f/adapters/bukkit/nms/v26_3_R1/src/test/java/art/arcane/iris/probe/OfflineNativeFeatureFeasibilityTest.java)
 - [Iris documentation](https://github.com/VolmitSoftware/docs/tree/master/iris)
+
+## Batch 1 verification result
+
+[Windows verification run](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40343283902):
+
+- All 15 dependency-free contract assertions passed on Windows x64/Java 25 and locally.
+- Official Iris and integration sources compiled with VolmLib `210705c5ab1321dc74b86b48457fd6d5e0452944`.
+- The current Overworld pack passed official offline validation.
+- The official core initialized and emitted full block and biome hashes for eight chunks at seed 1337, including negative/distant coordinates. The configured Y range was [-256,512), with no truncation. This supports initial core-generation feasibility using the upstream stub platform.
+- All three selected native test classes passed.
+- Shutdown failed because the pinned storage implementation attempts directory `FileChannel` flushing on Windows. Cleanup also failed on read-only Git metadata copied into the disposable workspace. The first session therefore did not close successfully and subsequent seeds/repeatability checks did not execute. The probe correctly stayed red.
+- Source-pack integrity, peak heap and failure details are emitted in the run's `report.properties`; no native parity or final cache-budget claim is made.
+
+The next small batch should use an upstream dependency revision containing both the required structure-volume API and the Windows atomic-write fix, and keep checkout metadata outside generation inputs. Do not suppress the shutdown error or weaken repeatability checks to make CI pass.
