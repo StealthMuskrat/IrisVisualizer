@@ -170,6 +170,17 @@ public final class LosslessJson {
     public byte[] objectArrayNumber(String field, int index, String property, double value) {
         return objectArrayEdit(field, index, object -> object.number(property, value));
     }
+    /** Updates one object member; absent parents are created only for explicit enable operations. */
+    byte[] objectEdit(String field, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+        String original = token(field);
+        if (original == null && !create) throw new IllegalArgumentException("Absent parent must be explicitly enabled first");
+        byte[] updated = operation.apply(new LosslessJson((original == null ? "{}" : original).getBytes(StandardCharsets.UTF_8)));
+        new LosslessJson(updated);
+        String next = new String(updated, StandardCharsets.UTF_8);
+        if (original == null) return insertObject(field, next);
+        Span span = root.get(field);
+        return splice(span.start(), span.end(), next);
+    }
     byte[] objectArrayEdit(String field, int index, java.util.function.Function<LosslessJson, byte[]> operation) {
         List<LosslessJson> objects = objectArray(field);
         if (index < 0 || index >= objects.size()) throw new IllegalArgumentException("Array index out of range");

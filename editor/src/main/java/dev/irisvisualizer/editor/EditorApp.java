@@ -301,6 +301,12 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        if (ImGui.collapsingHeader("Cliff height noise")) {
+            ImGui.textWrapped("Cliff shaping is active when cliffHeightMax is positive. Enable individual fields to configure its noise.");
+            String token = document.token("cliffHeightGenerator");
+            try { drawNoiseFields(new LosslessJson((token == null ? "{}" : token).getBytes(StandardCharsets.UTF_8)), NoiseFields.Target.cliffHeight()); }
+            catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Cliff noise is a snippet or unsupported value (read-only)."); }
+        }
         if (ImGui.collapsingHeader("Composite noise entries")) drawNoise(document);
         ImGui.textWrapped("Noise styles, fracture trees, interpolation methods and other fields remain read-only.");
     }
@@ -323,34 +329,36 @@ public final class EditorApp extends Application {
             if (ImGui.button("Move down")) action = CompositeNoise.Action.DOWN;
             ImGui.endDisabled();
             if (action != null) { ImGui.treePop(); changeNoise(action, index); return; }
-            LosslessJson object = entries.get(index);
-            for (String field : NoiseFields.EDITABLE) {
-                String token = object.token(field), key = "composite#" + index + "." + field;
-                ImGui.pushID(key); ImGui.text(field);
-                if (ImGui.isItemHovered()) ImGui.setTooltip(NoiseFields.description(field));
-                if (token == null) {
-                    if (ImGui.button("Enable (" + NoiseFields.defaultToken(field) + ")")) {
-                        try { workspace.replace(selected, NoiseFields.enable(selected, workspace.read(selected), index, field)); error = null; }
-                        catch (Exception failure) { error = failure.getMessage(); }
-                    }
-                } else if (NoiseFields.booleanField(field)) {
-                    if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored type mismatch (read-only)");
-                    else if (ImGui.checkbox("Enabled", token.equals("true"))) {
-                        try { workspace.replace(selected, NoiseFields.editBoolean(selected, workspace.read(selected), index, field, !token.equals("true"))); error = null; }
-                        catch (Exception failure) { error = failure.getMessage(); }
-                    }
-                } else {
-                    ImGui.textWrapped(NoiseFields.constraints(field));
-                    ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
-                    ImGui.inputText("Value", input); drafts.update(key, token, input.get());
-                    if (ImGui.button("Apply")) {
-                        try { workspace.replace(selected, NoiseFields.editText(selected, workspace.read(selected), index, field, input.get())); drafts.applied(key); values.remove(key); error = null; }
-                        catch (Exception failure) { error = failure.getMessage(); }
-                    }
-                }
-                ImGui.popID();
-            }
+            drawNoiseFields(entries.get(index), NoiseFields.Target.composite(index));
             ImGui.treePop();
+        }
+    }
+    private void drawNoiseFields(LosslessJson object, NoiseFields.Target target) {
+        for (String field : NoiseFields.EDITABLE) {
+            String token = object.token(field), key = target.draftPrefix() + field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(NoiseFields.description(field));
+            if (token == null) {
+                if (ImGui.button("Enable (" + NoiseFields.defaultToken(field) + ")")) {
+                    try { workspace.replace(selected, NoiseFields.enable(selected, workspace.read(selected), target, field)); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else if (NoiseFields.booleanField(field)) {
+                if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored type mismatch (read-only)");
+                else if (ImGui.checkbox("Enabled", token.equals("true"))) {
+                    try { workspace.replace(selected, NoiseFields.editBoolean(selected, workspace.read(selected), target, field, !token.equals("true"))); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else {
+                ImGui.textWrapped(NoiseFields.constraints(field));
+                ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
+                ImGui.inputText("Value", input); drafts.update(key, token, input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected, NoiseFields.editText(selected, workspace.read(selected), target, field, input.get())); drafts.applied(key); values.remove(key); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
         }
     }
     private void changeNoise(CompositeNoise.Action action, int index) {
