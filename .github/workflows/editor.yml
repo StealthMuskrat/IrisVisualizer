@@ -38,6 +38,8 @@ jobs:
           $pwsh = (Get-Command pwsh).Source
           & $pwsh -NoProfile -File $launcher -CheckRuntime
           if ($LASTEXITCODE -ne 0) { throw 'Valid Java 25 x64 runtime rejected' }
+          & $pwsh -NoProfile -File $launcher -CheckInstallation
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged ImGui/GLFW installation check failed' }
           $originalPath = $env:PATH
           $originalJavaHome = $env:JAVA_HOME
           try {

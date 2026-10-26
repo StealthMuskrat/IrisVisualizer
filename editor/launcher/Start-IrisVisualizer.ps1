@@ -1,4 +1,4 @@
-param([switch]$CheckRuntime)
+param([switch]$CheckRuntime, [switch]$CheckInstallation)
 $ErrorActionPreference = 'Stop'
 try {
     if ($env:OS -ne 'Windows_NT') { throw 'Iris Visualizer supports Windows x64 only.' }
@@ -27,6 +27,10 @@ try {
     if (-not (Test-Path -LiteralPath $library -PathType Container) -or
         -not (Get-ChildItem -LiteralPath $library -Filter '*.jar' -File)) { throw 'Package libraries are missing. Extract the entire Iris Visualizer ZIP before launching.' }
     if ($CheckRuntime) { Write-Output 'PASS: Java 25 x64 runtime and package libraries found.'; exit 0 }
+    if ($CheckInstallation) {
+        & $javaPath '-cp' (Join-Path $library '*') 'dev.irisvisualizer.editor.EditorApp' '--check-installation'
+        exit $LASTEXITCODE
+    }
     & $javaPath '-cp' (Join-Path $library '*') 'dev.irisvisualizer.editor.EditorApp'
     exit $LASTEXITCODE
 } catch {

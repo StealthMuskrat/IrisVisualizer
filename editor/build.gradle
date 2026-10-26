@@ -47,6 +47,7 @@ tasks.register('prepareWindowsDistribution') {
 Extract the complete ZIP. Install Java 25 x64 separately and set JAVA_HOME or PATH.
 From PowerShell: powershell -NoProfile -ExecutionPolicy Bypass -File .\\Start-IrisVisualizer.ps1
 To check runtime/package only: add -CheckRuntime.
+To verify packaged UI native libraries without opening a window: add -CheckInstallation.
 No Java runtime is bundled or installed automatically. OpenGL 3.0-capable graphics are required.
 Unsupported terrain/world previews remain disabled. Editing/schema coverage is incomplete.
 This package has automated compile/storage/decoder tests; interactive GUI/GPU verification is pending.
