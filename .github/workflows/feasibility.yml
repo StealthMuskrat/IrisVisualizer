@@ -1,7 +1,7 @@
 name: Windows Iris feasibility
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -38,6 +38,7 @@ jobs:
         with:
           name: windows-feasibility-${{ matrix.suite }}
           if-no-files-found: warn
+          include-hidden-files: true
           path: |
             build/feasibility/
             .work/iris/adapters/bukkit/nms/v26_3_R1/build/reports/tests/
