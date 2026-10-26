@@ -125,10 +125,15 @@ public final class LosslessJson {
         return arraySpans(field).stream().map(span -> new LosslessJson(text.substring(span.start(), span.end()).getBytes(StandardCharsets.UTF_8))).toList();
     }
     public byte[] objectArrayNumber(String field, int index, String property, double value) {
+        return objectArrayEdit(field, index, object -> object.number(property, value));
+    }
+    byte[] objectArrayEdit(String field, int index, java.util.function.Function<LosslessJson, byte[]> operation) {
         List<LosslessJson> objects = objectArray(field);
         if (index < 0 || index >= objects.size()) throw new IllegalArgumentException("Array index out of range");
         Span span = arraySpans(field).get(index);
-        return splice(span.start(), span.end(), new String(objects.get(index).number(property, value), StandardCharsets.UTF_8));
+        byte[] updated = operation.apply(objects.get(index));
+        new LosslessJson(updated); // Keep the array element an unambiguous JSON object.
+        return splice(span.start(), span.end(), new String(updated, StandardCharsets.UTF_8));
     }
     private byte[] updatePath(String path, java.util.function.BiFunction<LosslessJson, String, byte[]> operation, boolean create) {
         int dot = path.indexOf('.');

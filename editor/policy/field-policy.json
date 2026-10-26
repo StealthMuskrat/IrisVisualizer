@@ -286,5 +286,59 @@
       "classification": "generation",
       "reason": "Controls generated biome height relative to fluid height."
     }
+  },
+  "noise": {
+    "zoom": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "negative": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "opacity": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "offsetX": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "offsetY": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "offsetZ": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "parametric": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "bezier": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "sinCentered": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "exponent": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "enabled": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    },
+    "octaves": {
+      "classification": "generation",
+      "reason": "Controls composite noise coordinate sampling, output shaping or deterministic seed."
+    }
   }
 }

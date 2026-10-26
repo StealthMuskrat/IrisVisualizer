@@ -60,6 +60,13 @@ jobs:
           python editor/tools/extract_region_fields.py IrisRegion.java generated-region.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-region.properties).Hash -ne (Get-FileHash editor/src/main/resources/region-fields.properties).Hash) { throw 'Pinned region definitions differ' }
+      - name: Verify pinned composite noise definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/IrisNoiseGenerator.java' -OutFile IrisNoiseGenerator.java
+          python editor/tools/extract_noise_fields.py IrisNoiseGenerator.java generated-noise.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-noise.properties).Hash -ne (Get-FileHash editor/src/main/resources/noise-fields.properties).Hash) { throw 'Pinned noise definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
