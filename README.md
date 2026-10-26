@@ -19,6 +19,8 @@ Preparation checks out the exact Iris, VolmLib and Overworld revisions in [iris.
 
 The test harness needs network access to public Gradle and upstream Maven repositories. Missing dependencies, invalid current packs, generation errors, height/budget violations and nondeterminism fail verification. The workflow intentionally does not turn an incomplete generation result into a passing preview.
 
+The native registry/terrain proof has a separate [run guide and scope](docs/NATIVE-FIXTURE.md).
+
 Read [the feasibility findings](docs/FEASIBILITY.md) and [the development batches](docs/DEVELOPMENT.md) before continuing. The full [project specification](docs/SPECIFICATION.md) is retained in the repository. The two UI images supplied with the request guide the later desktop layout.
 
 ## Native comparison

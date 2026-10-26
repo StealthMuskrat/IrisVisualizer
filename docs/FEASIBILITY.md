@@ -99,3 +99,11 @@ Per-session TSVs now record and flush completed chunk hashes as they are generat
 - The published compatibility helper's Git blob exactly matches upstream (`4c6fd0dc792e492a6b5f29357ff2750616659987`).
 
 Generation used the full configured Y range [-256,512). The smoke test still does not establish 128 × 128 performance, 512 × 512 maps, total engine/native memory bounds, or production native parity. The report continues to state `nativeParity=NOT_TESTED` and `cacheBudgetsConfirmed=false`.
+
+## Batch 3: native terrain fixture
+
+The [native fixture proof](NATIVE-FIXTURE.md) passed on Windows in [verification run 40352382975](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40352382975). It checks every one of the runtime's 35,723 vanilla block states, uses real native block and biome implementations in the official engine, generates the complete 128 × 128 fixture at its configured 256-block height, and reproduces all 64 chunk hashes in a fresh JVM. The two retained index buffers use 32 MiB; this excludes palettes and engine/native memory.
+
+The registry contract is bound in memory. No running server or generation-history directory is present, all source bytes remain unchanged, and temporary generation workspaces close and are deleted. The original core and native-boundary suites also remained green.
+
+This clears the representative native-terrain fixture check. It does not clear production Overworld parity, native feature/structure completion, map output or total preview memory/cache confirmation. No custom terrain or noise implementation was introduced.
