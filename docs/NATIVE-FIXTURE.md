@@ -31,4 +31,14 @@ This fixture has ordinary volumetric terrain and vanilla biome references. Its e
 
 The report remains `nativeParity=NOT_TESTED`, `completeNativeWorld=false` and `cacheBudgetsConfirmed=false`. Native registry round-tripping and fixture repeatability do not substitute for independent complete native Overworld generation. The index arrays do not measure total engine/native memory or mesh-cache costs. The 512 × 512 map default is retained but map generation is outside this batch.
 
-Verification result: pending Windows CI.
+## Verified result
+
+[Windows verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40352382975) for code commit `30192be01929456cbd66dfa540031856d4591213`.
+
+- 35,723 native vanilla block-state combinations round-tripped in each JVM. The three invalid/external examples were rejected.
+- Each run generated 64 full-height chunks across 128 × 128 columns. The fixture configures Y = [0,256), so the two retained index arrays occupy 33,554,432 bytes (32 MiB), excluding palettes and engine/native memory.
+- Full block and biome hash tables matched between the two fresh JVMs: 128 chunk generations total.
+- Native block/biome implementation checks, the Minecraft-version check, the no-server check, source-byte preservation, history-directory absence and workspace cleanup all passed.
+- The existing 17 contract assertions, Overworld stub-repeatability test and selected native boundary tests remained green.
+
+This verifies a native terrain path for the pinned fixture. Independent complete Overworld parity, actual 512 × 512 map generation, native structures/features and total cache/memory budgets remain pending.
