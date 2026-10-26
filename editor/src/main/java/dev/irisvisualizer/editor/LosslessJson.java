@@ -25,6 +25,27 @@ public final class LosslessJson {
         String next = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
         return (text.substring(0, span.start()) + next + text.substring(span.end())).getBytes(StandardCharsets.UTF_8);
     }
+    public byte[] bool(String field, boolean value) {
+        String old = token(field);
+        if (!"true".equals(old) && !"false".equals(old)) throw new IllegalArgumentException("Stored field is not boolean");
+        Span span = root.get(field);
+        return splice(span.start(), span.end(), Boolean.toString(value));
+    }
+    /** Explicitly inserts one absent numeric/boolean field; existing source text is retained. */
+    public byte[] enable(String field, String value) {
+        if (root.containsKey(field)) throw new IllegalArgumentException("Field is already present");
+        if (!field.matches("[A-Za-z][A-Za-z0-9]*") || !value.matches("true|false|-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))
+            throw new IllegalArgumentException("Invalid scalar field definition");
+        int position;
+        String prefix;
+        if (root.isEmpty()) { position = text.indexOf('{') + 1; prefix = ""; }
+        else { position = root.values().stream().mapToInt(Span::end).max().orElseThrow(); prefix = ","; }
+        String spacing = text.contains("\r\n") ? "\r\n  " : text.contains("\n") ? "\n  " : " ";
+        return splice(position, position, prefix + spacing + "\"" + field + "\": " + value);
+    }
+    private byte[] splice(int start, int end, String value) {
+        return (text.substring(0, start) + value + text.substring(end)).getBytes(StandardCharsets.UTF_8);
+    }
     private void value(int depth) {
         if (depth > 128) throw new IllegalArgumentException("JSON nesting exceeds editor limit");
         space(); char c = peek();
