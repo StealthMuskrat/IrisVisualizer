@@ -36,6 +36,7 @@ final class NativeStructureBlockBoundary {
 
     static void run(HeadlessTerrainContext context, IrisDimension dimension,
                     HeadlessStructurePlanner.PlannedChunk<NativeStructureOwnershipRecord> planned,
+                    HeadlessStructurePlanner.PlannedChunk<NativeStructureOwnershipRecord> other,
                     Path output, Properties report) throws Exception {
         var nativeContext = context.structures();
         if (!(context.engine() instanceof IrisEngine engine))
@@ -121,9 +122,10 @@ final class NativeStructureBlockBoundary {
         report.setProperty("structureBlockFixtureMinY", Integer.toString(context.engine().getMinHeight()));
         report.setProperty("structureTerrainMissingService", "ServerLevel");
         report.setProperty("isolatedPieceStatus", results.get(1).status());
+        NativeTemplatePreparationProof.run(context, dimension, List.of(planned, other), output, report);
     }
 
-    private static Fixture fixture(HeadlessTerrainContext context, IrisDimension dimension, ChunkPos center) {
+    static Fixture fixture(HeadlessTerrainContext context, IrisDimension dimension, ChunkPos center) {
         var registries = context.structures().registries();
         var type = registries.lookupOrThrow(Registries.DIMENSION_TYPE).getOrThrow(ResourceKey.create(
                 Registries.DIMENSION_TYPE, Identifier.parse("iris:" + dimension.getDimensionTypeKey()))).value();
@@ -166,6 +168,6 @@ final class NativeStructureBlockBoundary {
             }
         return count;
     }
-    private record Fixture(OfflineFeatureWorld world, List<ProtoChunk> chunks) {}
+    record Fixture(OfflineFeatureWorld world, List<ProtoChunk> chunks) {}
     private record Result(String phase, String status, String service, int nonAir) {}
 }

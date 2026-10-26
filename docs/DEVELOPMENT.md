@@ -10,7 +10,8 @@ Follow the attached specification. Keep batches small, with one concrete deliver
 | 4a — verified | Real Overworld native context and world-preview readiness gate | 12 regions/378 biomes; typed ancient-city reference; 96 MiB index allocation; 24 contract assertions; preview correctly blocked |
 | 4b.1 — verified | Real Overworld native structure starts and references | Two ancient-city start NBT comparisons, ownership, 289-origin halo, missing-origin rejection, no history and cleanup |
 | 4b.2 — boundary verified | Real-pack structure block service boundary | Both real ancient-city calls reach ServerLevel dependencies before writing blocks; exact failure stacks, unchanged inputs and cleanup |
-| 4b.3 | Complete native world context and Overworld comparison | Resolve world services, finish native block-placement/feature phases, confirm total memory budgets and compare an independent native baseline |
+| 4b.3a — verified | Explicit native template services | Two native eroded carves without ServerLevel (9,616/9,740 blocks), full-height legacy comparison, 26 assertions and overlay provenance |
+| 4b.3b | Complete native world context and Overworld comparison | Resolve the remaining piece/world services, finish native features, confirm total memory budgets and compare an independent native baseline |
 | 5 | Typed preview context, in-memory isolation and generation scheduler | Latest-edit result, one active task, at most 10 polls/second, bounded caches |
 | 6 | Lossless pack directory and ZIP workspace | Unknown/invalid data and asset preservation; untouched bytes; no file history |
 | 7 | Typed resource operations and reference maintenance | Safe create/duplicate/rename/move/delete; dimension-location rules |

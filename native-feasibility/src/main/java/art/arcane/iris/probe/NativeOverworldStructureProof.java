@@ -109,7 +109,7 @@ final class NativeOverworldStructureProof {
                 report.setProperty("missingOriginHaloRejected", "true");
                 report.setProperty("ancientCityOriginReferenceRetained", "true");
                 report.setProperty("structurePlanningPassed", "true");
-                if (auditBlocks) NativeStructureBlockBoundary.run(context, dimension, first, output, report);
+                if (auditBlocks) NativeStructureBlockBoundary.run(context, dimension, first, other, output, report);
             }
             NativeFixtureProof.requireNoReports(engine);
         }

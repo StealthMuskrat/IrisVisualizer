@@ -9,6 +9,46 @@ gradle.projectsEvaluated {
         shared.tasks.named('compileJava').configure {
             source(new File(root, 'compatibility/volmlib/src/main/java/art/arcane/volmlib/util/mantle/io/IOWorkerSupport.java'))
         }
+        def sha256 = { byte[] bytes -> java.security.MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString() }
+        def lock = new groovy.json.JsonSlurper().parse(new File(root, 'iris.lock.json'))
+        def manifestFile = new File(root, lock.volmlib.templateServices.path)
+        if (sha256(manifestFile.bytes) != lock.volmlib.templateServices.sha256)
+            throw new GradleException('Template service manifest does not match iris.lock.json')
+        def manifest = new groovy.json.JsonSlurper().parse(manifestFile)
+        if (manifest.format != 1 || manifest.upstreamRevision != lock.volmlib.revision)
+            throw new GradleException('Template service overlay targets a different native source revision')
+        def nativeModule = gradle.rootProject.project(':native:v26_3_R1')
+        def overlayDirectory = nativeModule.layout.buildDirectory.dir('generated/sources/visualizer-template-services')
+        def overlay = nativeModule.tasks.register('visualizerTemplateServices') {
+            inputs.file(manifestFile)
+            inputs.files(manifest.files.collect { nativeModule.file('src/main/java/' + it.path) })
+            outputs.dir(overlayDirectory)
+            doLast {
+                def directory = overlayDirectory.get().asFile
+                nativeModule.delete(directory)
+                manifest.files.each { entry ->
+                    def original = nativeModule.file('src/main/java/' + entry.path)
+                    if (sha256(original.bytes) != entry.upstreamSha256)
+                        throw new GradleException('Unpinned native template source: ' + entry.path)
+                    def content = original.getText('UTF-8')
+                    entry.edits.each { edit ->
+                        if (!edit.before || content.indexOf(edit.before) < 0 || content.indexOf(edit.before) != content.lastIndexOf(edit.before))
+                            throw new GradleException('Native template edit must have exactly one match: ' + entry.path)
+                        content = content.replace(edit.before, edit.after)
+                    }
+                    if (sha256(content.getBytes('UTF-8')) != entry.patchedSha256)
+                        throw new GradleException('Native template overlay output hash mismatch: ' + entry.path)
+                    def destination = new File(directory, entry.path)
+                    destination.parentFile.mkdirs()
+                    destination.setText(content, 'UTF-8')
+                }
+            }
+        }
+        manifest.files.each { nativeModule.sourceSets.main.java.exclude(it.path) }
+        nativeModule.tasks.named('compileJava').configure {
+            dependsOn(overlay)
+            source(overlayDirectory)
+        }
         return
     }
     // Init scripts also run for buildSrc and included builds; touch only the Iris root.
@@ -34,6 +74,8 @@ gradle.projectsEvaluated {
     }
     def nativeProject = gradle.rootProject.project(':adapters:bukkit:nms:v26_3_R1')
     nativeProject.sourceSets.offline.java.srcDir(new File(root, 'native-feasibility/src/main/java'))
+    // Reference-side test double only; never part of the future desktop application.
+    nativeProject.dependencies.add('offlineImplementation', 'org.mockito:mockito-core:5.23.0')
     // Reuse the pinned official finite WorldGenLevel fixture unchanged; no server is installed.
     nativeProject.tasks.named('compileOfflineJava').configure {
         source(nativeProject.file('src/test/java/art/arcane/iris/probe/OfflineFeatureWorld.java'))

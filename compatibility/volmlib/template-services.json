@@ -1,0 +1,49 @@
+{
+  "format": 1,
+  "upstreamRevision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
+  "purpose": "Explicit template service injection; native terrain calculations and legacy world lookups retained",
+  "files": [
+    {
+      "path": "art/arcane/volmlib/nativelib/v26_3_R1/terrain/NativeStructureTerrainIntegrator.java",
+      "upstreamSha256": "426cba146e0a48ce55bb99de59618945ee35f12b9cb2003705ca1d3dd5824856",
+      "patchedSha256": "e594849d09438540760a5fbd51f6bb61d8d9d333a82c1a7d2c0ce06cfc60e828",
+      "edits": [
+        {
+          "before": "                                 SourceTerrainSnapshot sourceTerrain) {\n        StructureTerrainSettings terrain = configuredTerrain == null",
+          "after": "                                 SourceTerrainSnapshot sourceTerrain) {\n        integrateTerrain(world, area, structureId, start, configuredTerrain, paletteBlockResolver,\n                sourceTerrain, () -> world.getLevel().getStructureTemplateManager());\n    }\n\n    /** Supplies standalone template access without changing native terrain calculations. */\n    public static void integrateTerrain(WorldGenLevel world, BoundingBox area, String structureId,\n                                 StructureStart start, StructureTerrainSettings configuredTerrain,\n                                 NativeStructureTerrainIntegrator.PaletteBlockResolver paletteBlockResolver,\n                                 SourceTerrainSnapshot sourceTerrain, Supplier<StructureTemplateManager> templates) {\n        StructureTerrainSettings terrain = configuredTerrain == null"
+        },
+        {
+          "before": "                carveFootprint(start, Math.max(0, terrain.getHorizontalPadding()),\n                        () -> world.getLevel().getStructureTemplateManager()),",
+          "after": "                carveFootprint(start, Math.max(0, terrain.getHorizontalPadding()), templates),"
+        }
+      ]
+    },
+    {
+      "path": "art/arcane/volmlib/nativelib/v26_3_R1/terrain/NativeStructurePostProcessor.java",
+      "upstreamSha256": "fc4acebb7f104edce129deee2a64d3e0af7a9fca5d86bfad700802e1edff1939",
+      "patchedSha256": "7685210d933359b69a1c32853c30a3c328101fce439d78a996dbc520dadd2737",
+      "edits": [
+        {
+          "before": "import java.util.List;",
+          "after": "import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;\n\nimport java.util.List;\nimport java.util.function.Supplier;"
+        },
+        {
+          "before": "                                      NativeStructureTerrainIntegrator.PaletteBlockResolver paletteBlockResolver) {\n        if (targets == null",
+          "after": "                                      NativeStructureTerrainIntegrator.PaletteBlockResolver paletteBlockResolver) {\n        prepareTerrain(world, area, targets, paletteBlockResolver, () -> world.getLevel().getStructureTemplateManager());\n    }\n\n    /** Explicit template service for standalone hosts; legacy callers keep their world-based lookup. */\n    public static void prepareTerrain(WorldGenLevel world, BoundingBox area,\n                                      List<NativeStructureTerrainIntegrator.TerrainTarget> targets,\n                                      NativeStructureTerrainIntegrator.PaletteBlockResolver paletteBlockResolver,\n                                      Supplier<StructureTemplateManager> templates) {\n        if (targets == null"
+        },
+        {
+          "before": "target.terrain(), paletteBlockResolver, sourceTerrain);",
+          "after": "target.terrain(), paletteBlockResolver, sourceTerrain, templates);"
+        },
+        {
+          "before": "world, area, target.start(), () -> world.getLevel().getStructureTemplateManager());",
+          "after": "world, area, target.start(), templates);"
+        },
+        {
+          "before": "world, area, targets, () -> world.getLevel().getStructureTemplateManager());",
+          "after": "world, area, targets, templates);"
+        }
+      ]
+    }
+  ]
+}
