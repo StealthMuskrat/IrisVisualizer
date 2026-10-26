@@ -1,7 +1,11 @@
 # Editor foundation
 
-Windows x64 / Java 25 only. Native previews are disabled.
+Windows x64 / Java 25 only. Native previews remain unavailable.
 
-Build with Gradle 9.5.1: `gradle -p editor workspaceTest run`. The first shell provides the five File actions, a resource list, byte-preserving folder/ZIP workspace and read-only JSON inspection. Save/export do not depend on preview validation.
+Build with Gradle 9.5.1: `gradle -p editor workspaceTest run`.
 
-Schema-driven editing, audited editable fields, typed resource operations, image viewing, unsaved-close handling and Windows-only distribution packaging are unfinished. New currently creates an empty workspace, not a schema-complete Iris starter pack. The GUI build and visual verification remain pending; workspace contracts have passed locally.
+The shell has five File actions, three panels, folder/ZIP storage and JSON inspection. Existing top-level dimension `fluidHeight` and `dimensionAngleDeg` fields now have numeric edit/apply controls. Constraints/default descriptors are extracted from the pinned official IrisDimension definitions, with reproducible extraction checked in Windows CI. An audited UI allowlist permits only these terrain-affecting fields; other and unknown fields remain read-only and their coverage count is shown. This is initial field-definition integration, not full schema coverage.
+
+Edits splice only the selected value token. Unknown properties, whitespace, line endings and absent optional fields remain unchanged. Invalid/ambiguous JSON stays inspectable and saveable; structured editing rejects it. Preview errors do not gate save/export.
+
+Workspace and edit contracts pass locally. Windows compilation, workspace/edit contracts and pinned field-definition regeneration passed in run 40378433658. Full official schemas, optional-field enablement, nested/array controls, typed resource operations, image viewing, unsaved-close handling, valid New starter-pack generation, Windows-only distribution packaging and visual verification remain unfinished.
