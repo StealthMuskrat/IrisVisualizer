@@ -227,6 +227,10 @@
     "seed": {
       "classification": "generation",
       "reason": "Controls generator coordinate sampling, output shape or deterministic seed."
+    },
+    "composite": {
+      "classification": "generation",
+      "reason": "Ordered composite noise list; object-only structural controls preserve nested data and enforce the pinned minimum entry count."
     }
   },
   "region": {

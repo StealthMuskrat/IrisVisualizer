@@ -24,4 +24,10 @@ public final class InspectorDrafts {
         return true;
     }
     public void clear() { changed.clear(); }
+    public boolean transitionUnder(String prefix, java.util.function.BooleanSupplier allowed, Change change) throws java.io.IOException {
+        if (!allowed.getAsBoolean()) return false;
+        change.run();
+        clearUnder(prefix);
+        return true;
+    }
 }

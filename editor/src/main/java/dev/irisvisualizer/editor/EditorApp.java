@@ -301,15 +301,28 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
-        if (document.token("composite") != null && ImGui.collapsingHeader("Composite noise entries")) drawNoise(document);
+        if (ImGui.collapsingHeader("Composite noise entries")) drawNoise(document);
         ImGui.textWrapped("Noise styles, fracture trees, interpolation methods and other fields remain read-only.");
     }
     private void drawNoise(LosslessJson document) {
         List<LosslessJson> entries;
-        try { entries = document.objectArray("composite"); }
+        try { entries = document.token("composite") == null ? List.of() : document.objectArray("composite"); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Composite contains snippet/non-object entries (read-only)."); return; }
+        ImGui.textWrapped("Add creates an empty object using Iris defaults. Styles and fracture trees remain read-only. List order affects generation.");
+        if (ImGui.button("Add default noise entry")) { changeNoise(CompositeNoise.Action.ADD, -1); return; }
         for (int index=0;index<entries.size();index++) {
             if (!ImGui.treeNode("Noise entry " + index)) continue;
+            CompositeNoise.Action action = null;
+            if (ImGui.button("Duplicate")) action = CompositeNoise.Action.DUPLICATE;
+            ImGui.sameLine(); ImGui.beginDisabled(entries.size() <= CompositeNoise.minimumEntries());
+            if (ImGui.button("Remove")) action = CompositeNoise.Action.REMOVE;
+            ImGui.endDisabled();
+            ImGui.beginDisabled(index == 0);
+            if (ImGui.button("Move up")) action = CompositeNoise.Action.UP;
+            ImGui.endDisabled(); ImGui.sameLine(); ImGui.beginDisabled(index == entries.size()-1);
+            if (ImGui.button("Move down")) action = CompositeNoise.Action.DOWN;
+            ImGui.endDisabled();
+            if (action != null) { ImGui.treePop(); changeNoise(action, index); return; }
             LosslessJson object = entries.get(index);
             for (String field : NoiseFields.EDITABLE) {
                 String token = object.token(field), key = "composite#" + index + "." + field;
@@ -339,6 +352,14 @@ public final class EditorApp extends Application {
             }
             ImGui.treePop();
         }
+    }
+    private void changeNoise(CompositeNoise.Action action, int index) {
+        try {
+            byte[] next = CompositeNoise.change(selected, workspace.read(selected), action, index);
+            if (drafts.transitionUnder("composite#", () -> discardArrayDrafts("composite", null), () -> workspace.replace(selected, next))) {
+                values.keySet().removeIf(key -> key.startsWith("composite#")); error = null;
+            }
+        } catch (Exception failure) { error = failure.getMessage(); }
     }
     private void drawBiome(LosslessJson document) {
         for (String field : BiomeFields.EDITABLE) {
@@ -585,7 +606,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

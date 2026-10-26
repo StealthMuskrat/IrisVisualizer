@@ -9,7 +9,7 @@ Direct nonstatic/nontransient private fields in nine pinned source classes only.
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 12 | 6 | 30 |
 | biomeGeneratorLink | 3 | 2 | 2 | 1 |
-| generator | 16 | 11 | 11 | 5 |
+| generator | 16 | 12 | 12 | 4 |
 | interpolator | 2 | 1 | 1 | 1 |
 | region | 27 | 17 | 11 | 10 |
 | noise | 15 | 13 | 13 | 2 |
@@ -36,7 +36,7 @@ Unclassified: `generator`.
 
 ## generator
 
-Unclassified: `cliffHeightGenerator`, `cliffHeightMax`, `cliffHeightMin`, `composite`, `interpolator`.
+Unclassified: `cliffHeightGenerator`, `cliffHeightMax`, `cliffHeightMin`, `interpolator`.
 
 ## interpolator
 
