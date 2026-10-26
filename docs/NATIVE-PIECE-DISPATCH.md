@@ -29,4 +29,15 @@ This phase is isolated native piece placement, not a complete structure stage. P
 
 ## Status
 
-All 28 dependency-free contract assertions passed locally. Windows native verification is pending.
+[Windows x64/Java 25 verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40370040842) for executable code commit `94c233f6b22ad7fc3aa22c7fa46bdf5803a69513`.
+
+| Ancient-city origin chunk | Non-air target blocks | Distinct target block states | Full-height result |
+| --- | ---: | ---: | --- |
+| -99, -21 | 2,528 | 88 | Complete state hash/counts match the original runtime method |
+| 42, 19 | 2,240 | 63 | Complete state hash/counts match the original runtime method |
+
+Both standalone cases placed real native blocks with server getters unavailable. The reference exercised and cleaned up its intercepted inactive callback wrapper. The order/reference-position/intersection/afterPlace/empty-start contract checks also passed. Each comparison covers the configured 768-block height at Y=[-256,512). Original NBT/status, source integrity, no-history and cleanup checks passed; no isolated result was published as a preview. All 28 contract assertions passed locally and on Windows.
+
+The dispatcher source directory is forced to LF checkout form so the pinned source-byte hash remains identical on Windows. The raw original runtime path continues to reproduce its earlier ServerLevel boundary. Complete structures, features and independent full-world parity remain unverified.
+
+All five Windows suites passed: core repeatability, native boundaries, full-size native fixture repeatability, Overworld context and the extended structure/template/piece proof.
