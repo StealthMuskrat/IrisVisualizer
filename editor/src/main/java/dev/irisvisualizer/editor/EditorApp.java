@@ -106,7 +106,7 @@ public final class EditorApp extends Application {
             resources = ResourceTree.build(workspace.paths(), workspace.directories(), indexedFilter);
         }
         if (resources.isEmpty()) ImGui.textWrapped(workspace.paths().isEmpty() ? "No resources. Open a pack folder or import a ZIP." : "No matching resources.");
-        ImGui.textDisabled("Ctrl + click: duplicate; Ctrl + middle-click folder: new subfolder");
+        ImGui.textDisabled("Ctrl-click: duplicate; Ctrl-right-click folder: create; Ctrl-middle-click folder: subfolder");
         drawResources(resources);
         ImGui.end();
         ImGui.setNextWindowPos(width * .24f, 24); ImGui.setNextWindowSize(width * .48f, height);
@@ -419,6 +419,7 @@ public final class EditorApp extends Application {
                 if (!filter.get().isBlank()) ImGui.setNextItemOpen(true);
                 boolean expanded = ImGui.treeNodeEx(node.name(), ImGuiTreeNodeFlags.SpanAvailWidth);
                 if (ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(2)) createSubfolder(node.path());
+                else if (ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(1)) createResource(node.path());
                 if (expanded) { drawResources(node.children()); ImGui.treePop(); }
             } else if (ImGui.selectable(node.name() + (workspace.changed(node.path()) ? " *" : ""), node.path().equals(selected))) {
                 if (ImGui.getIO().getKeyCtrl()) duplicateResource(node.path());
@@ -437,6 +438,24 @@ public final class EditorApp extends Application {
             ResourceTypes.target(source, key); // Validate before asking to discard text drafts.
             if (!discardDraftsAllowed()) return;
             selected = workspace.duplicate(source, key); values.clear(); filter.set(""); error = null;
+        } catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private void createResource(String parent) {
+        try {
+            ResourceCreation.base(parent);
+            String name = JOptionPane.showInputDialog(null, "New resource name (omit .json):", "new_resource");
+            if (name == null) return;
+            String dependency = null, type = ResourceCreation.dependencyType(parent);
+            if (type != null) {
+                List<String> choices = ResourceCreation.choices(workspace, parent);
+                if (choices.isEmpty()) throw new IllegalArgumentException("Create a " + type + " resource first; this template needs an existing reference");
+                Object chosen = JOptionPane.showInputDialog(null, "Choose existing " + type + " key for the new resource:", "Resource reference",
+                        JOptionPane.QUESTION_MESSAGE, null, choices.toArray(), choices.get(0));
+                if (chosen == null) return;
+                dependency = chosen.toString();
+            }
+            if (!discardDraftsAllowed()) return;
+            selected = workspace.createResource(parent, name, dependency); values.clear(); filter.set(""); error = null;
         } catch (Exception failure) { error = failure.getMessage(); }
     }
     private void createSubfolder(String parent) {

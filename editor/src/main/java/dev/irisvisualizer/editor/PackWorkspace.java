@@ -44,6 +44,22 @@ public final class PackWorkspace {
         }
         changed.add(target); created.add(target); resourceRevision++; return target;
     }
+    public String createResource(String parent, String name, String dependency) throws IOException {
+        String base = ResourceCreation.base(parent);
+        if (name == null || !name.matches("[a-z0-9_-]+")) throw new IOException("Use lowercase letters, digits, _ or - for the resource name; omit .json");
+        if (!directories.contains(parent) && files.keySet().stream().noneMatch(path -> path.startsWith(parent + "/")))
+            throw new IOException("Parent folder is not in this workspace");
+        String key = (parent.equals(base) ? "" : parent.substring(base.length() + 1) + "/") + name;
+        String target = safe(ResourceTypes.target(base + "/template.json", key));
+        byte[] bytes = ResourceCreation.bytes(this, parent, name, dependency);
+        if (files.values().stream().mapToLong(value -> value.length).sum() + bytes.length > MAX_BYTES) throw new IOException("Workspace exceeds byte limit");
+        add(target, bytes);
+        try { validatePaths(); }
+        catch (IOException failure) {
+            files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target); throw failure;
+        }
+        changed.add(target); created.add(target); resourceRevision++; return target;
+    }
     public String createSubfolder(String parent, String name) throws IOException {
         if (!ResourceTypes.folderFamily(parent)) throw new IOException("Subfolders are supported only inside regions, biomes, generators, objects and images; dimensions must stay flat");
         if (name == null || !name.matches("[a-z0-9_-]+")) throw new IOException("Use lowercase letters, digits, _ or - for a subfolder name");
