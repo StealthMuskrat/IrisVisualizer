@@ -1,5 +1,5 @@
 """Noise enum parsing must preserve constructor boundaries and reject skipped declarations."""
-from extract_style_fields import enum_choices, extract
+from extract_style_fields import ROOTS, enum_choices, extract
 
 noise = b'private IrisGeneratorStyle style = NoiseStyle.IRIS.style();'
 style = b'''    @Description("Base style")
@@ -42,3 +42,15 @@ rejects(noise_source=noise.replace(b'NoiseStyle.IRIS.style()', b'new IrisGenerat
 rejects(style_source=style.replace(b'NoiseStyle.FLAT', b'NoiseStyle.MISSING'))
 rejects(style_source=style.replace(b'this.style = s;', b'this.style = NoiseStyle.FLAT;'))
 print('PASS: noise enum boundaries, defaults and factory assumptions reject changed declarations')
+
+roots = {group: ''.join('    @Description("Placement")\n    private IrisGeneratorStyle '+name+' = NoiseStyle.IRIS.style();\n' for name in names).encode() for group,names in ROOTS.items()}
+data = extract(noise,style,enum,roots).decode('ascii')
+assert 'dimensions.regionStyle.default=IRIS\n' in data and 'biomes.childStyle.default=IRIS\n' in data
+for changed in [roots['dimensions'].replace(b'NoiseStyle.IRIS',b'NoiseStyle.MISSING'), roots['dimensions'].replace(b'IrisGeneratorStyle regionStyle',b'OtherType regionStyle')]:
+    try:
+        extract(noise,style,enum,dict(roots,dimensions=changed))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('Changed root style default/type was accepted')
+print('PASS: contextual style defaults and types are extracted for each permitted root field')

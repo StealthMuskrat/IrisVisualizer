@@ -23,6 +23,13 @@ public final class DimensionFields {
         List<String> paths = new ArrayList<>();
         for (String field : document.fields()) {
             if (EDITABLE.contains(field)) continue;
+            if (NoiseStyleFields.DIMENSION_FIELDS.contains(field)) {
+                try {
+                    LosslessJson object = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    for (String child : object.fields()) if (!NoiseStyleFields.EDITABLE.contains(child)) paths.add(field+"."+child);
+                } catch (IllegalArgumentException mismatch) { paths.add(field); }
+                continue;
+            }
             if (EDITABLE.stream().noneMatch(known -> known.startsWith(field + "."))) { paths.add(field); continue; }
             try {
                 LosslessJson object = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));

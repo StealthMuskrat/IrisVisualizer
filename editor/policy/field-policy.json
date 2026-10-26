@@ -131,6 +131,30 @@
     "upperObjectsForcePlace": {
       "classification": "generation",
       "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "regionStyle": {
+      "classification": "generation",
+      "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
+    },
+    "continentalStyle": {
+      "classification": "generation",
+      "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
+    },
+    "landBiomeStyle": {
+      "classification": "generation",
+      "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
+    },
+    "shoreBiomeStyle": {
+      "classification": "generation",
+      "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
+    },
+    "seaBiomeStyle": {
+      "classification": "generation",
+      "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
+    },
+    "caveBiomeStyle": {
+      "classification": "generation",
+      "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
     }
   },
   "biome": {
@@ -193,6 +217,10 @@
     "generators": {
       "classification": "generation",
       "reason": "Ordered biome height-generator links; explicit source-default enablement and object-only list operations preserve unrelated content."
+    },
+    "childStyle": {
+      "classification": "generation",
+      "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
     }
   },
   "generator": {
