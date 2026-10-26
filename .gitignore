@@ -1,0 +1,6 @@
+.work/
+build/
+*.class
+.idea/
+*.iml
+.gradle/

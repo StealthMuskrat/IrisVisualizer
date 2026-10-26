@@ -1,0 +1,21 @@
+// Adds integration sources to the official probe module without editing Iris sources.
+gradle.projectsEvaluated {
+    def root = System.getenv('IRIS_VISUALIZER_ROOT')
+    if (!root) throw new GradleException('Use scripts/Test-Feasibility.ps1')
+    def probe = gradle.rootProject.project(':probe')
+    probe.sourceSets.main.java.srcDir(new File(root, 'feasibility/src/main/java'))
+    probe.tasks.register('visualizerFeasibility', JavaExec) {
+        dependsOn(probe.tasks.named('classes'))
+        classpath = probe.sourceSets.main.runtimeClasspath + probe.configurations.studioProbeApi
+        mainClass = 'art.arcane.iris.probe.VisualizerFeasibility'
+        jvmArgs('--add-modules=jdk.incubator.vector', '-Djava.awt.headless=true', '-XX:+ExitOnOutOfMemoryError')
+        minHeapSize = '1g'
+        maxHeapSize = '4g'
+        args(System.getenv('IRIS_VISUALIZER_PACK'), 'overworld', System.getenv('IRIS_VISUALIZER_REPORT'))
+    }
+    probe.tasks.register('visualizerContractTest', JavaExec) {
+        dependsOn(probe.tasks.named('classes'))
+        classpath = probe.sourceSets.main.runtimeClasspath
+        mainClass = 'dev.irisvisualizer.feasibility.ContractTests'
+    }
+}
