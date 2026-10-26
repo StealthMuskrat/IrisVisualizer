@@ -18,6 +18,30 @@ public final class PackWorkspace {
     private Path directory;
     public static final long MAX_BYTES = 512L * 1024 * 1024;
     public static final int MAX_FILES = 100_000;
+    public static final int MAX_PATH_SEGMENTS = 64;
+    record LoadLimits(long bytes, int entries, int depth) {
+        LoadLimits {
+            if (bytes < 0 || bytes > MAX_BYTES || entries < 1 || entries > MAX_FILES || depth < 1 || depth > MAX_PATH_SEGMENTS)
+                throw new IllegalArgumentException("Invalid workspace load limits");
+        }
+    }
+    private static final LoadLimits LOAD_LIMITS = new LoadLimits(MAX_BYTES, MAX_FILES, MAX_PATH_SEGMENTS);
+    private static final class LoadBudget {
+        final LoadLimits limits; long bytes; final Set<String> nodes = new HashSet<>();
+        LoadBudget(LoadLimits limits) { this.limits = limits; }
+        String entry(String key) throws IOException {
+            key = safe(key); String[] parts = key.split("/");
+            if (parts.length > limits.depth()) throw new IOException("Pack path exceeds nesting limit: " + key);
+            String current = "";
+            for (String part : parts) {
+                current += (current.isEmpty() ? "" : "/") + part;
+                nodes.add(current.toLowerCase(Locale.ROOT));
+                if (nodes.size() > limits.entries()) throw new IOException("Too many pack entries, including folders");
+            }
+            return key;
+        }
+        long remaining() { return limits.bytes() - bytes; }
+    }
 
     public static PackWorkspace empty() { return new PackWorkspace(); }
     static PackWorkspace newPack(Map<String, byte[]> content) throws IOException {
@@ -75,49 +99,59 @@ public final class PackWorkspace {
         catch (IOException failure) { directories.remove(target); throw failure; }
         changedDirectories.add(target); resourceRevision++; return target;
     }
-    public static PackWorkspace open(Path root) throws IOException {
-        root = root.toRealPath();
-        if (!Files.isDirectory(root)) throw new IOException("Select a pack directory");
-        PackWorkspace result = empty(); result.directory = root;
-        long bytes = 0;
-        try (var paths = Files.walk(root)) {
-            for (Path path : paths.toList()) {
-                if (Files.isSymbolicLink(path)) throw new IOException("Pack contains a symbolic link: " + path);
-                String key = root.relativize(path).toString().replace('\\', '/');
-                if (key.isEmpty()) continue;
-                key = safe(key);
-                if (Files.isDirectory(path)) result.directories.add(key);
-                else if (Files.isRegularFile(path)) {
-                    long size = Files.size(path);
-                    if (size > MAX_BYTES - bytes) throw new IOException("Pack exceeds 512 MiB workspace limit");
-                    byte[] data = Files.readAllBytes(path); bytes += data.length;
-                    result.add(key, data);
-                } else throw new IOException("Unsupported pack entry: " + path);
+    public static PackWorkspace open(Path root) throws IOException { return open(root, LOAD_LIMITS); }
+    static PackWorkspace open(Path root, LoadLimits limits) throws IOException {
+        Path base = root.toRealPath();
+        if (!Files.isDirectory(base)) throw new IOException("Select a pack directory");
+        PackWorkspace result = empty(); result.directory = base; LoadBudget budget = new LoadBudget(limits);
+        Files.walkFileTree(base, new SimpleFileVisitor<>() {
+            private String key(Path path) throws IOException { return budget.entry(base.relativize(path).toString().replace('\\', '/')); }
+            @Override public FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
+                if (!dir.equals(base)) result.directories.add(key(dir));
+                return FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult visitFile(Path path, java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
+                String key = key(path);
+                if (attributes.isSymbolicLink() || !attributes.isRegularFile()) throw new IOException("Unsupported or linked pack entry: " + key);
+                if (attributes.size() > budget.remaining()) throw new IOException("Pack exceeds workspace byte limit");
+                byte[] data;
+                try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { data = readBounded(input, budget.remaining()); }
+                budget.bytes += data.length; result.add(key, data); return FileVisitResult.CONTINUE;
+            }
+        });
+        result.validatePaths(); return result;
+    }
+    public static PackWorkspace importZip(Path archive) throws IOException { return importZip(archive, LOAD_LIMITS); }
+    static PackWorkspace importZip(Path archive, LoadLimits limits) throws IOException {
+        PackWorkspace result = empty(); LoadBudget budget = new LoadBudget(limits);
+        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(archive))) {
+            ZipEntry entry; Set<String> names = new HashSet<>();
+            while ((entry = zip.getNextEntry()) != null) {
+                String key = budget.entry(entry.getName().replaceAll("/$", ""));
+                if (!names.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Duplicate ZIP entry: " + key);
+                if (entry.isDirectory()) {
+                    // Do not silently drain an unbounded payload disguised as a directory.
+                    readBounded(zip, 0); result.directories.add(key);
+                } else {
+                    if (entry.getSize() > budget.remaining()) throw new IOException("Expanded ZIP exceeds workspace byte limit");
+                    byte[] data = readBounded(zip, budget.remaining());
+                    budget.bytes += data.length; result.add(key, data);
+                }
             }
         }
         result.validatePaths(); return result;
     }
-    public static PackWorkspace importZip(Path archive) throws IOException {
-        PackWorkspace result = empty(); long total = 0;
-        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(archive))) {
-            ZipEntry entry; Set<String> names = new HashSet<>();
-            while ((entry = zip.getNextEntry()) != null) {
-                String key = safe(entry.getName().replaceAll("/$", ""));
-                if (!names.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Duplicate ZIP entry: " + key);
-                if (entry.isDirectory()) result.directories.add(key);
-                else {
-                    ByteArrayOutputStream data = new ByteArrayOutputStream(); byte[] buffer = new byte[8192]; int read;
-                    while ((read = zip.read(buffer)) != -1) {
-                        total += read;
-                        if (total > MAX_BYTES) throw new IOException("Expanded ZIP exceeds 512 MiB workspace limit");
-                        data.write(buffer, 0, read);
-                    }
-                    result.add(key, data.toByteArray());
-                }
-                if (names.size() > MAX_FILES) throw new IOException("Too many pack entries");
-            }
+    static byte[] readBounded(InputStream input, long limit) throws IOException {
+        if (limit < 0 || limit > MAX_BYTES) throw new IllegalArgumentException("Invalid read budget");
+        ByteArrayOutputStream data = new ByteArrayOutputStream(); byte[] buffer = new byte[8192]; long total = 0;
+        while (true) {
+            int count = input.read(buffer, 0, (int)Math.min(buffer.length, limit - total + 1));
+            if (count < 0) return data.toByteArray();
+            if (count == 0) { int value = input.read(); if (value < 0) return data.toByteArray(); buffer[0] = (byte)value; count = 1; }
+            total += count;
+            if (total > limit) throw new IOException("Pack exceeds workspace byte limit");
+            data.write(buffer, 0, count);
         }
-        result.validatePaths(); return result;
     }
     public Set<String> paths() { return Collections.unmodifiableSet(files.navigableKeySet()); }
     public Set<String> directories() { return Collections.unmodifiableSet(directories); }
@@ -197,6 +231,7 @@ public final class PackWorkspace {
             for (int i=0;i<parts.length;i++) {
                 current += (i == 0 ? "" : "/") + parts[i];
                 String folded = current.toLowerCase(Locale.ROOT), prior = spellings.putIfAbsent(folded, current);
+                if (spellings.size() > MAX_FILES) throw new IOException("Too many pack entries, including folders");
                 if (prior != null && !prior.equals(current)) throw new IOException("Conflicting Windows path spelling: " + current);
                 if (i < parts.length-1 || directories.contains(key)) folders.add(folded);
             }
@@ -234,7 +269,9 @@ public final class PackWorkspace {
     }
     private static String safe(String key) throws IOException {
         if (key.isBlank() || key.startsWith("/") || key.contains("\\") || key.contains(":")) throw new IOException("Unsafe pack path: " + key);
-        for (String part : key.split("/", -1)) {
+        String[] parts = key.split("/", -1);
+        if (parts.length > MAX_PATH_SEGMENTS) throw new IOException("Pack path exceeds 64 segments");
+        for (String part : parts) {
             String stem = part.split("\\.", 2)[0].toUpperCase(Locale.ROOT);
             if (part.isEmpty() || part.equals(".") || part.equals("..") || part.endsWith(".") || part.endsWith(" ")
                     || part.chars().anyMatch(c -> c < 32 || "<>\"|?*".indexOf(c) >= 0)
