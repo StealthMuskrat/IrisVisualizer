@@ -43,6 +43,35 @@ public final class LosslessJson {
         String spacing = text.contains("\r\n") ? "\r\n  " : text.contains("\n") ? "\n  " : " ";
         return splice(position, position, prefix + spacing + "\"" + field + "\": " + value);
     }
+    /** Audited dotted paths address object members only, never array indices or snippet references. */
+    public String tokenPath(String path) {
+        int dot = path.indexOf('.');
+        if (dot < 0) return token(path);
+        String parent = token(path.substring(0, dot));
+        return parent == null ? null : new LosslessJson(parent.getBytes(StandardCharsets.UTF_8)).tokenPath(path.substring(dot + 1));
+    }
+    public byte[] numberPath(String path, double value) { return updatePath(path, (doc, field) -> doc.number(field, value), false); }
+    public byte[] boolPath(String path, boolean value) { return updatePath(path, (doc, field) -> doc.bool(field, value), false); }
+    public byte[] enablePath(String path, String value) { return updatePath(path, (doc, field) -> doc.enable(field, value), true); }
+    private byte[] updatePath(String path, java.util.function.BiFunction<LosslessJson, String, byte[]> operation, boolean create) {
+        int dot = path.indexOf('.');
+        if (dot < 0) return operation.apply(this, path);
+        String field = path.substring(0, dot), rest = path.substring(dot + 1);
+        String parent = token(field);
+        if (parent == null && !create) throw new IllegalArgumentException("Absent parent must be explicitly enabled first");
+        LosslessJson child = new LosslessJson((parent == null ? "{}" : parent).getBytes(StandardCharsets.UTF_8));
+        String next = new String(child.updatePath(rest, operation, create), StandardCharsets.UTF_8);
+        if (parent == null) return insertObject(field, next);
+        Span span = root.get(field);
+        return splice(span.start(), span.end(), next);
+    }
+    private byte[] insertObject(String field, String value) {
+        // Reuse the validated insertion position/format; replace its temporary scalar by the object.
+        byte[] inserted = enable(field, "0");
+        LosslessJson document = new LosslessJson(inserted);
+        Span span = document.root.get(field);
+        return document.splice(span.start(), span.end(), value);
+    }
     private byte[] splice(int start, int end, String value) {
         return (text.substring(0, start) + value + text.substring(end)).getBytes(StandardCharsets.UTF_8);
     }

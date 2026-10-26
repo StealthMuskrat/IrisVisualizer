@@ -76,7 +76,11 @@ public final class EditorApp extends Application {
                 try {
                     LosslessJson document = new LosslessJson(bytes);
                     for (String field : DimensionFields.EDITABLE) {
-                        String token = document.token(field);
+                        String token;
+                        try { token = document.tokenPath(field); }
+                        catch (IllegalArgumentException invalidParent) { ImGui.textWrapped(field + ": parent is not an editable object"); continue; }
+                        ImGui.textDisabled("(?) " + field);
+                        if (ImGui.isItemHovered()) ImGui.setTooltip(DimensionFields.description(field));
                         if (token == null) {
                             ImGui.text(field + ": absent"); ImGui.sameLine();
                             if (ImGui.button("Enable##" + field)) {
@@ -103,7 +107,7 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
-                    ImGui.text("Other fields awaiting classification: " + document.fields().stream().filter(field -> !DimensionFields.EDITABLE.contains(field)).count());
+                    ImGui.text("Other fields awaiting classification: " + document.fields().stream().filter(field -> DimensionFields.EDITABLE.stream().noneMatch(editable -> editable.equals(field) || editable.startsWith(field + "."))).count());
                 } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
             if (selected.endsWith(".json") && bytes.length <= 1_000_000)
