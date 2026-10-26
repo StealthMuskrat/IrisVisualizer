@@ -16,6 +16,7 @@ public final class LosslessJson {
         space(); if (peek() != '{') throw error(); object(true, 0); space(); if (at != text.length()) throw error();
     }
     public Set<String> fields() { return Collections.unmodifiableSet(root.keySet()); }
+    byte[] sourceBytes() { return text.getBytes(StandardCharsets.UTF_8); }
     public String token(String field) { var span = root.get(field); return span == null ? null : text.substring(span.start(), span.end()); }
     public byte[] number(String field, double value) {
         if (!Double.isFinite(value)) throw new IllegalArgumentException("Finite number required");
@@ -134,6 +135,37 @@ public final class LosslessJson {
     }
     public List<LosslessJson> objectArray(String field) {
         return arraySpans(field).stream().map(span -> new LosslessJson(text.substring(span.start(), span.end()).getBytes(StandardCharsets.UTF_8))).toList();
+    }
+    /** Inserts a validated object; mixed arrays/snippets remain read-only. */
+    byte[] objectArrayInsert(String field, int index, byte[] object) {
+        new LosslessJson(object); objectArray(field);
+        List<Span> spans = arraySpans(field);
+        if (index < 0 || index > spans.size()) throw new IllegalArgumentException("Array index out of range");
+        String value = new String(object, StandardCharsets.UTF_8);
+        if (index < spans.size()) return splice(spans.get(index).start(), spans.get(index).start(), value + ", ");
+        int position = spans.isEmpty() ? root.get(field).start() + 1 : spans.getLast().end();
+        return splice(position, position, (spans.isEmpty() ? "" : ", ") + value);
+    }
+    byte[] objectArrayRemove(String field, int index) {
+        objectArray(field); List<Span> spans = arraySpans(field);
+        if (index < 0 || index >= spans.size()) throw new IllegalArgumentException("Array index out of range");
+        Span span = spans.get(index);
+        if (spans.size() == 1) return splice(span.start(), span.end(), "");
+        if (index < spans.size()-1) return splice(span.start(), spans.get(index+1).start(), "");
+        return splice(spans.get(index-1).end(), span.end(), "");
+    }
+    /** Moves whole object tokens, retaining separators/whitespace at each list position. */
+    byte[] objectArrayMove(String field, int from, int to) {
+        objectArray(field); List<Span> spans = arraySpans(field);
+        if (from < 0 || from >= spans.size() || to < 0 || to >= spans.size()) throw new IllegalArgumentException("Array index out of range");
+        List<String> tokens = new ArrayList<>(spans.stream().map(span -> text.substring(span.start(), span.end())).toList());
+        tokens.add(to, tokens.remove(from));
+        StringBuilder next = new StringBuilder(); int previous = 0;
+        for (int i=0;i<spans.size();i++) {
+            Span span = spans.get(i);
+            next.append(text, previous, span.start()).append(tokens.get(i)); previous = span.end();
+        }
+        return next.append(text, previous, text.length()).toString().getBytes(StandardCharsets.UTF_8);
     }
     public byte[] objectArrayNumber(String field, int index, String property, double value) {
         return objectArrayEdit(field, index, object -> object.number(property, value));

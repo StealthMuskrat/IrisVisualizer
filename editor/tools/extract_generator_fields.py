@@ -26,4 +26,8 @@ for path, prefix, names in [(Path(sys.argv[1]), '', ['zoom', 'opacity', 'surface
         for key, value in fields.items():
             escaped = str(value).replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
             lines.append(prefix + name + '.' + key + '=' + escaped)
+source = Path(sys.argv[1]).read_text()
+composite = re.search(r'@ArrayType\(min = (\d+), type = IrisNoiseGenerator.class\)\s+@Description\("[^"\n]*"\)\s+private KList<IrisNoiseGenerator> composite = new KList<>\(\);', source)
+if not composite: raise ValueError('Changed official composite list definition')
+lines.append('composite.minimumEntries=' + composite.group(1))
 Path(sys.argv[3]).write_bytes(('\n'.join(lines) + '\n').encode('ascii'))
