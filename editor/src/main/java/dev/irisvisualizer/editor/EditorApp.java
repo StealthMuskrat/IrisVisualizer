@@ -175,6 +175,10 @@ public final class EditorApp extends Application {
                 try { drawGenerator(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && RegionFields.region(selected)) {
+                try { drawRegion(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
                     ImGui.textWrapped(new String(workspace.read(selected), StandardCharsets.UTF_8));
@@ -185,6 +189,30 @@ public final class EditorApp extends Application {
         }
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+    }
+    private void drawRegion(LosslessJson document) {
+        for (String field : RegionFields.EDITABLE) {
+            String token = document.token(field), key = "region#" + field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(RegionFields.description(field));
+            if (token == null) {
+                if (ImGui.button("Enable (" + RegionFields.defaultToken(field) + ")")) {
+                    try { workspace.replace(selected, RegionFields.enable(selected, workspace.read(selected), field)); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else if (RegionFields.arrayField(field)) drawArray(field, document);
+            else {
+                ImGui.textWrapped(RegionFields.constraints(field));
+                ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
+                ImGui.inputText("Value", input); drafts.update(key, token, input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected, RegionFields.edit(selected, workspace.read(selected), field, Double.parseDouble(input.get()))); drafts.applied(key); values.remove(key); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        ImGui.textWrapped("Other region fields, including shore height ranges, remain read-only.");
     }
     private void drawGenerator(LosslessJson document) {
         for (String field : GeneratorFields.EDITABLE) {
@@ -279,7 +307,8 @@ public final class EditorApp extends Application {
         try { entries = document.stringArrayPath(field); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored value is not a string array (read-only)."); return; }
         ImGui.pushID(field);
-        ImGui.textWrapped("Registry key syntax only; registry existence is not checked.");
+        boolean region = RegionFields.region(selected);
+        ImGui.textWrapped(region ? "Exact in-pack biome keys only; loader aliases are not resolved." : "Registry key syntax only; registry existence is not checked.");
         for (int index=0;index<entries.size();index++) {
             ImGui.pushID(index);
             String key = field + "#" + index;
@@ -301,6 +330,10 @@ public final class EditorApp extends Application {
         ImString input = values.computeIfAbsent(key, ignored -> new ImString(16_384));
         ImGui.inputText("New key", input);
         drafts.update(key, "", input.get());
+        if (region && ImGui.beginCombo("Available biomes", "Choose biome")) {
+            for (String biome : RegionFields.biomeKeys(workspace)) if (ImGui.selectable(biome)) { input.set(biome); drafts.update(key, "", biome); }
+            ImGui.endCombo();
+        }
         if (ImGui.button("Add")) applyArray(field, entries.size(), input.get());
         ImGui.popID();
     }
@@ -309,7 +342,10 @@ public final class EditorApp extends Application {
             int count = new LosslessJson(workspace.read(selected)).stringArrayPath(field).size();
             boolean structural = value == null || index == count;
             if (structural && !discardArrayDrafts(field, index == count ? field + "#new" : null)) return;
-            workspace.replace(selected, DimensionFields.editArray(selected, workspace.read(selected), field, index, value));
+            byte[] updated = RegionFields.region(selected)
+                    ? RegionFields.editArray(selected, workspace.read(selected), field, index, value, workspace)
+                    : DimensionFields.editArray(selected, workspace.read(selected), field, index, value);
+            workspace.replace(selected, updated);
             if (structural) {
                 values.keySet().removeIf(key -> key.startsWith(field + "#")); drafts.clearUnder(field + "#");
             } else { values.remove(field + "#" + index); drafts.applied(field + "#" + index); }
@@ -403,7 +439,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
