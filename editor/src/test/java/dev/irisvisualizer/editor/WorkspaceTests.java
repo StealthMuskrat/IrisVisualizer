@@ -100,11 +100,37 @@ public final class WorkspaceTests {
    imported.save(temp.resolve("copy"));check(Arrays.equals(binary,Files.readAllBytes(temp.resolve("copy/asset.iob"))));check(Files.isDirectory(temp.resolve("copy/empty")));
    byte[] exposed=workspace.read("asset.iob");exposed[0]=42;check(workspace.read("asset.iob")[0]==0);
    workspace.replace("biomes/a.json",new byte[]{123});check(workspace.dirty());check(workspace.changed("biomes/a.json"));workspace.save(pack);check(!workspace.dirty());check(!workspace.changed("biomes/a.json"));check(Arrays.equals(binary,Files.readAllBytes(pack.resolve("asset.iob"))));
+   Path conflictPack=Files.createDirectory(temp.resolve("conflict-pack"));
+   Files.writeString(conflictPack.resolve("a.json"),"original-a");Files.writeString(conflictPack.resolve("b.json"),"original-b");
+   var conflict=PackWorkspace.open(conflictPack);conflict.replace("a.json","edited-a".getBytes());conflict.replace("b.json","edited-b".getBytes());
+   Files.writeString(conflictPack.resolve("b.json"),"external-b");
+   rejectsIo(()->conflict.save(conflictPack));check(conflict.dirty());
+   check(Files.readString(conflictPack.resolve("a.json")).equals("original-a"));check(Files.readString(conflictPack.resolve("b.json")).equals("external-b"));
+   Files.writeString(conflictPack.resolve("b.json"),"original-b");conflict.save(conflictPack);check(!conflict.dirty());
+   conflict.replace("b.json","next-b".getBytes());Files.delete(conflictPack.resolve("b.json"));
+   rejectsIo(()->conflict.save(conflictPack));check(conflict.dirty());
+   Path occupied=Files.createDirectory(temp.resolve("occupied"));Files.writeString(occupied.resolve("asset.iob"),"keep");
+   rejectsIo(()->workspace.save(occupied));check(Files.readString(occupied.resolve("asset.iob")).equals("keep"));check(!Files.exists(occupied.resolve("biomes")));
+   Path existingZip=temp.resolve("existing.zip");Files.writeString(existingZip,"keep");
+   rejectsIo(()->workspace.exportZip(existingZip));check(Files.readString(existingZip).equals("keep"));workspace.exportZip(existingZip,true);
+   check(PackWorkspace.importZip(existingZip).paths().equals(workspace.paths()));
+   Path caseZip=temp.resolve("case.zip");
+   try(var zip=new ZipOutputStream(Files.newOutputStream(caseZip))) {
+    zip.putNextEntry(new ZipEntry("Biomes/a.json"));zip.write(1);zip.closeEntry();
+    zip.putNextEntry(new ZipEntry("biomes/b.json"));zip.write(2);zip.closeEntry();
+   }
+   rejectsIo(()->PackWorkspace.importZip(caseZip));
+   Path outside=Files.createDirectory(temp.resolve("outside")), link=temp.resolve("link");
+   boolean links=false;
+   try {Files.createSymbolicLink(link,outside);links=true;}catch(java.io.IOException | UnsupportedOperationException unavailable) {}
+   if(links){rejectsIo(()->workspace.save(link.resolve("nested")));rejectsIo(()->workspace.exportZip(link.resolve("out.zip")));check(!Files.exists(outside.resolve("nested")));Files.delete(link);}
    try(var zip=new ZipOutputStream(Files.newOutputStream(temp.resolve("bad.zip")))) {zip.putNextEntry(new ZipEntry("../escaped"));zip.write(1);zip.closeEntry();}
    boolean rejected=false;try {PackWorkspace.importZip(temp.resolve("bad.zip"));}catch(java.io.IOException expected){rejected=true;}check(rejected);check(!Files.exists(temp.resolve("escaped")));
    System.out.println("PASS: resource hierarchy/filtering, numeric edit preservation, editor workspace round-trip, invalid JSON, binary/empty-directory preservation, defensive bytes, dirty/save and ZIP traversal checks");
   } finally {try(var paths=Files.walk(temp)){for(Path p:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(p);}}
  }
+ @FunctionalInterface private interface IoOperation {void run() throws java.io.IOException;}
+ private static void rejectsIo(IoOperation operation) throws java.io.IOException {try{operation.run();}catch(java.io.IOException expected){return;}throw new AssertionError("Unsafe file operation accepted");}
  private static void check(boolean value){if(!value)throw new AssertionError();}
  private static void rejects(Runnable operation){try{operation.run();}catch(IllegalArgumentException expected){return;}throw new AssertionError("Invalid edit accepted");}
 }

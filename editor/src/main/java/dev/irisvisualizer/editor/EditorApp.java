@@ -236,7 +236,11 @@ public final class EditorApp extends Application {
                     if (path != null) { PackWorkspace next = action.equals("Open") ? PackWorkspace.open(path) : PackWorkspace.importZip(path); workspace = next; selected = null; values.clear(); }
                 }
                 case "Save" -> { if (!appliedValuesOnlyAllowed() || !saveWorkspace()) return; }
-                case "Export" -> { if (!appliedValuesOnlyAllowed()) return; Path path = choose(false, true); if (path != null) workspace.exportZip(path); }
+                case "Export" -> { if (!appliedValuesOnlyAllowed()) return; Path path = choose(false, true); if (path != null) {
+                    boolean exists = java.nio.file.Files.exists(path);
+                    if (exists && JOptionPane.showConfirmDialog(null, "Replace existing ZIP?\n" + path, "Export", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
+                    workspace.exportZip(path, exists);
+                } }
             }
             error = null;
         } catch (Exception failure) { error = failure.getMessage(); }
