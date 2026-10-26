@@ -34,3 +34,5 @@ Editor track authorized: desktop shell/workspace implemented; initial lossless d
 Editor field-control verification: Windows run 40378433658 passed compilation, workspace/edit contracts and regeneration of the two pinned source-derived field definitions at cb79133c33af836b1c7171b9983a152bd46837fb. Visual GUI verification and broader schema coverage remain pending; previews remain unavailable.
 
 Editor navigation batch: hierarchical searchable resources, per-resource dirty markers, Save/Discard/Cancel for close/replacement, and visibly disabled preview controls. Pure workspace/resource-index tests pass locally. Windows run 40379021579 passed compilation, workspace/edit/resource-index contracts and pinned definition regeneration at 470a9b0c22d66d352c296499ef19019d141aec68. No preview backend is invoked.
+
+Expanded scalar editor batch: eleven audited dimension fields (four numeric, seven boolean), source-derived types/defaults/bounds, explicit absent-field enablement, token-preserving boolean updates and insertion. Unknown fields remain read-only; no preview generation. Current Windows validation pending.

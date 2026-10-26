@@ -77,7 +77,24 @@ public final class EditorApp extends Application {
                     LosslessJson document = new LosslessJson(bytes);
                     for (String field : DimensionFields.EDITABLE) {
                         String token = document.token(field);
-                        if (token == null) { ImGui.text(field + ": absent (preserved)"); continue; }
+                        if (token == null) {
+                            ImGui.text(field + ": absent"); ImGui.sameLine();
+                            if (ImGui.button("Enable##" + field)) {
+                                try { workspace.replace(selected, DimensionFields.enable(selected, workspace.read(selected), field)); error = null; }
+                                catch (Exception failure) { error = failure.getMessage(); }
+                            }
+                            if (ImGui.isItemHovered()) ImGui.setTooltip("Insert pinned Iris default: " + DimensionFields.defaultToken(field));
+                            continue;
+                        }
+                        if (DimensionFields.booleanField(field)) {
+                            if (!token.equals("true") && !token.equals("false")) { ImGui.text(field + ": stored type mismatch (read-only)"); continue; }
+                            if (ImGui.checkbox(field, token.equals("true"))) {
+                                try { workspace.replace(selected, DimensionFields.editBoolean(selected, workspace.read(selected), field, !token.equals("true"))); error = null; }
+                                catch (Exception failure) { error = failure.getMessage(); }
+                            }
+                            continue;
+                        }
+                        ImGui.text(field + " [" + DimensionFields.min(field) + " .. " + DimensionFields.max(field) + "]");
                         ImString input = values.computeIfAbsent(field, key -> new ImString(token, 128));
                         ImGui.inputText(field, input);
                         ImGui.sameLine();
