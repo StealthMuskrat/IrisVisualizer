@@ -1,6 +1,6 @@
 # Standalone feasibility gate
 
-Inspection date: 2026-10-26. **The official core generated eight full-height Overworld chunks on Windows. The overall probe failed during shutdown, so repeatability and native parity remain unverified.**
+Inspection date: 2026-10-26. **Windows core generation, fresh-session repeatability, cleanup and the selected native boundary checks passed. Native parity and full-preview cache budgets remain unverified.**
 
 ## Pinned inputs
 
@@ -89,4 +89,13 @@ Source preparation now places the pack checkout's Git object database at `.work/
 
 Per-session TSVs now record and flush completed chunk hashes as they are generated, preserving useful diagnostics if a later chunk or shutdown fails. Partial output never counts as repeatability or native parity. The failing state and strict shutdown checks remain in place.
 
-Verification is pending for this batch. It must complete both seeds and their fresh-session repeats, close the engine and disposable workspace successfully, preserve the input pack fingerprint, and pass the selected native boundary tests on Windows.
+[Windows verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40348282580) for code commit `c837d5868c676a233d1b1775bd1c6463e8ff3786`:
+
+- All 17 contract assertions passed on Windows x64/Java 25 and locally, including rejection of missing or mismatched compatibility-source hashes.
+- Both seeds (1337 and -8675309) completed eight full-height chunks and fresh-session repeats: 32 chunk generations total. Block and biome hashes matched within each seed across sessions.
+- Engine shutdown and disposable-workspace cleanup completed, and the source-pack fingerprint remained unchanged.
+- All selected native feature, bootstrap and state test classes passed.
+- All eight block and biome hash rows for the first seed matched the earlier batch-1 generation output. This is an I/O-change regression check, not native parity.
+- The published compatibility helper's Git blob exactly matches upstream (`4c6fd0dc792e492a6b5f29357ff2750616659987`).
+
+Generation used the full configured Y range [-256,512). The smoke test still does not establish 128 × 128 performance, 512 × 512 maps, total engine/native memory bounds, or production native parity. The report continues to state `nativeParity=NOT_TESTED` and `cacheBudgetsConfirmed=false`.
