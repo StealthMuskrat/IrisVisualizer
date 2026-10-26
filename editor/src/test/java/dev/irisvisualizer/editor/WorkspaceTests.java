@@ -11,6 +11,16 @@ public final class WorkspaceTests {
    var filtered=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json"),List.of(),"A.JSON");
    check(filtered.size()==1 && filtered.get(0).path().equals("dimensions") && filtered.get(0).children().get(0).path().equals("dimensions/a.json"));
    check(ResourceTree.build(List.of("biomes/z.json"),List.of(),"missing").isEmpty());
+   InspectorDrafts drafts=new InspectorDrafts();
+   drafts.update("fluidHeight","63","64");check(drafts.any() && drafts.count()==1);
+   drafts.update("fluidHeight","63","63");check(!drafts.any());
+   drafts.update("disabled#1","mod:a","mod:b");drafts.update("disabled#10","mod:a","mod:c");
+   drafts.applied("disabled#1");check(!drafts.contains("disabled#1") && drafts.contains("disabled#10"));
+   drafts.update("landChance","0.5","invalid");drafts.clearUnder("disabled#");
+   check(drafts.count()==1 && drafts.contains("landChance"));drafts.clear();check(!drafts.any());
+   var coverage=DimensionFields.readOnlyPaths(new LosslessJson("{\"fluidHeight\":63,\"future\":1,\"importedStructures\":{\"disabled\":[],\"futureNested\":{}}}".getBytes()));
+   check(coverage.equals(List.of("future","importedStructures.futureNested")));
+   check(DimensionFields.readOnlyPaths(new LosslessJson("{\"importedFeatures\":\"snippet\"}".getBytes())).equals(List.of("importedFeatures")));
    String arrays="{\r\n \"importedStructures\":{\"disabled\":[ \"minecraft:village\",  \"mod:keep\" , \"minecraft:ore\" ],\"unknown\":{\"雪\":true}}\r\n}";
    byte[] arrayEdit=DimensionFields.editArray("dimensions/a.json",arrays.getBytes(java.nio.charset.StandardCharsets.UTF_8),"importedStructures.disabled",1,"mod:new");
    check(new String(arrayEdit,java.nio.charset.StandardCharsets.UTF_8).equals(arrays.replace("mod:keep","mod:new")));

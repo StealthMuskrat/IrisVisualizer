@@ -18,6 +18,19 @@ public final class DimensionFields {
             "importedStructures.datapackOverrides", "importedFeatures.enabled",
             "importedStructures.disabled", "importedStructures.disabledExact",
             "importedFeatures.disabled", "importedFeatures.disabledExact");
+    /** Report unknown root fields and unknown children of the supported object groups. */
+    public static List<String> readOnlyPaths(LosslessJson document) {
+        List<String> paths = new ArrayList<>();
+        for (String field : document.fields()) {
+            if (EDITABLE.contains(field)) continue;
+            if (EDITABLE.stream().noneMatch(known -> known.startsWith(field + "."))) { paths.add(field); continue; }
+            try {
+                LosslessJson object = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                for (String child : object.fields()) if (!EDITABLE.contains(field + "." + child)) paths.add(field + "." + child);
+            } catch (IllegalArgumentException mismatch) { paths.add(field); }
+        }
+        return List.copyOf(paths);
+    }
     public static boolean dimension(String path) { return path.startsWith("dimensions/") && path.substring(11).indexOf('/') < 0 && path.endsWith(".json"); }
     private static void authorize(String path, String field) {
         if (!dimension(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Field is read-only");
