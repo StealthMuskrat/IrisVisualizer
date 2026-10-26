@@ -8,7 +8,7 @@ from pathlib import Path
 sources = {
     'dimension': (Path(sys.argv[1]), ['fluidHeight', 'dimensionAngleDeg', 'landChance',
         'objectSurfaceSupportBuffer', 'bedrock', 'decorate', 'carvingEnabled',
-        'postProcessing', 'postProcessingSlabs', 'postProcessingWalls', 'requireObjectSurfaceSupport', 'regions']),
+        'postProcessing', 'postProcessingSlabs', 'postProcessingWalls', 'requireObjectSurfaceSupport', 'regions', 'biomeZoom', 'landZoom', 'seaZoom', 'continentZoom', 'regionZoom', 'coordFractureZoom', 'coordFractureDistance', 'terrainSamplingStep', 'biomeBoundsSamplingStep', 'caveDensitySamplingStep', 'caveLavaHeight', 'upperDimensionGap', 'upperDimensionCarving', 'upperDimensionObjects', 'upperObjectsForcePlace']),
     'importedStructures': (Path(sys.argv[3]), ['undergroundYShift', 'datapackOverrides', 'disabled', 'disabledExact']),
     'importedFeatures': (Path(sys.argv[4]), ['enabled', 'disabled', 'disabledExact']),
 }
@@ -47,7 +47,10 @@ for group, (path, names) in sources.items():
         else:
             fields.update(minimum=float(re.search(r'@MinNumber\(([^)]+)\)', annotations).group(1)),
                           maximum=float(re.search(r'@MaxNumber\(([^)]+)\)', annotations).group(1)),
-                          default=float(default))
+                          default=float(default.removesuffix('D')))
+        options = re.search(r'@IntegerOptions\(\{([^}]+)\}\)', annotations)
+        if options:
+            fields['options'] = ','.join(str(int(value.strip())) for value in options.group(1).split(','))
         key = name if group == 'dimension' else group + '.' + name
         lines.extend(key + '.' + item + '=' + escape(value) for item, value in fields.items())
 Path(sys.argv[2]).write_bytes(('\n'.join(lines) + '\n').encode('ascii'))

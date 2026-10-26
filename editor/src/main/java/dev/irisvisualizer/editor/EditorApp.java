@@ -160,6 +160,7 @@ public final class EditorApp extends Application {
                             continue;
                         }
                         ImGui.text(field + " [" + DimensionFields.min(field) + " .. " + DimensionFields.max(field) + "]");
+                        if (!DimensionFields.options(field).isEmpty()) ImGui.textWrapped("Allowed: " + DimensionFields.options(field));
                         ImString input = values.computeIfAbsent(field, key -> new ImString(token, 128));
                         ImGui.inputText(field, input);
                         drafts.update(field, token, input.get());

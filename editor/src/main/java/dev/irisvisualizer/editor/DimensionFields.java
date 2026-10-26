@@ -17,7 +17,7 @@ public final class DimensionFields {
             "postProcessingWalls", "requireObjectSurfaceSupport", "importedStructures.undergroundYShift",
             "importedStructures.datapackOverrides", "importedFeatures.enabled",
             "importedStructures.disabled", "importedStructures.disabledExact",
-            "importedFeatures.disabled", "importedFeatures.disabledExact", "regions");
+            "importedFeatures.disabled", "importedFeatures.disabledExact", "regions", "biomeZoom", "landZoom", "seaZoom", "continentZoom", "regionZoom", "coordFractureZoom", "coordFractureDistance", "terrainSamplingStep", "biomeBoundsSamplingStep", "caveDensitySamplingStep", "caveLavaHeight", "upperDimensionGap", "upperDimensionCarving", "upperDimensionObjects", "upperObjectsForcePlace");
     /** Report unknown root fields and unknown children of the supported object groups. */
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
@@ -74,6 +74,7 @@ public final class DimensionFields {
         return new LosslessJson(original).boolPath(field, value);
     }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
+    public static String options(String field) { return DEFINITIONS.getProperty(field + ".options", ""); }
     public static double min(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".minimum")); }
     public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum")); }
     public static byte[] edit(String path, byte[] original, String field, double value) {
@@ -82,6 +83,8 @@ public final class DimensionFields {
         if (!Double.isFinite(value) || value < min(field) || value > max(field)
                 || (DEFINITIONS.getProperty(field + ".type").equals("int") && value != Math.rint(value)))
             throw new IllegalArgumentException("Value violates the pinned Iris field constraints");
+        if (!options(field).isEmpty() && Arrays.stream(options(field).split(",")).noneMatch(option -> Double.parseDouble(option) == value))
+            throw new IllegalArgumentException("Choose one of the pinned Iris options: " + options(field));
         return new LosslessJson(original).numberPath(field, value);
     }
 }

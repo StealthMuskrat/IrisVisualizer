@@ -71,6 +71,66 @@
     "loot": {
       "classification": "read-only",
       "reason": "Metadata, gameplay effects/spawning, loot or drops; outside voxel-generation editing scope."
+    },
+    "biomeZoom": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "landZoom": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "seaZoom": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "continentZoom": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "regionZoom": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "coordFractureZoom": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "coordFractureDistance": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "terrainSamplingStep": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "biomeBoundsSamplingStep": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "caveDensitySamplingStep": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "caveLavaHeight": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "upperDimensionGap": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "upperDimensionCarving": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "upperDimensionObjects": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
+    },
+    "upperObjectsForcePlace": {
+      "classification": "generation",
+      "reason": "Controls dimension terrain sampling, coordinate scale/warping, fluid height or upper-terrain voxel placement."
     }
   },
   "biome": {
