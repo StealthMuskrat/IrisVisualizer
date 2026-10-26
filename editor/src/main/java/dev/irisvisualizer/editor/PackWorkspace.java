@@ -8,6 +8,8 @@ import java.util.zip.*;
 /** UI-owned, byte-preserving pack data. Preview validation has no authority over file operations. */
 public final class PackWorkspace {
     private final NavigableMap<String, byte[]> files = new TreeMap<>();
+    private final Set<String> created = new HashSet<>();
+    private long resourceRevision;
     private final Set<String> changed = new HashSet<>();
     private final Set<String> directories = new TreeSet<>();
     private final Map<String, byte[]> savedHashes = new HashMap<>();
@@ -22,9 +24,24 @@ public final class PackWorkspace {
         for (var entry : content.entrySet()) {
             bytes += entry.getValue().length;
             if (bytes > MAX_BYTES) throw new IOException("Pack exceeds workspace limit");
-            String path = safe(entry.getKey()); result.add(path, entry.getValue().clone()); result.changed.add(path);
+            String path = safe(entry.getKey()); result.add(path, entry.getValue().clone()); result.changed.add(path); result.created.add(path);
         }
         result.validatePaths(); return result;
+    }
+    public long resourceRevision() { return resourceRevision; }
+    /** Duplicate bytes under the same supported type. No references or file contents are rewritten. */
+    public String duplicate(String source, String key) throws IOException {
+        if (!files.containsKey(source)) throw new IOException("Unknown resource");
+        String target = safe(ResourceTypes.target(source, key));
+        if (files.values().stream().mapToLong(bytes -> bytes.length).sum() + files.get(source).length > MAX_BYTES)
+            throw new IOException("Workspace exceeds byte limit");
+        // add() checks case-insensitive file collisions before mutating storage.
+        add(target, files.get(source).clone());
+        try { validatePaths(); }
+        catch (IOException failure) {
+            files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target); throw failure;
+        }
+        changed.add(target); created.add(target); resourceRevision++; return target;
     }
     public static PackWorkspace open(Path root) throws IOException {
         root = root.toRealPath();
@@ -100,22 +117,24 @@ public final class PackWorkspace {
             if (same && !changed.contains(key)) continue;
             Path file = target.resolve(key);
             if (Files.exists(file)) {
-                if (!same) throw new IOException("Destination already contains resource: " + key + ". Choose an empty folder.");
+                if (!same || created.contains(key)) throw new IOException("Destination already contains resource: " + key + ". Choose an empty folder.");
                 if (!Files.isRegularFile(file) || !Arrays.equals(savedHashes.get(key), hashFile(file)))
                     throw new IOException("Resource changed outside the editor: " + key + ". Reopen the pack to review disk changes before saving.");
-            } else if (same) throw new IOException("Resource was removed outside the editor: " + key);
+            } else if (same && !created.contains(key)) throw new IOException("Resource was removed outside the editor: " + key);
         }
         Files.createDirectories(target);
         for (String key : directories) Files.createDirectories(target.resolve(key));
         for (var entry : files.entrySet()) {
             if (same && !changed.contains(entry.getKey())) continue;
             Path file = target.resolve(entry.getKey()); Files.createDirectories(file.getParent());
-            Files.write(file, entry.getValue(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            if (created.contains(entry.getKey())) Files.write(file, entry.getValue(), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            else Files.write(file, entry.getValue(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            created.remove(entry.getKey());
             savedHashes.put(entry.getKey(), hash(entry.getValue()));
         }
         directory = target.toRealPath();
         for (var entry : files.entrySet()) savedHashes.put(entry.getKey(), hash(entry.getValue()));
-        changed.clear();
+        changed.clear(); created.clear();
     }
     public void exportZip(Path archive) throws IOException { exportZip(archive, false); }
     public void exportZip(Path archive, boolean replaceExisting) throws IOException {

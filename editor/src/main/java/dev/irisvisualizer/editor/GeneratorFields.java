@@ -13,7 +13,7 @@ public final class GeneratorFields {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static final List<String> EDITABLE = List.of("zoom", "opacity", "surfaceDetail", "multiplicitive", "cellFractureZoom", "cellFractureShuffle", "cellFractureHeight", "cellPercentSize", "offsetX", "offsetZ", "seed", "interpolator.horizontalScale");
-    public static boolean generator(String path) { return path.startsWith("generators/") && path.substring(11).indexOf('/') < 0 && path.endsWith(".json"); }
+    public static boolean generator(String path) { return "generators".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, String field) {
         if (!generator(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Generator field is read-only");
     }

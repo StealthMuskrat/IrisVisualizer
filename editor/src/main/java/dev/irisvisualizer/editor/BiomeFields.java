@@ -13,7 +13,7 @@ public final class BiomeFields {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static final List<String> EDITABLE = List.of("rarity", "caveMinDepthBelowSurface", "oreDepositFrequencyMultiplier", "oreDepositSizeMultiplier", "lockLayers", "mergeFloatingChildBiomes");
-    public static boolean biome(String path) { return path.startsWith("biomes/") && path.substring(7).indexOf('/') < 0 && path.endsWith(".json"); }
+    public static boolean biome(String path) { return "biomes".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, String field) {
         if (!biome(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Biome field is read-only");
     }
