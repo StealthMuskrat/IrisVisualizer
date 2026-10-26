@@ -309,7 +309,7 @@ public final class EditorApp extends Application {
             catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Cliff noise is a snippet or unsupported value (read-only)."); }
         }
         if (ImGui.collapsingHeader("Composite noise entries")) drawNoise(document);
-        ImGui.textWrapped("Noise styles, fracture trees and other fields remain read-only.");
+        ImGui.textWrapped("Fracture trees and other unsupported fields remain read-only.");
     }
     private void drawInterpolation(LosslessJson document) {
         ImGui.textWrapped(InterpolationFields.description());
@@ -339,7 +339,7 @@ public final class EditorApp extends Application {
         List<LosslessJson> entries;
         try { entries = document.token("composite") == null ? List.of() : document.objectArray("composite"); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Composite contains snippet/non-object entries (read-only)."); return; }
-        ImGui.textWrapped("Add creates an empty object using Iris defaults. Styles and fracture trees remain read-only. List order affects generation.");
+        ImGui.textWrapped("Add creates an empty object using Iris defaults. Fracture trees remain read-only. List order affects generation.");
         if (ImGui.button("Add default noise entry")) { changeNoise(CompositeNoise.Action.ADD, -1); return; }
         for (int index=0;index<entries.size();index++) {
             if (!ImGui.treeNode("Noise entry " + index)) continue;
@@ -385,6 +385,60 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        if (ImGui.treeNode("Style settings##" + target.draftPrefix())) {
+            drawStyleFields(object, target);
+            ImGui.treePop();
+        }
+    }
+    private void drawStyleFields(LosslessJson noise, NoiseFields.Target target) {
+        LosslessJson style;
+        try { style = NoiseStyleFields.object(noise); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored style is a snippet or unsupported value (read-only)."); return; }
+        ImGui.textWrapped("Expression and image-map settings can override the base style. Those, cellular, cache and fracture settings remain read-only.");
+        if (style == null) {
+            ImGui.textWrapped("Absent style uses " + NoiseStyleFields.noiseDefault() + ". Enable it explicitly before changing style settings.");
+            if (ImGui.button("Enable style (" + NoiseStyleFields.noiseDefault() + ")")) enableStyle(target, "style");
+            return;
+        }
+        for (String field : NoiseStyleFields.EDITABLE) {
+            String token = style.token(field), key = target.draftPrefix() + "style." + field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(NoiseStyleFields.description(field));
+            if (token == null) {
+                String value = field.equals("style") ? NoiseStyleFields.objectDefault() : NoiseStyleFields.defaultToken(field);
+                if (ImGui.button("Enable (" + value + ")")) enableStyle(target, field);
+            } else if (field.equals("style")) {
+                String current = null;
+                try { current = style.stringToken(field); }
+                catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored base style is not a string (read-only)."); }
+                if (current != null) {
+                    if (!NoiseStyleFields.choices().contains(current)) ImGui.textWrapped("Unrecognized stored style. Choose a listed style to replace it.");
+                    if (ImGui.beginCombo("Base style", current.length() > 128 ? "Unrecognized style" : current)) {
+                        for (String choice : NoiseStyleFields.choices()) {
+                            if (ImGui.selectable(choice, choice.equals(current))) {
+                                try { workspace.replace(selected, NoiseStyleFields.editStyle(selected, workspace.read(selected), target, choice)); error = null; }
+                                catch (Exception failure) { error = failure.getMessage(); }
+                            }
+                            if (ImGui.isItemHovered()) ImGui.setTooltip(NoiseStyleFields.description(choice));
+                        }
+                        ImGui.endCombo();
+                    }
+                }
+            } else {
+                ImGui.textWrapped(NoiseStyleFields.constraints(field));
+                ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
+                ImGui.inputText("Value", input); drafts.update(key, token, input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected, NoiseStyleFields.editText(selected, workspace.read(selected), target, field, input.get())); drafts.applied(key); values.remove(key); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+    }
+    private void enableStyle(NoiseFields.Target target, String field) {
+        try { workspace.replace(selected, NoiseStyleFields.enable(selected, workspace.read(selected), target, field)); error = null; }
+        catch (Exception failure) { error = failure.getMessage(); }
     }
     private void changeNoise(CompositeNoise.Action action, int index) {
         try {
@@ -639,7 +693,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

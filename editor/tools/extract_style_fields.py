@@ -1,0 +1,99 @@
+"""Extract bounded style controls and annotated enum names without running noise factories."""
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+
+def enum_choices(source):
+    match = re.search(r'public enum NoiseStyle\s*\{', source)
+    if not match:
+        raise ValueError('Missing NoiseStyle enum')
+    body = source[match.end():]
+    choices = {}
+    head = re.compile(r'\s*@Description\(("(?:[^"\\]|\\.)*")\)\s+([A-Z][A-Z0-9_]*)\(')
+    while True:
+        if body.lstrip().startswith(';'):
+            break
+        entry = head.match(body)
+        if not entry:
+            raise ValueError('Unsupported noise enum declaration')
+        help_text, name = entry.groups()
+        if name in choices:
+            raise ValueError('Duplicate noise enum constant')
+        # Skip a balanced constructor expression, respecting quoted Java tokens. Fail on new syntax.
+        position, depth = entry.end(), 1
+        while depth and position < len(body):
+            character = body[position]
+            if character in ('"', "'"):
+                quote = character
+                position += 1
+                while position < len(body):
+                    if body[position] == '\\':
+                        position += 2
+                    elif body[position] == quote:
+                        position += 1
+                        break
+                    else:
+                        position += 1
+                else:
+                    raise ValueError('Unterminated constructor string')
+                continue
+            if body.startswith('//', position) or body.startswith('/*', position):
+                raise ValueError('Unsupported comment in noise enum constructor')
+            if character == '(':
+                depth += 1
+            elif character == ')':
+                depth -= 1
+            position += 1
+        if depth:
+            raise ValueError('Unterminated noise enum constructor')
+        body = body[position:].lstrip()
+        if not body.startswith(','):
+            raise ValueError('Expected noise enum separator')
+        body = body[1:]
+        choices[name] = json.loads(help_text)
+    if not choices:
+        raise ValueError('Empty noise enum')
+    return choices
+
+
+def extract(noise, style, enum):
+    noise_text, style_text, enum_text = (value.decode('utf-8') for value in (noise, style, enum))
+    contextual = re.search(r'private IrisGeneratorStyle style = NoiseStyle\.([A-Z][A-Z0-9_]*)\.style\(\);', noise_text)
+    default = re.search(r'private NoiseStyle style = NoiseStyle\.([A-Z][A-Z0-9_]*);', style_text)
+    if not contextual or not default or not re.search(r'public IrisGeneratorStyle style\(\)\s*\{\s*return new IrisGeneratorStyle\(this\);\s*\}', enum_text):
+        raise ValueError('Changed style defaults/factory')
+    if not re.search(r'public IrisGeneratorStyle\(NoiseStyle s\)\s*\{\s*this.style = s;\s*\}', style_text):
+        raise ValueError('Changed style constructor')
+    choices = enum_choices(enum_text)
+    if contextual.group(1) not in choices or default.group(1) not in choices:
+        raise ValueError('Style default is not a known enum constant')
+    values = dict(irisRevision='c3359e0a16438b1bb8468901c6171dcefdf63f7f',
+                  noiseSourceSha256=hashlib.sha256(noise).hexdigest(),
+                  styleSourceSha256=hashlib.sha256(style).hexdigest(),
+                  enumSourceSha256=hashlib.sha256(enum).hexdigest(),
+                  noiseDefault=contextual.group(1), objectDefault=default.group(1), choices=','.join(choices))
+    values.update((name+'.description', text) for name, text in choices.items())
+    help_match = re.search(r'@Description\(("(?:[^"\\]|\\.)*")\)\s+private NoiseStyle style =', style_text)
+    if not help_match:
+        raise ValueError('Changed style description')
+    values['style.description'] = json.loads(help_match.group(1))
+    for name in ['zoom', 'exponent']:
+        match = re.search(r'((?:    @[^\n]+\n)+)    private (double) '+name+r' = ([^;]+);', style_text)
+        if not match:
+            raise ValueError('Changed official style field: '+name)
+        annotations, kind, token = match.groups()
+        values[name+'.type'] = kind
+        values[name+'.default'] = str(float(token.removesuffix('D')))
+        values[name+'.description'] = json.loads(re.search(r'@Description\(("(?:[^"\\]|\\.)*")\)', annotations).group(1))
+        for annotation, key in [('MinNumber', 'minimum'), ('MaxNumber', 'maximum')]:
+            bound = re.search('@'+annotation+r'\(([^)]+)\)', annotations)
+            if bound:
+                values[name+'.'+key] = str(float(bound.group(1)))
+    return ''.join(key+'='+value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')+'\n' for key, value in values.items()).encode('ascii')
+
+
+if __name__ == '__main__':
+    Path(sys.argv[4]).write_bytes(extract(*(Path(value).read_bytes() for value in sys.argv[1:4])))

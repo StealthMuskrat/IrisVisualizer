@@ -76,6 +76,16 @@ jobs:
           python editor/tools/extract_noise_fields.py IrisNoiseGenerator.java generated-noise.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-noise.properties).Hash -ne (Get-FileHash editor/src/main/resources/noise-fields.properties).Hash) { throw 'Pinned noise definitions differ' }
+      - name: Verify pinned noise style definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/IrisGeneratorStyle.java' -OutFile IrisGeneratorStyle.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/NoiseStyle.java' -OutFile NoiseStyle.java
+          python editor/tools/test_style_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_style_fields.py IrisNoiseGenerator.java IrisGeneratorStyle.java NoiseStyle.java generated-styles.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-styles.properties).Hash -ne (Get-FileHash editor/src/main/resources/style-fields.properties).Hash) { throw 'Pinned noise style definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

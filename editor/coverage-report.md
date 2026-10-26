@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in nine pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in ten pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -12,7 +12,8 @@ Direct nonstatic/nontransient private fields in nine pinned source classes only.
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
 | region | 27 | 19 | 13 | 8 |
-| noise | 15 | 13 | 13 | 2 |
+| noise | 15 | 14 | 14 | 1 |
+| noiseStyle | 10 | 3 | 3 | 7 |
 
 ## dimension
 
@@ -48,4 +49,8 @@ Unclassified: `caveProfile`, `depositVariants`, `deposits`, `objects`, `ores`, `
 
 ## noise
 
-Unclassified: `fracture`, `style`.
+Unclassified: `fracture`.
+
+## noiseStyle
+
+Unclassified: `cacheSize`, `cellularFrequency`, `cellularZoom`, `expression`, `fracture`, `imageMap`, `multiplier`.

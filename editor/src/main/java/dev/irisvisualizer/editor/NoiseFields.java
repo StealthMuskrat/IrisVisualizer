@@ -68,7 +68,7 @@ public final class NoiseFields {
         authorize(path, field); if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");
         return editObject(original, target, object -> object.bool(field, value), false);
     }
-    private static byte[] editObject(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+    static byte[] editObject(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
         var document = new LosslessJson(original);
         if (target.index() >= 0) return document.objectArrayEdit(target.objectField(), target.index(), operation);
         return document.objectEdit(target.objectField(), operation, create);
