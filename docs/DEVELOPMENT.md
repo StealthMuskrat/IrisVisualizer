@@ -9,7 +9,7 @@ Follow the attached specification. Keep batches small, with one concrete deliver
 | 3 — verified | Native registry/terrain feasibility fixture | 35,723 states; full-height 128 × 128 terrain; fresh-JVM repeatability; no history directory |
 | 4a — verified | Real Overworld native context and world-preview readiness gate | 12 regions/378 biomes; typed ancient-city reference; 96 MiB index allocation; 24 contract assertions; preview correctly blocked |
 | 4b.1 — verified | Real Overworld native structure starts and references | Two ancient-city start NBT comparisons, ownership, 289-origin halo, missing-origin rejection, no history and cleanup |
-| 4b.2 — implemented, verification pending | Real-pack structure block service boundary | Official terrain preparation/piece calls, exact unavailable-service diagnostics, isolated partial-result discard |
+| 4b.2 — boundary verified | Real-pack structure block service boundary | Both real ancient-city calls reach ServerLevel dependencies before writing blocks; exact failure stacks, unchanged inputs and cleanup |
 | 4b.3 | Complete native world context and Overworld comparison | Resolve world services, finish native block-placement/feature phases, confirm total memory budgets and compare an independent native baseline |
 | 5 | Typed preview context, in-memory isolation and generation scheduler | Latest-edit result, one active task, at most 10 polls/second, bounded caches |
 | 6 | Lossless pack directory and ZIP workspace | Unknown/invalid data and asset preservation; untouched bytes; no file history |

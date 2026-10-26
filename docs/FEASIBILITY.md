@@ -121,3 +121,11 @@ The [real Overworld structure-planning proof](OVERWORLD-STRUCTURES.md) passed on
 This is structure-start/reference integration evidence, not a complete native baseline. Native structure block placement and features remain incomplete, total memory is unconfirmed, and all four world-preview blockers remain active. No generation algorithm was replaced or user pack repaired.
 
 All five Windows suites passed: core repeatability, native boundaries, full-size native fixture, Overworld context audit and real Overworld structure planning.
+
+## Batch 4b.2: actual ancient-city block service boundaries
+
+The [block-service audit](NATIVE-BLOCK-BOUNDARY.md) passed on [Windows x64/Java 25](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40363924685) at code commit `a1975bd4dac2165d61d06dd5b80c6555c9e65d4f`. Both actual native calls were blocked before writing non-air blocks. Eroded terrain preparation requests a template manager through `WorldGenLevel.getLevel()` in `NativeStructureTerrainIntegrator`; native `StructureStart.placeInChunk` enters `CraftStructureTransformer`, which requests `getMinecraftWorld()`. Both reach the official finite fixture's explicit missing `ServerLevel` service.
+
+Each call used a fresh native NBT copy of the real configured city and disposable full-height chunks with official biome samples. This air-input capability experiment is not generated Overworld terrain or a native baseline. The input chunk statuses and planned-start NBT remained unchanged, all partial results were discarded, no history was attached or created, source bytes were preserved and resources/scratch data closed cleanly. Full stacks and exact resource/field references are retained in CI artifacts. The unchanged official fixture was reused; no fake server or replacement generation algorithm was added. World-preview readiness remains blocked.
+
+All five Windows suites passed on this code: core repeatability, native boundaries, native fixture repeatability, Overworld context and the extended real-pack structure audit.

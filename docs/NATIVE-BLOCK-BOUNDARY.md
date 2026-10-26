@@ -26,4 +26,15 @@ The air input intentionally does not measure native terrain behavior, fluid/ligh
 
 ## Verification status
 
-Windows integration verification is pending. The complete native pipeline still needs an actual standalone service solution for its world dependencies, followed by native feature completion, an independent native comparison and total memory validation.
+[Windows x64/Java 25 verification passed](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40363924685) for executable code commit `a1975bd4dac2165d61d06dd5b80c6555c9e65d4f`. Passing means the boundary was reproduced and handled correctly; both native calls are blocked.
+
+| Isolated call | Observed result | Native dependency |
+| --- | --- | --- |
+| Ancient-city terrain preparation | `BLOCKED`, zero non-air blocks | `NativeStructureTerrainIntegrator.integrateTerrain` obtains the template manager through `WorldGenLevel.getLevel()` while resolving the eroded carve footprint |
+| Ancient-city native pieces | `BLOCKED`, zero non-air blocks | `StructureStart.placeInChunk` constructs `CraftStructureTransformer`, which calls `getMinecraftWorld()` |
+
+The exact failure stacks are retained in `terrain-preparation-failure.txt` and `native-pieces-failure.txt`, alongside resource/field locations in the TSV. Both missing services are `ServerLevel`. Input chunks remained at `TERRAIN`, planned source NBT was unchanged and no partial result was published. The native dimension type matched all 768 configured vertical blocks at Y = [-256,512). Source integrity, no-history assertions, resource closure and scratch deletion passed; all 24 contract assertions passed locally and on Windows.
+
+This identifies a template-service dependency and a CraftBukkit callback dependency in the current development runtime. It does not prove a server must run in the eventual application, and it does not justify replacing native generation or supplying dummy services. The next work must resolve those service boundaries through a valid standalone native path before completing feature generation, independent comparison and total memory validation.
+
+All five Windows suites passed on this code: core repeatability, native boundaries, native fixture repeatability, Overworld context and the extended real-pack structure audit.
