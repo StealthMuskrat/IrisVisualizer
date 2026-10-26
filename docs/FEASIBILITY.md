@@ -9,10 +9,10 @@ Inspection date: 2026-10-26. **The official core generated eight full-height Ove
 | Iris latest stable release | 4.3.5-26.1.2-26.3 |
 | Iris source | c3359e0a16438b1bb8468901c6171dcefdf63f7f |
 | Minecraft target | 26.3 |
-| VolmLib source candidate | 210705c5ab1321dc74b86b48457fd6d5e0452944 |
+| VolmLib source candidate | 3b4aebec440b73bbe9007ab7aa2a2db1cefa2508 |
 | Latest Overworld pack | 2e85a52133ad1206c88cad2f50b6f622bea60cb9 |
 
-The initial VolmLib candidate selected by source date failed Windows compilation: Iris requires `intersectsInfluenceRect`, `surfaceAdjustment` and `surfaceCutY`. The corrected pin is the upstream commit titled "Synced structure volume surface API", committed immediately after the Iris release commit. It supplies these methods but has not yet been verified against a released Iris binary. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
+The initial VolmLib candidate selected by source date failed Windows compilation: Iris requires `intersectsInfluenceRect`, `surfaceAdjustment` and `surfaceCutY`. The API-compatible pin (`210705c`) supplied those methods but exposed a Windows directory-flush failure during shutdown. The current pin (`3b4aebe`) merges both the required API and the upstream Windows atomic-write fix. It has not yet been verified against a released Iris binary. This changes the pinned dependency baseline; hashes from the earlier dependency are not an interchangeable native baseline. Iris's build uses changing `master-SNAPSHOT` dependencies by default; the harness substitutes a fixed local checkout. A release dependency stamp and resolved dependency verification metadata are still needed for complete binary reproducibility. The latest pack is newer than the latest stable Iris release and includes hydrology-schema changes. Its compatibility is an explicit test, not an assumption; do not downgrade or repair it silently.
 
 ## Source findings
 
@@ -79,3 +79,13 @@ The native properties file must include matching `irisRevision`, `volmlibRevisio
 - Source-pack integrity, peak heap and failure details are emitted in the run's `report.properties`; no native parity or final cache-budget claim is made.
 
 The next small batch should use an upstream dependency revision containing both the required structure-volume API and the Windows atomic-write fix, and keep checkout metadata outside generation inputs. Do not suppress the shutdown error or weaken repeatability checks to make CI pass.
+
+## Batch 2: Windows lifecycle compatibility
+
+This batch selects upstream VolmLib merge `3b4aebec440b73bbe9007ab7aa2a2db1cefa2508`, which includes both the required structure-volume API and [the Windows atomic-write fix](https://github.com/VolmitSoftware/VolmLib/commit/0eb8a9282cd549e437ddd7ca0457a7ab79917a5f). No Iris generation source or algorithms are patched.
+
+Source preparation now places the pack checkout's Git object database at `.work/pack-repository`, outside the generation input. Existing clean, verified test checkouts are migrated with Git's `--separate-git-dir`; conflicting metadata is never overwritten. Resource paths and file contents are unchanged. Checkout metadata location is checked before generation.
+
+Per-session TSVs now record and flush completed chunk hashes as they are generated, preserving useful diagnostics if a later chunk or shutdown fails. Partial output never counts as repeatability or native parity. The failing state and strict shutdown checks remain in place.
+
+Verification is pending for this batch. It must complete both seeds and their fresh-session repeats, close the engine and disposable workspace successfully, preserve the input pack fingerprint, and pass the selected native boundary tests on Windows.

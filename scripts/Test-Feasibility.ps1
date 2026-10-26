@@ -12,6 +12,9 @@ foreach ($name in @('iris','volmlib','pack')) {
     $dirty = & git -C (Join-Path $work $name) status --porcelain
     if ($LASTEXITCODE -ne 0 -or $dirty) { throw "Dirty $name source checkout. Refusing nonreproducible results." }
 }
+if (Test-Path -LiteralPath (Join-Path $work 'pack/.git') -PathType Container) {
+    throw 'Run Prepare-Sources.ps1 to move Git metadata outside the disposable generation input.'
+}
 $report = Join-Path $root 'build/feasibility'
 if (Test-Path -LiteralPath $report) { throw 'build/feasibility already exists. Remove this generated test output explicitly before another run.' }
 $null = New-Item -ItemType Directory -Force -Path $report

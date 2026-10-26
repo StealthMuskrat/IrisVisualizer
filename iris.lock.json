@@ -9,8 +9,8 @@
   },
   "volmlib": {
     "repository": "https://github.com/VolmitSoftware/VolmLib.git",
-    "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
-    "selection": "First upstream source commit supplying the structure-volume surface API required by the Iris release; release binary stamp not yet verified"
+    "revision": "3b4aebec440b73bbe9007ab7aa2a2db1cefa2508",
+    "selection": "Upstream merge containing both the required structure-volume API and Windows atomic-write fix; release binary dependency stamp remains unverified"
   },
   "pack": {
     "repository": "https://github.com/IrisDimensions/overworld.git",
