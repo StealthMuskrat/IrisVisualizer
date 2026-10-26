@@ -8,3 +8,93 @@ tasks.register('workspaceTest', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'dev.irisvisualizer.editor.WorkspaceTests'
 }
+
+// Development dependency includes several platforms. The deliverable retains Windows x64 natives only.
+def windowsStage = layout.buildDirectory.dir('windows/IrisVisualizer')
+tasks.register('prepareWindowsDistribution') {
+    dependsOn jar
+    inputs.files(configurations.runtimeClasspath, tasks.jar.archiveFile)
+    inputs.files('launcher/Start-IrisVisualizer.ps1', '../iris.lock.json', '../LICENSE.md')
+    inputs.property('buildRevision', providers.environmentVariable('GITHUB_SHA').orElse('development-uncommitted'))
+    outputs.dir(windowsStage)
+    doLast {
+        File root = windowsStage.get().asFile
+        delete(root)
+        File lib = new File(root, 'lib'); lib.mkdirs()
+        def jars = (configurations.runtimeClasspath.files + tasks.jar.archiveFile.get().asFile).sort { it.name }
+        jars.each { File source ->
+            if (!source.name.endsWith('.jar')) throw new GradleException("Unexpected runtime artifact: ${source.name}")
+            if (source.name =~ /natives-(linux|macos|freebsd|windows-(arm64|x86))/) return
+            new java.util.zip.ZipFile(source).withCloseable { input ->
+                new java.util.zip.ZipOutputStream(new FileOutputStream(new File(lib, source.name))).withCloseable { output ->
+                    input.entries().toList().sort { it.name }.each { entry ->
+                        String name = entry.name
+                        // Includes native files embedded inside imgui-java-app itself.
+                        if (name =~ /(?i)(\.so(?:\.[0-9]+)*|\.dylib|\.jnilib)$/) return
+                        if (name =~ /(?i)(^|\/)(linux|macos|freebsd)(\/|$)/) return
+                        // JAR signatures become invalid when native entries are filtered.
+                        if (name =~ /(?i)^META-INF\/[^\/]+\.(SF|RSA|DSA|EC)$/) return
+                        def next = new java.util.zip.ZipEntry(name); next.time = 0
+                        output.putNextEntry(next)
+                        if (!entry.directory) input.getInputStream(entry).withCloseable { stream -> stream.transferTo(output) }
+                        output.closeEntry()
+                    }
+                }
+            }
+        }
+        copy { from 'launcher/Start-IrisVisualizer.ps1'; from '../iris.lock.json'; from '../LICENSE.md'; into root }
+        new File(root, 'README.txt').text = '''Iris Visualizer editor — Windows x64 / Java 25
+Extract the complete ZIP. Install Java 25 x64 separately and set JAVA_HOME or PATH.
+From PowerShell: powershell -NoProfile -ExecutionPolicy Bypass -File .\\Start-IrisVisualizer.ps1
+To check runtime/package only: add -CheckRuntime.
+No Java runtime is bundled or installed automatically. OpenGL 3.0-capable graphics are required.
+Unsupported terrain/world previews remain disabled. Editing/schema coverage is incomplete.
+This package has automated compile/storage/decoder tests; interactive GUI/GPU verification is pending.
+Third-party JAR license notices are retained. Iris Visualizer: GPL-3.0-or-later (LICENSE.md).
+'''
+        def lock = new groovy.json.JsonSlurper().parse(file('../iris.lock.json'))
+        new File(root, 'build-info.properties').text = "buildRevision=${providers.environmentVariable('GITHUB_SHA').getOrElse('development-uncommitted')}\nirisRevision=${lock.iris.revision}\nirisVersion=${lock.iris.version}\njava=25\nplatform=windows-x64\nimguiJava=1.92.7.1\nworldPreviews=disabled\n"
+        def hashes = fileTree(root).files.sort { root.toPath().relativize(it.toPath()).toString() }.collect { item ->
+            def digest = java.security.MessageDigest.getInstance('SHA-256').digest(item.bytes).encodeHex().toString()
+            "${digest}  ${root.toPath().relativize(item.toPath()).toString().replace('\\', '/')}"
+        }
+        new File(root, 'SHA256SUMS.txt').text = hashes.join('\n') + '\n'
+    }
+}
+tasks.register('verifyWindowsDistribution') {
+    dependsOn 'prepareWindowsDistribution'
+    doLast {
+        File root = windowsStage.get().asFile
+        def dlls = []
+        fileTree(new File(root, 'lib')).matching { include '*.jar' }.files.each { item ->
+            if (item.name =~ /natives-(linux|macos|freebsd|windows-(arm64|x86))/) throw new GradleException("Non-x64 Windows artifact: ${item.name}")
+            new java.util.zip.ZipFile(item).withCloseable { zip ->
+                zip.entries().each { entry ->
+                    if (entry.name =~ /(?i)(\.so(?:\.[0-9]+)*|\.dylib|\.jnilib)$/) throw new GradleException("Non-Windows native: ${entry.name}")
+                    if (entry.name.toLowerCase().endsWith('.dll')) {
+                        byte[] binary = zip.getInputStream(entry).withCloseable { it.readAllBytes() }
+                        if (binary.length < 64 || binary[0] != 77 || binary[1] != 90) throw new GradleException("Invalid Windows DLL: ${entry.name}")
+                        def bytes = java.nio.ByteBuffer.wrap(binary).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                        int offset = bytes.getInt(60)
+                        if (offset < 0 || offset > binary.length - 6 || bytes.getInt(offset) != 0x4550 || (bytes.getShort(offset + 4) & 0xffff) != 0x8664)
+                            throw new GradleException("Non-x64 DLL: ${entry.name}")
+                        dlls.add(entry.name)
+                    }
+                }
+            }
+        }
+        if (!dlls.any { it.endsWith('imgui-java64.dll') } || !dlls.any { it.toLowerCase().endsWith('glfw.dll') })
+            throw new GradleException('Required Windows UI natives are missing')
+        if (fileTree(root).files.any { it.name.equalsIgnoreCase('java.exe') || it.name.equalsIgnoreCase('jvm.dll') })
+            throw new GradleException('A Java runtime must not be bundled')
+        logger.lifecycle("PASS: Windows-only native package; ${dlls.size()} DLL entries; external Java runtime")
+    }
+}
+tasks.register('windowsZip', Zip) {
+    dependsOn 'verifyWindowsDistribution'
+    archiveFileName = 'IrisVisualizer-windows-x64.zip'
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from(windowsStage) { into 'IrisVisualizer' }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}

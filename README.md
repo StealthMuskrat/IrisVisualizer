@@ -2,7 +2,9 @@
 
 Standalone Windows x64 visualizer and generation-focused pack editor for Iris, targeting Java 25, LWJGL and ImGui.
 
-**Status: feasibility gate in progress. This repository does not yet contain a desktop application.** The first batch establishes a reproducible official-core probe before committing to the engine, editor and renderer. No custom replacement terrain generator is included. Native parity has not been established.
+**Status: editor implementation in progress; native world previews disabled.** The Windows x64 ImGui editor opens folders/ZIPs, preserves original/unknown data, edits selected dimension fields and filters, and inspects image assets. Full schema coverage and interactive GUI/GPU verification remain pending. No custom replacement terrain generator is included. Native parity has not been established.
+
+See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/launcher verification is being established.
 
 ## Verify the first batch
 
