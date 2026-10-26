@@ -13,7 +13,7 @@ public final class RegionFields {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static final List<String> EDITABLE = List.of("rarity", "shoreHeightZoom", "shoreMinimumWidth", "landBiomeZoom", "shoreBiomeZoom", "seaBiomeZoom", "caveBiomeZoom", "landBiomes", "seaBiomes", "shoreBiomes", "caveBiomes");
-    public static boolean region(String path) { return path.startsWith("regions/") && path.substring(8).indexOf('/') < 0 && path.endsWith(".json"); }
+    public static boolean region(String path) { return "regions".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, String field) {
         if (!region(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Region field is read-only");
     }

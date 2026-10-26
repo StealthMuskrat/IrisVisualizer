@@ -17,7 +17,7 @@ public final class DimensionFields {
             "postProcessingWalls", "requireObjectSurfaceSupport", "importedStructures.undergroundYShift",
             "importedStructures.datapackOverrides", "importedFeatures.enabled",
             "importedStructures.disabled", "importedStructures.disabledExact",
-            "importedFeatures.disabled", "importedFeatures.disabledExact");
+            "importedFeatures.disabled", "importedFeatures.disabledExact", "regions");
     /** Report unknown root fields and unknown children of the supported object groups. */
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
@@ -31,14 +31,25 @@ public final class DimensionFields {
         }
         return List.copyOf(paths);
     }
-    public static boolean dimension(String path) { return path.startsWith("dimensions/") && path.substring(11).indexOf('/') < 0 && path.endsWith(".json"); }
+    public static boolean dimension(String path) { return "dimensions".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, String field) {
         if (!dimension(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Field is read-only");
     }
-    public static boolean arrayField(String field) { return "stringArray".equals(DEFINITIONS.getProperty(field + ".type")); }
+    public static boolean arrayField(String field) { return "stringArray".equals(DEFINITIONS.getProperty(field + ".type")) || "regionArray".equals(DEFINITIONS.getProperty(field + ".type")); }
+    public static List<String> regionKeys(PackWorkspace workspace) {
+        return workspace.paths().stream().filter(path -> "regions".equals(ResourceTypes.base(path)))
+                .map(path -> path.substring(8, path.length()-5)).sorted().toList();
+    }
+    public static byte[] editArray(String path, byte[] original, String field, int index, String value, PackWorkspace workspace) {
+        if (!field.equals("regions")) return editArray(path, original, field, index, value);
+        authorize(path, field); var document = new LosslessJson(original);
+        if (value != null && !regionKeys(workspace).contains(value)) throw new IllegalArgumentException("Choose an exact region key present in this pack");
+        if (value == null && document.stringArrayPath(field).size() == 1) throw new IllegalArgumentException("Keep at least one region in this required list");
+        return document.stringArrayPath(field, index, value);
+    }
     public static byte[] editArray(String path, byte[] original, String field, int index, String value) {
         authorize(path, field);
-        if (!arrayField(field)) throw new IllegalArgumentException("Field is not a string array");
+        if (!arrayField(field) || field.equals("regions")) throw new IllegalArgumentException("Field requires its typed reference control");
         // Syntax only: registries are not available to this editor. Existing strings remain untouched.
         if (value != null) {
             boolean prefixes = "true".equals(DEFINITIONS.getProperty(field + ".prefixes"));

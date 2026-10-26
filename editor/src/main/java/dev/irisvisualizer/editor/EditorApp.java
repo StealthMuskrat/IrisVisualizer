@@ -68,6 +68,7 @@ public final class EditorApp extends Application {
     private boolean styled, closeRequested;
     private final ImString filter = new ImString(256);
     private String indexedFilter;
+    private long indexedRevision = -1;
     private PackWorkspace indexedWorkspace;
     private List<ResourceTree.Node> resources = List.of();
     @Override protected void preRun() {
@@ -100,11 +101,12 @@ public final class EditorApp extends Application {
         ImGui.setNextWindowPos(0, 24); ImGui.setNextWindowSize(width * .24f, height);
         ImGui.begin("Resources");
         ImGui.inputText("Search", filter);
-        if (indexedWorkspace != workspace || !filter.get().equals(indexedFilter)) {
-            indexedWorkspace = workspace; indexedFilter = filter.get();
+        if (indexedWorkspace != workspace || indexedRevision != workspace.resourceRevision() || !filter.get().equals(indexedFilter)) {
+            indexedWorkspace = workspace; indexedRevision = workspace.resourceRevision(); indexedFilter = filter.get();
             resources = ResourceTree.build(workspace.paths(), workspace.directories(), indexedFilter);
         }
         if (resources.isEmpty()) ImGui.textWrapped(workspace.paths().isEmpty() ? "No resources. Open a pack folder or import a ZIP." : "No matching resources.");
+        ImGui.textDisabled("Ctrl + click: duplicate supported JSON resource");
         drawResources(resources);
         ImGui.end();
         ImGui.setNextWindowPos(width * .24f, 24); ImGui.setNextWindowSize(width * .48f, height);
@@ -307,8 +309,8 @@ public final class EditorApp extends Application {
         try { entries = document.stringArrayPath(field); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored value is not a string array (read-only)."); return; }
         ImGui.pushID(field);
-        boolean region = RegionFields.region(selected);
-        ImGui.textWrapped(region ? "Exact in-pack biome keys only; loader aliases are not resolved." : "Registry key syntax only; registry existence is not checked.");
+        boolean region = RegionFields.region(selected), dimensionRegions = DimensionFields.dimension(selected) && field.equals("regions");
+        ImGui.textWrapped(region ? "Exact in-pack biome keys only; loader aliases are not resolved." : dimensionRegions ? "Exact in-pack region keys only; loader aliases are not resolved." : "Registry key syntax only; registry existence is not checked.");
         for (int index=0;index<entries.size();index++) {
             ImGui.pushID(index);
             String key = field + "#" + index;
@@ -330,8 +332,9 @@ public final class EditorApp extends Application {
         ImString input = values.computeIfAbsent(key, ignored -> new ImString(16_384));
         ImGui.inputText("New key", input);
         drafts.update(key, "", input.get());
-        if (region && ImGui.beginCombo("Available biomes", "Choose biome")) {
-            for (String biome : RegionFields.biomeKeys(workspace)) if (ImGui.selectable(biome)) { input.set(biome); drafts.update(key, "", biome); }
+        if ((region || dimensionRegions) && ImGui.beginCombo(region ? "Available biomes" : "Available regions", "Choose resource")) {
+            for (String reference : region ? RegionFields.biomeKeys(workspace) : DimensionFields.regionKeys(workspace))
+                if (ImGui.selectable(reference)) { input.set(reference); drafts.update(key, "", reference); }
             ImGui.endCombo();
         }
         if (ImGui.button("Add")) applyArray(field, entries.size(), input.get());
@@ -344,7 +347,7 @@ public final class EditorApp extends Application {
             if (structural && !discardArrayDrafts(field, index == count ? field + "#new" : null)) return;
             byte[] updated = RegionFields.region(selected)
                     ? RegionFields.editArray(selected, workspace.read(selected), field, index, value, workspace)
-                    : DimensionFields.editArray(selected, workspace.read(selected), field, index, value);
+                    : DimensionFields.editArray(selected, workspace.read(selected), field, index, value, workspace);
             workspace.replace(selected, updated);
             if (structural) {
                 values.keySet().removeIf(key -> key.startsWith(field + "#")); drafts.clearUnder(field + "#");
@@ -361,10 +364,23 @@ public final class EditorApp extends Application {
                     drawResources(node.children()); ImGui.treePop();
                 }
             } else if (ImGui.selectable(node.name() + (workspace.changed(node.path()) ? " *" : ""), node.path().equals(selected))) {
-                if (!node.path().equals(selected) && discardDraftsAllowed()) { selected = node.path(); values.clear(); }
+                if (ImGui.getIO().getKeyCtrl()) duplicateResource(node.path());
+                else if (!node.path().equals(selected) && discardDraftsAllowed()) { selected = node.path(); values.clear(); }
             }
             ImGui.popID();
         }
+    }
+    private void duplicateResource(String source) {
+        try {
+            String base = ResourceTypes.base(source);
+            if (base == null) throw new IllegalArgumentException("Duplication is currently available for dimension, region, biome and generator JSON only");
+            String originalKey = source.substring(base.length() + 1, source.length() - 5);
+            String key = JOptionPane.showInputDialog(null, "New resource key (omit .json):", originalKey + "_copy");
+            if (key == null) return;
+            ResourceTypes.target(source, key); // Validate before asking to discard text drafts.
+            if (!discardDraftsAllowed()) return;
+            selected = workspace.duplicate(source, key); values.clear(); filter.set(""); error = null;
+        } catch (Exception failure) { error = failure.getMessage(); }
     }
     private boolean discardArrayDrafts(String field, String appliedKey) {
         boolean other = values.entrySet().stream().anyMatch(entry -> entry.getKey().startsWith(field + "#")
