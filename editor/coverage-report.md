@@ -4,7 +4,7 @@ Direct nonstatic/nontransient private fields in nine pinned source classes only.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 18 | 12 | 64 |
+| dimension | 82 | 33 | 27 | 49 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 12 | 6 | 30 |
@@ -16,7 +16,7 @@ Direct nonstatic/nontransient private fields in nine pinned source classes only.
 
 ## dimension
 
-Unclassified: `allObjectScaleFactor`, `biomeBoundsSamplingStep`, `biomeZoom`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `caveBiomeStyle`, `caveDensitySamplingStep`, `caveLavaHeight`, `caveProfile`, `continentZoom`, `continentalStyle`, `coordFractureDistance`, `coordFractureZoom`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionHeight`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `fluidPalette`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `hydrology`, `imageMaps`, `importedFeatures`, `importedStructures`, `landBiomeStyle`, `landZoom`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `regionStyle`, `regionZoom`, `riverPolicy`, `rockPalette`, `seaBiomeStyle`, `seaZoom`, `shoreBiomeStyle`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `surfaceLayerFallback`, `terrainSamplingStep`, `terrainTransform`, `treeSettings`, `upperDimension`, `upperDimensionCarving`, `upperDimensionGap`, `upperDimensionObjects`, `upperObjectsForcePlace`, `useMantle`, `worldBoundary`.
+Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `caveBiomeStyle`, `caveProfile`, `continentalStyle`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionHeight`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `fluidPalette`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `hydrology`, `imageMaps`, `importedFeatures`, `importedStructures`, `landBiomeStyle`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `regionStyle`, `riverPolicy`, `rockPalette`, `seaBiomeStyle`, `shoreBiomeStyle`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `surfaceLayerFallback`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
 
 ## importedStructures
 
