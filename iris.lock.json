@@ -26,5 +26,10 @@
   },
   "java": 25,
   "minecraft": "26.3",
-  "platform": "windows-x64"
+  "platform": "windows-x64",
+  "nativeFixture": {
+    "sourcePath": "probe/src/test/resources/terrain3d-pack",
+    "dimension": "terrain3d",
+    "sha256": "124da7dbcf007dbd597dd32a750139e4a3e63d4451457edb6fd884214f9e380f"
+  }
 }

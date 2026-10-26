@@ -31,4 +31,17 @@ gradle.projectsEvaluated {
         classpath = probe.sourceSets.main.runtimeClasspath
         mainClass = 'dev.irisvisualizer.feasibility.ContractTests'
     }
+    def nativeProject = gradle.rootProject.project(':adapters:bukkit:nms:v26_3_R1')
+    nativeProject.sourceSets.offline.java.srcDir(new File(root, 'native-feasibility/src/main/java'))
+    nativeProject.tasks.register('visualizerNativeFixture', JavaExec) {
+        dependsOn(nativeProject.tasks.named('offlineClasses'))
+        classpath = nativeProject.sourceSets.offline.runtimeClasspath
+        mainClass = 'art.arcane.iris.probe.NativeFixtureProof'
+        minHeapSize = '1g'
+        maxHeapSize = '4g'
+        jvmArgs('--add-modules=jdk.incubator.vector', '-Djava.awt.headless=true', '-XX:+ExitOnOutOfMemoryError')
+        doFirst {
+            args(System.getenv('IRIS_VISUALIZER_NATIVE_FIXTURE'), System.getenv('IRIS_VISUALIZER_NATIVE_REPORT'), '1337')
+        }
+    }
 }
