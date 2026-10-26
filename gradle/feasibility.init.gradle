@@ -54,6 +54,7 @@ gradle.projectsEvaluated {
         jvmArgs('--add-modules=jdk.incubator.vector', '-Djava.awt.headless=true', '-XX:+ExitOnOutOfMemoryError')
         doFirst {
             args(System.getenv('IRIS_VISUALIZER_PACK'), System.getenv('IRIS_VISUALIZER_OVERWORLD_REPORT'))
+            if (System.getenv('IRIS_VISUALIZER_STRUCTURE_PLANNING') == 'true') args('structures')
         }
     }
 }

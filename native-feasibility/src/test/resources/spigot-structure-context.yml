@@ -1,0 +1,5 @@
+# Explicit development-test context; never an implicit application world setting.
+config-version: 13
+world-settings:
+  default:
+    verbose: false
