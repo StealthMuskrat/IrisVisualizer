@@ -106,7 +106,7 @@ public final class EditorApp extends Application {
             resources = ResourceTree.build(workspace.paths(), workspace.directories(), indexedFilter);
         }
         if (resources.isEmpty()) ImGui.textWrapped(workspace.paths().isEmpty() ? "No resources. Open a pack folder or import a ZIP." : "No matching resources.");
-        ImGui.textDisabled("Ctrl + click: duplicate supported JSON resource");
+        ImGui.textDisabled("Ctrl + click: duplicate; Ctrl + middle-click folder: new subfolder");
         drawResources(resources);
         ImGui.end();
         ImGui.setNextWindowPos(width * .24f, 24); ImGui.setNextWindowSize(width * .48f, height);
@@ -417,9 +417,9 @@ public final class EditorApp extends Application {
             ImGui.pushID(node.path());
             if (node.folder()) {
                 if (!filter.get().isBlank()) ImGui.setNextItemOpen(true);
-                if (ImGui.treeNodeEx(node.name(), ImGuiTreeNodeFlags.SpanAvailWidth)) {
-                    drawResources(node.children()); ImGui.treePop();
-                }
+                boolean expanded = ImGui.treeNodeEx(node.name(), ImGuiTreeNodeFlags.SpanAvailWidth);
+                if (ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(2)) createSubfolder(node.path());
+                if (expanded) { drawResources(node.children()); ImGui.treePop(); }
             } else if (ImGui.selectable(node.name() + (workspace.changed(node.path()) ? " *" : ""), node.path().equals(selected))) {
                 if (ImGui.getIO().getKeyCtrl()) duplicateResource(node.path());
                 else if (!node.path().equals(selected) && discardDraftsAllowed()) { selected = node.path(); values.clear(); }
@@ -429,14 +429,22 @@ public final class EditorApp extends Application {
     }
     private void duplicateResource(String source) {
         try {
-            String base = ResourceTypes.base(source);
-            if (base == null) throw new IllegalArgumentException("Duplication is currently available for dimension, region, biome and generator JSON only");
-            String originalKey = source.substring(base.length() + 1, source.length() - 5);
-            String key = JOptionPane.showInputDialog(null, "New resource key (omit .json):", originalKey + "_copy");
+            String base = ResourceTypes.fileFamily(source);
+            if (base == null) throw new IllegalArgumentException("Duplicate supported generation JSON, objects/*.iob or images/*.png/*.jpg/*.jpeg only");
+            String originalKey = source.substring(base.length() + 1, source.length() - ResourceTypes.extension(source).length());
+            String key = JOptionPane.showInputDialog(null, "New resource key (omit file extension):", originalKey + "_copy");
             if (key == null) return;
             ResourceTypes.target(source, key); // Validate before asking to discard text drafts.
             if (!discardDraftsAllowed()) return;
             selected = workspace.duplicate(source, key); values.clear(); filter.set(""); error = null;
+        } catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private void createSubfolder(String parent) {
+        try {
+            if (!ResourceTypes.folderFamily(parent)) throw new IllegalArgumentException("This folder is read-only for subfolder creation; dimensions must stay flat");
+            String name = JOptionPane.showInputDialog(null, "New subfolder name:", "new_folder");
+            if (name == null) return;
+            workspace.createSubfolder(parent, name); filter.set(""); error = null;
         } catch (Exception failure) { error = failure.getMessage(); }
     }
     private boolean discardArrayDrafts(String field, String appliedKey) {
