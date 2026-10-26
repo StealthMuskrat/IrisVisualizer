@@ -14,7 +14,8 @@ public final class DimensionFields {
     }
     public static final List<String> EDITABLE = List.of("fluidHeight", "dimensionAngleDeg", "landChance", "objectSurfaceSupportBuffer",
             "bedrock", "decorate", "carvingEnabled", "postProcessing", "postProcessingSlabs",
-            "postProcessingWalls", "requireObjectSurfaceSupport");
+            "postProcessingWalls", "requireObjectSurfaceSupport", "importedStructures.undergroundYShift",
+            "importedStructures.datapackOverrides", "importedFeatures.enabled");
     public static boolean dimension(String path) { return path.startsWith("dimensions/") && path.substring(11).indexOf('/') < 0 && path.endsWith(".json"); }
     private static void authorize(String path, String field) {
         if (!dimension(path) || !EDITABLE.contains(field)) throw new IllegalArgumentException("Field is read-only");
@@ -27,13 +28,14 @@ public final class DimensionFields {
     }
     public static byte[] enable(String path, byte[] original, String field) {
         authorize(path, field);
-        return new LosslessJson(original).enable(field, defaultToken(field));
+        return new LosslessJson(original).enablePath(field, defaultToken(field));
     }
     public static byte[] editBoolean(String path, byte[] original, String field, boolean value) {
         authorize(path, field);
         if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");
-        return new LosslessJson(original).bool(field, value);
+        return new LosslessJson(original).boolPath(field, value);
     }
+    public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
     public static double min(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".minimum")); }
     public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum")); }
     public static byte[] edit(String path, byte[] original, String field, double value) {
@@ -42,6 +44,6 @@ public final class DimensionFields {
         if (!Double.isFinite(value) || value < min(field) || value > max(field)
                 || (DEFINITIONS.getProperty(field + ".type").equals("int") && value != Math.rint(value)))
             throw new IllegalArgumentException("Value violates the pinned Iris field constraints");
-        return new LosslessJson(original).number(field, value);
+        return new LosslessJson(original).numberPath(field, value);
     }
 }

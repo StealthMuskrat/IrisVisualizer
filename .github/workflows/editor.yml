@@ -22,7 +22,9 @@ jobs:
         shell: pwsh
         run: |
           Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimension.java' -OutFile IrisDimension.java
-          python editor/tools/extract_dimension_fields.py IrisDimension.java generated-fields.properties
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/IrisImportedStructureControl.java' -OutFile IrisImportedStructureControl.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/IrisImportedFeatureControl.java' -OutFile IrisImportedFeatureControl.java
+          python editor/tools/extract_dimension_fields.py IrisDimension.java generated-fields.properties IrisImportedStructureControl.java IrisImportedFeatureControl.java
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-fields.properties).Hash) { throw 'Pinned Iris field definitions differ' }
       - name: Compile editor and verify workspace
