@@ -38,8 +38,7 @@ public final class RegionFields {
         return new LosslessJson(original).number(field, value);
     }
     public static List<String> biomeKeys(PackWorkspace workspace) {
-        return workspace.paths().stream().filter(path -> path.startsWith("biomes/") && path.endsWith(".json"))
-                .map(path -> path.substring(7, path.length()-5)).sorted().toList();
+        return ResourceTypes.referenceKeys(workspace,"biomes");
     }
     public static byte[] editArray(String path, byte[] original, String field, int index, String value, PackWorkspace workspace) {
         authorize(path, field); if (!arrayField(field)) throw new IllegalArgumentException("Field is not a biome list");

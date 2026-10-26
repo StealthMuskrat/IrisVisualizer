@@ -24,8 +24,7 @@ public final class ResourceCreation {
     public static List<String> choices(PackWorkspace workspace, String folder) throws IOException {
         String type = dependencyType(folder);
         if (type == null) return List.of();
-        return workspace.paths().stream().filter(path -> type.equals(ResourceTypes.base(path)))
-                .map(path -> path.substring(type.length() + 1, path.length() - 5)).sorted().toList();
+        return ResourceTypes.referenceKeys(workspace,type);
     }
     static byte[] bytes(PackWorkspace workspace, String folder, String name, String dependency) throws IOException {
         String base = base(folder);

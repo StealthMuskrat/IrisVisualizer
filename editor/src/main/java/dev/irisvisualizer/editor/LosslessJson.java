@@ -127,6 +127,19 @@ public final class LosslessJson {
         if (index < count-1) return splice(span.start(), entries.get(index+1).span().start(), "");
         return splice(entries.get(index-1).span().end(), span.end(), "");
     }
+    byte[] stringArrayDuplicate(String field, int index) {
+        List<StringEntry> entries = stringEntries(field);
+        if (index < 0 || index >= entries.size()) throw new IllegalArgumentException("Array index out of range");
+        Span span = entries.get(index).span(); String token = text.substring(span.start(),span.end());
+        if (index+1 < entries.size()) {
+            int position = entries.get(index+1).span().start();
+            return splice(position,position,token+", ");
+        }
+        return splice(span.end(),span.end(),", "+token);
+    }
+    byte[] stringArrayMove(String field, int from, int to) {
+        return moveSpans(stringEntries(field).stream().map(StringEntry::span).toList(),from,to);
+    }
     private static String quote(String value) {
         StringBuilder out = new StringBuilder("\"");
         for (int i=0;i<value.length();i++) {
@@ -171,6 +184,9 @@ public final class LosslessJson {
     /** Moves whole object tokens, retaining separators/whitespace at each list position. */
     byte[] objectArrayMove(String field, int from, int to) {
         objectArray(field); List<Span> spans = arraySpans(field);
+        return moveSpans(spans,from,to);
+    }
+    private byte[] moveSpans(List<Span> spans, int from, int to) {
         if (from < 0 || from >= spans.size() || to < 0 || to >= spans.size()) throw new IllegalArgumentException("Array index out of range");
         List<String> tokens = new ArrayList<>(spans.stream().map(span -> text.substring(span.start(), span.end())).toList());
         tokens.add(to, tokens.remove(from));

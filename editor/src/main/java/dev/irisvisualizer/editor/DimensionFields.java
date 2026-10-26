@@ -44,8 +44,7 @@ public final class DimensionFields {
     }
     public static boolean arrayField(String field) { return "stringArray".equals(DEFINITIONS.getProperty(field + ".type")) || "regionArray".equals(DEFINITIONS.getProperty(field + ".type")); }
     public static List<String> regionKeys(PackWorkspace workspace) {
-        return workspace.paths().stream().filter(path -> "regions".equals(ResourceTypes.base(path)))
-                .map(path -> path.substring(8, path.length()-5)).sorted().toList();
+        return ResourceTypes.referenceKeys(workspace,"regions");
     }
     public static byte[] editArray(String path, byte[] original, String field, int index, String value, PackWorkspace workspace) {
         if (!field.equals("regions")) return editArray(path, original, field, index, value);

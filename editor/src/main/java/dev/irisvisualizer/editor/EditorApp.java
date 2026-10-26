@@ -210,7 +210,7 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks dimension regions, region biome lists and biome generator links only. Exact files are not validated; Iris aliases and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks dimension regions, region biome lists, biome generators and child biomes only. Exact files are not validated; Iris aliases and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -487,9 +487,18 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         drawRootStyles(document, false);
+        if (ImGui.collapsingHeader("Child biomes")) {
+            ImGui.textWrapped(BiomeChildren.description());
+            if (document.token("children") == null) {
+                if (ImGui.button("Enable child list")) {
+                    try { workspace.replace(selected,BiomeChildren.enable(selected,workspace.read(selected))); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else drawArray("children",document);
+        }
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawBiomeGenerators(LosslessJson document) {
         ImGui.textWrapped(BiomeGeneratorLinks.description());
@@ -587,7 +596,9 @@ public final class EditorApp extends Application {
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored value is not a string array (read-only)."); return; }
         ImGui.pushID(field);
         boolean region = RegionFields.region(selected), dimensionRegions = DimensionFields.dimension(selected) && field.equals("regions");
-        ImGui.textWrapped(region ? "Exact in-pack biome keys only; loader aliases are not resolved." : dimensionRegions ? "Exact in-pack region keys only; loader aliases are not resolved." : "Registry key syntax only; registry existence is not checked.");
+        boolean children = BiomeFields.biome(selected) && field.equals("children");
+        if (children) ImGui.textWrapped("Optional child list; empty means no child links. Iris supports cyclic relationships. Exact files only; aliases and target contents are unchecked.");
+        ImGui.textWrapped(region || children ? "Exact in-pack biome keys only; loader aliases are not resolved." : dimensionRegions ? "Exact in-pack region keys only; loader aliases are not resolved." : "Registry key syntax only; registry existence is not checked.");
         for (int index=0;index<entries.size();index++) {
             ImGui.pushID(index);
             String key = field + "#" + index;
@@ -602,15 +613,25 @@ public final class EditorApp extends Application {
                 ImGui.sameLine();
             }
             boolean remove = ImGui.button("Remove");
+            BiomeChildren.Action action = null;
+            if (children) {
+                ImGui.sameLine(); if (ImGui.button("Duplicate")) action = BiomeChildren.Action.DUPLICATE;
+                ImGui.beginDisabled(index == 0);
+                if (ImGui.button("Move up")) action = BiomeChildren.Action.UP;
+                ImGui.endDisabled(); ImGui.sameLine(); ImGui.beginDisabled(index == entries.size()-1);
+                if (ImGui.button("Move down")) action = BiomeChildren.Action.DOWN;
+                ImGui.endDisabled();
+            }
             ImGui.popID();
             if (remove) { applyArray(field, index, null); break; }
+            if (action != null) { changeChildren(index,action); break; }
         }
         String key = field + "#new";
         ImString input = values.computeIfAbsent(key, ignored -> new ImString(16_384));
         ImGui.inputText("New key", input);
         drafts.update(key, "", input.get());
-        if ((region || dimensionRegions) && ImGui.beginCombo(region ? "Available biomes" : "Available regions", "Choose resource")) {
-            for (String reference : region ? RegionFields.biomeKeys(workspace) : DimensionFields.regionKeys(workspace))
+        if ((region || children || dimensionRegions) && ImGui.beginCombo(region || children ? "Available biomes" : "Available regions", "Choose resource")) {
+            for (String reference : region || children ? RegionFields.biomeKeys(workspace) : DimensionFields.regionKeys(workspace))
                 if (ImGui.selectable(reference)) { input.set(reference); drafts.update(key, "", reference); }
             ImGui.endCombo();
         }
@@ -624,12 +645,21 @@ public final class EditorApp extends Application {
             if (structural && !discardArrayDrafts(field, index == count ? field + "#new" : null)) return;
             byte[] updated = RegionFields.region(selected)
                     ? RegionFields.editArray(selected, workspace.read(selected), field, index, value, workspace)
+                    : BiomeFields.biome(selected) && field.equals("children") ? BiomeChildren.edit(selected,workspace.read(selected),index,value,workspace)
                     : DimensionFields.editArray(selected, workspace.read(selected), field, index, value, workspace);
             workspace.replace(selected, updated);
             if (structural) {
                 values.keySet().removeIf(key -> key.startsWith(field + "#")); drafts.clearUnder(field + "#");
             } else { values.remove(field + "#" + index); drafts.applied(field + "#" + index); }
             error = null;
+        } catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private void changeChildren(int index, BiomeChildren.Action action) {
+        try {
+            byte[] next = BiomeChildren.change(selected,workspace.read(selected),index,action);
+            if (drafts.transitionUnder("children#", () -> discardArrayDrafts("children",null), () -> workspace.replace(selected,next))) {
+                values.keySet().removeIf(key -> key.startsWith("children#")); error = null;
+            }
         } catch (Exception failure) { error = failure.getMessage(); }
     }
     private void drawResources(List<ResourceTree.Node> nodes) {
@@ -773,7 +803,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
