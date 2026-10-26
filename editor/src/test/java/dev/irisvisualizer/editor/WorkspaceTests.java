@@ -11,6 +11,28 @@ public final class WorkspaceTests {
    var filtered=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json"),List.of(),"A.JSON");
    check(filtered.size()==1 && filtered.get(0).path().equals("dimensions") && filtered.get(0).children().get(0).path().equals("dimensions/a.json"));
    check(ResourceTree.build(List.of("biomes/z.json"),List.of(),"missing").isEmpty());
+   byte[] bounded={1,2,3,4};
+   check(Arrays.equals(bounded,PackWorkspace.readBounded(new java.io.ByteArrayInputStream(bounded),4)));
+   rejectsIo(()->PackWorkspace.readBounded(new java.io.ByteArrayInputStream(bounded),3));
+   check(PackWorkspace.readBounded(new java.io.ByteArrayInputStream(new byte[0]),0).length==0);
+   Path boundedFolder=Files.createDirectory(temp.resolve("bounded-folder"));
+   Files.createDirectories(boundedFolder.resolve("a/b"));Files.write(boundedFolder.resolve("a/b/data.bin"),bounded);
+   check(PackWorkspace.open(boundedFolder,new PackWorkspace.LoadLimits(4,3,3)).size("a/b/data.bin")==4);
+   rejectsIo(()->PackWorkspace.open(boundedFolder,new PackWorkspace.LoadLimits(3,3,3)));
+   rejectsIo(()->PackWorkspace.open(boundedFolder,new PackWorkspace.LoadLimits(4,2,3)));
+   rejectsIo(()->PackWorkspace.open(boundedFolder,new PackWorkspace.LoadLimits(4,3,2)));
+   Path boundedZip=temp.resolve("bounded.zip");
+   try(var zip=new ZipOutputStream(Files.newOutputStream(boundedZip))) {zip.putNextEntry(new ZipEntry("a/b/data.bin"));zip.write(bounded);zip.closeEntry();}
+   check(PackWorkspace.importZip(boundedZip,new PackWorkspace.LoadLimits(4,3,3)).size("a/b/data.bin")==4);
+   rejectsIo(()->PackWorkspace.importZip(boundedZip,new PackWorkspace.LoadLimits(3,3,3)));
+   rejectsIo(()->PackWorkspace.importZip(boundedZip,new PackWorkspace.LoadLimits(4,2,3)));
+   rejectsIo(()->PackWorkspace.importZip(boundedZip,new PackWorkspace.LoadLimits(4,3,2)));
+   Path directoryPayload=temp.resolve("directory-payload.zip");
+   try(var zip=new ZipOutputStream(Files.newOutputStream(directoryPayload))) {zip.putNextEntry(new ZipEntry("folder/"));zip.write(1);zip.closeEntry();}
+   rejectsIo(()->PackWorkspace.importZip(directoryPayload));
+   Path deepZip=temp.resolve("deep.zip");
+   try(var zip=new ZipOutputStream(Files.newOutputStream(deepZip))) {zip.putNextEntry(new ZipEntry("a/".repeat(64)+"file"));zip.closeEntry();}
+   rejectsIo(()->PackWorkspace.importZip(deepZip));
    InspectorDrafts transitionDrafts=new InspectorDrafts();
    transitionDrafts.update("pending","stored","unapplied");
    int[] commits={0};
