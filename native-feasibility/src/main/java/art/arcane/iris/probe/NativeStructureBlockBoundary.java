@@ -20,6 +20,7 @@ import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
+import net.minecraft.world.level.levelgen.structure.Structure;
 
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
@@ -69,15 +70,7 @@ final class NativeStructureBlockBoundary {
                                 throw new IllegalStateException("Unexpected palette lookup during ancient-city FORCE_CARVE preparation");
                             });
                 } else {
-                    // Same registry/decoration seed selection as the official native structure stage.
-                    int index = 0;
-                    for (var candidate : nativeContext.registries().lookupOrThrow(Registries.STRUCTURE)) {
-                        if (candidate == structure) break;
-                        if (candidate.step() == structure.step()) index++;
-                    }
-                    var random = new WorldgenRandom(new XoroshiroRandomSource(0L));
-                    long decorationSeed = random.setDecorationSeed(fixture.world().getSeed(), center.getMinBlockX(), center.getMinBlockZ());
-                    random.setFeatureSeed(decorationSeed, index, structure.step().ordinal());
+                    var random = decorationRandom(context, structure, center);
                     start.placeInChunk(fixture.world(), new StructureManager(fixture.world(), nativeContext.worldOptions(), null),
                             nativeContext.generator(), random, area, center);
                 }
@@ -123,6 +116,19 @@ final class NativeStructureBlockBoundary {
         report.setProperty("structureTerrainMissingService", "ServerLevel");
         report.setProperty("isolatedPieceStatus", results.get(1).status());
         NativeTemplatePreparationProof.run(context, dimension, List.of(planned, other), output, report);
+        NativePieceDispatchProof.run(context, dimension, List.of(planned, other), output, report);
+    }
+
+    static WorldgenRandom decorationRandom(HeadlessTerrainContext context, Structure structure, ChunkPos center) {
+        int index = 0;
+        for (var candidate : context.structures().registries().lookupOrThrow(Registries.STRUCTURE)) {
+            if (candidate == structure) break;
+            if (candidate.step() == structure.step()) index++;
+        }
+        var random = new WorldgenRandom(new XoroshiroRandomSource(0L));
+        long decorationSeed = random.setDecorationSeed(context.engine().getSeedManager().getSeed(), center.getMinBlockX(), center.getMinBlockZ());
+        random.setFeatureSeed(decorationSeed, index, structure.step().ordinal());
+        return random;
     }
 
     static Fixture fixture(HeadlessTerrainContext context, IrisDimension dimension, ChunkPos center) {

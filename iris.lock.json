@@ -36,5 +36,17 @@
     "sourcePath": "probe/src/test/resources/terrain3d-pack",
     "dimension": "terrain3d",
     "sha256": "124da7dbcf007dbd597dd32a750139e4a3e63d4451457edb6fd884214f9e380f"
+  },
+  "nativePieceAdapter": {
+    "path": "native-engine/src/main/java/dev/irisvisualizer/engine/NativePieceDispatcher.java",
+    "sha256": "4bbf2c05a61eb5be969e35d4ff1235b55a50f0b2b99e64d9f532b49b19adaea1",
+    "runtimePaperBundle": "26.3.build.25-alpha",
+    "policy": "Native piece dispatch and afterPlace without Bukkit plugin callbacks; complete structure/features remain unverified",
+    "sourceReference": {
+      "repository": "https://github.com/PaperMC/Paper",
+      "revision": "28f8027abbe02be5d3dff1b322c6fadbccb4d658",
+      "path": "paper-server/patches/sources/net/minecraft/world/level/levelgen/structure/StructureStart.java.patch",
+      "blob": "a73e4a06613ead7b5b3503b2b8efe9779067c42a"
+    }
   }
 }

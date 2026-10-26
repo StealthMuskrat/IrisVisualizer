@@ -35,3 +35,10 @@ function Get-TemplateServicesHash {
     if ($hash -ne $Lock.volmlib.templateServices.sha256) { throw 'Native template service manifest hash mismatch.' }
     return $hash
 }
+
+function Get-NativePieceAdapterHash {
+    param([string]$Root, $Lock)
+    $hash = (Get-FileHash -LiteralPath (Join-Path $Root $Lock.nativePieceAdapter.path) -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($hash -ne $Lock.nativePieceAdapter.sha256) { throw 'Native piece dispatcher source hash mismatch.' }
+    return $hash
+}

@@ -139,3 +139,13 @@ Real ancient-city starts at chunk origins (-99,-21) and (42,19), seed 1337, carv
 The original world-based preparation and native piece calls still reach their known ServerLevel boundaries. The explicit service route resolves this eroded-carve template dependency only. The CraftBukkit piece callback, remaining world services, complete native features, an independent full native baseline and total memory validation remain unfinished; world-preview readiness stays blocked.
 
 All five Windows suites passed: core repeatability, native boundaries, full-size native fixture repeatability, Overworld context and the extended structure/template-service proof.
+
+## Batch 4b.3b: standalone native piece dispatch
+
+The [native piece dispatcher](NATIVE-PIECE-DISPATCH.md) passed on [Windows x64/Java 25](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40370040842) at code commit `94c233f6b22ad7fc3aa22c7fa46bdf5803a69513`. The small adapter retains native piece order, bounding intersection, reference position and `Structure.afterPlace`, calling existing native algorithms in the standalone context without Bukkit plugin callbacks. The source SHA-256 is pinned/recorded and required during baseline comparison, and LF checkout preserves those source bytes on Windows. The actual runtime StructureStart class hash is also recorded.
+
+At seed 1337, real ancient-city starts at origins (-99,-21) and (42,19) placed 2,528 and 2,240 non-air blocks, with 88 and 63 distinct target states, in isolated air-input fixtures. Both complete target-state hashes over Y=[-256,512) matched the original runtime method with inactive plugin callbacks. Only the reference intercepted the callback constructor; the standalone path kept both server getters unavailable and used no callback substitute. Separate native dispatch contracts verified piece order, anchor, clipping, complete afterPlace input and empty-start behavior. Original NBT/status, source integrity, no-history and cleanup passed. All 28 dependency-free contract assertions passed locally and on Windows.
+
+This establishes the tested native piece route on artificial inputs, not an assembled structure stage or complete world parity. Native preparation integration, foundations/stilts, features, remaining world services, independent full-native comparison and total memory checks remain unfinished. World-preview readiness stays blocked.
+
+All five Windows suites passed: core repeatability, native boundaries, full-size native fixture repeatability, Overworld context and the extended structure/template/piece proof.
