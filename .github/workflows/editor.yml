@@ -37,6 +37,14 @@ jobs:
             $expected = Join-Path 'editor/src/main/resources/starter' $file.Name
             if ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $expected).Hash) { throw "Pinned starter differs: $($file.Name)" }
           }
+      - name: Verify pinned biome field definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiome.java' -OutFile IrisBiome.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeGeneratorLink.java' -OutFile IrisBiomeGeneratorLink.java
+          python editor/tools/extract_biome_fields.py IrisBiome.java IrisBiomeGeneratorLink.java generated-biome.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-biome.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-fields.properties).Hash) { throw 'Pinned biome definitions differ' }
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes
       - name: Build Windows x64 package
