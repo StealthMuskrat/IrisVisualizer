@@ -497,6 +497,14 @@
     "exponent": {
       "classification": "generation",
       "reason": "Selects or scales/shapes source-defined base noise; expression, image-map and fracture settings remain read-only."
+    },
+    "cellularFrequency": {
+      "classification": "generation",
+      "reason": "Controls cellular noise sampling with source-verified finite/nonnegative frequency and conditionally positive finite-reciprocal zoom constraints."
+    },
+    "cellularZoom": {
+      "classification": "generation",
+      "reason": "Controls cellular noise sampling with source-verified finite/nonnegative frequency and conditionally positive finite-reciprocal zoom constraints."
     }
   }
 }

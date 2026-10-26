@@ -405,7 +405,8 @@ public final class EditorApp extends Application {
         try { style = NoiseStyleFields.object(container, target); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored style is a snippet or unsupported value (read-only)."); return; }
         ImGui.textWrapped(NoiseStyleFields.contextDescription(target));
-        ImGui.textWrapped("Expression and image-map settings can override the base style. Those, cellular, cache and fracture settings remain read-only.");
+        ImGui.textWrapped("Expression and image-map settings can override the base style. Those, cache and fracture settings remain read-only.");
+        ImGui.textWrapped("Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
             ImGui.textWrapped("Absent style uses " + NoiseStyleFields.contextDefault(target) + ". Enable it explicitly before changing style settings.");
             if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefault(target) + ")")) enableStyle(target, "style");

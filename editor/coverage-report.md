@@ -13,7 +13,7 @@ Direct nonstatic/nontransient private fields in ten pinned source classes only. 
 | interpolator | 2 | 2 | 2 | 0 |
 | region | 27 | 19 | 13 | 8 |
 | noise | 15 | 14 | 14 | 1 |
-| noiseStyle | 10 | 3 | 3 | 7 |
+| noiseStyle | 10 | 5 | 5 | 5 |
 
 ## dimension
 
@@ -53,4 +53,4 @@ Unclassified: `fracture`.
 
 ## noiseStyle
 
-Unclassified: `cacheSize`, `cellularFrequency`, `cellularZoom`, `expression`, `fracture`, `imageMap`, `multiplier`.
+Unclassified: `cacheSize`, `expression`, `fracture`, `imageMap`, `multiplier`.
