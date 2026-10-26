@@ -103,6 +103,25 @@ public final class LosslessJson {
         }
         return out.append('"').toString();
     }
+    private List<Span> arraySpans(String field) {
+        Span container = root.get(field);
+        if (container == null) throw new IllegalArgumentException("Array is absent");
+        at = container.start(); require('['); space(); List<Span> spans = new ArrayList<>();
+        if (peek() == ']') return spans;
+        do {
+            space(); int start = at; value(0); spans.add(new Span(start, at));
+            space(); if (peek() == ']') return spans; require(',');
+        } while (true);
+    }
+    public List<LosslessJson> objectArray(String field) {
+        return arraySpans(field).stream().map(span -> new LosslessJson(text.substring(span.start(), span.end()).getBytes(StandardCharsets.UTF_8))).toList();
+    }
+    public byte[] objectArrayNumber(String field, int index, String property, double value) {
+        List<LosslessJson> objects = objectArray(field);
+        if (index < 0 || index >= objects.size()) throw new IllegalArgumentException("Array index out of range");
+        Span span = arraySpans(field).get(index);
+        return splice(span.start(), span.end(), new String(objects.get(index).number(property, value), StandardCharsets.UTF_8));
+    }
     private byte[] updatePath(String path, java.util.function.BiFunction<LosslessJson, String, byte[]> operation, boolean create) {
         int dot = path.indexOf('.');
         if (dot < 0) return operation.apply(this, path);

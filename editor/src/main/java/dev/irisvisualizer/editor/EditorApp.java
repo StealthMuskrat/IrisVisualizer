@@ -167,6 +167,10 @@ public final class EditorApp extends Application {
                     ImGui.textWrapped("Apply text changes before saving. Toggles apply immediately.");
                 } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && BiomeFields.biome(selected)) {
+                try { drawBiome(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
                     ImGui.textWrapped(new String(workspace.read(selected), StandardCharsets.UTF_8));
@@ -177,6 +181,62 @@ public final class EditorApp extends Application {
         }
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+    }
+    private void drawBiome(LosslessJson document) {
+        for (String field : BiomeFields.EDITABLE) {
+            String token = document.token(field), key = "biome#" + field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description(field));
+            if (token == null) {
+                if (ImGui.button("Enable (" + BiomeFields.defaultToken(field) + ")")) {
+                    try { workspace.replace(selected, BiomeFields.enable(selected, workspace.read(selected), field)); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else if (BiomeFields.booleanField(field)) {
+                if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored type mismatch (read-only)");
+                else if (ImGui.checkbox("Enabled", token.equals("true"))) {
+                    try { workspace.replace(selected, BiomeFields.editBoolean(selected, workspace.read(selected), field, !token.equals("true"))); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else {
+                ImGui.text("Range: " + BiomeFields.min(field) + " .. " + BiomeFields.max(field));
+                ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
+                ImGui.inputText("Value", input); drafts.update(key, token, input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected, BiomeFields.edit(selected, workspace.read(selected), field, Double.parseDouble(input.get()))); drafts.applied(key); values.remove(key); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        if (document.token("generators") != null && ImGui.collapsingHeader("Generator height ranges")) {
+            try {
+                List<LosslessJson> links = document.objectArray("generators");
+                for (int index=0;index<links.size();index++) {
+                    var link = links.get(index); String key = "generator#" + index;
+                    ImGui.pushID(key); ImGui.textWrapped("Generator " + index + ": " + link.token("generator"));
+                    if (link.token("min") == null || link.token("max") == null) ImGui.textWrapped("Absent range fields remain read-only.");
+                    else {
+                        String minKey = key + ".min", maxKey = key + ".max";
+                        ImString minimum = values.computeIfAbsent(minKey, ignored -> new ImString(link.token("min"), 128));
+                        ImString maximum = values.computeIfAbsent(maxKey, ignored -> new ImString(link.token("max"), 128));
+                        ImGui.inputText("Minimum", minimum); drafts.update(minKey, link.token("min"), minimum.get());
+                        if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description("generators.min"));
+                        ImGui.inputText("Maximum", maximum); drafts.update(maxKey, link.token("max"), maximum.get());
+                        if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description("generators.max"));
+                        if (ImGui.button("Apply height range")) {
+                            try {
+                                workspace.replace(selected, BiomeFields.generatorRange(selected, workspace.read(selected), index, Double.parseDouble(minimum.get()), Double.parseDouble(maximum.get())));
+                                drafts.applied(minKey); drafts.applied(maxKey); values.remove(minKey); values.remove(maxKey); error = null;
+                            } catch (Exception failure) { error = failure.getMessage(); }
+                        }
+                    }
+                    ImGui.popID();
+                }
+            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Generator list contains unsupported non-object entries (read-only)."); }
+        }
+        if (ImGui.collapsingHeader("Other biome fields (read-only)"))
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawArray(String field, LosslessJson document) {
         List<String> entries;
@@ -307,7 +367,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
