@@ -27,6 +27,16 @@ jobs:
           python editor/tools/extract_dimension_fields.py IrisDimension.java generated-fields.properties IrisImportedStructureControl.java IrisImportedFeatureControl.java
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-fields.properties).Hash) { throw 'Pinned Iris field definitions differ' }
+      - name: Verify pinned official starter templates
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/studio/StudioSVC.java' -OutFile StudioSVC.java
+          python editor/tools/extract_starter.py StudioSVC.java generated-starter
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($file in Get-ChildItem generated-starter -File) {
+            $expected = Join-Path 'editor/src/main/resources/starter' $file.Name
+            if ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $expected).Hash) { throw "Pinned starter differs: $($file.Name)" }
+          }
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes
       - name: Build Windows x64 package

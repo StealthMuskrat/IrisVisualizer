@@ -280,7 +280,12 @@ public final class EditorApp extends Application {
     private void perform(String action) {
         try {
             switch (action) {
-                case "New" -> { if (replaceAllowed()) { workspace = PackWorkspace.empty(); selected = null; values.clear(); } }
+                case "New" -> {
+                    String name = JOptionPane.showInputDialog(null, "Pack key (letters a-z, digits, _ or -):", "new_pack");
+                    if (name == null) return;
+                    PackWorkspace next = StarterPack.create(name);
+                    if (replaceAllowed()) { workspace = next; selected = "dimensions/" + StarterPack.normalizeName(name) + ".json"; values.clear(); }
+                }
                 case "Open", "Import" -> {
                     if (!replaceAllowed()) return;
                     Path path = choose(action.equals("Open"), false);
@@ -303,7 +308,10 @@ public final class EditorApp extends Application {
             ImGui.createContext();
             try {
                 if (DimensionFields.EDITABLE.isEmpty()) throw new IllegalStateException("Missing field policy");
-                System.out.println("PASS: packaged ImGui context, field definitions and GLFW " + glfwGetVersionString());
+                try {
+                    if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
+                } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
+                System.out.println("PASS: packaged ImGui context, field definitions, starter templates and GLFW " + glfwGetVersionString());
             } finally { ImGui.destroyContext(); }
             return;
         }

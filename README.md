@@ -4,7 +4,7 @@ Standalone Windows x64 visualizer and generation-focused pack editor for Iris, t
 
 **Status: editor implementation in progress; native world previews disabled.** The Windows x64 ImGui editor opens folders/ZIPs, preserves original/unknown data, edits selected dimension fields and filters, and inspects image assets. Full schema coverage and interactive GUI/GPU verification remain pending. No custom replacement terrain generator is included. Native parity has not been established.
 
-See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40383799925](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40383799925). Download its IrisVisualizer-windows-x64 artifact to try the editor.
+See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40384565387](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40384565387). Download its IrisVisualizer-windows-x64 artifact to try the editor.
 
 ## Verify the first batch
 
