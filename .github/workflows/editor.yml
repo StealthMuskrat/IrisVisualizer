@@ -219,6 +219,19 @@ jobs:
           python editor/tools/extract_surface_river_fields.py IrisRiverHydrology.java IrisSurfaceRiverConfig.java IrisSurfaceRiverSourceConfig.java IrisSurfaceRiverChannelConfig.java IrisSurfaceRiverBankConfig.java IrisSurfaceRiverFlowConfig.java IrisRiverMouthConfig.java generated-surface-river.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-surface-river.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-river-fields.properties).Hash) { throw 'Pinned surface-river definitions differ' }
+      - name: Verify pinned surface shaping and erosion choices
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisSurfaceRiverErosionConfig.java' -OutFile IrisSurfaceRiverErosionConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisSurfaceRiverBedConfig.java' -OutFile IrisSurfaceRiverBedConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverExcavationConfig.java' -OutFile IrisRiverExcavationConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverBlendStyle.java' -OutFile IrisRiverBlendStyle.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverBedProfile.java' -OutFile IrisRiverBedProfile.java
+          python editor/tools/test_surface_shaping_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_surface_shaping_fields.py IrisSurfaceRiverConfig.java IrisSurfaceRiverBankConfig.java IrisSurfaceRiverErosionConfig.java IrisSurfaceRiverBedConfig.java IrisRiverExcavationConfig.java IrisRiverBlendStyle.java IrisRiverBedProfile.java generated-surface-shaping.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-surface-shaping.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-shaping-fields.properties).Hash) { throw 'Pinned surface-shaping definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

@@ -565,7 +565,7 @@ public final class EditorApp extends Application {
             return;
         }
         drawSurfaceRiverScalars(surface,"");
-        for (String section : SurfaceRiverFields.SECTIONS) {
+        for (String section : SurfaceRiverFields.sections()) {
             if (ImGui.treeNode(section+" settings")) {
                 ImGui.textWrapped(SurfaceRiverFields.description(section));
                 LosslessJson object=null; boolean supported=true;
@@ -576,7 +576,9 @@ public final class EditorApp extends Application {
                         if (ImGui.button("Create "+section+" (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,SurfaceRiverFields.enableSection(selected,workspace.read(selected),section)));
                     } else {
                         drawSurfaceRiverScalars(object,section);
-                        for (String field : object.fields()) if (!SurfaceRiverFields.fields(section).contains(field)) ImGui.textWrapped(field+" (read-only)");
+                        if (section.equals("banks") && ImGui.treeNode("Excavation limits")) { drawSurfaceExcavation(surface); ImGui.treePop(); }
+                        for (String field : object.fields()) if (!SurfaceRiverFields.fields(section).contains(field)
+                                && !(section.equals("banks") && SurfaceRiverFields.EXCAVATION_OBJECT_FIELDS.contains(field))) ImGui.textWrapped(field+" (read-only)");
                     }
                 }
                 ImGui.treePop();
@@ -584,12 +586,43 @@ public final class EditorApp extends Application {
         }
         for (String field : surface.fields()) if (!SurfaceRiverFields.ROOT_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
+    private void drawSurfaceExcavation(LosslessJson surface) {
+        String section="banks.excavation";
+        ImGui.textWrapped(SurfaceRiverFields.description(section));
+        LosslessJson excavation;
+        try { excavation=SurfaceRiverFields.section(surface,section); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored excavation has an unsupported type (read-only)."); return; }
+        if (excavation==null) {
+            if (ImGui.button("Create excavation limits (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,SurfaceRiverFields.enableSection(selected,workspace.read(selected),section)));
+            return;
+        }
+        drawSurfaceRiverScalars(excavation,section);
+        for (String field : excavation.fields()) if (!SurfaceRiverFields.EXCAVATION_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
     private void drawSurfaceRiverScalars(LosslessJson object,String section) {
         for (String field : SurfaceRiverFields.fields(section)) {
             String token=object.token(field), key=SurfaceRiverFields.draftPrefix(section)+field;
             ImGui.pushID(key); ImGui.text(field);
             if (ImGui.isItemHovered()) ImGui.setTooltip(SurfaceRiverFields.help(section,field));
-            if (SurfaceRiverFields.booleanField(section,field)) {
+            if (SurfaceRiverFields.enumField(section,field)) {
+                if (token==null) {
+                    if (ImGui.button("Enable ("+SurfaceRiverFields.defaultToken(section,field)+")")) applyRoutingExtra(() -> workspace.replace(selected,SurfaceRiverFields.enableScalar(selected,workspace.read(selected),section,field)));
+                } else {
+                    String current=null;
+                    try { current=object.stringToken(field); }
+                    catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored choice is not a string (read-only)."); }
+                    if (current!=null) {
+                        if (!SurfaceRiverFields.choices(section,field).contains(current)) ImGui.textWrapped("Unrecognized stored choice. Choose a listed option to replace it.");
+                        if (ImGui.beginCombo("Choice",current.length()>128 ? "Unrecognized choice" : current)) {
+                            for (String choice : SurfaceRiverFields.choices(section,field)) {
+                                if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SurfaceRiverFields.setEnum(selected,workspace.read(selected),section,field,choice)));
+                                if (ImGui.isItemHovered()) ImGui.setTooltip(SurfaceRiverFields.choiceHelp(section,field,choice));
+                            }
+                            ImGui.endCombo();
+                        }
+                    }
+                }
+            } else if (SurfaceRiverFields.booleanField(section,field)) {
                 String effective=token==null ? SurfaceRiverFields.defaultToken(section,field) : token;
                 if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
                 else if (ImGui.checkbox(token==null ? "Enabled (Iris default)" : "Enabled",effective.equals("true")))
