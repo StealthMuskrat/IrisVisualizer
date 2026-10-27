@@ -71,7 +71,9 @@ public final class UndergroundRiverFields {
             var underground=underground(rivers); if (underground==null) return List.of();
             for (String field : underground.fields()) {
                 if (ROOT_SCALARS.contains(field)) continue;
-                if (RiverChannelRanges.UNDERGROUND_FIELDS.contains(field)) {
+                if (RiverMaterialFields.UNDERGROUND_FIELDS.contains(field)) {
+                    paths.addAll(RiverMaterialFields.readOnlyPaths(rivers,"underground."+field));
+                } else if (RiverChannelRanges.UNDERGROUND_FIELDS.contains(field)) {
                     for (String path : RiverChannelRanges.readOnlyPaths(underground,RiverChannelRanges.undergroundKey(field))) paths.add("underground."+path);
                 } else if (field.equals("sources")) {
                     try {

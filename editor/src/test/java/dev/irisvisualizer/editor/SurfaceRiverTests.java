@@ -131,7 +131,7 @@ final class SurfaceRiverTests {
             }
         }
         byte[] nested=bytes("{\"hydrology\":{\"rivers\":{\"surface\":{\"channel\":{\"width\":{\"min\":4},\"depth\":null,\"roughness\":0.25},\"banks\":{\"excavation\":\"snippet\",\"shoreMaterial\":{\"enabled\":true},\"bankMaterial\":null},\"bed\":{},\"erosion\":{},\"ponds\":{}}}}}");
-        check(DimensionFields.readOnlyPaths(new LosslessJson(nested)).containsAll(List.of("hydrology.rivers.surface.channel.depth","hydrology.rivers.surface.banks.excavation","hydrology.rivers.surface.banks.shoreMaterial","hydrology.rivers.surface.banks.bankMaterial")));
+        check(DimensionFields.readOnlyPaths(new LosslessJson(nested)).containsAll(List.of("hydrology.rivers.surface.channel.depth","hydrology.rivers.surface.banks.excavation","hydrology.rivers.surface.banks.bankMaterial")));
         check(text(SurfaceRiverFields.setText(PATH,nested,"channel","roughness","0")).equals(text(nested).replace("\"roughness\":0.25","\"roughness\":0")));
         rejects(() -> SurfaceRiverFields.enableScalar(PATH,nested,"channel","width"));
         rejects(() -> SurfaceRiverFields.setText(PATH,nested,"banks","excavation","1"));

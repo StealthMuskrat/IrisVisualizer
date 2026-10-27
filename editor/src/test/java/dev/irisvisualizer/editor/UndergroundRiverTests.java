@@ -131,7 +131,7 @@ final class UndergroundRiverTests {
             byte[] wrongStyle=bytes(prefix+"{\"min\":1,\"max\":2,\"style\":null}"+suffix);
             rejects(() -> NoiseStyleFields.enable(PATH,wrongStyle,target,"style"));
             check(range(RiverChannelRanges.editBounds(PATH,wrongStyle,key,"3","4"),field).token("style").equals("null"));
-            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).containsAll(List.of("hydrology.rivers.underground."+field+".future","hydrology.rivers.underground."+field+".style.fracture","hydrology.rivers.underground.bedMaterial")));
+            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).containsAll(List.of("hydrology.rivers.underground."+field+".future","hydrology.rivers.underground."+field+".style.fracture","hydrology.rivers.underground.bedMaterial.future")));
             rejects(() -> NoiseStyleFields.enable(PATH,root,target,"style"));
             rejects(() -> RiverChannelRanges.enable(PATH,parent,key));
             rejects(() -> new NoiseStyleFields.Target("biomes",target.objectField(),null));

@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in forty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in forty-six pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -33,20 +33,23 @@ Direct nonstatic/nontransient private fields in forty-three pinned source classe
 | surfaceRiver | 9 | 9 | 9 | 0 |
 | surfaceRiverSource | 4 | 4 | 4 | 0 |
 | surfaceRiverChannel | 12 | 12 | 12 | 0 |
-| surfaceRiverBank | 10 | 8 | 8 | 2 |
+| surfaceRiverBank | 10 | 10 | 10 | 0 |
 | surfaceRiverFlow | 6 | 6 | 6 | 0 |
 | surfaceRiverMouth | 7 | 7 | 7 | 0 |
 | surfaceRiverErosion | 9 | 9 | 9 | 0 |
-| surfaceRiverBed | 4 | 2 | 2 | 2 |
+| surfaceRiverBed | 4 | 4 | 4 | 0 |
 | riverExcavation | 3 | 3 | 3 | 0 |
 | surfaceRiverPonds | 2 | 2 | 2 | 0 |
 | surfaceRiverPond | 4 | 4 | 4 | 0 |
-| undergroundRiver | 13 | 12 | 12 | 1 |
+| undergroundRiver | 13 | 13 | 13 | 0 |
 | undergroundRiverSource | 3 | 3 | 3 | 0 |
 | riverGrottos | 2 | 2 | 2 | 0 |
 | coastalGrotto | 9 | 9 | 9 | 0 |
 | inlandGrotto | 6 | 6 | 6 | 0 |
 | seaCaves | 6 | 6 | 6 | 0 |
+| riverMaterial | 3 | 3 | 3 | 0 |
+| materialPalette | 3 | 1 | 1 | 2 |
+| blockData | 6 | 2 | 2 | 4 |
 
 ## dimension
 
@@ -166,7 +169,7 @@ Unclassified: none.
 
 ## surfaceRiverBank
 
-Unclassified: `bankMaterial`, `shoreMaterial`.
+Unclassified: none.
 
 ## surfaceRiverFlow
 
@@ -182,7 +185,7 @@ Unclassified: none.
 
 ## surfaceRiverBed
 
-Unclassified: `material`, `paddingPalette`.
+Unclassified: none.
 
 ## riverExcavation
 
@@ -198,7 +201,7 @@ Unclassified: none.
 
 ## undergroundRiver
 
-Unclassified: `bedMaterial`.
+Unclassified: none.
 
 ## undergroundRiverSource
 
@@ -219,3 +222,15 @@ Unclassified: none.
 ## seaCaves
 
 Unclassified: none.
+
+## riverMaterial
+
+Unclassified: none.
+
+## materialPalette
+
+Unclassified: `style`, `zoom`.
+
+## blockData
+
+Unclassified: `backup`, `data`, `debug`, `tileData`.
