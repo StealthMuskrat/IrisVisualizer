@@ -601,6 +601,10 @@
     "cellularZoom": {
       "classification": "generation",
       "reason": "Controls cellular noise sampling with source-verified finite/nonnegative frequency and conditionally positive finite-reciprocal zoom constraints."
+    },
+    "multiplier": {
+      "classification": "generation",
+      "reason": "Bounded multiplier editing only in floating placement coordinate warps, where native code uses it for horizontal offsets. Other style contexts remain read-only."
     }
   },
   "terrain3D": {
@@ -2163,6 +2167,38 @@
     "rotation": {
       "classification": "generation",
       "reason": "Bounded inline rotation authoring in floatingObjects only; anchored consumers replace configured rotation. Native placement/block-state rotation and slope-derived overrides remain unvalidated."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "slopeCondition": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "rotateTowardsSlope": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "carvingSupport": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "surfaceSupportBuffer": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "surfaceSupportDepth": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "requireSurfaceSupport": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "warp": {
+      "classification": "generation",
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
     }
   },
   "objectTranslate": {
@@ -2239,6 +2275,16 @@
     "interval": {
       "classification": "generation",
       "reason": "Source-derived floating-object rotation controls; absent Y uses its contextual enabled/90-degree defaults while explicit inline axes use class defaults. Ordered angle pairs are an editor subset."
+    }
+  },
+  "objectLimit": {
+    "minimumHeight": {
+      "classification": "generation",
+      "reason": "Exact annotation-bounded height clamp pair in floatingObjects placements only; native force/raw-mode bypasses and world compatibility are not validated."
+    },
+    "maximumHeight": {
+      "classification": "generation",
+      "reason": "Exact annotation-bounded height clamp pair in floatingObjects placements only; native force/raw-mode bypasses and world compatibility are not validated."
     }
   }
 }

@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in fifty-seven pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in fifty-eight pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -65,6 +65,7 @@ SOURCES = {
  'objectScale': 'structure/object/IrisObjectScale.java',
  'objectRotation': 'structure/object/IrisObjectRotation.java',
  'axisRotation': 'structure/object/IrisAxisRotationClamp.java',
+ 'objectLimit': 'structure/object/IrisObjectLimit.java',
 }
 
 def declared_fields(text):
@@ -103,6 +104,8 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['objectPlacement'] = set(editable(java_dir, 'FloatingObjectPlacements'))
     implemented['objectPlacement'].update(editable(java_dir, 'FloatingPlacementSettings', 'OBJECT_FIELDS'))
     implemented['objectPlacement'].update(editable(java_dir, 'FloatingObjectRotations'))
+    implemented['objectPlacement'].update(editable(java_dir, 'FloatingPlacementConstraints'))
+    implemented['objectLimit'] = set(editable(java_dir, 'FloatingPlacementConstraints', 'CLAMP_FIELDS'))
     implemented['objectRotation'] = set(editable(java_dir, 'FloatingObjectRotations', 'ROTATION_FIELDS'))
     implemented['axisRotation'] = set(editable(java_dir, 'FloatingObjectRotations', 'AXIS_FIELDS'))
     implemented['objectScale'] = set(editable(java_dir, 'FloatingPlacementSettings', 'SCALE_FIELDS'))
@@ -125,6 +128,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['noise'] = set(editable(java_dir, 'NoiseFields'))
     implemented['noise'].update(editable(java_dir, 'NoiseStyleFields', 'OBJECT_FIELDS'))
     implemented['noiseStyle'] = set(editable(java_dir, 'NoiseStyleFields'))
+    implemented['noiseStyle'].update(editable(java_dir, 'FloatingPlacementConstraints', 'WARP_FIELDS'))
     implemented['terrain3D'] = set(editable(java_dir, 'Terrain3DFields'))
     implemented['terrain3D'].update(editable(java_dir, 'NoiseStyleFields', 'TERRAIN_FIELDS'))
     implemented['caveProfile'] = set(editable(java_dir, 'CaveProfileFields'))
@@ -188,7 +192,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in fifty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in fifty-eight pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

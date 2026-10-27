@@ -450,6 +450,16 @@ jobs:
           python editor/tools/extract_floating_object_rotation.py IrisObjectRotation.java IrisAxisRotationClamp.java IrisObjectPlacement.java MantleFloatingObjectComponent.java IrisObjectPlacementRunner.java generated-floating-object-rotation.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-object-rotation.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-object-rotation.properties).Hash) { throw 'Pinned floating rotation definitions differ' }
+      - name: Verify pinned floating placement guard and warp definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectLimit.java' -OutFile IrisObjectLimit.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/cave/CarvingMode.java' -OutFile CarvingMode.java
+          python editor/tools/test_floating_placement_constraints.py IrisObjectPlacement.java IrisObjectLimit.java IrisSlopeClip.java CarvingMode.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisGeneratorStyle.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_placement_constraints.py IrisObjectPlacement.java IrisObjectLimit.java IrisSlopeClip.java CarvingMode.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisGeneratorStyle.java generated-floating-placement-constraints.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-placement-constraints.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-constraints.properties).Hash) { throw 'Pinned placement guard and warp definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

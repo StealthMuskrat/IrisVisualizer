@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in fifty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in fifty-eight pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -13,7 +13,7 @@ Direct nonstatic/nontransient private fields in fifty-seven pinned source classe
 | interpolator | 2 | 2 | 2 | 0 |
 | region | 27 | 21 | 15 | 6 |
 | noise | 15 | 14 | 14 | 1 |
-| noiseStyle | 10 | 5 | 5 | 5 |
+| noiseStyle | 10 | 6 | 6 | 4 |
 | terrain3D | 14 | 14 | 14 | 0 |
 | caveProfile | 32 | 32 | 32 | 0 |
 | styledRange | 3 | 3 | 3 | 0 |
@@ -56,11 +56,12 @@ Direct nonstatic/nontransient private fields in fifty-seven pinned source classe
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
 | floatingBiome | 42 | 42 | 41 | 0 |
-| objectPlacement | 41 | 11 | 11 | 30 |
+| objectPlacement | 41 | 19 | 19 | 22 |
 | objectTranslate | 4 | 4 | 4 | 0 |
 | objectScale | 5 | 5 | 5 | 0 |
 | objectRotation | 4 | 4 | 4 | 0 |
 | axisRotation | 4 | 4 | 4 | 0 |
+| objectLimit | 2 | 2 | 2 | 0 |
 
 ## dimension
 
@@ -100,7 +101,7 @@ Unclassified: `fracture`.
 
 ## noiseStyle
 
-Unclassified: `cacheSize`, `expression`, `fracture`, `imageMap`, `multiplier`.
+Unclassified: `cacheSize`, `expression`, `fracture`, `imageMap`.
 
 ## terrain3D
 
@@ -272,7 +273,7 @@ Unclassified: none.
 
 ## objectPlacement
 
-Unclassified: `bore`, `boreExtendMaxY`, `boreExtendMinY`, `bottom`, `carvingSupport`, `caveAnchorMode`, `clamp`, `edit`, `forcePlace`, `fromBottom`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `meld`, `onwater`, `overrideGlobalLoot`, `requireSurfaceSupport`, `rotateTowardsSlope`, `slopeCondition`, `smartBore`, `stiltSettings`, `surfaceSupportBuffer`, `surfaceSupportDepth`, `trees`, `underwater`, `vacuumSettings`, `vanillaLoot`, `warp`, `waterloggable`.
+Unclassified: `bore`, `boreExtendMaxY`, `boreExtendMinY`, `bottom`, `caveAnchorMode`, `edit`, `forcePlace`, `fromBottom`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `meld`, `onwater`, `overrideGlobalLoot`, `smartBore`, `stiltSettings`, `trees`, `underwater`, `vacuumSettings`, `vanillaLoot`, `waterloggable`.
 
 ## objectTranslate
 
@@ -287,5 +288,9 @@ Unclassified: none.
 Unclassified: none.
 
 ## axisRotation
+
+Unclassified: none.
+
+## objectLimit
 
 Unclassified: none.
