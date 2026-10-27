@@ -471,6 +471,17 @@ jobs:
           python editor/tools/extract_floating_placement_effects.py IrisObjectPlacement.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisObject.java IrisObjectShaping.java IrisProceduralBlocks.java generated-floating-placement-effects.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-placement-effects.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-effects.properties).Hash) { throw 'Pinned placement excavation and water definitions differ' }
+      - name: Verify pinned floating stilt and vacuum definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisStiltSettings.java' -OutFile IrisStiltSettings.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisVacuumSettings.java' -OutFile IrisVacuumSettings.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectVacuum.java' -OutFile IrisObjectVacuum.java
+          python editor/tools/test_floating_placement_deformation.py IrisObjectPlacement.java IrisStiltSettings.java IrisVacuumSettings.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisObjectVacuum.java IrisObjectShaping.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_placement_deformation.py IrisObjectPlacement.java IrisStiltSettings.java IrisVacuumSettings.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisObjectVacuum.java IrisObjectShaping.java generated-floating-placement-deformation.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-placement-deformation.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-deformation.properties).Hash) { throw 'Pinned stilt and vacuum definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

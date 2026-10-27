@@ -622,6 +622,7 @@ public final class EditorApp extends Application {
             drawFloatingPlacementSettings(placement,new FloatingPlacementSettings.Context(index,list,placementIndex));
             drawFloatingPlacementConstraints(placement,new FloatingPlacementConstraints.Context(index,list,placementIndex));
             drawFloatingPlacementEffects(placement,new FloatingPlacementEffects.Context(index,list,placementIndex));
+            drawFloatingDeformation(placement,new FloatingPlacementDeformation.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
@@ -756,6 +757,81 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         ImGui.treePop();
+    }
+    private void drawFloatingDeformation(LosslessJson placement,FloatingPlacementDeformation.Context context) {
+        for (String object : FloatingPlacementDeformation.OBJECT_FIELDS) {
+            if (!ImGui.treeNode(object)) continue;
+            ImGui.textWrapped(FloatingPlacementDeformation.help(object));
+            ImGui.textWrapped(object.equals("stiltSettings") ? "Used by native stilt modes. Anchored collections remap classic stilt modes; their classic ranges stay read-only here. Palette settings remain read-only." : "Used by VACUUM modes when native terrain context is available. Radius 0 chooses the mode default (12, HIGH 20, FAST 8); FAST uses a two-block sampling step. Organic jitter and wave controls apply only to their matching modes.");
+            ImGui.textWrapped("Authoring settings leaves placement mode unchanged. Deformation is not previewed or validated.");LosslessJson settings;
+            try { settings=FloatingPlacementDeformation.object(placement,object); }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored settings are a snippet or unsupported value (read-only).");ImGui.treePop();continue; }
+            if (settings==null) {
+                ImGui.textWrapped("Absent/null uses native fallback defaults. Creating an empty settings object retains class defaults.");
+                if (ImGui.button("Create explicit settings")) changeFloatingDeformation(context,object,true);
+                ImGui.treePop();continue;
+            }
+            if (ImGui.button("Restore implicit settings (null)")) { changeFloatingDeformation(context,object,false);ImGui.treePop();continue; }
+            for (String field : FloatingPlacementDeformation.scalars(object)) if (FloatingPlacementDeformation.editable(context.list(),object,field)) {
+                ImGui.pushID(field);ImGui.text(field);
+                if (ImGui.isItemHovered()) ImGui.setTooltip(object.equals("vacuumSettings") && field.equals("waveScale") ? "Direct multiplier on world X/Z fed to native wave noise; the editor does not estimate wavelength." : FloatingPlacementDeformation.help(object,field));
+                ImGui.textWrapped(FloatingPlacementDeformation.constraints(object,field));String token=settings.token(field),key=context.prefix(object)+field;
+                if (token==null) {
+                    if (ImGui.button("Enable ("+FloatingPlacementDeformation.defaultToken(object,field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementDeformation.enableScalar(selected,workspace.read(selected),context,object,field)));
+                } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored scalar has an unsupported type (read-only).");
+                else {
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Value",input);drafts.update(key,token,input.get());
+                    if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingPlacementDeformation.setScalar(selected,workspace.read(selected),context,object,field,input.get())));
+                }
+                ImGui.popID();
+            }
+            if (object.equals("stiltSettings") && ImGui.treeNode("Material exclusions")) { drawFloatingStiltExclusions(settings,context);ImGui.treePop(); }
+            for (String path : FloatingPlacementDeformation.readOnlyPaths(placement,context)) if (path.startsWith(object+".")) ImGui.textWrapped(path+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void changeFloatingDeformation(FloatingPlacementDeformation.Context context,String object,boolean enable) {
+        try { byte[] current=workspace.read(selected);commitProfileChange(context.prefix(object),enable ? FloatingPlacementDeformation.enable(selected,current,context,object) : FloatingPlacementDeformation.disable(selected,current,context,object),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingStiltExclusions(LosslessJson settings,FloatingPlacementDeformation.Context context) {
+        ImGui.textWrapped("Excludes material keys across all block states, before and after palette/edit replacement. Storage blocks and tile entities are always excluded. New values accept Minecraft material names only, without states; registry existence is unchecked. Existing unsupported values are preserved.");
+        List<String> entries;
+        try { entries=FloatingPlacementDeformation.exclusions(settings); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored exclusions are not a string array (read-only).");return; }
+        if (entries==null) {
+            if (ImGui.button("Enable empty authored exclusions")) {
+                try { commitProfileChange(context.exclusionPrefix(),FloatingPlacementDeformation.enableExclusions(selected,workspace.read(selected),context),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        if (ImGui.button("Disable authored material exclusions (null)")) {
+            try { commitProfileChange(context.exclusionPrefix(),FloatingPlacementDeformation.disableExclusions(selected,workspace.read(selected),context),null); }
+            catch (Exception failure) { error=failure.getMessage(); }
+            return;
+        }
+        String newKey=context.exclusionPrefix()+"new";ImString material=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New material key",material);drafts.update(newKey,"",material.get());
+        ImGui.beginDisabled(!FloatingPlacementDeformation.materialSyntax(material.get()));
+        if (ImGui.button("Add material exclusion")) { ImGui.endDisabled();changeFloatingExclusion(context,RiverProfiles.Action.ADD,-1,material.get(),newKey);return; }
+        ImGui.endDisabled();
+        if (entries.isEmpty()) ImGui.textWrapped("No authored exclusions. Add a material to populate the list.");
+        for (int index=0;index<entries.size();index++) {
+            ImGui.pushID(index);int selectedIndex=index;String current=entries.get(index),key=context.exclusionPrefix()+index+".value";
+            if (!FloatingPlacementDeformation.materialSyntax(current)) ImGui.textWrapped("Stored exclusion has unsupported syntax/namespace and is preserved until replaced.");
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(128,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Material",input);drafts.update(key,current,input.get());
+            if (ImGui.button("Apply material")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingPlacementDeformation.setExclusion(selected,workspace.read(selected),context,selectedIndex,input.get())));
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();ImGui.beginDisabled(entries.size()<=1);if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Move down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            ImGui.popID();if (action!=null) { changeFloatingExclusion(context,action,index,null,null);return; }
+        }
+    }
+    private void changeFloatingExclusion(FloatingPlacementDeformation.Context context,RiverProfiles.Action action,int index,String material,String appliedKey) {
+        try { commitProfileChange(context.exclusionPrefix(),FloatingPlacementDeformation.changeExclusion(selected,workspace.read(selected),context,action,index,material),appliedKey); }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawFloatingPlacementMode(LosslessJson placement,int entry,String list,int index) {
         String current;
