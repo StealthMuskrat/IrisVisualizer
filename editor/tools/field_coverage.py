@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in forty-nine pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in fifty-one pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -57,6 +57,8 @@ SOURCES = {
  'riverProfile': 'generation/hydrology/IrisRiverProfile.java',
  'standingSurfacePool': 'generation/hydrology/IrisSurfacePoolConfig.java',
  'deepFluid': 'generation/hydrology/IrisDeepFluidConfig.java',
+ 'biomePaletteLayer': 'generation/biome/IrisBiomePaletteLayer.java',
+ 'slopeClip': 'generation/terrain/IrisSlopeClip.java',
 }
 
 def declared_fields(text):
@@ -84,6 +86,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['generator'].update(editable(java_dir, 'InterpolationFields', 'OBJECT_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'BiomeGeneratorLinks', 'LIST_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'BiomeChildren'))
+    implemented['biome'].update(editable(java_dir, 'BiomeLayers', 'LIST_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'Terrain3DFields', 'OBJECT_FIELDS'))
     for group in ['dimension','region','biome']:
         implemented[group].update(editable(java_dir, 'CaveProfileFields', 'OBJECT_FIELDS'))
@@ -153,6 +156,8 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['surfaceRiverBank'].update(editable(java_dir, 'RiverMaterialFields', 'BANK_FIELDS'))
     implemented['surfaceRiverBed'].update(editable(java_dir, 'RiverMaterialFields', 'BED_FIELDS'))
     implemented['undergroundRiver'].update(editable(java_dir, 'RiverMaterialFields', 'UNDERGROUND_FIELDS'))
+    implemented['biomePaletteLayer'] = set(editable(java_dir, 'BiomeLayers'))
+    implemented['slopeClip'] = set(editable(java_dir, 'BiomeLayers', 'SLOPE_FIELDS'))
     implemented['deepFluid'] = set(editable(java_dir, 'DeepFluids'))
     implemented['standingSurfacePool'] = set(editable(java_dir, 'SurfacePools'))
     implemented['riverProfile'] = set(editable(java_dir, 'RiverProfiles'))
@@ -163,7 +168,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in forty-nine pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in fifty-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name
