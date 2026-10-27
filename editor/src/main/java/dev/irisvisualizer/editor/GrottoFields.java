@@ -12,6 +12,7 @@ import java.util.function.Function;
 public final class GrottoFields {
     public static final List<String> OBJECT_FIELDS = List.of("grottos");
     public static final List<String> SECTIONS = List.of("coastal", "inland");
+    public static final List<String> COASTAL_OBJECT_FIELDS = List.of("seaCaves");
     public static final List<String> COASTAL_FIELDS = List.of("enabled", "poolLevel", "horizontalRadius", "verticalRadius", "headroom", "maximumVolume", "cliffMinimumHeight", "cliffSlopeFactor");
     public static final List<String> INLAND_FIELDS = List.of("enabled", "connectSurfaceRivers", "horizontalRadius", "verticalRadius", "headroom", "maximumVolume");
     private static final Properties DATA=new Properties();
@@ -61,7 +62,10 @@ public final class GrottoFields {
     public static byte[] enableScalar(String path,byte[] original,String section,String field) {
         authorize(path,section,field);
         if (nullable(section,field)) throw new IllegalArgumentException("Supply an explicit cliff-height override or keep the fallback");
-        return edit(original,section,object -> enumField(section,field) ? object.enableStringPath(field,defaultToken(section,field)) : object.enable(field,defaultToken(section,field)));
+        return edit(original,section,object -> {
+            if (section.equals("coastal") && field.equals("horizontalRadius")) SeaCaveFields.validateRadiusEdit(object,Integer.parseInt(defaultToken(section,field)));
+            return enumField(section,field) ? object.enableStringPath(field,defaultToken(section,field)) : object.enable(field,defaultToken(section,field));
+        });
     }
     public static byte[] setBoolean(String path,byte[] original,String section,String field,boolean value) {
         authorize(path,section,field); if (!booleanField(section,field)) throw new IllegalArgumentException("This grotto field is not boolean");
@@ -82,7 +86,10 @@ public final class GrottoFields {
         } else value=Double.parseDouble(input);
         String p=prefix(section,field);
         if (!Double.isFinite(value) || value<Double.parseDouble(DATA.getProperty(p+".minimum")) || value>Double.parseDouble(DATA.getProperty(p+".maximum"))) throw new IllegalArgumentException("Value violates pinned grotto bounds");
-        return edit(original,section,object -> nullable(section,field) ? object.nullableNumber(field,value) : object.number(field,value));
+        return edit(original,section,object -> {
+            if (section.equals("coastal") && field.equals("horizontalRadius")) SeaCaveFields.validateRadiusEdit(object,(int)value);
+            return nullable(section,field) ? object.nullableNumber(field,value) : object.number(field,value);
+        });
     }
     public static byte[] reset(String path,byte[] original,String section,String field) {
         authorize(path,section,field); if (!nullable(section,field)) throw new IllegalArgumentException("This grotto field has no null fallback");
@@ -99,7 +106,11 @@ public final class GrottoFields {
                 if (!SECTIONS.contains(section)) { paths.add("grottos."+section); continue; }
                 try {
                     var object=section(grottos,section);
-                    for (String field : object.fields()) if (!fields(section).contains(field)) paths.add("grottos."+section+"."+field);
+                    for (String field : object.fields()) {
+                        if (section.equals("coastal") && COASTAL_OBJECT_FIELDS.contains(field)) {
+                            for (String path : SeaCaveFields.readOnlyPaths(object)) paths.add("grottos.coastal."+path);
+                        } else if (!fields(section).contains(field)) paths.add("grottos."+section+"."+field);
+                    }
                 } catch (IllegalArgumentException mismatch) { paths.add("grottos."+section); }
             }
         } catch (IllegalArgumentException mismatch) { paths.add("grottos"); }

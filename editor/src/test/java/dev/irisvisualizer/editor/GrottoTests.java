@@ -55,7 +55,7 @@ final class GrottoTests {
             String other=name.equals("coastal") ? "inland" : "coastal";
             String prefix="{\r\n \"hydrology\":{\"rivers\":{\"enabled\":false,\"grottos\":{\""+name+"\":";
             String suffix=",\""+other+"\":{\"futureSibling\":true},\"futureRoot\":[\"\\u0061\"]},\"geometry\":{\"grottos\":{\"aspectRange\":0.2}},\"underground\":{\"sources\":{\"density\":0.25}},\"profiles\":[{\"id\":\"literal ID\"}]}},\"unknown\":9007199254740993\r\n}\r\n";
-            String leaf="{"+String.join(",",specs.stream().map(spec -> "\""+spec.field()+"\":"+(spec.kind().equals("enum") ? "\"FUTURE\\u005fLEVEL\"" : spec.value())).toList())+(name.equals("coastal") ? ",\"seaCaves\":{\"enabled\":false,\"future\":true}" : "")+",\"future\":\"雪\\u0061\"}";
+            String leaf="{"+String.join(",",specs.stream().map(spec -> "\""+spec.field()+"\":"+(spec.kind().equals("enum") ? "\"FUTURE\\u005fLEVEL\"" : spec.value())).toList())+(name.equals("coastal") ? ",\"seaCaves\":{\"enabled\":false,\"minimumSpacing\":8192,\"future\":true}" : "")+",\"future\":\"雪\\u0061\"}";
             byte[] original=bytes(prefix+leaf+suffix),copy=original.clone();
             for (var spec : specs) {
                 String field=spec.field();
@@ -115,7 +115,7 @@ final class GrottoTests {
             }
             check(Arrays.equals(original,copy));
             check(DimensionFields.readOnlyPaths(new LosslessJson(original)).containsAll(List.of("hydrology.rivers.grottos."+name+".future","hydrology.rivers.grottos.futureRoot")));
-            if (name.equals("coastal")) check(DimensionFields.readOnlyPaths(new LosslessJson(original)).contains("hydrology.rivers.grottos.coastal.seaCaves"));
+            if (name.equals("coastal")) check(DimensionFields.readOnlyPaths(new LosslessJson(original)).contains("hydrology.rivers.grottos.coastal.seaCaves.future"));
             for (String bad : List.of("null","[]","1","true","\"snippet\"")) {
                 byte[] wrong=bytes(prefix+bad+suffix);
                 rejects(() -> GrottoFields.enableSection(PATH,wrong,name));
@@ -156,7 +156,7 @@ final class GrottoTests {
         GrottoFields.reset(PATH,zero,"coastal","cliffMinimumHeight"); drafts.applied(GrottoFields.draftPrefix("coastal")+"cliffMinimumHeight");
         check(drafts.count()==4 && drafts.contains(GrottoFields.draftPrefix("inland")+"horizontalRadius"));
         check(FieldCoverage.fields("riverGrottos").size()==2 && FieldCoverage.fields("riverGrottos").stream().allMatch(FieldCoverage.Field::implemented));
-        check(FieldCoverage.fields("coastalGrotto").size()==9 && FieldCoverage.fields("coastalGrotto").stream().filter(FieldCoverage.Field::implemented).count()==8);
+        check(FieldCoverage.fields("coastalGrotto").size()==9 && FieldCoverage.fields("coastalGrotto").stream().filter(FieldCoverage.Field::implemented).count()==9);
         check(FieldCoverage.fields("inlandGrotto").size()==6 && FieldCoverage.fields("inlandGrotto").stream().allMatch(FieldCoverage.Field::implemented));
         var workspace=PackWorkspace.newPack(Map.of(PATH,zero,"dimensions/null-height.json",nullHeight,"dimensions/defaults.json",empty,"dimensions/unknown.json",preserved));
         workspace.save(temp.resolve("grotto-settings")); workspace.exportZip(temp.resolve("grotto-settings.zip"));

@@ -583,7 +583,13 @@ public final class EditorApp extends Application {
             String token=object.token(field),key=GrottoFields.draftPrefix(section)+field;
             ImGui.pushID(key); ImGui.text(field);
             if (ImGui.isItemHovered()) ImGui.setTooltip(GrottoFields.help(section,field));
-            if (GrottoFields.enumField(section,field)) {
+            boolean pairedRadius=false;
+            if (section.equals("coastal") && field.equals("horizontalRadius")) {
+                try { pairedRadius=SeaCaveFields.object(object)!=null; }
+                catch (IllegalArgumentException mismatch) { /* Unsupported sea-cave data remains read-only. */ }
+            }
+            if (pairedRadius) drawSeaCaveSpacingPair(object);
+            else if (GrottoFields.enumField(section,field)) {
                 if (token==null) {
                     if (ImGui.button("Enable ("+GrottoFields.defaultToken(section,field)+")")) applyRoutingExtra(() -> workspace.replace(selected,GrottoFields.enableScalar(selected,workspace.read(selected),section,field)));
                 } else {
@@ -632,7 +638,74 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
-        for (String field : object.fields()) if (!GrottoFields.fields(section).contains(field)) ImGui.textWrapped(field+" (read-only)");
+        if (section.equals("coastal") && ImGui.treeNode("Sea caves")) { drawSeaCaves(object); ImGui.treePop(); }
+        for (String field : object.fields()) if (!GrottoFields.fields(section).contains(field)
+                && !(section.equals("coastal") && GrottoFields.COASTAL_OBJECT_FIELDS.contains(field))) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawSeaCaveSpacingPair(LosslessJson coastal) {
+        var caves=SeaCaveFields.object(coastal);
+        String radius=coastal.token("horizontalRadius"),spacing=caves.token("minimumSpacing");
+        if (radius!=null && !LosslessJson.numericToken(radius) || spacing!=null && !LosslessJson.numericToken(spacing)) {
+            ImGui.textWrapped("Stored radius or spacing has an unsupported type (read-only)."); return;
+        }
+        String radiusKey=GrottoFields.draftPrefix("coastal")+"horizontalRadius",spacingKey=SeaCaveFields.draftPrefix()+"minimumSpacing";
+        String storedRadius=radius==null ? GrottoFields.defaultToken("coastal","horizontalRadius") : radius,storedSpacing=spacing==null ? SeaCaveFields.defaultToken("minimumSpacing") : spacing;
+        ImString radiusInput=values.computeIfAbsent(radiusKey,ignored -> new ImString(storedRadius,Math.max(128,storedRadius.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImString spacingInput=values.computeIfAbsent(spacingKey,ignored -> new ImString(storedSpacing,Math.max(128,storedSpacing.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImGui.textWrapped("Sea-cave spacing must be at least twice the coastal radius. Apply both values together.");
+        ImGui.inputText(radius==null ? "Coastal radius (Iris default)" : "Coastal radius",radiusInput); drafts.update(radiusKey,storedRadius,radiusInput.get());
+        ImGui.inputText(spacing==null ? "Sea-cave spacing (Iris default)" : "Sea-cave spacing",spacingInput); drafts.update(spacingKey,storedSpacing,spacingInput.get());
+        if (ImGui.button("Apply radius and spacing")) {
+            try {
+                workspace.replace(selected,SeaCaveFields.setSpacingAndRadius(selected,workspace.read(selected),radiusInput.get(),spacingInput.get()));
+                drafts.applied(radiusKey); drafts.applied(spacingKey); values.remove(radiusKey); values.remove(spacingKey); error=null;
+            } catch (Exception failure) { error=failure.getMessage(); }
+        }
+    }
+    private void drawSeaCaves(LosslessJson coastal) {
+        ImGui.textWrapped(SeaCaveFields.description());
+        ImGui.textWrapped("Sea caves also require the coastal grotto to be enabled. These controls leave its enable flag unchanged.");
+        LosslessJson caves;
+        try { caves=SeaCaveFields.object(coastal); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored sea-cave settings have an unsupported type (read-only)."); return; }
+        if (caves==null) {
+            String key=SeaCaveFields.creationDraftKey(),stored=SeaCaveFields.defaultToken("minimumSpacing");
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,128));
+            ImGui.textWrapped("Initial spacing must be at least twice the stored coastal radius. Other sea-cave settings keep their Iris defaults.");
+            try { ImGui.text("Required spacing here: "+(SeaCaveFields.coastalRadius(coastal)*2)); }
+            catch (IllegalArgumentException mismatch) { ImGui.textWrapped(mismatch.getMessage()); }
+            ImGui.inputText("Initial minimum spacing",input); drafts.update(key,stored,input.get());
+            if (ImGui.button("Create sea-cave settings")) {
+                try { workspace.replace(selected,SeaCaveFields.enableObject(selected,workspace.read(selected),input.get())); drafts.applied(key); values.remove(key); error=null; }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        for (String field : SeaCaveFields.EDITABLE) {
+            String token=caves.token(field),key=SeaCaveFields.draftPrefix()+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(SeaCaveFields.help(field));
+            if (field.equals("minimumSpacing")) ImGui.textWrapped("Edit minimum spacing with coastal horizontalRadius above.");
+            else if (SeaCaveFields.booleanField(field)) {
+                String effective=token==null ? SeaCaveFields.defaultToken(field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Enabled (Iris default)" : "Enabled",effective.equals("true")))
+                    applyRoutingExtra(() -> workspace.replace(selected,SeaCaveFields.setEnabled(selected,workspace.read(selected),!effective.equals("true"))));
+            } else if (token==null) {
+                if (ImGui.button("Enable ("+SeaCaveFields.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,SeaCaveFields.enable(selected,workspace.read(selected),field)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            else {
+                ImGui.textWrapped(SeaCaveFields.constraints(field));
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Value",input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected,SeaCaveFields.setText(selected,workspace.read(selected),field,input.get())); drafts.applied(key); values.remove(key); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        for (String field : caves.fields()) if (!SeaCaveFields.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawUndergroundRiver(LosslessJson rivers) {
         ImGui.textWrapped(UndergroundRiverFields.description("underground"));
@@ -1840,7 +1913,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
