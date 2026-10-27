@@ -9,6 +9,7 @@ public final class LosslessJson {
     private final String text;
     private int at;
     private final Map<String, Span> root = new LinkedHashMap<>();
+    private final Map<String, Span> rootKeys = new LinkedHashMap<>();
     private record Span(int start, int end) {}
     public LosslessJson(byte[] bytes) {
         try { text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString(); }
@@ -36,6 +37,33 @@ public final class LosslessJson {
         if (span == null) throw new IllegalArgumentException("String field is absent");
         at = span.start(); string();
         return splice(span.start(), span.end(), quote(value));
+    }
+    record StringProperty(String key,String value) {}
+    /** Literal dictionary keys never pass through dotted-path addressing. */
+    List<StringProperty> stringProperties() {
+        List<StringProperty> properties=new ArrayList<>();
+        for (String key : root.keySet()) properties.add(new StringProperty(key,stringToken(key)));
+        return List.copyOf(properties);
+    }
+    byte[] stringMapAdd(String key,String value) {
+        stringProperties();
+        if (key==null || value==null || root.containsKey(key)) throw new IllegalArgumentException("Map key is null or already present");
+        int position=root.isEmpty() ? text.indexOf('{')+1 : root.values().stream().mapToInt(Span::end).max().orElseThrow();
+        String spacing=text.contains("\r\n") ? "\r\n  " : text.contains("\n") ? "\n  " : " ";
+        return splice(position,position,(root.isEmpty() ? "" : ",")+spacing+quote(key)+": "+quote(value));
+    }
+    byte[] stringMapRename(String key,String next) {
+        stringProperties();
+        if (!root.containsKey(key) || next==null || !key.equals(next) && root.containsKey(next)) throw new IllegalArgumentException("Map key is absent or collides with another key");
+        if (key.equals(next)) return sourceBytes();
+        Span span=rootKeys.get(key);return splice(span.start(),span.end(),quote(next));
+    }
+    byte[] stringMapRemove(String key) {
+        stringProperties();var keys=new ArrayList<>(root.keySet());int index=keys.indexOf(key);
+        if (index<0) throw new IllegalArgumentException("Map key is absent");
+        if (index<keys.size()-1) return splice(rootKeys.get(key).start(),rootKeys.get(keys.get(index+1)).start(),"");
+        int start=index==0 ? rootKeys.get(key).start() : root.get(keys.get(index-1)).end();
+        return splice(start,root.get(key).end(),"");
     }
     /** Explicit optional-string assignment; only absent, null or string values are supported. */
     byte[] nullableString(String field, String value) {
@@ -315,9 +343,9 @@ public final class LosslessJson {
         require('{'); space(); if (peek() == '}') { at++; return; }
         Set<String> keys = new HashSet<>();
         do {
-            space(); String key = string(); if (!keys.add(key)) throw new IllegalArgumentException("Duplicate JSON property: " + key);
+            space(); int keyStart=at; String key = string(); int keyEnd=at; if (!keys.add(key)) throw new IllegalArgumentException("Duplicate JSON property: " + key);
             space(); require(':'); space(); int start = at; value(depth + 1); int end = at;
-            if (capture) root.put(key, new Span(start, end));
+            if (capture) { root.put(key, new Span(start, end)); rootKeys.put(key,new Span(keyStart,keyEnd)); }
             space(); if (peek() == '}') { at++; return; } require(',');
         } while (true);
     }
