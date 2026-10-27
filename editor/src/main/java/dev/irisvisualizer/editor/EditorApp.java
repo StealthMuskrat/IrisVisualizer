@@ -621,6 +621,7 @@ public final class EditorApp extends Application {
             for (String field : FloatingObjectPlacements.SCALARS) drawFloatingPlacementScalar(placement,index,list,placementIndex,field);
             drawFloatingPlacementSettings(placement,new FloatingPlacementSettings.Context(index,list,placementIndex));
             drawFloatingPlacementConstraints(placement,new FloatingPlacementConstraints.Context(index,list,placementIndex));
+            drawFloatingPlacementEffects(placement,new FloatingPlacementEffects.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
@@ -729,6 +730,32 @@ public final class EditorApp extends Application {
             try { workspace.replace(selected,FloatingPlacementConstraints.setBounds(selected,workspace.read(selected),context,field,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
             catch (Exception failure) { error=failure.getMessage(); }
         }
+    }
+    private void drawFloatingPlacementEffects(LosslessJson placement,FloatingPlacementEffects.Context context) {
+        if (!ImGui.treeNode("Excavation and water")) return;
+        ImGui.textWrapped("Native modes, terrain and existing blocks determine these effects. Editing extensions does not enable excavation. Object geometry and placement are not previewed.");
+        for (String field : FloatingPlacementEffects.FLAGS) if (FloatingPlacementEffects.editable(context.list(),field)) {
+            ImGui.pushID(field);ImGui.text(field);ImGui.textWrapped(FloatingPlacementEffects.contextHelp(field));
+            String token=placement.token(field);
+            if (token==null) {
+                if (ImGui.button("Enable stored "+field+" ("+FloatingPlacementEffects.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementEffects.enableFlag(selected,workspace.read(selected),context,field)));
+            } else if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored flag has an unsupported type (read-only).");
+            else { ImBoolean value=new ImBoolean(Boolean.parseBoolean(token));if (ImGui.checkbox(field,value)) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementEffects.setFlag(selected,workspace.read(selected),context,field,value.get()))); }
+            ImGui.popID();
+        }
+        for (String field : FloatingPlacementEffects.SCALARS) {
+            ImGui.pushID(field);ImGui.text(field);ImGui.textWrapped(FloatingPlacementEffects.contextHelp(field));ImGui.textWrapped(FloatingPlacementEffects.constraints(field));
+            String token=placement.token(field),key=context.prefix()+field;
+            if (token==null) {
+                if (ImGui.button("Enable "+field+" ("+FloatingPlacementEffects.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementEffects.enableScalar(selected,workspace.read(selected),context,field)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored extension has an unsupported type (read-only).");
+            else {
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+                if (ImGui.button("Apply extension")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingPlacementEffects.setScalar(selected,workspace.read(selected),context,field,input.get())));
+            }
+            ImGui.popID();
+        }
+        ImGui.treePop();
     }
     private void drawFloatingPlacementMode(LosslessJson placement,int entry,String list,int index) {
         String current;

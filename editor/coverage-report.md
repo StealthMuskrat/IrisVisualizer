@@ -56,7 +56,7 @@ Direct nonstatic/nontransient private fields in fifty-eight pinned source classe
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
 | floatingBiome | 42 | 42 | 41 | 0 |
-| objectPlacement | 41 | 19 | 19 | 22 |
+| objectPlacement | 41 | 28 | 28 | 13 |
 | objectTranslate | 4 | 4 | 4 | 0 |
 | objectScale | 5 | 5 | 5 | 0 |
 | objectRotation | 4 | 4 | 4 | 0 |
@@ -273,7 +273,7 @@ Unclassified: none.
 
 ## objectPlacement
 
-Unclassified: `bore`, `boreExtendMaxY`, `boreExtendMinY`, `bottom`, `caveAnchorMode`, `edit`, `forcePlace`, `fromBottom`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `meld`, `onwater`, `overrideGlobalLoot`, `smartBore`, `stiltSettings`, `trees`, `underwater`, `vacuumSettings`, `vanillaLoot`, `waterloggable`.
+Unclassified: `bottom`, `caveAnchorMode`, `edit`, `forcePlace`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `overrideGlobalLoot`, `stiltSettings`, `trees`, `vacuumSettings`, `vanillaLoot`.
 
 ## objectTranslate
 

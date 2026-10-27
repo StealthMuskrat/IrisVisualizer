@@ -2199,6 +2199,42 @@
     "warp": {
       "classification": "generation",
       "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+    },
+    "bore": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "boreExtendMinY": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "boreExtendMaxY": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "smartBore": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "meld": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "waterloggable": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "onwater": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "fromBottom": {
+      "classification": "generation",
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
     }
   },
   "objectTranslate": {
