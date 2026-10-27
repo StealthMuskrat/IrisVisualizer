@@ -35,10 +35,14 @@ public final class RiverPaletteFields {
     private static void authorize(String path,String target) { target(target); if (!DimensionFields.dimension(path)) throw new IllegalArgumentException("River palette noise is dimension-only"); }
     public static byte[] enableZoom(String path,byte[] original,String target) { authorize(path,target); return editPalette(original,target,palette -> palette.enable("zoom",zoomDefault())); }
     public static byte[] setZoom(String path,byte[] original,String target,String input) {
-        authorize(path,target); double value;
+        authorize(path,target); double value=checkedZoom(input);
+        return editPalette(original,target,palette -> palette.number("zoom",value));
+    }
+    static double checkedZoom(String input) {
+        double value;
         try { value=Double.parseDouble(input); } catch (NumberFormatException | NullPointerException invalid) { throw new IllegalArgumentException("Enter a finite palette zoom",invalid); }
         if (!Double.isFinite(value) || value<Double.parseDouble(zoomMinimum())) throw new IllegalArgumentException("Palette zoom must be finite and at least "+zoomMinimum());
-        return editPalette(original,target,palette -> palette.number("zoom",value));
+        return value;
     }
     static List<String> readOnlyStylePaths(LosslessJson palette,String target) {
         var paths=new ArrayList<String>();

@@ -444,7 +444,7 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else if ((target.banks() || target.riverRange() || target.palette()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            } else if ((target.banks() || target.riverRange() || target.palette() || target.profilePalette()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
             else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
@@ -549,12 +549,154 @@ public final class EditorApp extends Application {
             try { workspace.replace(selected,HydrologyFields.setEnabled(selected,workspace.read(selected),!effective.equals("true"))); error=null; }
             catch (Exception failure) { error=failure.getMessage(); }
         }
+        if (ImGui.treeNode("River profiles")) { drawRiverProfiles(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("Drainage routing settings")) { drawHydrologyRouting(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("River geometry")) { drawRiverGeometry(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("Surface river settings")) { drawSurfaceRiver(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("Underground river settings")) { drawUndergroundRiver(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("Coastal and inland grotto settings")) { drawGrottoSettings(rivers); ImGui.treePop(); }
         for (String field : rivers.fields()) if (!HydrologyFields.RIVER_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawRiverProfiles(LosslessJson rivers) {
+        ImGui.textWrapped(RiverProfiles.description());
+        ImGui.textWrapped("IDs use 1-64 lowercase letters, digits, _ or - and start with a letter or digit. Renaming/removing profiles leaves policy ID selections unchanged; review those selections after editing. Creating profiles leaves river planning unchanged.");
+        List<LosslessJson> profiles;
+        try { profiles=RiverProfiles.entries(rivers); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored profiles contain snippets or unsupported entries (read-only)."); return; }
+        if (profiles==null) {
+            ImGui.textWrapped("Uses the implicit default profile with water. Enable writes an explicit default ID and water palette.");
+            if (ImGui.button("Enable default river profile")) {
+                try { commitProfileChange(RiverProfiles.draftPrefix(),RiverProfiles.enable(selected,workspace.read(selected)),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        if (profiles.isEmpty()) ImGui.textWrapped("The explicit profile list is empty. Add a profile to repair the source-required list.");
+        String newKey=RiverProfiles.draftPrefix()+"new.id";
+        ImString newId=values.computeIfAbsent(newKey,ignored -> new ImString("",256));
+        ImGui.inputText("New profile ID",newId);drafts.update(newKey,"",newId.get());
+        ImGui.beginDisabled(profiles.size()>=RiverProfiles.maximumProfiles());
+        if (ImGui.button("Add water profile")) { ImGui.endDisabled();changeProfile(RiverProfiles.Action.ADD,-1,newId.get(),newKey);return; }
+        ImGui.endDisabled();
+        for (int index=0;index<profiles.size();index++) {
+            if (!ImGui.treeNode("Profile "+index)) continue;
+            int profileIndex=index;var profile=profiles.get(index);
+            String copyKey=RiverProfiles.profilePrefix(index)+"copyId";
+            ImString copyId=values.computeIfAbsent(copyKey,ignored -> new ImString("",256));
+            ImGui.inputText("Duplicate as ID",copyId);drafts.update(copyKey,"",copyId.get());
+            RiverProfiles.Action action=null;
+            ImGui.beginDisabled(profiles.size()>=RiverProfiles.maximumProfiles());
+            if (ImGui.button("Duplicate profile")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(profiles.size()<=RiverProfiles.minimumProfiles());
+            if (ImGui.button("Remove profile")) action=RiverProfiles.Action.REMOVE;
+            ImGui.endDisabled();ImGui.beginDisabled(index==0);
+            if (ImGui.button("Move profile up")) action=RiverProfiles.Action.UP;
+            ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==profiles.size()-1);
+            if (ImGui.button("Move profile down")) action=RiverProfiles.Action.DOWN;
+            ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeProfile(action,index,copyId.get(),action==RiverProfiles.Action.DUPLICATE ? copyKey : null);return; }
+            try {
+                String stored=profile.token("id")==null ? RiverProfiles.defaultId() : profile.stringToken("id"),key=RiverProfiles.profilePrefix(index)+"id";
+                ImString id=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(256,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText(profile.token("id")==null ? "ID (missing; class default shown)" : "ID",id);drafts.update(key,stored,id.get());
+                if (ImGui.button("Apply profile ID")) commitRiverOverride(key,() -> workspace.replace(selected,RiverProfiles.setId(selected,workspace.read(selected),profileIndex,id.get())));
+            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored profile ID is not a string (read-only)."); }
+            if (ImGui.treeNode("Fluid palette")) { drawProfileFluids(profile,index);ImGui.treePop(); }
+            for (String field : profile.fields()) if (!RiverProfiles.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void drawProfileFluids(LosslessJson profile,int profileIndex) {
+        LosslessJson palette;
+        try { palette=RiverProfiles.palette(profile); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored fluid palette is a snippet or unsupported value (read-only).");return; }
+        if (palette==null) {
+            ImGui.textWrapped("Absent profile palette inherits water; the native pack validator requires an explicit palette.");
+            if (ImGui.button("Create water palette")) {
+                try { commitProfileChange(RiverProfiles.fluidPrefix(profileIndex),RiverProfiles.createPalette(selected,workspace.read(selected),profileIndex),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        if (ImGui.treeNode("Fluid palette noise")) { drawProfilePaletteNoise(palette,profileIndex);ImGui.treePop(); }
+        for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+        ImGui.textWrapped("1-64 weighted fluid entries; weights 1-64. Minecraft entries permit water, lava and bubble_column. Custom names pass the native name filter but still require runtime fluid/registry validation. Advanced block data stays read-only.");
+        List<LosslessJson> fluids;
+        try { fluids=RiverProfiles.fluids(palette); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored fluid list contains snippets or unsupported entries (read-only).");return; }
+        if (fluids==null) {
+            ImGui.textWrapped("This explicit palette is missing entries. Its palette class default is STONE; Initialize water writes the profile's water choice explicitly.");
+            if (ImGui.button("Initialize water entries")) {
+                try { commitProfileChange(RiverProfiles.fluidPrefix(profileIndex),RiverProfiles.initializeWater(selected,workspace.read(selected),profileIndex),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        String newKey=RiverProfiles.fluidPrefix(profileIndex)+"new.block";
+        ImString newFluid=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));
+        ImGui.inputText("New fluid block",newFluid);drafts.update(newKey,"",newFluid.get());
+        ImGui.beginDisabled(fluids.size()>=RiverProfiles.maximumFluids());
+        if (ImGui.button("Add fluid")) { ImGui.endDisabled();changeProfileFluid(profileIndex,RiverProfiles.Action.ADD,-1,newFluid.get(),newKey);return; }
+        ImGui.endDisabled();
+        if (fluids.isEmpty()) ImGui.textWrapped("The fluid list is empty. Add a fluid to repair it.");
+        for (int index=0;index<fluids.size();index++) {
+            if (!ImGui.treeNode("Fluid "+index)) continue;
+            int fluidIndex=index;var entry=fluids.get(index);RiverProfiles.Action action=null;
+            ImGui.beginDisabled(fluids.size()>=RiverProfiles.maximumFluids());
+            if (ImGui.button("Duplicate fluid")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(fluids.size()<=1);
+            if (ImGui.button("Remove fluid")) action=RiverProfiles.Action.REMOVE;
+            ImGui.endDisabled();ImGui.beginDisabled(index==0);
+            if (ImGui.button("Move fluid up")) action=RiverProfiles.Action.UP;
+            ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==fluids.size()-1);
+            if (ImGui.button("Move fluid down")) action=RiverProfiles.Action.DOWN;
+            ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeProfileFluid(profileIndex,action,index,null,null);return; }
+            try {
+                String block=entry.token("block")==null ? "" : entry.stringToken("block"),key=RiverProfiles.fluidPrefix(profileIndex)+index+".block";
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(block,Math.max(4096,block.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText(entry.token("block")==null ? "Required fluid (missing)" : "Fluid block",input);drafts.update(key,block,input.get());
+                if (ImGui.button("Apply fluid")) commitRiverOverride(key,() -> workspace.replace(selected,RiverProfiles.setFluid(selected,workspace.read(selected),profileIndex,fluidIndex,input.get())));
+            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored fluid block is not a string (read-only)."); }
+            String weight=entry.token("weight"),weightKey=RiverProfiles.fluidPrefix(profileIndex)+index+".weight";
+            if (weight==null) {
+                if (ImGui.button("Enable fluid weight (1)")) applyRoutingExtra(() -> workspace.replace(selected,RiverProfiles.enableWeight(selected,workspace.read(selected),profileIndex,fluidIndex)));
+            } else if (!LosslessJson.numericToken(weight)) ImGui.textWrapped("Stored fluid weight has an unsupported type (read-only).");
+            else {
+                ImString input=values.computeIfAbsent(weightKey,ignored -> new ImString(weight,Math.max(128,weight.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Weight (1-64)",input);drafts.update(weightKey,weight,input.get());
+                if (ImGui.button("Apply weight")) commitRiverOverride(weightKey,() -> workspace.replace(selected,RiverProfiles.setWeight(selected,workspace.read(selected),profileIndex,fluidIndex,input.get())));
+            }
+            for (String field : entry.fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void drawProfilePaletteNoise(LosslessJson palette,int index) {
+        String token=palette.token("zoom"),key=RiverProfiles.noisePrefix(index)+"zoom";
+        ImGui.textWrapped(RiverPaletteFields.zoomConstraints());
+        if (token==null) {
+            if (ImGui.button("Enable fluid palette zoom (5)")) applyRoutingExtra(() -> workspace.replace(selected,RiverProfiles.enableZoom(selected,workspace.read(selected),index)));
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored palette zoom has an unsupported type (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Fluid palette zoom",input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply fluid palette zoom")) commitRiverOverride(key,() -> workspace.replace(selected,RiverProfiles.setZoom(selected,workspace.read(selected),index,input.get())));
+        }
+        if (ImGui.treeNode("Fluid generator style")) { drawStyleFields(palette,NoiseStyleFields.Target.profilePalette(index));ImGui.treePop(); }
+    }
+    private void changeProfile(RiverProfiles.Action action,int index,String id,String appliedKey) {
+        try { commitProfileChange(RiverProfiles.draftPrefix(),RiverProfiles.change(selected,workspace.read(selected),action,index,id),appliedKey); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void changeProfileFluid(int profile,RiverProfiles.Action action,int index,String value,String appliedKey) {
+        try { commitProfileChange(RiverProfiles.fluidPrefix(profile),RiverProfiles.changeFluid(selected,workspace.read(selected),profile,action,index,value),appliedKey); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void commitProfileChange(String prefix,byte[] next,String appliedKey) throws java.io.IOException {
+        if (drafts.transitionUnder(prefix,() -> {
+            boolean other=values.keySet().stream().anyMatch(key -> key.startsWith(prefix) && !key.equals(appliedKey) && drafts.contains(key));
+            return !other || JOptionPane.showConfirmDialog(null,"This changes list positions and discards other unapplied text in this list. Continue?","Unapplied text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION;
+        },() -> workspace.replace(selected,next))) { values.keySet().removeIf(key -> key.startsWith(prefix));error=null; }
     }
     private void drawGrottoSettings(LosslessJson rivers) {
         ImGui.textWrapped(GrottoFields.description("grottos"));
@@ -2048,7 +2190,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

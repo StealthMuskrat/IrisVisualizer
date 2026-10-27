@@ -27,6 +27,7 @@ public final class NoiseStyleFields {
             valid = valid || noise==null && "dimensions".equals(resourceBase) && (objectField.equals("hydrology.rivers.surface.channel.width.style") || objectField.equals("hydrology.rivers.surface.channel.depth.style"));
             valid = valid || noise==null && "dimensions".equals(resourceBase) && List.of("hydrology.rivers.underground.fluidLevel.style", "hydrology.rivers.underground.channelWidth.style", "hydrology.rivers.underground.depth.style", "hydrology.rivers.underground.headroom.style").contains(objectField);
             valid = valid || noise==null && "dimensions".equals(resourceBase) && RiverPaletteFields.targetForStylePath(objectField)!=null;
+            valid = valid || noise==null && "dimensions".equals(resourceBase) && RiverProfiles.styleIndex(objectField)>=0;
             valid = moduleIndex == -1 ? valid : moduleIndex >= 0 && noise == null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.equals("caveProfile.modules.style");
             if (!valid) throw new IllegalArgumentException("Unsupported style target");
         }
@@ -52,6 +53,9 @@ public final class NoiseStyleFields {
             if (!RiverChannelRanges.UNDERGROUND_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported underground range style");
             return new Target("dimensions","hydrology.rivers.underground."+field+".style",null);
         }
+        public static Target profilePalette(int index) { if (index<0) throw new IllegalArgumentException("Select a profile");return new Target("dimensions","hydrology.rivers.profiles."+index+".fluidPalette.style",null); }
+        public boolean profilePalette() { return RiverProfiles.styleIndex(objectField)>=0; }
+        public int profileIndex() { int index=RiverProfiles.styleIndex(objectField);if (index<0) throw new IllegalArgumentException("Not a profile palette");return index; }
         public static Target palette(String target) { return new Target("dimensions",RiverPaletteFields.stylePath(target),null); }
         public boolean palette() { return RiverPaletteFields.targetForStylePath(objectField)!=null; }
         public String paletteTarget() { String target=RiverPaletteFields.targetForStylePath(objectField); if (target==null) throw new IllegalArgumentException("Not a river palette style"); return target; }
@@ -65,8 +69,8 @@ public final class NoiseStyleFields {
         public boolean cave() { return objectField.startsWith("caveProfile."); }
         public boolean threshold() { return objectField.equals("caveProfile.densityThreshold.style"); }
         public boolean module() { return moduleIndex >= 0; }
-        public String member() { return palette() ? "style" : riverRange() ? "style" : banks() ? "densityStyle" : module() || threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
-        public String draftPrefix() { return palette() ? RiverPaletteFields.draftPrefix(paletteTarget())+"style." : riverRange() ? RiverChannelRanges.draftPrefix(rangeField())+"style." : banks() ? RiverBankFields.draftPrefix()+"densityStyle." : module() ? CaveModules.draftPrefix(resourceBase,moduleIndex)+"style." : threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
+        public String member() { return profilePalette() ? "style" : palette() ? "style" : riverRange() ? "style" : banks() ? "densityStyle" : module() || threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
+        public String draftPrefix() { return profilePalette() ? RiverProfiles.noisePrefix(profileIndex())+"style." : palette() ? RiverPaletteFields.draftPrefix(paletteTarget())+"style." : riverRange() ? RiverChannelRanges.draftPrefix(rangeField())+"style." : banks() ? RiverBankFields.draftPrefix()+"densityStyle." : module() ? CaveModules.draftPrefix(resourceBase,moduleIndex)+"style." : threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
     }
     private static final Properties DEFINITIONS = new Properties();
     private static final List<String> CHOICES;
@@ -107,8 +111,8 @@ public final class NoiseStyleFields {
     public static List<String> choices() { return CHOICES; }
     public static String noiseDefault() { return DEFINITIONS.getProperty("noiseDefault"); }
     public static String objectDefault() { return DEFINITIONS.getProperty("objectDefault"); }
-    public static String contextDefault(Target target) { return target.palette() ? RiverPaletteFields.styleDefault() : target.riverRange() ? RiverChannelRanges.classStyle() : target.banks() ? RiverBankFields.styleDefault() : target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
-    public static String contextDescription(Target target) { return target.palette() ? RiverPaletteFields.description("style") : target.riverRange() ? RiverChannelRanges.styleDescription() : target.banks() ? RiverBankFields.description("densityStyle") : target.module() ? CaveModules.help("style") : target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
+    public static String contextDefault(Target target) { return target.profilePalette() || target.palette() ? RiverPaletteFields.styleDefault() : target.riverRange() ? RiverChannelRanges.classStyle() : target.banks() ? RiverBankFields.styleDefault() : target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
+    public static String contextDescription(Target target) { return target.profilePalette() || target.palette() ? RiverPaletteFields.description("style") : target.riverRange() ? RiverChannelRanges.styleDescription() : target.banks() ? RiverBankFields.description("densityStyle") : target.module() ? CaveModules.help("style") : target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
     public static String contextDefaultLabel(Target target) {
         String override=target.cave() && !target.threshold() && !target.module() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
         return contextDefault(target)+(override==null ? "" : ", zoom "+override);
@@ -201,6 +205,7 @@ public final class NoiseStyleFields {
         }
     }
     private static byte[] editContainer(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+        if (target.profilePalette()) return RiverProfiles.editPalette(original,target.profileIndex(),operation);
         if (target.palette()) return RiverPaletteFields.editPalette(original,target.paletteTarget(),operation);
         if (target.riverRange()) return RiverChannelRanges.editRange(original,target.rangeField(),operation);
         if (target.banks()) return RiverBankFields.editObject(original,operation);

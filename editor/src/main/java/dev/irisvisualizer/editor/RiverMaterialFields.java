@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.function.Function;
 
-/** Lossless river material authoring. Registry resolution and palette noise remain outside this editor. */
+/** Lossless river material authoring. Runtime registry resolution remains outside this editor. */
 public final class RiverMaterialFields {
     public static final List<String> MATERIAL_TARGETS = List.of("surface.banks.shoreMaterial", "surface.banks.bankMaterial", "surface.bed.material", "underground.bedMaterial");
     public static final List<String> EDITABLE = List.of("enabled", "depth", "palette");
