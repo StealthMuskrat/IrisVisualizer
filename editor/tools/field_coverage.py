@@ -90,6 +90,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
         implemented[group].update(editable(java_dir, 'RiverPolicyFields', 'OBJECT_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'NoiseStyleFields', 'DIMENSION_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'HydrologyFields', 'ROOT_FIELDS'))
+    implemented['dimension'].update(editable(java_dir, 'DimensionHeights', 'OBJECT_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'NoiseStyleFields', 'BIOME_FIELDS'))
     for group in ['importedStructures', 'importedFeatures']:
         implemented[group] = {path.split('.', 1)[1] for path in ui['dimension'] if path.startswith(group + '.')}

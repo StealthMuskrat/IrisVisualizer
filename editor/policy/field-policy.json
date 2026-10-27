@@ -167,6 +167,10 @@
     "hydrology": {
       "classification": "generation",
       "reason": "Dimension-owned physical hydrology settings; explicit empty-object creation and bounded river routing controls preserve source defaults without executing planning."
+    },
+    "dimensionHeight": {
+      "classification": "generation",
+      "reason": "Paired dimension-height authoring with source native constructor bounds/alignment and read-only logical-height guard; runtime borrowed types remain unresolved."
     }
   },
   "biome": {
@@ -890,7 +894,7 @@
     },
     "deepFluids": {
       "classification": "generation",
-      "reason": "Independent deep-fluid list authoring; dimension-height envelopes and native placement remain pending."
+      "reason": "Independent deep-fluid list authoring with advisory dimension-height footprint checks; native placement remains pending."
     }
   },
   "riverHydrology": {
@@ -1802,51 +1806,51 @@
   "deepFluid": {
     "id": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "fluidPalette": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "density": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "spacing": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "height": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "horizontalRadius": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "verticalRadius": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "channelWidth": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "depth": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "headroom": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "containedPools": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     },
     "shortChannels": {
       "classification": "generation",
-      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
     }
   }
 }
