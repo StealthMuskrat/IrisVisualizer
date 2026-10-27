@@ -313,6 +313,10 @@
     "floatingChildBiomes": {
       "classification": "generation",
       "reason": "Inline floating child entry authoring with source-default lists, geometry, height pairs, exact target selection and bounded placement modes; nested generation/placement data is preserved."
+    },
+    "objects": {
+      "classification": "generation",
+      "reason": "Pinned IrisObjectPlacement collection consumed by biome surface/cave object passes; exact in-pack references and lossless shared placement controls only. Native dispatch, generation and preview remain unavailable."
     }
   },
   "generator": {
@@ -2126,135 +2130,143 @@
   "objectPlacement": {
     "place": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "allowedCollisions": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "forbiddenCollisions": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "chance": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "density": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "snow": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "mode": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "translate": {
       "classification": "generation",
-      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "densityStyle": {
       "classification": "generation",
-      "reason": "Explicit inline density range and object scale in floating collections, with null fallbacks restored explicitly; native generation and snippet resolution remain outside the editor."
+      "reason": "Explicit inline density range and object scale in floating collections, with null fallbacks restored explicitly; native generation and snippet resolution remain outside the editor. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "scale": {
       "classification": "generation",
-      "reason": "Explicit inline density range and object scale in floating collections, with null fallbacks restored explicitly; native generation and snippet resolution remain outside the editor."
+      "reason": "Explicit inline density range and object scale in floating collections, with null fallbacks restored explicitly; native generation and snippet resolution remain outside the editor. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "rotation": {
       "classification": "generation",
-      "reason": "Bounded inline rotation authoring in floatingObjects only; anchored consumers replace configured rotation. Native placement/block-state rotation and slope-derived overrides remain unvalidated."
+      "reason": "Bounded inline rotation authoring in floatingObjects only; anchored consumers replace configured rotation. Native placement/block-state rotation and slope-derived overrides remain unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "clamp": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "slopeCondition": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "rotateTowardsSlope": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "carvingSupport": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "surfaceSupportBuffer": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "surfaceSupportDepth": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "requireSurfaceSupport": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "warp": {
       "classification": "generation",
-      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated."
+      "reason": "Bounded floating placement authoring: guards in floatingObjects only and coordinate warp in all four collections; native mode/force/context gating remains unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "bore": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "boreExtendMinY": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "boreExtendMaxY": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "smartBore": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "meld": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "waterloggable": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "underwater": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "onwater": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "fromBottom": {
       "classification": "generation",
-      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+      "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "stiltSettings": {
       "classification": "generation",
-      "reason": "Optional inline stilt/vacuum authoring across floating collections, preserving native mode fallbacks; classic stilt ranges stay read-only in anchored paths."
+      "reason": "Optional inline stilt/vacuum authoring across floating collections, preserving native mode fallbacks; classic stilt ranges stay read-only in anchored paths. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "vacuumSettings": {
       "classification": "generation",
-      "reason": "Optional inline stilt/vacuum authoring across floating collections, preserving native mode fallbacks; classic stilt ranges stay read-only in anchored paths."
+      "reason": "Optional inline stilt/vacuum authoring across floating collections, preserving native mode fallbacks; classic stilt ranges stay read-only in anchored paths. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "edit": {
       "classification": "generation",
-      "reason": "Ordered floating object replacement rules with native chance/state matching; object assets and unrelated data remain preserved."
+      "reason": "Ordered floating object replacement rules with native chance/state matching; object assets and unrelated data remain preserved. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "heightmap": {
       "classification": "generation",
-      "reason": "Optional floating placement virtual height queries using the existing noise/style controls, with strict inline ancestors and null restoration. Native sampling/world-height validation is pending."
+      "reason": "Optional floating placement virtual height queries using the existing noise/style controls, with strict inline ancestors and null restoration. Native sampling/world-height validation is pending. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
     },
     "forcePlace": {
       "classification": "generation",
-      "reason": "FloatingObjects-only native force boolean, editing a single stored canonical/alternate key in place. Ambiguous dual keys and anchored overrides remain read-only."
+      "reason": "FloatingObjects-only native force boolean, editing a single stored canonical/alternate key in place. Ambiguous dual keys and anchored overrides remain read-only. Root biome objects reuse these native definitions; their surface/cave dispatch is audited separately."
+    },
+    "bottom": {
+      "classification": "generation",
+      "reason": "Biome object placements only: source-default boolean for explicit non-negative Y, excluding raw structure pieces and floor alignment. Surface and floating Y=-1 calls ignore it; anchored floating consumers replace it."
+    },
+    "caveAnchorMode": {
+      "classification": "generation",
+      "reason": "Biome object placements only: pinned cave-anchor enum and profile fallback in MantleObjectComponent. CEILING_HANG forces ceiling anchors; floating entry lists do not consume this setting."
     }
   },
   "objectTranslate": {

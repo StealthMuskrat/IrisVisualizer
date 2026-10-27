@@ -24,12 +24,12 @@ public final class FloatingPlacementConstraints {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public record Context(int entry,String list,int placement) {
-        public Context { if (entry<0 || placement<0 || list==null || !FloatingObjectPlacements.LIST_FIELDS.contains(list)) throw new IllegalArgumentException("Select a floating placement"); }
+        public Context { if (!FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object placement"); }
         public String prefix(String field) { field(field);return FloatingObjectPlacements.placementPrefix(entry,list,placement)+field+"."; }
         public NoiseStyleFields.Target warpTarget() { return NoiseStyleFields.Target.placementWarp(entry,list,placement); }
     }
     private static void field(String value) { if (value==null || !EDITABLE.contains(value)) throw new IllegalArgumentException("Unsupported placement constraint"); }
-    static boolean editable(String list,String field) { return EDITABLE.contains(field) && (field.equals("warp") || "floatingObjects".equals(list)); }
+    static boolean editable(String list,String field) { return EDITABLE.contains(field) && (field.equals("warp") || FloatingObjectPlacements.configured(list)); }
     private static void authorize(String path,Context context,String field) { field(field);if (!BiomeFields.biome(path) || !editable(context.list(),field)) throw new IllegalArgumentException("Placement guards stay read-only in anchored collections"); }
     private static void objectField(String value) { if (value==null || !OBJECT_FIELDS.contains(value)) throw new IllegalArgumentException("Unsupported placement bound object"); }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description",""); }
@@ -70,9 +70,8 @@ public final class FloatingPlacementConstraints {
     public static byte[] enableMultiplier(String path,byte[] original,Context context) { authorize(path,context,"warp");return editPlacement(original,context,p -> p.objectEdit("warp",w -> w.enable("multiplier",multiplierDefault()),false)); }
     public static byte[] setMultiplier(String path,byte[] original,Context context,String input) { authorize(path,context,"warp");double value=number(input,"warp.multiplier",false);return editPlacement(original,context,p -> p.objectEdit("warp",w -> w.number("multiplier",value),false)); }
     static Context warpContext(String path) {
-        if (path==null) return null;var match=java.util.regex.Pattern.compile("floatingChildBiomes\\.(0|[1-9][0-9]*)\\.([A-Za-z]+)\\.(0|[1-9][0-9]*)\\.warp").matcher(path);
-        if (!match.matches() || !FloatingObjectPlacements.LIST_FIELDS.contains(match.group(2))) return null;
-        try { return new Context(Integer.parseInt(match.group(1)),match.group(2),Integer.parseInt(match.group(3))); } catch (IllegalArgumentException invalid) { return null; }
+        var parsed=FloatingObjectPlacements.parsePath(path);
+        return parsed!=null && parsed.suffix().equals("warp") ? new Context(parsed.entry(),parsed.list(),parsed.placement()) : null;
     }
     static List<String> readOnlyPaths(LosslessJson placement,Context context) {
         var paths=new ArrayList<String>();

@@ -18,7 +18,7 @@ public final class FloatingObjectReplacements {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public record Context(int entry,String list,int placement) {
-        public Context { if (entry<0 || placement<0 || list==null || !FloatingObjectPlacements.LIST_FIELDS.contains(list)) throw new IllegalArgumentException("Select a floating placement"); }
+        public Context { if (!FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object placement"); }
         public String prefix() { return FloatingObjectPlacements.placementPrefix(entry,list,placement)+"edit#"; }
         public String rulePrefix(int rule) { if (rule<0) throw new IllegalArgumentException("Select a rule");return prefix()+rule+"."; }
         public String findPrefix(int rule) { return rulePrefix(rule)+"find#"; }

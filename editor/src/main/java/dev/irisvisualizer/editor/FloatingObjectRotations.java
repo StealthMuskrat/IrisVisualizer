@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
 
-/** Rotation authoring only where the floating consumer preserves configured transforms. */
+/** Rotation authoring where native biome and floating consumers retain configured transforms. */
 public final class FloatingObjectRotations {
     public static final List<String> EDITABLE = List.of("rotation");
     public static final List<String> ROTATION_FIELDS = List.of("enabled", "xAxis", "yAxis", "zAxis");
@@ -22,11 +22,11 @@ public final class FloatingObjectRotations {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public record Context(int entry,String list,int placement) {
-        public Context { if (entry<0 || placement<0 || !"floatingObjects".equals(list)) throw new IllegalArgumentException("Configured rotation is editable only in floatingObjects; anchored consumers replace it"); }
+        public Context { if (!FloatingObjectPlacements.validContext(entry,list,placement) || !FloatingObjectPlacements.configured(list)) throw new IllegalArgumentException("Configured rotation is editable in biome objects and floatingObjects; anchored consumers replace it"); }
         public String prefix() { return FloatingObjectPlacements.placementPrefix(entry,list,placement)+"rotation."; }
         public String axisPrefix(String axis) { axis(axis);return prefix()+axis+"."; }
     }
-    static boolean editable(String list,String field) { return "floatingObjects".equals(list) && EDITABLE.contains(field); }
+    static boolean editable(String list,String field) { return FloatingObjectPlacements.configured(list) && EDITABLE.contains(field); }
     private static void authorize(String path) { if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Floating rotation is biome-only"); }
     private static void axis(String value) { if (value==null || !AXES.contains(value)) throw new IllegalArgumentException("Unsupported rotation axis"); }
     private static void axisField(String value) { if (value==null || !AXIS_FIELDS.contains(value)) throw new IllegalArgumentException("Unsupported axis field"); }

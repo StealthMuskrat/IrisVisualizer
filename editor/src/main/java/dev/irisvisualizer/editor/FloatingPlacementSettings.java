@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
 
-/** Explicit density and scale settings for the four floating-placement collections. */
+/** Explicit density and scale settings for root biome and floating-entry placements. */
 public final class FloatingPlacementSettings {
     public static final List<String> OBJECT_FIELDS = List.of("densityStyle", "scale");
     public static final List<String> SCALE_FIELDS = List.of("size", "variations", "minimumScale", "maximumScale", "interpolation");
@@ -21,7 +21,7 @@ public final class FloatingPlacementSettings {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public record Context(int entry,String list,int placement) {
-        public Context { if (entry<0 || placement<0 || !FloatingObjectPlacements.LIST_FIELDS.contains(list)) throw new IllegalArgumentException("Select a floating placement"); }
+        public Context { if (!FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object placement"); }
         public NoiseStyleFields.Target styleTarget() { return NoiseStyleFields.Target.placementDensity(entry,list,placement); }
         public String prefix(String field) { field(field);return FloatingObjectPlacements.placementPrefix(entry,list,placement)+field+"."; }
     }
@@ -75,9 +75,8 @@ public final class FloatingPlacementSettings {
         return editObject(original,context,"scale",scale -> scale.token("interpolation")==null ? scale.enableStringPath("interpolation",value) : scale.stringValue("interpolation",value));
     }
     static Context styleContext(String path) {
-        if (path==null) return null;var match=java.util.regex.Pattern.compile("floatingChildBiomes\\.(0|[1-9][0-9]*)\\.([A-Za-z]+)\\.(0|[1-9][0-9]*)\\.densityStyle\\.style").matcher(path);
-        if (!match.matches() || !FloatingObjectPlacements.LIST_FIELDS.contains(match.group(2))) return null;
-        try { return new Context(Integer.parseInt(match.group(1)),match.group(2),Integer.parseInt(match.group(3))); } catch (IllegalArgumentException invalid) { return null; }
+        var parsed=FloatingObjectPlacements.parsePath(path);
+        return parsed!=null && parsed.suffix().equals("densityStyle.style") ? new Context(parsed.entry(),parsed.list(),parsed.placement()) : null;
     }
     static List<String> readOnlyPaths(LosslessJson placement) {
         var paths=new ArrayList<String>();

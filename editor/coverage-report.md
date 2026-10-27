@@ -7,7 +7,7 @@ Direct nonstatic/nontransient private fields in sixty-one pinned source classes 
 | dimension | 82 | 46 | 40 | 36 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 32 | 26 | 10 |
+| biome | 42 | 33 | 27 | 9 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
@@ -56,7 +56,7 @@ Direct nonstatic/nontransient private fields in sixty-one pinned source classes 
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
 | floatingBiome | 42 | 42 | 41 | 0 |
-| objectPlacement | 41 | 33 | 33 | 8 |
+| objectPlacement | 41 | 35 | 35 | 6 |
 | objectTranslate | 4 | 4 | 4 | 0 |
 | objectScale | 5 | 5 | 5 | 0 |
 | objectRotation | 4 | 4 | 4 | 0 |
@@ -80,7 +80,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `objects`, `ores`, `proceduralObjects`, `structures`, `surfaceOreReplaceableBlocks`.
+Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `ores`, `proceduralObjects`, `structures`, `surfaceOreReplaceableBlocks`.
 
 ## biomeGeneratorLink
 
@@ -276,7 +276,7 @@ Unclassified: none.
 
 ## objectPlacement
 
-Unclassified: `bottom`, `caveAnchorMode`, `isDolphinTarget`, `loot`, `markers`, `overrideGlobalLoot`, `trees`, `vanillaLoot`.
+Unclassified: `isDolphinTarget`, `loot`, `markers`, `overrideGlobalLoot`, `trees`, `vanillaLoot`.
 
 ## objectTranslate
 
