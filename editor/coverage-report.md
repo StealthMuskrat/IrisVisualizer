@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in twelve pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in thirteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -15,7 +15,8 @@ Direct nonstatic/nontransient private fields in twelve pinned source classes onl
 | noise | 15 | 14 | 14 | 1 |
 | noiseStyle | 10 | 5 | 5 | 5 |
 | terrain3D | 14 | 14 | 14 | 0 |
-| caveProfile | 32 | 30 | 30 | 2 |
+| caveProfile | 32 | 31 | 31 | 1 |
+| styledRange | 3 | 3 | 3 | 0 |
 
 ## dimension
 
@@ -63,4 +64,8 @@ Unclassified: none.
 
 ## caveProfile
 
-Unclassified: `densityThreshold`, `modules`.
+Unclassified: `modules`.
+
+## styledRange
+
+Unclassified: none.

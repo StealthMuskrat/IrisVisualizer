@@ -701,6 +701,24 @@
     "defaultObjectPlaceMode": {
       "classification": "generation",
       "reason": "Generation cave object placement override; source-derived enum choices and nullable default, without placing objects."
+    },
+    "densityThreshold": {
+      "classification": "generation",
+      "reason": "Generation cave carve cutoff; bounded styled-range editing preserves contextual/class defaults and unknown data without evaluating noise."
+    }
+  },
+  "styledRange": {
+    "min": {
+      "classification": "generation",
+      "reason": "Generation threshold minimum; finite paired range editor preserves unchanged tokens and requires minimum at most maximum."
+    },
+    "max": {
+      "classification": "generation",
+      "reason": "Generation threshold maximum; finite paired range editor preserves unchanged tokens and requires minimum at most maximum."
+    },
+    "style": {
+      "classification": "generation",
+      "reason": "Generation threshold range distribution; bounded style selector/scalars with explicit STATIC class default, without running noise factories."
     }
   }
 }
