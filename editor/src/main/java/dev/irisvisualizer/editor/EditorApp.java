@@ -591,7 +591,86 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
-        for (String field : route.fields()) if (!HydrologyFields.ROUTING_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+        if (ImGui.treeNode("Regional drainage")) { drawRegionalRouting(route); ImGui.treePop(); }
+        if (ImGui.treeNode("Inland outlets")) { drawInlandOutlets(route); ImGui.treePop(); }
+        for (String field : route.fields()) if (!HydrologyFields.ROUTING_FIELDS.contains(field) && !RoutingExtras.OBJECT_FIELDS.contains(field) && !RoutingExtras.LIST_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawRegionalRouting(LosslessJson route) {
+        ImGui.textWrapped(RoutingExtras.regionalDescription());
+        LosslessJson region;
+        try { region=RoutingExtras.regional(route); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored regional settings have an unsupported type (read-only)."); return; }
+        if (region==null) {
+            if (ImGui.button("Create regional settings (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.enableRegional(selected,workspace.read(selected))));
+            return;
+        }
+        for (String field : RoutingExtras.REGIONAL_FIELDS) {
+            String token=region.token(field), key=RoutingExtras.regionalPrefix()+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(RoutingExtras.help(field));
+            if (RoutingExtras.booleanField(field)) {
+                String effective=token==null ? RoutingExtras.defaultToken(field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Value (Iris default)" : "Value",effective.equals("true"))) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.setBoolean(selected,workspace.read(selected),field,!effective.equals("true"))));
+            } else if (token==null) {
+                if (ImGui.button("Enable ("+RoutingExtras.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.enableScalar(selected,workspace.read(selected),field)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value is not numeric (read-only).");
+            else if (!RoutingExtras.options(field).isEmpty()) {
+                ImGui.textWrapped(RoutingExtras.constraints(field));
+                if (ImGui.beginCombo("Value",token.length()>128 ? "Stored number" : token)) {
+                    for (String choice : RoutingExtras.options(field)) if (ImGui.selectable(choice,RoutingExtras.optionMatches(token,choice))) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.setText(selected,workspace.read(selected),field,choice)));
+                    ImGui.endCombo();
+                }
+            } else {
+                ImGui.textWrapped(RoutingExtras.constraints(field));
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Value",input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected,RoutingExtras.setText(selected,workspace.read(selected),field,input.get())); drafts.applied(key); values.remove(key); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        for (String field : region.fields()) if (!RoutingExtras.REGIONAL_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawInlandOutlets(LosslessJson route) {
+        ImGui.textWrapped(RoutingExtras.outletsDescription());
+        if (route.token("inlandOutlets")==null) {
+            ImGui.textWrapped("Absent list uses the empty Iris default.");
+            if (ImGui.button("Enable empty inland outlet list")) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.enableOutlets(selected,workspace.read(selected))));
+            return;
+        }
+        List<String> entries;
+        try { entries=route.stringArrayPath("inlandOutlets"); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored outlet list is not a string array (read-only)."); return; }
+        for (int index=0;index<entries.size();index++) {
+            int item=index; String current=entries.get(index);
+            ImGui.pushID(index);
+            if (!RoutingExtras.outletChoices().contains(current)) ImGui.textWrapped("Unrecognized stored kind is retained until replaced or removed.");
+            if (ImGui.beginCombo("Kind",current.length()>128 ? "Long stored kind" : current)) {
+                for (String choice : RoutingExtras.outletChoices()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.editOutlet(selected,workspace.read(selected),item,choice)));
+                ImGui.endCombo();
+            }
+            boolean remove=ImGui.button("Remove"); ImGui.sameLine();
+            RoutingExtras.Action action=null;
+            if (ImGui.button("Duplicate")) action=RoutingExtras.Action.DUPLICATE;
+            ImGui.beginDisabled(index==0); if (ImGui.button("Move up")) action=RoutingExtras.Action.UP;
+            ImGui.endDisabled(); ImGui.sameLine(); ImGui.beginDisabled(index==entries.size()-1);
+            if (ImGui.button("Move down")) action=RoutingExtras.Action.DOWN;
+            ImGui.endDisabled(); ImGui.popID();
+            if (remove || action!=null) {
+                RoutingExtras.Action chosen=action;
+                if (remove) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.editOutlet(selected,workspace.read(selected),item,null)));
+                else applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.changeOutlet(selected,workspace.read(selected),item,chosen)));
+                return;
+            }
+        }
+        for (String choice : RoutingExtras.outletChoices()) if (ImGui.button("Add "+choice)) applyRoutingExtra(() -> workspace.replace(selected,RoutingExtras.editOutlet(selected,workspace.read(selected),entries.size(),choice)));
+    }
+    private void applyRoutingExtra(InspectorDrafts.Change action) {
+        try { action.run(); error=null; }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawRiverPolicy(LosslessJson document) {
         if (!ImGui.collapsingHeader("River policy")) return;
@@ -1353,7 +1432,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

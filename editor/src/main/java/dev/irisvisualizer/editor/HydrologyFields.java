@@ -59,7 +59,7 @@ public final class HydrologyFields {
     private static byte[] editRivers(byte[] original, Function<LosslessJson,byte[]> operation) {
         return new LosslessJson(original).objectEdit("hydrology",hydro -> hydro.objectEdit("rivers",operation,false),false);
     }
-    private static byte[] editRouting(byte[] original, Function<LosslessJson,byte[]> operation) { return editRivers(original,rivers -> rivers.objectEdit("routing",operation,false)); }
+    static byte[] editRouting(byte[] original, Function<LosslessJson,byte[]> operation) { return editRivers(original,rivers -> rivers.objectEdit("routing",operation,false)); }
     public static byte[] enableScalar(String path, byte[] original, String field) {
         authorize(path,field); return editRouting(original,route -> route.enable(field,routingDefault(field)));
     }
@@ -101,7 +101,12 @@ public final class HydrologyFields {
                         if (!riverField.equals("routing")) { paths.add("hydrology.rivers."+riverField); continue; }
                         try {
                             var route=routing(rivers);
-                            for (String member : route.fields()) if (!ROUTING_FIELDS.contains(member)) paths.add("hydrology.rivers.routing."+member);
+                            for (String member : route.fields()) {
+                                if (ROUTING_FIELDS.contains(member)) continue;
+                                if (RoutingExtras.OBJECT_FIELDS.contains(member) || RoutingExtras.LIST_FIELDS.contains(member)) {
+                                    for (String path : RoutingExtras.readOnlyPaths(route,member)) paths.add("hydrology.rivers.routing."+path);
+                                } else paths.add("hydrology.rivers.routing."+member);
+                            }
                         } catch (IllegalArgumentException mismatch) { paths.add("hydrology.rivers.routing"); }
                     }
                 } catch (IllegalArgumentException mismatch) { paths.add("hydrology.rivers"); }
