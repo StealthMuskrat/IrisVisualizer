@@ -117,7 +117,7 @@ final class FloatingObjectTests {
             for (String path : saved.paths()) check(Arrays.equals(saved.read(path),reopened.read(path)) && Arrays.equals(saved.read(path),imported.read(path)));
         }
         rejects(() -> FloatingObjectPlacements.enable(PATH,absent,0,"objects"));rejects(() -> FloatingObjectPlacements.enableScalar(PATH,document("extraObjects","[{}]"),0,"extraObjects",0,"forcePlace"));
-        check(FieldCoverage.fields("objectPlacement").size()==41 && FieldCoverage.fields("objectPlacement").stream().filter(FieldCoverage.Field::implemented).count()==33);
+        check(FieldCoverage.fields("objectPlacement").size()==41 && FieldCoverage.fields("objectPlacement").stream().filter(FieldCoverage.Field::implemented).count()==35);
         check(FieldCoverage.fields("objectTranslate").size()==4 && FieldCoverage.fields("objectTranslate").stream().allMatch(FieldCoverage.Field::implemented));
         System.out.println("PASS: four floating object collections, exact asset catalogs/pools, all modes and chance/density/snow bounds, free-floating translations, anchored guards, raw preservation, scoped drafts and Save/ZIP contracts");
     }
