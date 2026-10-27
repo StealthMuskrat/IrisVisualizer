@@ -59,6 +59,8 @@ final class CavePlacementTests {
                 byte[] wrong = bytes("{\"caveProfile\":{\"verticalRange\":" + bad + "}}");
                 rejects(() -> CavePlacementFields.enableRange(path, wrong));
                 rejects(() -> CavePlacementFields.editRange(path, wrong, "0", "384"));
+            }
+            for (String bad : List.of("null", "[]", "true", "\"snippet\"")) {
                 byte[] wrongMin = bytes("{\"caveProfile\":{\"verticalRange\":{\"min\":" + bad + ",\"max\":384}}}");
                 rejects(() -> CavePlacementFields.editRange(path, wrongMin, "0", "384"));
                 byte[] wrongMax = bytes("{\"caveProfile\":{\"verticalRange\":{\"min\":0,\"max\":" + bad + "}}}");
