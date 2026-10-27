@@ -187,6 +187,10 @@
     "ores": {
       "classification": "generation",
       "reason": "Ordered native IrisOreGenerator list with exclusive surface/underground filtering and first-result scope precedence. Bounded lossless controls author settings only; native sampling, registry resolution and previews remain unavailable."
+    },
+    "deposits": {
+      "classification": "generation",
+      "reason": "Native additive IrisDepositGenerator lists consumed in dimension/center-region/center-biome order. Lossless controls author source-bounded settings; clump geometry, registry resolution and effective generation remain unavailable."
     }
   },
   "biome": {
@@ -325,6 +329,10 @@
     "ores": {
       "classification": "generation",
       "reason": "Ordered native IrisOreGenerator list with exclusive surface/underground filtering and first-result scope precedence. Bounded lossless controls author settings only; native sampling, registry resolution and previews remain unavailable."
+    },
+    "deposits": {
+      "classification": "generation",
+      "reason": "Native additive IrisDepositGenerator lists consumed in dimension/center-region/center-biome order. Lossless controls author source-bounded settings; clump geometry, registry resolution and effective generation remain unavailable."
     }
   },
   "generator": {
@@ -485,6 +493,10 @@
     "ores": {
       "classification": "generation",
       "reason": "Ordered native IrisOreGenerator list with exclusive surface/underground filtering and first-result scope precedence. Bounded lossless controls author settings only; native sampling, registry resolution and previews remain unavailable."
+    },
+    "deposits": {
+      "classification": "generation",
+      "reason": "Native additive IrisDepositGenerator lists consumed in dimension/center-region/center-biome order. Lossless controls author source-bounded settings; clump geometry, registry resolution and effective generation remain unavailable."
     }
   },
   "importedStructures": {
@@ -2465,6 +2477,92 @@
     "range": {
       "classification": "generation",
       "reason": "Pinned single-block ore authoring: empty contextual versus STONE class palettes, weighted materials/styles, threshold/flag and paired inclusive engine-local height bands. Existing unsupported data is preserved; effective native generation remains unvalidated."
+    }
+  },
+  "depositGenerator": {
+    "minHeight": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "maxHeight": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "heightDistribution": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "placementScope": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "surfaceClearance": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "minSize": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "maxSize": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "shape": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "maxPerChunk": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "minPerChunk": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "spawnChance": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "perClumpSpawnChance": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "discardChanceOnAirExposure": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "palette": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "varience": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "replaceableBlocks": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "surfaceReplaceableBlocks": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "biomeScope": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "includedBiomes": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "excludedBiomes": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    },
+    "replaceBedrock": {
+      "classification": "generation",
+      "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
     }
   }
 }

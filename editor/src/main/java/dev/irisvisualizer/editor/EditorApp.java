@@ -173,6 +173,7 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
+                    drawDeposits(document,"dimensions");
                     drawOres(document,"dimensions");
                     drawDimensionPalettes(document);
                     drawSurfaceLayerFallback(document);
@@ -284,6 +285,7 @@ public final class EditorApp extends Application {
         drawCaveProfile(document);
         drawRiverPolicy(document);
         drawRootObjects(document,FloatingObjectPlacements.REGION_ROOT);
+        drawDeposits(document,"regions");
         drawOres(document,"regions");
         ImGui.textWrapped("Other region fields remain read-only.");
     }
@@ -510,6 +512,7 @@ public final class EditorApp extends Application {
         drawBiomeLayers(document);
         drawBiomeSlabWall(document);
         drawRootObjects(document,FloatingObjectPlacements.BIOME_ROOT);
+        drawDeposits(document,"biomes");
         drawOres(document,"biomes");
         drawFloatingBiomes(document);
         drawRootStyles(document, false);
@@ -527,7 +530,7 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
@@ -574,6 +577,125 @@ public final class EditorApp extends Application {
             }
             ImGui.treePop();
         }
+    }
+    private void drawDeposits(LosslessJson document,String base) {
+        if (!ImGui.collapsingHeader("Deposit generators")) return;
+        ImGui.textWrapped("Native clump generators combine dimension, region and biome lists in that order, using the region/biome at the chunk's center column. Reordering can change deterministic native outcomes. Single-block ore noise generators are configured separately.");
+        ImGui.textWrapped("Biome multipliers, host rules, variant remaps and world context affect results. Geometry, registry compatibility and native generation are not evaluated or previewed.");
+        List<LosslessJson> entries;
+        try { entries=DepositGenerators.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored deposits contain nulls, snippets or unsupported entries (read-only).");return; }
+        String prefix=DepositGenerators.listPrefix(base);
+        if (entries==null) {
+            if (ImGui.button("Initialize empty deposit list")) { try { commitProfileChange(prefix,DepositGenerators.enable(selected,workspace.read(selected),base),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            return;
+        }
+        String newKey=prefix+"new.block";ImString material=values.computeIfAbsent(newKey,ignored -> new ImString("minecraft:iron_ore",4096));ImGui.inputText("Material for new deposit",material);drafts.update(newKey,"minecraft:iron_ore",material.get());
+        if (ImGui.button("Add deposit with material")) { changeDeposit(base,RiverProfiles.Action.ADD,-1,material.get(),newKey);return; }
+        for (int index=0;index<entries.size();index++) {
+            if (!ImGui.treeNode("Deposit "+index)) continue;
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate deposit")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();if (ImGui.button("Remove deposit")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Deposit up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Deposit down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeDeposit(base,action,index,null,null);return; }
+            var entry=entries.get(index);var context=new DepositGenerators.Context(base,index);
+            ImGui.textWrapped("Height uses inclusive engine-local Y: 0 is the dimension bottom. Per-chunk count is sampled inclusively, then chunk/per-clump chances and native filters apply. Surface clearance also affects ABOVE_TERRAIN placement.");
+            for (String pair : DepositGenerators.PAIRS) if (ImGui.treeNode(pair+" range")) { drawDepositPair(entry,context,pair);ImGui.treePop(); }
+            for (String field : DepositGenerators.SCALARS) drawDepositScalar(entry,context,field);
+            for (String field : DepositGenerators.ENUMS) {
+                ImGui.pushID(field);ImGui.textWrapped(DepositGenerators.help(field));
+                try {
+                    String current=entry.token(field)==null ? DepositGenerators.defaultToken(field) : entry.stringToken(field);
+                    if (ImGui.beginCombo(field,current.length()>128 ? "Unknown stored choice" : current+(entry.token(field)==null ? " (native default)" : ""))) {
+                        for (String choice : DepositGenerators.choices(field)) { if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DepositGenerators.setChoice(selected,workspace.read(selected),context,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(DepositGenerators.choiceHelp(field,choice)); }
+                        ImGui.endCombo();
+                    }
+                } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored enum has an unsupported type (read-only)."); }
+                ImGui.popID();
+            }
+            String bedrock=entry.token("replaceBedrock");ImGui.textWrapped("Bedrock replacement permits bedrock through its native guard; host, scope and other world rules still apply.");
+            if (bedrock==null) { if (ImGui.button("Enable bedrock replacement flag (false)")) applyRoutingExtra(() -> workspace.replace(selected,DepositGenerators.enableBedrock(selected,workspace.read(selected),context))); }
+            else if (!bedrock.equals("true") && !bedrock.equals("false")) ImGui.textWrapped("Stored bedrock flag has an unsupported type (read-only).");
+            else { ImBoolean flag=new ImBoolean(Boolean.parseBoolean(bedrock));if (ImGui.checkbox("Replace bedrock",flag)) applyRoutingExtra(() -> workspace.replace(selected,DepositGenerators.setBedrock(selected,workspace.read(selected),context,flag.get()))); }
+            if (ImGui.treeNode("Deposit materials")) { drawDepositPalette(entry,context);ImGui.treePop(); }
+            for (String field : DepositGenerators.FILTERS) if (ImGui.treeNode(field)) { drawDepositFilter(entry,context,field);ImGui.treePop(); }
+            for (String field : entry.fields()) if (!DepositGenerators.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void changeDeposit(String base,RiverProfiles.Action action,int index,String block,String appliedKey) {
+        try { commitProfileChange(DepositGenerators.listPrefix(base),DepositGenerators.change(selected,workspace.read(selected),base,action,index,block),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawDepositPair(LosslessJson entry,DepositGenerators.Context context,String pair) {
+        String low=DepositGenerators.pairField(pair,true),high=DepositGenerators.pairField(pair,false),min=entry.token(low),max=entry.token(high);
+        ImGui.textWrapped(DepositGenerators.help(low));ImGui.textWrapped(DepositGenerators.help(high));ImGui.textWrapped(DepositGenerators.constraints(low));
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored paired bounds have unsupported types (read-only).");return; }
+        String storedMin=min==null ? DepositGenerators.defaultToken(low) : min,storedMax=max==null ? DepositGenerators.defaultToken(high) : max,minKey=context.prefix()+low,maxKey=context.prefix()+high;
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImGui.inputText(min==null ? "Minimum (native default)" : "Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());ImGui.inputText(max==null ? "Maximum (native default)" : "Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        if (ImGui.button("Apply paired range")) { try { workspace.replace(selected,DepositGenerators.setPair(selected,workspace.read(selected),context,pair,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+    }
+    private void drawDepositScalar(LosslessJson entry,DepositGenerators.Context context,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(DepositGenerators.help(field));ImGui.textWrapped(DepositGenerators.constraints(field));String token=entry.token(field);
+        if (token==null) { if (ImGui.button("Enable "+field+" ("+DepositGenerators.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,DepositGenerators.enableScalar(selected,workspace.read(selected),context,field))); }
+        else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored scalar has an unsupported type (read-only).");
+        else {
+            String key=context.prefix()+field;ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply scalar")) commitRiverOverride(key,() -> workspace.replace(selected,DepositGenerators.setScalar(selected,workspace.read(selected),context,field,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void drawDepositPalette(LosslessJson entry,DepositGenerators.Context context) {
+        ImGui.textWrapped("Materials are selected uniformly by entry. Stored weights are ignored by the native deposit selector; advanced block data remains read-only. Block names require nonblank text; registry/state validity is unchecked.");
+        List<LosslessJson> palette;
+        try { palette=DepositGenerators.palette(entry); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored palette is a snippet or unsupported list (read-only).");return; }
+        if (palette==null) {
+            if (ImGui.button("Initialize empty material list")) { try { commitProfileChange(context.palettePrefix(),DepositGenerators.enablePalette(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            return;
+        }
+        if (palette.isEmpty()) ImGui.textWrapped("Empty material list: add a block to configure this generator.");
+        String newKey=context.palettePrefix()+"new.block";ImString block=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New deposit block",block);drafts.update(newKey,"",block.get());
+        if (ImGui.button("Add deposit block")) { changeDepositPalette(context,RiverProfiles.Action.ADD,-1,block.get(),newKey);return; }
+        for (int index=0;index<palette.size();index++) {
+            ImGui.pushID(index);int row=index;var value=palette.get(index);
+            try {
+                String stored=value.token("block")==null ? "" : value.stringToken("block"),key=context.palettePrefix()+index+".block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(value.token("block")==null ? "Missing block" : "Block",input);drafts.update(key,stored,input.get());
+                if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,DepositGenerators.setBlock(selected,workspace.read(selected),context,row,input.get())));
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block has an unsupported type (read-only)."); }
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate block")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();ImGui.beginDisabled(palette.size()<=1);if (ImGui.button("Remove block")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
+            ImGui.beginDisabled(index==0);if (ImGui.button("Block up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==palette.size()-1);if (ImGui.button("Block down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            for (String field : value.fields()) if (!field.equals("block")) ImGui.textWrapped(field+" (read-only)");
+            ImGui.popID();if (action!=null) { changeDepositPalette(context,action,index,null,null);return; }
+        }
+    }
+    private void changeDepositPalette(DepositGenerators.Context context,RiverProfiles.Action action,int index,String block,String appliedKey) {
+        try { commitProfileChange(context.palettePrefix(),DepositGenerators.changePalette(selected,workspace.read(selected),context,action,index,block),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawDepositFilter(LosslessJson entry,DepositGenerators.Context context,String field) {
+        ImGui.textWrapped(DepositGenerators.help(field));boolean biome=DepositGenerators.biomeFilter(field);
+        ImGui.textWrapped(biome ? "Include and exclude filters match the selected Iris biome key or derivative id; exclusions win. New values need an exact in-pack biome key or a namespaced derivative id. Registry existence is unchecked." : "Literal block ids without states; registry existence is unchecked. Empty main host lists add no host restriction; empty surface lists use the main host fallback. For ore deposits, biome exterior-surface rules can replace the deposit surface filter.");
+        List<String> filters;
+        try { filters=DepositGenerators.filter(entry,field); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored filter is null, mixed or unsupported (read-only).");return; }
+        if (filters==null) {
+            if (ImGui.button("Initialize empty filter list")) { try { commitProfileChange(context.filterPrefix(field),DepositGenerators.enableFilter(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            return;
+        }
+        var choices=biome ? ResourceTypes.referenceKeys(workspace,"biomes") : List.<String>of();String newKey=context.filterPrefix(field)+"new.value";
+        int capacity=Math.max(4096,choices.stream().mapToInt(value -> value.getBytes(StandardCharsets.UTF_8).length+1).max().orElse(1));ImString input=values.computeIfAbsent(newKey,ignored -> new ImString("",capacity));
+        if (biome && ImGui.beginCombo("In-pack biome","Choose a key")) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(input.get()))) input.set(choice);ImGui.endCombo(); }
+        ImGui.inputText("New filter",input);drafts.update(newKey,"",input.get());
+        if (ImGui.button("Add filter")) { changeDepositFilter(context,field,RiverProfiles.Action.ADD,-1,input.get(),newKey);return; }
+        for (int index=0;index<filters.size();index++) {
+            ImGui.pushID(index);int row=index;String stored=filters.get(index),key=context.filterPrefix(field)+index;ImString value=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Filter",value);drafts.update(key,stored,value.get());
+            if (ImGui.button("Apply filter")) commitRiverOverride(key,() -> workspace.replace(selected,DepositGenerators.setFilter(selected,workspace.read(selected),context,field,row,value.get(),workspace)));
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate filter")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();if (ImGui.button("Remove filter")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Filter up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==filters.size()-1);if (ImGui.button("Filter down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            ImGui.popID();if (action!=null) { changeDepositFilter(context,field,action,index,null,null);return; }
+        }
+    }
+    private void changeDepositFilter(DepositGenerators.Context context,String field,RiverProfiles.Action action,int index,String value,String appliedKey) {
+        try { commitProfileChange(context.filterPrefix(field),DepositGenerators.changeFilter(selected,workspace.read(selected),context,field,action,index,value,workspace),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawOres(LosslessJson document,String base) {
         if (!ImGui.collapsingHeader("Ore generators")) return;

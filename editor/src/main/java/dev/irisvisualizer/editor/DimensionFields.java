@@ -22,7 +22,7 @@ public final class DimensionFields {
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
         for (String field : document.fields()) {
-            if (EDITABLE.contains(field) || OreGenerators.LIST_FIELDS.contains(field)) continue;
+            if (EDITABLE.contains(field) || OreGenerators.LIST_FIELDS.contains(field) || DepositGenerators.LIST_FIELDS.contains(field)) continue;
             if (SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field)) continue;
             if (DimensionPalettes.OBJECT_FIELDS.contains(field)) { paths.addAll(DimensionPalettes.readOnlyPaths(document,field));continue; }
             if (DimensionHeights.OBJECT_FIELDS.contains(field)) { paths.addAll(DimensionHeights.readOnlyPaths(document));continue; }
