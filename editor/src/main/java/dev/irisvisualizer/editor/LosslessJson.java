@@ -37,6 +37,16 @@ public final class LosslessJson {
         at = span.start(); string();
         return splice(span.start(), span.end(), quote(value));
     }
+    /** Explicit optional-string assignment; only absent, null or string values are supported. */
+    byte[] nullableString(String field, String value) {
+        Span span = root.get(field);
+        if (span == null) {
+            if (value == null) return sourceBytes(); // Preserve an absent null default.
+            return enableStringPath(field, value);
+        }
+        if (!"null".equals(token(field))) stringToken(field);
+        return splice(span.start(), span.end(), value == null ? "null" : quote(value));
+    }
     public byte[] integer(String field, long value) {
         Span span = root.get(field);
         if (span == null) throw new IllegalArgumentException("Absent field must be explicitly enabled first");

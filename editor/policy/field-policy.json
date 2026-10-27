@@ -689,6 +689,18 @@
     "surfaceBreakStyle": {
       "classification": "generation",
       "reason": "Controls cave density/warp/surface-break noise using bounded style scalars and enum selection; explicit creation preserves constructor defaults including surface-break zoom override."
+    },
+    "verticalRange": {
+      "classification": "generation",
+      "reason": "Generation cave bounds; finite ordered pair editor with pinned contextual/class defaults and unknown-member preservation."
+    },
+    "defaultObjectAnchor": {
+      "classification": "generation",
+      "reason": "Generation cave object anchor mode; source-derived enum choices/default, without resolving profile selection."
+    },
+    "defaultObjectPlaceMode": {
+      "classification": "generation",
+      "reason": "Generation cave object placement override; source-derived enum choices and nullable default, without placing objects."
     }
   }
 }
