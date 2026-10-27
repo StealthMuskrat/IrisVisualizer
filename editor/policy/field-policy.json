@@ -2151,6 +2151,14 @@
     "translate": {
       "classification": "generation",
       "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "densityStyle": {
+      "classification": "generation",
+      "reason": "Explicit inline density range and object scale in floating collections, with null fallbacks restored explicitly; native generation and snippet resolution remain outside the editor."
+    },
+    "scale": {
+      "classification": "generation",
+      "reason": "Explicit inline density range and object scale in floating collections, with null fallbacks restored explicitly; native generation and snippet resolution remain outside the editor."
     }
   },
   "objectTranslate": {
@@ -2169,6 +2177,28 @@
     "z": {
       "classification": "generation",
       "reason": "Exact annotation-bounded translation control in floatingObjects only; anchored top/bottom contexts remain read-only."
+    }
+  },
+  "objectScale": {
+    "size": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement scale control; ordered range pairs are an editor subset, with source factor/variation bounds and exact interpolation choices."
+    },
+    "variations": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement scale control; ordered range pairs are an editor subset, with source factor/variation bounds and exact interpolation choices."
+    },
+    "minimumScale": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement scale control; ordered range pairs are an editor subset, with source factor/variation bounds and exact interpolation choices."
+    },
+    "maximumScale": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement scale control; ordered range pairs are an editor subset, with source factor/variation bounds and exact interpolation choices."
+    },
+    "interpolation": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement scale control; ordered range pairs are an editor subset, with source factor/variation bounds and exact interpolation choices."
     }
   }
 }

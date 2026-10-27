@@ -618,6 +618,7 @@ public final class EditorApp extends Application {
             var placement=placements.get(placementIndex);
             drawFloatingPlacementMode(placement,index,list,placementIndex);
             for (String field : FloatingObjectPlacements.SCALARS) drawFloatingPlacementScalar(placement,index,list,placementIndex,field);
+            drawFloatingPlacementSettings(placement,new FloatingPlacementSettings.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
             if (ImGui.treeNode("Other placement data (read-only)")) { for (String field : FloatingObjectPlacements.readOnlyFields(placement,list)) ImGui.textWrapped(field);ImGui.treePop(); }
@@ -632,7 +633,7 @@ public final class EditorApp extends Application {
         ImGui.pushID(field);
         ImGui.textWrapped(field.equals("chance") ? "Floating placement tests chance per attempt with native jitter of +/-0.005. Density controls attempts, or densityStyle when configured." : FloatingObjectPlacements.help(field));
         ImGui.textWrapped(FloatingObjectPlacements.constraints(field));
-        if (field.equals("density") && placement.token("densityStyle")!=null && !placement.token("densityStyle").equals("null")) ImGui.textWrapped("A resolved non-null densityStyle overrides fixed density. The styled range remains read-only.");
+        if (field.equals("density") && placement.token("densityStyle")!=null && !placement.token("densityStyle").equals("null")) ImGui.textWrapped("A resolved non-null densityStyle overrides fixed density. Open Density range to author it or restore fixed density.");
         String token=placement.token(field),key=FloatingObjectPlacements.placementPrefix(entry,list,index)+field;
         if (token==null) {
             if (ImGui.button("Enable "+field+" ("+FloatingObjectPlacements.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.enableScalar(selected,workspace.read(selected),entry,list,index,field)));
@@ -654,6 +655,76 @@ public final class EditorApp extends Application {
                 if (ImGui.isItemHovered()) ImGui.setTooltip(FloatingObjectPlacements.modeHelp(choice));
             }
             ImGui.endCombo();
+        }
+    }
+    private void drawFloatingPlacementSettings(LosslessJson placement,FloatingPlacementSettings.Context context) {
+        for (String field : FloatingPlacementSettings.OBJECT_FIELDS) {
+            if (!ImGui.treeNode(field.equals("scale") ? "Object scale" : "Density range")) continue;
+            ImGui.textWrapped(FloatingPlacementSettings.help(field));LosslessJson object;
+            try { object=FloatingPlacementSettings.object(placement,field); }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored setting is a snippet or unsupported value (read-only).");ImGui.treePop();continue; }
+            if (object==null) {
+                ImGui.textWrapped(field.equals("scale") ? "Absent/null uses the dimension's allObjectScaleFactor. Creating an explicit scale, even an empty object, overrides that factor with class defaults: size 1, range 1 to 1, 7 variants, NONE interpolation." : "Absent/null uses fixed density. Creating a range uses Iris defaults: 16 to 32, STATIC style. The sampled result is rounded for placement attempts.");
+                if (ImGui.button("Create explicit "+field)) changeFloatingPlacementSetting(context,field,true);
+                ImGui.treePop();continue;
+            }
+            if (ImGui.button(field.equals("scale") ? "Restore dimension scale fallback" : "Restore fixed density")) { changeFloatingPlacementSetting(context,field,false);ImGui.treePop();continue; }
+            if (field.equals("densityStyle")) {
+                ImGui.textWrapped("Density is sampled once per chunk for this placement. Editor bounds: 0 to 2147483647, ordered and finite. These are editor limits; Iris styled ranges have no annotated bounds. Zero attempts disables placement. Full generation cost and native validity are unchecked.");
+                drawFloatingPlacementBounds(object,context,false);
+                if (ImGui.treeNode("Density generator style")) { drawStyleFields(object,context.styleTarget());ImGui.treePop(); }
+            } else {
+                ImGui.textWrapped("Size other than 1 selects a fixed scale and overrides the range. At size 1, Iris selects cached variants across the range; its upper endpoint is not included when the bounds differ. The floating entry's shrink factor applies afterward. Scaling is not previewed.");
+                for (String member : List.of("size","variations")) drawFloatingScaleScalar(object,context,member);
+                drawFloatingPlacementBounds(object,context,true);
+                String current;
+                try { current=object.token("interpolation")==null ? FloatingPlacementSettings.scaleDefault("interpolation") : object.stringToken("interpolation"); }
+                catch (IllegalArgumentException unsupported) { current=null;ImGui.textWrapped("Stored interpolation has an unsupported type (read-only)."); }
+                if (current!=null && ImGui.beginCombo("Upscale interpolation",current.length()>128 ? "Unknown stored interpolation" : current+(object.token("interpolation")==null ? " (Iris default)" : ""))) {
+                    for (String choice : FloatingPlacementSettings.interpolations()) {
+                        if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementSettings.setInterpolation(selected,workspace.read(selected),context,choice)));
+                        if (ImGui.isItemHovered()) ImGui.setTooltip(FloatingPlacementSettings.interpolationHelp(choice));
+                    }
+                    ImGui.endCombo();
+                }
+            }
+            for (String path : FloatingPlacementSettings.readOnlyPaths(placement)) if (path.equals(field) || path.startsWith(field+".")) ImGui.textWrapped(path+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void changeFloatingPlacementSetting(FloatingPlacementSettings.Context context,String field,boolean enable) {
+        try { byte[] current=workspace.read(selected);commitProfileChange(context.prefix(field),enable ? FloatingPlacementSettings.enable(selected,current,context,field) : FloatingPlacementSettings.disable(selected,current,context,field),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingScaleScalar(LosslessJson scale,FloatingPlacementSettings.Context context,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(FloatingPlacementSettings.scaleHelp(field));ImGui.textWrapped(FloatingPlacementSettings.scaleConstraints(field));
+        String token=scale.token(field),key=context.prefix("scale")+field;
+        if (token==null) {
+            if (ImGui.button("Enable "+field+" ("+FloatingPlacementSettings.scaleDefault(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementSettings.enableScaleScalar(selected,workspace.read(selected),context,field)));
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored scalar has an unsupported type (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingPlacementSettings.setScaleScalar(selected,workspace.read(selected),context,field,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void drawFloatingPlacementBounds(LosslessJson object,FloatingPlacementSettings.Context context,boolean scale) {
+        String field=scale ? "scale" : "densityStyle",minField=scale ? "minimumScale" : "min",maxField=scale ? "maximumScale" : "max";
+        String min=object.token(minField),max=object.token(maxField);
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored range bounds have unsupported types (read-only).");return; }
+        String storedMin=min!=null ? min : scale ? FloatingPlacementSettings.scaleDefault(minField) : FloatingPlacementSettings.rangeDefault(minField);
+        String storedMax=max!=null ? max : scale ? FloatingPlacementSettings.scaleDefault(maxField) : FloatingPlacementSettings.rangeDefault(maxField);
+        String minKey=context.prefix(field)+minField,maxKey=context.prefix(field)+maxField;
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImString maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+        if (scale) ImGui.textWrapped("Editor range: ordered finite scale factors from 0.01 to 50. Iris accepts reversed ranges; the editor authors ordered pairs.");
+        ImGui.inputText(min==null ? "Minimum (Iris default)" : "Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());
+        ImGui.inputText(max==null ? "Maximum (Iris default)" : "Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        if (ImGui.button("Apply range bounds")) {
+            try {
+                byte[] current=workspace.read(selected);workspace.replace(selected,scale ? FloatingPlacementSettings.setScaleBounds(selected,current,context,minimum.get(),maximum.get()) : FloatingPlacementSettings.setDensityBounds(selected,current,context,minimum.get(),maximum.get()));
+                drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null;
+            } catch (Exception failure) { error=failure.getMessage(); }
         }
     }
     private void drawFloatingObjectPool(LosslessJson placement,int entry,String list,int index,String pool,List<String> choices) {

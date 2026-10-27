@@ -27,7 +27,7 @@ public final class FieldCoverage {
         if (base == null) return List.of();
         return switch (base) {
             case "dimensions" -> List.of("dimension", "importedStructures", "importedFeatures", "caveProfile", "styledRange", "caveModule", "range", "riverPolicy", "hydrology", "riverHydrology", "riverRouting", "riverRegional", "riverGeometry", "riverMeanders", "riverSurfaceShape", "riverChannelShape", "riverDropShape", "riverBank3D", "surfaceRiver", "surfaceRiverSource", "surfaceRiverChannel", "surfaceRiverBank", "surfaceRiverFlow", "surfaceRiverMouth", "surfaceRiverErosion", "surfaceRiverBed", "riverExcavation", "surfaceRiverPonds", "surfaceRiverPond", "undergroundRiver", "undergroundRiverSource", "riverGrottos", "coastalGrotto", "inlandGrotto", "seaCaves", "riverMaterial", "materialPalette", "blockData", "riverProfile", "standingSurfacePool", "deepFluid", "noiseStyle");
-            case "biomes" -> List.of("biome", "biomeGeneratorLink", "terrain3D", "caveProfile", "styledRange", "caveModule", "range", "riverPolicy", "biomePaletteLayer", "slopeClip", "blockData", "noiseStyle", "floatingBiome", "objectPlacement", "objectTranslate");
+            case "biomes" -> List.of("biome", "biomeGeneratorLink", "terrain3D", "caveProfile", "styledRange", "caveModule", "range", "riverPolicy", "biomePaletteLayer", "slopeClip", "blockData", "noiseStyle", "floatingBiome", "objectPlacement", "objectTranslate", "objectScale");
             case "generators" -> List.of("generator", "interpolator", "noise", "noiseStyle");
             case "regions" -> List.of("region", "caveProfile", "styledRange", "caveModule", "range", "riverPolicy");
             default -> List.of();
