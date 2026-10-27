@@ -120,7 +120,7 @@ final class RiverGeometryTests {
         drafts.update(RiverPolicyFields.draftPrefix("dimensions")+"widthMultiplier","1","2");
         RiverGeometryFields.setText(PATH,empty,"surface","bedRoughness","0"); drafts.applied(surfaceKey);
         check(drafts.count()==3 && drafts.contains(meanderKey));
-        check(FieldCoverage.fields("riverGeometry").size()==6 && FieldCoverage.fields("riverGeometry").stream().filter(FieldCoverage.Field::implemented).count()==2);
+        check(FieldCoverage.fields("riverGeometry").size()==6 && FieldCoverage.fields("riverGeometry").stream().filter(FieldCoverage.Field::implemented).count()==5);
         check(FieldCoverage.fields("riverMeanders").size()==7 && FieldCoverage.fields("riverMeanders").stream().allMatch(FieldCoverage.Field::implemented));
         check(FieldCoverage.fields("riverSurfaceShape").size()==12 && FieldCoverage.fields("riverSurfaceShape").stream().filter(FieldCoverage.Field::implemented).count()==10);
         check(FieldCoverage.fields("riverSurfaceShape").stream().filter(field -> !field.implemented()).allMatch(field -> field.classification().equals("read-only")));

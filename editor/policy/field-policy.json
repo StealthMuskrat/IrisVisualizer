@@ -1011,6 +1011,18 @@
     "surface": {
       "classification": "generation",
       "reason": "River geometry subsection; explicit empty-object creation and bounded scalar editing preserve class defaults and nullable channel fallbacks."
+    },
+    "underground": {
+      "classification": "generation",
+      "reason": "River passage subsection; explicit empty-object creation and bounded primitive edits preserve class defaults and inactive fields."
+    },
+    "grottos": {
+      "classification": "generation",
+      "reason": "River passage subsection; explicit empty-object creation and bounded primitive edits preserve class defaults and inactive fields."
+    },
+    "drops": {
+      "classification": "generation",
+      "reason": "River passage subsection; explicit empty-object creation and bounded primitive edits preserve class defaults and inactive fields."
     }
   },
   "riverMeanders": {
@@ -1091,6 +1103,90 @@
     "aspectRange": {
       "classification": "read-only",
       "reason": "Pinned source says only grotto chambers consume this shared-record field; no surface-context generation control is exposed."
+    }
+  },
+  "riverChannelShape": {
+    "bedRoundness": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "bedRoughness": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "wallRoughness": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "roughnessWavelength": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "radialBase": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "radialMinimum": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "radialMaximum": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "primaryLobeStrength": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "detailLobeStrength": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "ceilingRoughness": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "aspectMinimum": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    },
+    "aspectRange": {
+      "classification": "generation",
+      "reason": "Source-defined channel scalar with primitive defaults and finite annotation bounds; aspect controls are editable only in grotto geometry."
+    }
+  },
+  "riverDropShape": {
+    "cascadeRunPerBlock": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    },
+    "cascadeExponent": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    },
+    "maximumCascadeStep": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    },
+    "flowWidthRatio": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    },
+    "maximumFlowDepth": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    },
+    "basinWidthRatio": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    },
+    "maximumBasinDepth": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    },
+    "undergroundCascadeRunPerBlock": {
+      "classification": "generation",
+      "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
     }
   }
 }

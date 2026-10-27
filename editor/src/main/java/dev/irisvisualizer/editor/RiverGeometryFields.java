@@ -8,19 +8,28 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
 
-/** Bounded meander and surface-shape settings; channel fallback values and geometry are not evaluated. */
+/** Bounded river geometry settings; channel fallback values and geometry are not evaluated. */
 public final class RiverGeometryFields {
     public static final List<String> OBJECT_FIELDS = List.of("geometry");
     public static final List<String> GEOMETRY_FIELDS = List.of("meanders", "surface");
     public static final List<String> MEANDER_FIELDS = List.of("primaryWavelength", "detailWavelength", "primaryStrength", "detailStrength", "maximumOffsetRatio", "smoothingPasses", "maximumTurnDegrees");
     public static final List<String> SURFACE_FIELDS = List.of("bedRoundness", "bedRoughness", "wallRoughness", "roughnessWavelength", "radialBase", "radialMinimum", "radialMaximum", "primaryLobeStrength", "detailLobeStrength", "ceilingRoughness");
+    public static final List<String> PASSAGE_FIELDS = List.of("underground", "grottos", "drops");
+    public static final List<String> CHANNEL_FIELDS = List.of("bedRoundness", "bedRoughness", "wallRoughness", "roughnessWavelength", "radialBase", "radialMinimum", "radialMaximum", "primaryLobeStrength", "detailLobeStrength", "ceilingRoughness", "aspectMinimum", "aspectRange");
+    public static final List<String> UNDERGROUND_FIELDS = List.of("bedRoundness", "bedRoughness", "wallRoughness", "roughnessWavelength", "radialBase", "radialMinimum", "radialMaximum", "primaryLobeStrength", "detailLobeStrength", "ceilingRoughness");
+    public static final List<String> DROP_FIELDS = List.of("cascadeRunPerBlock", "cascadeExponent", "maximumCascadeStep", "flowWidthRatio", "maximumFlowDepth", "basinWidthRatio", "maximumBasinDepth", "undergroundCascadeRunPerBlock");
+    public static List<String> sections() { return List.of("meanders", "surface", "underground", "grottos", "drops"); }
     private static final Properties DEFINITIONS=new Properties();
     static {
         try (var input=RiverGeometryFields.class.getResourceAsStream("/river-geometry-fields.properties")) {
             if (input==null) throw new IOException("Missing pinned river geometry definitions");
             DEFINITIONS.load(input);
-            for (String object : List.of("geometry","meanders","surface")) if (!"{}".equals(DEFINITIONS.getProperty(object+".default"))) throw new IOException("Unsupported geometry object defaults");
-            for (String section : GEOMETRY_FIELDS) for (String field : fields(section)) {
+            try (var passages=RiverGeometryFields.class.getResourceAsStream("/river-passage-fields.properties")) {
+                if (passages==null) throw new IOException("Missing pinned river passage definitions");
+                DEFINITIONS.load(passages);
+            }
+            for (String object : List.of("geometry","meanders","surface","underground","grottos","drops")) if (!"{}".equals(DEFINITIONS.getProperty(object+".default"))) throw new IOException("Unsupported geometry object defaults");
+            for (String section : sections()) for (String field : fields(section)) {
                 String kind=DEFINITIONS.getProperty(section+"."+field+".type", "");
                 if (!List.of("int","double","Integer","Double").contains(kind) || nullable(section,field) && !"null".equals(defaultToken(section,field))) throw new IOException("Unsupported geometry scalar defaults/types");
             }
@@ -28,7 +37,7 @@ public final class RiverGeometryFields {
     }
     private static void authorize(String path) { if (!DimensionFields.dimension(path)) throw new IllegalArgumentException("River geometry is dimension-only"); }
     public static List<String> fields(String section) {
-        return switch(section) { case "meanders" -> MEANDER_FIELDS; case "surface" -> SURFACE_FIELDS; default -> throw new IllegalArgumentException("Unsupported geometry section"); };
+        return switch(section) { case "meanders" -> MEANDER_FIELDS; case "surface" -> SURFACE_FIELDS; case "underground" -> UNDERGROUND_FIELDS; case "grottos" -> CHANNEL_FIELDS; case "drops" -> DROP_FIELDS; default -> throw new IllegalArgumentException("Unsupported geometry section"); };
     }
     private static void authorize(String path, String section, String field) {
         authorize(path); if (!fields(section).contains(field)) throw new IllegalArgumentException("Geometry field is read-only");
@@ -93,7 +102,7 @@ public final class RiverGeometryFields {
         try {
             var geometry=geometry(rivers); if (geometry==null) return List.of();
             for (String field : geometry.fields()) {
-                if (!GEOMETRY_FIELDS.contains(field)) { paths.add("geometry."+field); continue; }
+                if (!sections().contains(field)) { paths.add("geometry."+field); continue; }
                 try {
                     var object=section(geometry,field);
                     for (String member : object.fields()) if (!fields(field).contains(member)) paths.add("geometry."+field+"."+member);
