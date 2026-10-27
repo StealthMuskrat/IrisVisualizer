@@ -448,7 +448,7 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else if ((target.banks() || target.riverRange() || target.palette() || target.profilePalette() || target.poolPalette() || target.deepPalette() || target.deepHeight() || target.dimensionPalette() || target.biomeLayer()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
             else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
@@ -500,6 +500,7 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        drawBiomeDerivatives(document);
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
         drawRootStyles(document, false);
@@ -517,7 +518,61 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawBiomeDerivatives(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Biome derivatives and scatter")) return;
+        ImGui.textWrapped("These are biome registry keys, separate from pack biome file references. Enter nonblank text; registry existence and physical biome mapping require Iris. Stored keys are preserved exactly. Native structure selection can constrain Minecraft derivatives for sea and shore roles.");
+        for (String field : BiomeDerivatives.SCALARS) {
+            ImGui.pushID(field);ImGui.textWrapped(BiomeDerivatives.description(field));
+            try {
+                String stored=BiomeDerivatives.storedKey(document,field),key=BiomeDerivatives.prefix(field)+"value";
+                if (stored==null) ImGui.textWrapped(field.equals("derivative") ? "Absent: Iris default "+BiomeDerivatives.defaultKey() : "Absent/null: inherit derivative. Failed native registry lookup can also fall back to derivative.");
+                String baseline=stored==null ? field.equals("derivative") ? BiomeDerivatives.defaultKey() : "" : stored;
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(baseline,Math.max(4096,baseline.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText(field,input);drafts.update(key,baseline,input.get());
+                if (ImGui.button("Apply registry key")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDerivatives.set(selected,workspace.read(selected),field,input.get())));
+                if (field.equals("vanillaDerivative")) {
+                    ImGui.sameLine();if (ImGui.button("Inherit derivative")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDerivatives.inherit(selected,workspace.read(selected))));
+                }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored derivative has an unsupported type (read-only)."); }
+            ImGui.popID();
+        }
+        for (String field : BiomeDerivatives.LISTS) if (ImGui.treeNode(field)) { drawBiomeScatter(document,field);ImGui.treePop(); }
+        ImGui.textWrapped("The biomeStyle noise controls under Distribution styles select scatter variants. A single entry does not need random selection. An empty sky list follows the ground selection; an empty ground list follows derivative.");
+    }
+    private void drawBiomeScatter(LosslessJson document,String field) {
+        ImGui.textWrapped(BiomeDerivatives.description(field));List<String> entries;
+        try { entries=BiomeDerivatives.entries(document,field); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored scatter list is not a string array (read-only).");return; }
+        if (entries==null) {
+            ImGui.textWrapped(field.equals("biomeScatter") ? "Absent: use derivative." : "Absent: use the ground biome selection.");
+            if (ImGui.button("Enable empty scatter list (Iris default)")) {
+                try { commitProfileChange(BiomeDerivatives.prefix(field),BiomeDerivatives.enable(selected,workspace.read(selected),field),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        String newKey=BiomeDerivatives.prefix(field)+"new";ImString newValue=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));
+        ImGui.inputText("New registry key",newValue);drafts.update(newKey,"",newValue.get());
+        if (ImGui.button("Add scatter key")) { changeBiomeScatter(field,RiverProfiles.Action.ADD,-1,newValue.get(),newKey);return; }
+        if (entries.isEmpty()) ImGui.textWrapped(field.equals("biomeScatter") ? "Empty: use derivative." : "Empty: use the ground biome selection.");
+        for (int index=0;index<entries.size();index++) {
+            ImGui.pushID(index);int entryIndex=index;String stored=entries.get(index),key=BiomeDerivatives.prefix(field)+index+".value";
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Registry key",input);drafts.update(key,stored,input.get());
+            if (ImGui.button("Apply key")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDerivatives.edit(selected,workspace.read(selected),field,entryIndex,input.get())));
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Move down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            ImGui.popID();if (action!=null) { changeBiomeScatter(field,action,index,null,null);return; }
+        }
+    }
+    private void changeBiomeScatter(String field,RiverProfiles.Action action,int index,String value,String appliedKey) {
+        try { commitProfileChange(BiomeDerivatives.prefix(field),BiomeDerivatives.change(selected,workspace.read(selected),field,action,index,value),appliedKey); }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawBiomeLayers(LosslessJson document) {
         if (!ImGui.collapsingHeader("Biome material layers")) return;
@@ -2620,7 +2675,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || DimensionHeights.defaultBound("min",true)==null || DimensionPalettes.maximumWeight()!=1000 || SurfaceLayerFallbacks.choices().isEmpty() || BiomeLayers.defaultBlock()==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || DimensionHeights.defaultBound("min",true)==null || DimensionPalettes.maximumWeight()!=1000 || SurfaceLayerFallbacks.choices().isEmpty() || BiomeLayers.defaultBlock()==null || BiomeDerivatives.defaultKey()==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

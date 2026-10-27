@@ -365,6 +365,15 @@ jobs:
           python editor/tools/extract_biome_layer_fields.py IrisBiome.java IrisBiomePaletteLayer.java IrisSlopeClip.java ArrayType.java IrisBiomeLayerGenerator.java IrisBlockData.java PackBiomeLayerValidator.java generated-biome-layer.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-biome-layer.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-layer-fields.properties).Hash) { throw 'Pinned biome layer definitions differ' }
+      - name: Verify pinned biome derivative and scatter definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeDerivatives.java' -OutFile IrisBiomeDerivatives.java
+          python editor/tools/test_biome_derivative_fields.py IrisBiome.java IrisBiomeDerivatives.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_biome_derivative_fields.py IrisBiome.java IrisBiomeDerivatives.java generated-biome-derivative.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-biome-derivative.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-derivative-fields.properties).Hash) { throw 'Pinned biome derivative definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

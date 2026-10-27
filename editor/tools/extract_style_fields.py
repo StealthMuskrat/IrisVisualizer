@@ -61,7 +61,7 @@ def enum_choices(source):
 
 ROOTS = {
     'dimensions': ['regionStyle', 'continentalStyle', 'landBiomeStyle', 'shoreBiomeStyle', 'seaBiomeStyle', 'caveBiomeStyle'],
-    'biomes': ['childStyle'],
+    'biomes': ['childStyle', 'biomeStyle'],
 }
 
 

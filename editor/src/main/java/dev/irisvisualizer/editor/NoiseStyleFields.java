@@ -10,7 +10,7 @@ public final class NoiseStyleFields {
     public static final List<String> EDITABLE = List.of("style", "zoom", "exponent", "cellularFrequency", "cellularZoom");
     public static final List<String> OBJECT_FIELDS = List.of("style");
     public static final List<String> DIMENSION_FIELDS = List.of("regionStyle", "continentalStyle", "landBiomeStyle", "shoreBiomeStyle", "seaBiomeStyle", "caveBiomeStyle");
-    public static final List<String> BIOME_FIELDS = List.of("childStyle");
+    public static final List<String> BIOME_FIELDS = List.of("childStyle", "biomeStyle");
     public static final List<String> TERRAIN_FIELDS = List.of("densityStyle", "crackStyle");
     public static final List<String> CAVE_FIELDS = List.of("baseDensityStyle", "detailDensityStyle", "warpStyle", "surfaceBreakStyle");
     public record Target(String resourceBase, String objectField, NoiseFields.Target noise, int moduleIndex) {

@@ -281,6 +281,26 @@
     "caveCeilingLayers": {
       "classification": "generation",
       "reason": "Independent inline material layer lists with source defaults, lossless structural operations and scoped drafts; snippets and native generation remain unresolved."
+    },
+    "derivative": {
+      "classification": "generation",
+      "reason": "Literal biome registry key for the biome derivative; runtime registry and physical mapping are unresolved."
+    },
+    "vanillaDerivative": {
+      "classification": "generation",
+      "reason": "Nullable literal structure-selection derivative override; native registry fallback and sea/shore constraints remain with Iris."
+    },
+    "biomeScatter": {
+      "classification": "generation",
+      "reason": "Literal ground derivative scatter list; empty uses derivative, and runtime registry/selection are unresolved."
+    },
+    "biomeSkyScatter": {
+      "classification": "generation",
+      "reason": "Literal sky derivative scatter list; empty follows ground, and runtime registry/selection are unresolved."
+    },
+    "biomeStyle": {
+      "classification": "generation",
+      "reason": "Source-default noise style used to select scatter variants; controls do not sample or resolve registry keys."
     }
   },
   "generator": {
