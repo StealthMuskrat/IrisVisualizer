@@ -11,7 +11,7 @@ import java.util.function.Function;
 /** Dimension-owned bounded configuration editing; no drainage planning or generation is initialized. */
 public final class HydrologyFields {
     public static final List<String> ROOT_FIELDS = List.of("hydrology");
-    public static final List<String> HYDROLOGY_FIELDS = List.of("rivers", "surfacePools");
+    public static final List<String> HYDROLOGY_FIELDS = List.of("rivers", "surfacePools", "deepFluids");
     public static final List<String> RIVER_FIELDS = List.of("enabled", "routing", "geometry", "surface", "underground", "grottos", "profiles");
     public static final List<String> ROUTING_FIELDS = List.of("tileSize", "sampleSpacing", "maximumRouteLength", "minimumSurfaceCourseLength", "minimumUndergroundCourseLength", "maximumOutletsPerTile", "maximumCoastalOutletsPerTile", "oceanOutlets", "valleyPreference", "uphillPenalty", "slopePenalty", "confluenceAttraction", "lengthPreference", "tributaries");
     private static final Properties DEFINITIONS = new Properties();
@@ -93,6 +93,7 @@ public final class HydrologyFields {
             var hydro=hydrology(document);
             if (hydro==null) return List.of();
             for (String field : hydro.fields()) {
+                if (field.equals("deepFluids")) { for (String path : DeepFluids.readOnlyPaths(hydro)) paths.add("hydrology."+path);continue; }
                 if (field.equals("surfacePools")) { for (String path : SurfacePools.readOnlyPaths(hydro)) paths.add("hydrology."+path);continue; }
                 if (!field.equals("rivers")) { paths.add("hydrology."+field); continue; }
                 try {

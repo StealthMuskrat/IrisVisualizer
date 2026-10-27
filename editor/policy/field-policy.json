@@ -887,6 +887,10 @@
     "surfacePools": {
       "classification": "generation",
       "reason": "Dimension-owned standing pool list authoring; placements and effective policy selections are not evaluated."
+    },
+    "deepFluids": {
+      "classification": "generation",
+      "reason": "Independent deep-fluid list authoring; dimension-height envelopes and native placement remain pending."
     }
   },
   "riverHydrology": {
@@ -1793,6 +1797,56 @@
     "biome": {
       "classification": "generation",
       "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    }
+  },
+  "deepFluid": {
+    "id": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "fluidPalette": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "spacing": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "height": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "horizontalRadius": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "verticalRadius": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "channelWidth": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "headroom": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "containedPools": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
+    },
+    "shortChannels": {
+      "classification": "generation",
+      "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; full native and dimension-height envelope validation remain pending."
     }
   }
 }
