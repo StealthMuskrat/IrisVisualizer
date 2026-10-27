@@ -909,6 +909,10 @@
     "grottos": {
       "classification": "generation",
       "reason": "Explicit grotto container and coastal/inland section creation with bounded controls preserves river planning and unknown nested settings."
+    },
+    "profiles": {
+      "classification": "generation",
+      "reason": "Dimension-owned profile list authoring with source ID/fluid bounds; policy ID selections are preserved without reference rewrites."
     }
   },
   "riverRouting": {
@@ -1741,6 +1745,16 @@
     "weight": {
       "classification": "generation",
       "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    }
+  },
+  "riverProfile": {
+    "id": {
+      "classification": "generation",
+      "reason": "Bounded river profile ID and explicit weighted fluid palette authoring; full runtime validation remains pending."
+    },
+    "fluidPalette": {
+      "classification": "generation",
+      "reason": "Bounded river profile ID and explicit weighted fluid palette authoring; full runtime validation remains pending."
     }
   }
 }

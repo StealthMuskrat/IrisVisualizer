@@ -119,7 +119,7 @@ final class HydrologyTests {
         rejects(() -> HydrologyFields.enableScalar(PATH,source,"inlandOutlets"));
         rejects(() -> HydrologyFields.setRoutingText(PATH,source,"regional","1"));
         check(HydrologyFields.readOnlyPaths(new LosslessJson(bytes("{}"))).isEmpty());
-        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("hydrology.rivers.routing.regional.future","hydrology.rivers.routing.future","hydrology.rivers.profiles","hydrology.rivers.geometry.future","hydrology.rivers.future","hydrology.surfacePools","hydrology.deepFluids","hydrology.future","unknown")));
+        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("hydrology.rivers.routing.regional.future","hydrology.rivers.routing.future","hydrology.rivers.geometry.future","hydrology.rivers.future","hydrology.surfacePools","hydrology.deepFluids","hydrology.future","unknown")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"hydrology\":null}"))).equals(List.of("hydrology")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"hydrology\":{\"rivers\":null}}"))).equals(List.of("hydrology.rivers")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"hydrology\":{\"rivers\":{\"routing\":null}}}"))).equals(List.of("hydrology.rivers.routing")));

@@ -98,7 +98,7 @@ final class RiverGeometryTests {
             check(RiverGeometryFields.readOnlyReason("surface",field).contains("grotto"));
             check(DimensionFields.readOnlyPaths(new LosslessJson(inactive)).contains("hydrology.rivers.geometry.surface."+field));
         }
-        check(DimensionFields.readOnlyPaths(new LosslessJson(inactive)).containsAll(List.of("hydrology.rivers.geometry.banks3D.future","hydrology.rivers.geometry.future","hydrology.rivers.profiles","unknown")));
+        check(DimensionFields.readOnlyPaths(new LosslessJson(inactive)).containsAll(List.of("hydrology.rivers.geometry.banks3D.future","hydrology.rivers.geometry.future","unknown")));
         for (String missing : List.of("{}","{\"hydrology\":{}}","{\"hydrology\":null}","{\"hydrology\":{\"rivers\":null}}")) rejects(() -> RiverGeometryFields.enableGeometry(PATH,bytes(missing)));
         rejects(() -> RiverGeometryFields.enableSection(PATH,parent,"surface"));
         rejects(() -> RiverGeometryFields.enableScalar(PATH,created,"meanders","primaryWavelength"));

@@ -302,6 +302,14 @@ jobs:
           python editor/tools/extract_river_palette_fields.py IrisMaterialPalette.java IrisGeneratorStyle.java NoiseStyle.java generated-river-palette.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-river-palette.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-palette-fields.properties).Hash) { throw 'Pinned river palette noise definitions differ' }
+      - name: Verify pinned river profile and fluid palette definitions
+        shell: pwsh
+        run: |
+          python editor/tools/test_river_profile_fields.py IrisRiverHydrology.java IrisRiverProfile.java IrisMaterialPalette.java IrisBlockData.java PackHydrologyValidator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_river_profile_fields.py IrisRiverHydrology.java IrisRiverProfile.java IrisMaterialPalette.java IrisBlockData.java PackHydrologyValidator.java generated-river-profile.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-river-profile.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-profile-fields.properties).Hash) { throw 'Pinned river profile definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
