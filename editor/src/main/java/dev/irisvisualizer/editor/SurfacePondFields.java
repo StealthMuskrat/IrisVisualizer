@@ -55,7 +55,15 @@ public final class SurfacePondFields {
     }
     public static byte[] enablePond(String path,byte[] original,String context) {
         authorize(path); context(context);
-        return SurfaceRiverFields.editSurface(original,surface -> surface.objectEdit("ponds",ponds -> ponds.enable(context,createToken(context)),false));
+        return SurfaceRiverFields.editSurface(original,surface -> surface.objectEdit("ponds",ponds -> {
+            if (ponds.token(context)!=null) throw new IllegalArgumentException("Pond endpoint is already present or unsupported");
+            return ponds.objectEdit(context,pond -> {
+                byte[] next=pond.sourceBytes();
+                var seed=new LosslessJson(createToken(context).getBytes(StandardCharsets.UTF_8));
+                for (String field : seed.fields()) next=new LosslessJson(next).enable(field,seed.token(field));
+                return next;
+            },true);
+        },false));
     }
     private static byte[] edit(byte[] original,String context,java.util.function.Function<LosslessJson,byte[]> action) {
         return SurfaceRiverFields.editSurface(original,surface -> surface.objectEdit("ponds",ponds -> ponds.objectEdit(context,action,false),false));
