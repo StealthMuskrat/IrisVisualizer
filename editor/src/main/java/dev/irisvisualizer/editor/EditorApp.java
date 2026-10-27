@@ -171,6 +171,7 @@ public final class EditorApp extends Application {
                         }
                     }
                     drawRootStyles(document, true);
+                    drawCaveProfile(document);
                     List<String> readOnly = DimensionFields.readOnlyPaths(document);
                     if (ImGui.collapsingHeader("Read-only fields (" + readOnly.size() + ")"))
                         for (String path : readOnly) ImGui.textWrapped(path);
@@ -270,6 +271,7 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        drawCaveProfile(document);
         ImGui.textWrapped("Other region fields remain read-only.");
     }
     private void drawGenerator(LosslessJson document) {
@@ -489,6 +491,7 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         drawRootStyles(document, false);
+        drawCaveProfile(document);
         if (ImGui.collapsingHeader("Child biomes")) {
             ImGui.textWrapped(BiomeChildren.description());
             if (document.token("children") == null) {
@@ -501,7 +504,54 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawCaveProfile(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Cave profile")) return;
+        ImGui.textWrapped(CaveProfileFields.description(selected));
+        LosslessJson profile;
+        try { profile=CaveProfileFields.object(document); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored cave profile is a snippet or unsupported value (read-only)."); return; }
+        if (profile==null) {
+            ImGui.textWrapped("Uses the Iris default profile, with profile carving disabled. Create an explicit profile to edit its settings.");
+            if (ImGui.button("Create cave profile (disabled)")) {
+                try { workspace.replace(selected,CaveProfileFields.enableProfile(selected,workspace.read(selected))); error=null; }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        ImGui.textWrapped("Absent fields keep Iris defaults. This inspector does not resolve which profile the generator selects.");
+        for (String field:CaveProfileFields.EDITABLE) {
+            String token=profile.token(field),key="caveProfile#"+ResourceTypes.base(selected)+"."+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(CaveProfileFields.help(field));
+            if (CaveProfileFields.booleanField(field)) {
+                String effective=token==null ? CaveProfileFields.defaultToken(field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Value (Iris default)" : "Value",effective.equals("true"))) {
+                    try { workspace.replace(selected,CaveProfileFields.editBoolean(selected,workspace.read(selected),field,!effective.equals("true"))); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            } else if (token==null) {
+                if (ImGui.button("Enable ("+CaveProfileFields.defaultToken(field)+")")) {
+                    try { workspace.replace(selected,CaveProfileFields.enable(selected,workspace.read(selected),field)); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            } else {
+                ImGui.textWrapped(CaveProfileFields.constraints(field));
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Value",input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected,CaveProfileFields.editText(selected,workspace.read(selected),field,input.get())); drafts.applied(key); values.remove(key); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        if (ImGui.treeNode("Other cave settings (read-only)")) {
+            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field)) ImGui.textWrapped(field);
+            ImGui.treePop();
+        }
     }
     private void drawTerrain3D(LosslessJson document) {
         ImGui.textWrapped(Terrain3DFields.description());
@@ -854,7 +904,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

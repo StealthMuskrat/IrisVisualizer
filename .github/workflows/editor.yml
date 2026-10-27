@@ -95,6 +95,15 @@ jobs:
           python editor/tools/extract_terrain3d_fields.py IrisBiome.java IrisTerrain3D.java generated-terrain3d.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-terrain3d.properties).Hash -ne (Get-FileHash editor/src/main/resources/terrain3d-fields.properties).Hash) { throw 'Pinned terrain definitions differ' }
+      - name: Verify pinned cave profile definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/cave/IrisCaveProfile.java' -OutFile IrisCaveProfile.java
+          python editor/tools/test_cave_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_cave_fields.py IrisCaveProfile.java IrisDimension.java IrisRegion.java IrisBiome.java generated-cave.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-cave.properties).Hash -ne (Get-FileHash editor/src/main/resources/cave-profile-fields.properties).Hash) { throw 'Pinned cave definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
