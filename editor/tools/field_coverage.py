@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in sixty-four pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in sixty-seven pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -72,6 +72,9 @@ SOURCES = {
  'oreGenerator': 'generation/decoration/IrisOreGenerator.java',
  'depositGenerator': 'generation/decoration/IrisDepositGenerator.java',
  'depositVariant': 'generation/decoration/IrisDepositVariant.java',
+ 'staticObject': 'structure/object/IrisStaticObject.java',
+ 'staticObjectRotation': 'structure/object/IrisStaticObjectRotation.java',
+ 'position': 'pack/value/IrisPosition.java',
 }
 
 def declared_fields(text):
@@ -128,6 +131,11 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['depositVariant'] = set(editable(java_dir, 'DepositVariants'))
     for owner in ['dimension','region','biome']: implemented[owner].update(editable(java_dir, 'DepositVariants', 'LIST_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'BiomeOreHosts', 'LIST_FIELDS'))
+    implemented['dimension'].update(editable(java_dir, 'StaticObjects', 'LIST_FIELDS'))
+    implemented['dimension'].update(editable(java_dir, 'StaticObjects', 'ROOT_FIELDS'))
+    implemented['staticObject'] = set(editable(java_dir, 'StaticObjects'))
+    implemented['staticObjectRotation'] = set(editable(java_dir, 'StaticObjects', 'AXES'))
+    implemented['position'] = set(editable(java_dir, 'StaticObjects', 'AXES'))
     implemented['vacuumSettings'] = set(editable(java_dir, 'FloatingPlacementDeformation', 'VACUUM_FIELDS'))
     implemented['objectLimit'] = set(editable(java_dir, 'FloatingPlacementConstraints', 'CLAMP_FIELDS'))
     implemented['objectRotation'] = set(editable(java_dir, 'FloatingObjectRotations', 'ROTATION_FIELDS'))
@@ -216,7 +224,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in sixty-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in sixty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

@@ -195,6 +195,14 @@
     "depositVariants": {
       "classification": "generation",
       "reason": "Ordered native world-Y remap rules: first successful cave-biome, then region, then dimension mapping. Literal string-map and atomic band controls preserve unsupported data; native material resolution and generation remain unavailable."
+    },
+    "staticObjects": {
+      "classification": "generation",
+      "reason": "Ordered fixed world placements; later entries win overlaps in newly generated chunks."
+    },
+    "allObjectScaleFactor": {
+      "classification": "generation",
+      "reason": "Finite default object scale used only when an object or placement has no explicit scale; jigsaw structures excluded."
     }
   },
   "biome": {
@@ -2593,6 +2601,72 @@
     "remap": {
       "classification": "generation",
       "reason": "Pinned inclusive absolute world-Y bounds and material-identity remap dictionary. Exact integer pairs and lossless literal-key operations author saved settings; source aliases, target resolution and actual placement are unchecked."
+    }
+  },
+  "staticObject": {
+    "object": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "position": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "scale": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "scaleInterpolation": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "bore": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "smartBore": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
+    },
+    "edit": {
+      "classification": "read-only",
+      "reason": "Static replacement rules are preserved; this batch does not route shared replacement-palette controls into fixed placements."
+    }
+  },
+  "staticObjectRotation": {
+    "x": {
+      "classification": "generation",
+      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+    },
+    "y": {
+      "classification": "generation",
+      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+    },
+    "z": {
+      "classification": "generation",
+      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+    }
+  },
+  "position": {
+    "x": {
+      "classification": "generation",
+      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+    },
+    "y": {
+      "classification": "generation",
+      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+    },
+    "z": {
+      "classification": "generation",
+      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
     }
   }
 }
