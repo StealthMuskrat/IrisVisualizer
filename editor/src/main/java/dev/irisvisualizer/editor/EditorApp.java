@@ -503,6 +503,7 @@ public final class EditorApp extends Application {
         drawBiomeDerivatives(document);
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
+        drawBiomeSlabWall(document);
         drawRootStyles(document, false);
         drawCaveProfile(document);
         drawRiverPolicy(document);
@@ -518,7 +519,35 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawBiomeSlabWall(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Slab and wall materials")) return;
+        ImGui.textWrapped("Slab/wall placement also depends on dimension post-processing settings and native terrain conditions. Wall palettes are used by cave and subterrain material paths too. Editing here does not change dimension flags.");
+        for (String field : BiomeSlabWall.OBJECT_FIELDS) {
+            if (!ImGui.treeNode(field)) continue;
+            ImGui.textWrapped(BiomeSlabWall.description(field));LosslessJson palette=null;boolean supported=true;
+            try { palette=BiomeSlabWall.object(document,field); }
+            catch (IllegalArgumentException unsupported) { supported=false;ImGui.textWrapped("Stored material is a snippet or unsupported value (read-only)."); }
+            if (supported && palette==null) {
+                ImGui.textWrapped("Absent: the source uses an empty palette, placing no material. Create that same default explicitly before editing.");
+                if (ImGui.button("Create empty palette (source default)")) {
+                    try { commitProfileChange(BiomeSlabWall.prefix(field),BiomeSlabWall.create(selected,workspace.read(selected),field),null); }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            } else if (supported) {
+                ImGui.textWrapped("An empty block list selects no material. In an existing object, missing entries inherit GRASS_BLOCK until explicitly initialized. Thickness values remain read-only here.");
+                if (field.equals("slab") && ImGui.treeNode("Slab slope condition")) {
+                    drawSlopeCondition(palette,BiomeSlabWall.prefix(field),
+                            () -> workspace.replace(selected,BiomeSlabWall.createSlope(selected,workspace.read(selected),field)),
+                            (minimum,maximum) -> workspace.replace(selected,BiomeSlabWall.setSlope(selected,workspace.read(selected),field,minimum,maximum)));
+                    ImGui.treePop();
+                }
+                drawGeneralBlockPalette(palette,GeneralBlockPalettes.Target.slabWall(field));
+                if (ImGui.treeNode("Other material data (read-only)")) { for (String path : BiomeSlabWall.readOnlyPaths(document,field)) ImGui.textWrapped(path);ImGui.treePop(); }
+            }
+            ImGui.treePop();
+        }
     }
     private void drawBiomeDerivatives(LosslessJson document) {
         if (!ImGui.collapsingHeader("Biome derivatives and scatter")) return;
@@ -627,23 +656,30 @@ public final class EditorApp extends Application {
             catch (Exception failure) { error=failure.getMessage(); }
         }
     }
+    @FunctionalInterface
+    private interface SlopeWriter { void apply(String minimum,String maximum) throws Exception; }
     private void drawLayerSlope(LosslessJson layer,String list,int index) {
+        drawSlopeCondition(layer,BiomeLayers.layerPrefix(list,index),
+                () -> workspace.replace(selected,BiomeLayers.createSlope(selected,workspace.read(selected),list,index)),
+                (minimum,maximum) -> workspace.replace(selected,BiomeLayers.setSlope(selected,workspace.read(selected),list,index,minimum,maximum)));
+    }
+    private void drawSlopeCondition(LosslessJson layer,String prefix,InspectorDrafts.Change create,SlopeWriter writer) {
         LosslessJson slope;
         try { slope=BiomeLayers.slope(layer); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored slope condition is a snippet or unsupported value (read-only).");return; }
         ImGui.textWrapped("Slope bounds are finite from 0 to 1024. Minimum 0 with maximum >= 10 disables slope gating; the source defaults are 0 to 10. No terrain slopes are sampled here.");
         if (slope==null) {
-            if (ImGui.button("Create slope condition (source defaults)")) applyRoutingExtra(() -> workspace.replace(selected,BiomeLayers.createSlope(selected,workspace.read(selected),list,index)));
+            if (ImGui.button("Create slope condition (source defaults)")) applyRoutingExtra(create);
             return;
         }
         String min=slope.token("minimumSlope"),max=slope.token("maximumSlope");
         if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored slope bound has an unsupported type (read-only).");return; }
-        String minKey=BiomeLayers.layerPrefix(list,index)+"slopeCondition.minimumSlope",maxKey=BiomeLayers.layerPrefix(list,index)+"slopeCondition.maximumSlope",storedMin=min==null ? BiomeLayers.slopeDefault("minimumSlope") : min,storedMax=max==null ? BiomeLayers.slopeDefault("maximumSlope") : max;
+        String minKey=prefix+"slopeCondition.minimumSlope",maxKey=prefix+"slopeCondition.maximumSlope",storedMin=min==null ? BiomeLayers.slopeDefault("minimumSlope") : min,storedMax=max==null ? BiomeLayers.slopeDefault("maximumSlope") : max;
         ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
         ImGui.inputText(min==null ? "Minimum slope (Iris default)" : "Minimum slope",minimum);drafts.update(minKey,storedMin,minimum.get());
         ImGui.inputText(max==null ? "Maximum slope (Iris default)" : "Maximum slope",maximum);drafts.update(maxKey,storedMax,maximum.get());
         if (ImGui.button("Apply slope pair")) {
-            try { workspace.replace(selected,BiomeLayers.setSlope(selected,workspace.read(selected),list,index,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
+            try { writer.apply(minimum.get(),maximum.get());drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
             catch (Exception failure) { error=failure.getMessage(); }
         }
         for (String item : slope.fields()) if (!BiomeLayers.SLOPE_FIELDS.contains(item)) ImGui.textWrapped(item+" (read-only)");
@@ -705,7 +741,7 @@ public final class EditorApp extends Application {
             if (ImGui.treeNode("Palette generator style")) { drawStyleFields(palette,target.styleTarget());ImGui.treePop(); }
             ImGui.treePop();
         }
-        for (String item : palette.fields()) if (!target.layer() && !RiverMaterialFields.PALETTE_FIELDS.contains(item)) ImGui.textWrapped(item+" (read-only)");
+        for (String item : palette.fields()) if (!target.layer() && !target.slabWall() && !RiverMaterialFields.PALETTE_FIELDS.contains(item)) ImGui.textWrapped(item+" (read-only)");
         List<LosslessJson> entries;
         try { entries=DimensionPalettes.entries(palette); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored palette entries contain snippets or unsupported values (read-only).");return; }
@@ -720,12 +756,12 @@ public final class EditorApp extends Application {
         String newKey=target.listPrefix()+"new.block";
         ImString newBlock=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New block",newBlock);drafts.update(newKey,"",newBlock.get());
         if (ImGui.button("Add block")) { changeGeneralBlockPalette(target,RiverProfiles.Action.ADD,-1,newBlock.get(),newKey);return; }
-        if (entries.isEmpty()) ImGui.textWrapped("This list is empty. Add a block to repair the required list.");
+        if (entries.isEmpty()) ImGui.textWrapped(target.slabWall() ? "Empty palette: no material is selected. Add a block to author a material palette." : "This list is empty. Add a block to repair the required list.");
         for (int index=0;index<entries.size();index++) {
             if (!ImGui.treeNode("Block "+index)) continue;
             int entryIndex=index;var entry=entries.get(index);RiverProfiles.Action action=null;
             if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;
-            ImGui.sameLine();ImGui.beginDisabled(entries.size()<=1);
+            ImGui.sameLine();ImGui.beginDisabled(entries.size()<=target.minimumEntries());
             if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
             ImGui.endDisabled();ImGui.beginDisabled(index==0);
             if (ImGui.button("Move up")) action=RiverProfiles.Action.UP;
@@ -2675,7 +2711,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || DimensionHeights.defaultBound("min",true)==null || DimensionPalettes.maximumWeight()!=1000 || SurfaceLayerFallbacks.choices().isEmpty() || BiomeLayers.defaultBlock()==null || BiomeDerivatives.defaultKey()==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || DimensionHeights.defaultBound("min",true)==null || DimensionPalettes.maximumWeight()!=1000 || SurfaceLayerFallbacks.choices().isEmpty() || BiomeLayers.defaultBlock()==null || BiomeDerivatives.defaultKey()==null || BiomeSlabWall.classBlock()==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

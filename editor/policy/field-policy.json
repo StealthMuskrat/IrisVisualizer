@@ -301,6 +301,14 @@
     "biomeStyle": {
       "classification": "generation",
       "reason": "Source-default noise style used to select scatter variants; controls do not sample or resolve registry keys."
+    },
+    "slab": {
+      "classification": "generation",
+      "reason": "Biome slab material palette with empty contextual default, weighted blocks/noise and bounded slab slope controls; thickness stays read-only."
+    },
+    "wall": {
+      "classification": "generation",
+      "reason": "Biome wall material palette with empty contextual default and weighted blocks/noise; wall slope and thickness stay read-only."
     }
   },
   "generator": {
