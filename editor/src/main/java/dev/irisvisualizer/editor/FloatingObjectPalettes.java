@@ -9,11 +9,11 @@ import java.util.function.Function;
 public final class FloatingObjectPalettes {
     public static final List<String> STILT_FIELDS = List.of("palette");
     public record Context(int entry,String list,int placement,int rule) {
-        public Context { if (entry<0 || placement<0 || rule < -1 || list==null || !FloatingObjectPlacements.LIST_FIELDS.contains(list)) throw new IllegalArgumentException("Select a floating object palette"); }
+        public Context { if (rule < -1 || !FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object palette"); }
         public boolean stilt() { return rule==-1; }
         public FloatingObjectReplacements.Context owner() { return new FloatingObjectReplacements.Context(entry,list,placement); }
         public String prefix() { return stilt() ? FloatingObjectPlacements.placementPrefix(entry,list,placement)+"stiltSettings.palette." : owner().rulePrefix(rule)+"replace."; }
-        public String stylePath() { return "floatingChildBiomes."+entry+"."+list+"."+placement+(stilt() ? ".stiltSettings.palette.style" : ".edit."+rule+".replace.style"); }
+        public String stylePath() { return FloatingObjectPlacements.contextPath(entry,list,placement)+(stilt() ? ".stiltSettings.palette.style" : ".edit."+rule+".replace.style"); }
         public GeneralBlockPalettes.Target target() { return GeneralBlockPalettes.Target.objectPalette(this); }
     }
     private static void authorize(String path) { if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Object palettes are biome-only"); }
@@ -36,9 +36,11 @@ public final class FloatingObjectPalettes {
     public static byte[] enableZoom(String path,byte[] original,Context context) { authorize(path);return editPalette(original,context,p -> p.enable("zoom",RiverPaletteFields.zoomDefault())); }
     public static byte[] setZoom(String path,byte[] original,Context context,String input) { authorize(path);double value=RiverPaletteFields.checkedZoom(input);return editPalette(original,context,p -> p.number("zoom",value)); }
     static Context styleContext(String path) {
-        if (path==null) return null;var match=java.util.regex.Pattern.compile("floatingChildBiomes\\.(0|[1-9][0-9]*)\\.([A-Za-z]+)\\.(0|[1-9][0-9]*)\\.(?:stiltSettings\\.palette|edit\\.(0|[1-9][0-9]*)\\.replace)\\.style").matcher(path);
-        if (!match.matches() || !FloatingObjectPlacements.LIST_FIELDS.contains(match.group(2))) return null;
-        try { return new Context(Integer.parseInt(match.group(1)),match.group(2),Integer.parseInt(match.group(3)),match.group(4)==null ? -1 : Integer.parseInt(match.group(4))); } catch (IllegalArgumentException invalid) { return null; }
+        var parsed=FloatingObjectPlacements.parsePath(path);if (parsed==null) return null;
+        if (parsed.suffix().equals("stiltSettings.palette.style")) return new Context(parsed.entry(),parsed.list(),parsed.placement(),-1);
+        var match=java.util.regex.Pattern.compile("edit\\.(0|[1-9][0-9]*)\\.replace\\.style").matcher(parsed.suffix());
+        if (!match.matches()) return null;
+        try { return new Context(parsed.entry(),parsed.list(),parsed.placement(),Integer.parseInt(match.group(1))); } catch (NumberFormatException invalid) { return null; }
     }
     static List<String> readOnlyPaths(LosslessJson placement,Context context) {
         var paths=new ArrayList<String>();try { var palette=object(placement,context);if (palette==null) return List.of();

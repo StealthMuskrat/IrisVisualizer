@@ -506,6 +506,11 @@ public final class EditorApp extends Application {
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
         drawBiomeSlabWall(document);
+        if (ImGui.collapsingHeader("Biome object placements")) {
+            ImGui.textWrapped("Select exact .iob keys from this pack. Native object loading, collision checks and generation are unavailable here.");
+            ImGui.textWrapped("Carving support selects surface/cave passes. Imports can remap ordinary modes to FAST_MIN_STILT; CENTER_HEIGHT cave placements can inherit the active cave profile mode. Dimension settings also affect surface support. No effective placement is evaluated.");
+            drawFloatingObjectList(document,-1,"objects");
+        }
         drawFloatingBiomes(document);
         drawRootStyles(document, false);
         drawCaveProfile(document);
@@ -522,12 +527,12 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
         ImGui.textWrapped(FloatingBiomes.description());
-        ImGui.textWrapped("This editor authors applied settings without sampling islands. Object placement supports exact asset pools, chance/density, modes and free-floating translations; other placement settings remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
+        ImGui.textWrapped("This editor authors applied settings without sampling islands. Object placement supports exact asset pools and bounded native settings without sampling geometry. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
         List<LosslessJson> entries;
         try { entries=FloatingBiomes.entries(document); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored floating list contains snippets or unsupported entries (read-only).");return; }
@@ -619,6 +624,7 @@ public final class EditorApp extends Application {
             if (action!=null) { ImGui.treePop();changeFloatingObject(index,list,action,placementIndex,null,null);return; }
             var placement=placements.get(placementIndex);
             drawFloatingPlacementMode(placement,index,list,placementIndex);
+            if (index==-1 && list.equals("objects")) drawBiomeObjectAnchors(placement,placementIndex);
             for (String field : FloatingObjectPlacements.SCALARS) drawFloatingPlacementScalar(placement,index,list,placementIndex,field);
             drawFloatingPlacementSettings(placement,new FloatingPlacementSettings.Context(index,list,placementIndex));
             drawFloatingPlacementConstraints(placement,new FloatingPlacementConstraints.Context(index,list,placementIndex));
@@ -627,11 +633,32 @@ public final class EditorApp extends Application {
             drawFloatingReplacements(placement,new FloatingObjectReplacements.Context(index,list,placementIndex));
             drawFloatingOverrides(placement,new FloatingPlacementOverrides.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
-            if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
-            if (list.equals("floatingObjects") && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
+            if (FloatingObjectPlacements.configured(list) && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
+            if (FloatingObjectPlacements.configured(list) && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
             if (ImGui.treeNode("Other placement data (read-only)")) { for (String field : FloatingObjectPlacements.readOnlyFields(placement,list)) ImGui.textWrapped(field);ImGui.treePop(); }
             ImGui.treePop();
         }
+    }
+    private void drawBiomeObjectAnchors(LosslessJson placement,int index) {
+        if (!ImGui.treeNode("Cave anchors and bottom alignment")) return;
+        ImGui.textWrapped("Cave anchors apply when carvingSupport includes carving. PROFILE_DEFAULT uses the active cave profile anchor, falling back to FLOOR. CEILING_HANG forces ceiling anchors. Anchor search, burial and containment can reject a placement.");
+        String token=placement.token("caveAnchorMode");
+        try {
+            String current=token==null ? "Absent: "+BiomeObjectPlacements.defaultAnchor() : placement.stringToken("caveAnchorMode");
+            if (ImGui.beginCombo("Cave anchor",current.length()>128 ? "Unknown stored anchor" : current)) {
+                for (String choice : BiomeObjectPlacements.anchors()) {
+                    if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.setAnchor(selected,workspace.read(selected),index,choice)));
+                    if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeObjectPlacements.anchorHelp(choice));
+                }
+                ImGui.endCombo();
+            }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored cave anchor has an unsupported type (read-only)."); }
+        ImGui.textWrapped(BiomeObjectPlacements.bottomHelp());String bottom=placement.token("bottom");
+        if (bottom==null) {
+            if (ImGui.button("Enable bottom alignment (false)")) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.enableBottom(selected,workspace.read(selected),index)));
+        } else if (!bottom.equals("true") && !bottom.equals("false")) ImGui.textWrapped("Stored bottom flag has an unsupported type (read-only).");
+        else { ImBoolean value=new ImBoolean(Boolean.parseBoolean(bottom));if (ImGui.checkbox("Bottom alignment",value)) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.setBottom(selected,workspace.read(selected),index,value.get()))); }
+        ImGui.treePop();
     }
     private void changeFloatingObject(int entry,String list,RiverProfiles.Action action,int placement,String object,String mode) {
         try { commitProfileChange(FloatingObjectPlacements.listPrefix(entry,list),FloatingObjectPlacements.change(selected,workspace.read(selected),entry,list,action,placement,object,mode,workspace),null); }
@@ -639,7 +666,7 @@ public final class EditorApp extends Application {
     }
     private void drawFloatingPlacementScalar(LosslessJson placement,int entry,String list,int index,String field) {
         ImGui.pushID(field);
-        ImGui.textWrapped(field.equals("chance") ? "Floating placement tests chance per attempt with native jitter of +/-0.005. Density controls attempts, or densityStyle when configured." : FloatingObjectPlacements.help(field));
+        ImGui.textWrapped(field.equals("chance") ? (list.equals("objects") ? "Native surface and cave passes test chance before the density loop. Surface tests add +/-0.005 jitter; cave tests use the stored chance. A successful test permits the density attempts, not guaranteed placements." : "Floating placement tests chance per attempt with native jitter of +/-0.005. Density controls attempts, or densityStyle when configured.") : FloatingObjectPlacements.help(field));
         ImGui.textWrapped(FloatingObjectPlacements.constraints(field));
         if (field.equals("density") && placement.token("densityStyle")!=null && !placement.token("densityStyle").equals("null")) ImGui.textWrapped("A resolved non-null densityStyle overrides fixed density. Open Density range to author it or restore fixed density.");
         String token=placement.token(field),key=FloatingObjectPlacements.placementPrefix(entry,list,index)+field;
@@ -669,7 +696,7 @@ public final class EditorApp extends Application {
             }
             ImGui.treePop();
         }
-        if (context.list().equals("floatingObjects") && ImGui.treeNode("Placement guards")) {
+        if (FloatingObjectPlacements.configured(context.list()) && ImGui.treeNode("Placement guards")) {
             ImGui.textWrapped("These settings retain native mode-dependent behavior. Force placement can bypass clamp, slope and surface-support guards; FLOATING skips carving anchors and surface support. Support also depends on water/from-bottom settings. Effective placement is not validated or previewed.");
             ImGui.textWrapped("Slope-facing rotation requires native terrain context and replaces Y maximum/interval with a terrain direction plus the Y minimum.");
             for (String field : FloatingPlacementConstraints.FLAGS) {
@@ -739,7 +766,7 @@ public final class EditorApp extends Application {
         if (!ImGui.treeNode("Excavation and water")) return;
         ImGui.textWrapped("Native modes, terrain and existing blocks determine these effects. Editing extensions does not enable excavation. Object geometry and placement are not previewed.");
         for (String field : FloatingPlacementEffects.FLAGS) if (FloatingPlacementEffects.editable(context.list(),field)) {
-            ImGui.pushID(field);ImGui.text(field);ImGui.textWrapped(FloatingPlacementEffects.contextHelp(field));
+            ImGui.pushID(field);ImGui.text(field);ImGui.textWrapped(FloatingPlacementEffects.contextHelp(context.list(),field));
             String token=placement.token(field);
             if (token==null) {
                 if (ImGui.button("Enable stored "+field+" ("+FloatingPlacementEffects.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementEffects.enableFlag(selected,workspace.read(selected),context,field)));
@@ -748,7 +775,7 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         for (String field : FloatingPlacementEffects.SCALARS) {
-            ImGui.pushID(field);ImGui.text(field);ImGui.textWrapped(FloatingPlacementEffects.contextHelp(field));ImGui.textWrapped(FloatingPlacementEffects.constraints(field));
+            ImGui.pushID(field);ImGui.text(field);ImGui.textWrapped(FloatingPlacementEffects.contextHelp(context.list(),field));ImGui.textWrapped(FloatingPlacementEffects.constraints(field));
             String token=placement.token(field),key=context.prefix()+field;
             if (token==null) {
                 if (ImGui.button("Enable "+field+" ("+FloatingPlacementEffects.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementEffects.enableScalar(selected,workspace.read(selected),context,field)));
@@ -933,7 +960,7 @@ public final class EditorApp extends Application {
     }
     private void drawFloatingOverrides(LosslessJson placement,FloatingPlacementOverrides.Context context) {
         if (!ImGui.treeNode("Placement overrides")) return;
-        if (context.list().equals("floatingObjects") && ImGui.treeNode("Force placement")) {
+        if (FloatingObjectPlacements.configured(context.list()) && ImGui.treeNode("Force placement")) {
             ImGui.textWrapped("Force affects selected native guards. Hydrology, structure and block-specific paths can still veto placement. Anchored collections set force internally and keep it read-only here.");
             String key=null;boolean ambiguous=false;
             try { key=FloatingPlacementOverrides.forceKey(placement); } catch (IllegalArgumentException unsupported) { ambiguous=true;ImGui.textWrapped(unsupported.getMessage()); }
@@ -1001,7 +1028,7 @@ public final class EditorApp extends Application {
                 drawFloatingPlacementBounds(object,context,false);
                 if (ImGui.treeNode("Density generator style")) { drawStyleFields(object,context.styleTarget());ImGui.treePop(); }
             } else {
-                ImGui.textWrapped("Size other than 1 selects a fixed scale and overrides the range. At size 1, Iris selects cached variants across the range; its upper endpoint is not included when the bounds differ. The floating entry's shrink factor applies afterward. Scaling is not previewed.");
+                ImGui.textWrapped("Size other than 1 selects a fixed scale and overrides the range. At size 1, Iris selects cached variants across the range; its upper endpoint is not included when the bounds differ. Floating-entry shrink factors, when present, apply afterward. Scaling is not previewed.");
                 for (String member : List.of("size","variations")) drawFloatingScaleScalar(object,context,member);
                 drawFloatingPlacementBounds(object,context,true);
                 String current;
@@ -1090,7 +1117,7 @@ public final class EditorApp extends Application {
         catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawFloatingTranslation(LosslessJson placement,int entry,String list,int index) {
-        ImGui.textWrapped("This floating-object path preserves translation. FLOATING mode uses translate.y for absolute height; other modes retain their native behavior. Anchored top/bottom paths replace transforms and keep them read-only here.");
+        ImGui.textWrapped("Configured translation is retained in this collection. FLOATING uses translate.y for absolute height on native mode-based anchor paths; explicit cave anchors and floor alignment retain their own rules. Anchored floating top/bottom collections replace transforms.");
         LosslessJson translate;
         try { translate=FloatingObjectPlacements.translate(placement); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored translation is a snippet or unsupported value (read-only).");return; }

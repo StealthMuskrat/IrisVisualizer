@@ -18,12 +18,12 @@ public final class FloatingPlacementOverrides {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public record Context(int entry,String list,int placement) {
-        public Context { if (entry<0 || placement<0 || list==null || !FloatingObjectPlacements.LIST_FIELDS.contains(list)) throw new IllegalArgumentException("Select a floating placement"); }
+        public Context { if (!FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object placement"); }
         public String heightmapPrefix() { return FloatingObjectPlacements.placementPrefix(entry,list,placement)+"heightmap."; }
         public NoiseFields.Target noiseTarget() { return NoiseFields.Target.heightmap(this); }
     }
     private static void authorize(String path) { if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Floating overrides are biome-only"); }
-    private static void forceContext(String path,Context context) { authorize(path);if (!context.list().equals("floatingObjects")) throw new IllegalArgumentException("Anchored force placement stays read-only"); }
+    private static void forceContext(String path,Context context) { authorize(path);if (!FloatingObjectPlacements.configured(context.list())) throw new IllegalArgumentException("Anchored force placement stays read-only"); }
     public static String heightmapHelp() { return DATA.getProperty("heightmap.description",""); }
     static LosslessJson heightmap(LosslessJson placement) { String token=placement.token("heightmap");return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     static byte[] editHeightmap(byte[] original,Context context,java.util.function.Function<LosslessJson,byte[]> operation) { return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.objectEdit("heightmap",operation,false)); }
@@ -42,7 +42,7 @@ public final class FloatingPlacementOverrides {
     }
     static boolean handled(LosslessJson placement,String list,String field) {
         if (field.equals("heightmap")) return true;
-        if (!FORCE_KEYS.contains(field) || !list.equals("floatingObjects")) return false;
+        if (!FORCE_KEYS.contains(field) || !FloatingObjectPlacements.configured(list)) return false;
         try { String key=forceKey(placement);return field.equals(key) && List.of("true","false").contains(placement.token(key)); } catch (IllegalArgumentException unsupported) { return false; }
     }
     static List<String> readOnlyHeightmapPaths(LosslessJson placement) {

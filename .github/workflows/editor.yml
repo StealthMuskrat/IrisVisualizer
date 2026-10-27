@@ -500,6 +500,16 @@ jobs:
           python editor/tools/extract_floating_placement_overrides.py IrisObjectPlacement.java IrisNoiseGenerator.java HeightmapObjectPlacer.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java generated-floating-placement-overrides.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-placement-overrides.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-overrides.properties).Hash) { throw 'Pinned virtual heightmap/force definitions differ' }
+      - name: Verify pinned biome object dispatch and cave anchors
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/mantle/MantleObjectComponent.java' -OutFile MantleObjectComponent.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/cave/IrisCaveAnchorMode.java' -OutFile IrisCaveAnchorMode.java
+          python editor/tools/test_biome_object_fields.py IrisBiome.java IrisObjectPlacement.java MantleObjectComponent.java IrisCaveAnchorMode.java IrisObjectPlacementRunner.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_biome_object_fields.py IrisBiome.java IrisObjectPlacement.java MantleObjectComponent.java IrisCaveAnchorMode.java IrisObjectPlacementRunner.java generated-biome-object-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-biome-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-object-fields.properties).Hash) { throw 'Pinned biome object definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

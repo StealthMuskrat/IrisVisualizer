@@ -22,14 +22,14 @@ public final class FloatingPlacementDeformation {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public record Context(int entry,String list,int placement) {
-        public Context { if (entry<0 || placement<0 || list==null || !FloatingObjectPlacements.LIST_FIELDS.contains(list)) throw new IllegalArgumentException("Select a floating placement"); }
+        public Context { if (!FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object placement"); }
         public String prefix(String object) { objectField(object);return FloatingObjectPlacements.placementPrefix(entry,list,placement)+object+"."; }
         public String exclusionPrefix() { return prefix("stiltSettings")+"exclude#."; }
     }
     private static void objectField(String field) { if (field==null || !OBJECT_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported deformation object"); }
     private static void member(String object,String field) { objectField(object);if (field==null || !(object.equals("stiltSettings") ? STILT_FIELDS : VACUUM_FIELDS).contains(field)) throw new IllegalArgumentException("Unsupported deformation field"); }
     private static void authorize(String path,Context context,String object,String field) { objectField(object);if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Floating deformation is biome-only");if (field!=null) { member(object,field);if (!editable(context.list(),object,field)) throw new IllegalArgumentException("Classic stilt ranges remain read-only in anchored collections"); } }
-    public static boolean editable(String list,String object,String field) { member(object,field);return !object.equals("stiltSettings") || !CLASSIC_FIELDS.contains(field) || "floatingObjects".equals(list); }
+    public static boolean editable(String list,String object,String field) { member(object,field);return !object.equals("stiltSettings") || !CLASSIC_FIELDS.contains(field) || FloatingObjectPlacements.configured(list); }
     public static List<String> scalars(String object) { objectField(object);return object.equals("stiltSettings") ? STILT_FIELDS.stream().filter(field -> !field.equals("exclude")).toList() : VACUUM_FIELDS; }
     public static String help(String object) { objectField(object);return DATA.getProperty(object+".description",""); }
     public static String help(String object,String field) { member(object,field);return DATA.getProperty(object+"."+field+".description",""); }
