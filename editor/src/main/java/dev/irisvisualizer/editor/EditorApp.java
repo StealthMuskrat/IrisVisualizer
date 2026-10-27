@@ -387,9 +387,10 @@ public final class EditorApp extends Application {
                     try { workspace.replace(selected, NoiseFields.editBoolean(selected, workspace.read(selected), target, field, !token.equals("true"))); error = null; }
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
-            } else {
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored noise number has an unsupported type (read-only).");
+            else {
                 ImGui.textWrapped(NoiseFields.constraints(field));
-                ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
+                ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText("Value", input); drafts.update(key, token, input.get());
                 if (ImGui.button("Apply")) {
                     try { workspace.replace(selected, NoiseFields.editText(selected, workspace.read(selected), target, field, input.get())); drafts.applied(key); values.remove(key); error = null; }
@@ -624,6 +625,7 @@ public final class EditorApp extends Application {
             drawFloatingPlacementEffects(placement,new FloatingPlacementEffects.Context(index,list,placementIndex));
             drawFloatingDeformation(placement,new FloatingPlacementDeformation.Context(index,list,placementIndex));
             drawFloatingReplacements(placement,new FloatingObjectReplacements.Context(index,list,placementIndex));
+            drawFloatingOverrides(placement,new FloatingPlacementOverrides.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
@@ -928,6 +930,46 @@ public final class EditorApp extends Application {
     }
     private void changeFloatingFind(FloatingObjectReplacements.Context context,int rule,RiverProfiles.Action action,int index,String block,String appliedKey) {
         try { commitProfileChange(context.findPrefix(rule),FloatingObjectReplacements.changeFind(selected,workspace.read(selected),context,rule,action,index,block),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingOverrides(LosslessJson placement,FloatingPlacementOverrides.Context context) {
+        if (!ImGui.treeNode("Placement overrides")) return;
+        if (context.list().equals("floatingObjects") && ImGui.treeNode("Force placement")) {
+            ImGui.textWrapped("Force affects selected native guards. Hydrology, structure and block-specific paths can still veto placement. Anchored collections set force internally and keep it read-only here.");
+            String key=null;boolean ambiguous=false;
+            try { key=FloatingPlacementOverrides.forceKey(placement); } catch (IllegalArgumentException unsupported) { ambiguous=true;ImGui.textWrapped(unsupported.getMessage()); }
+            if (!ambiguous) {
+                if (key==null) {
+                    if (ImGui.button("Enable stored forcePlace (false)")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementOverrides.enableForce(selected,workspace.read(selected),context)));
+                } else {
+                    String token=placement.token(key);
+                    if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored native force flag is not boolean (read-only).");
+                    else { ImBoolean enabled=new ImBoolean(Boolean.parseBoolean(token));if (ImGui.checkbox("Native force (stored as "+key+")",enabled)) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementOverrides.setForce(selected,workspace.read(selected),context,enabled.get()))); }
+                }
+            }
+            ImGui.treePop();
+        }
+        if (ImGui.treeNode("Virtual heightmap")) {
+            ImGui.textWrapped(FloatingPlacementOverrides.heightmapHelp());
+            ImGui.textWrapped("Replaces native height queries with rounded noise samples; explicit/absolute anchor modes keep their own anchor rules. Noise disabled outputs offsetY. Restore null to use the underlying height queries. No noise or world-height validity is evaluated here.");
+            LosslessJson heightmap=null;boolean unsupported=false;
+            try { heightmap=FloatingPlacementOverrides.heightmap(placement); } catch (IllegalArgumentException invalid) { unsupported=true;ImGui.textWrapped("Stored heightmap is a snippet or unsupported value (read-only)."); }
+            if (!unsupported) {
+                if (heightmap==null) {
+                    ImGui.textWrapped("Creating {} uses Iris noise defaults: IRIS style, zoom 1, opacity 1 and offsetY 0. This is a noise-height override, not a sampled terrain heightmap.");
+                    if (ImGui.button("Create explicit virtual heightmap")) changeFloatingHeightmap(context,true);
+                } else if (ImGui.button("Restore underlying height queries (null)")) changeFloatingHeightmap(context,false);
+                else {
+                    drawNoiseFields(heightmap,context.noiseTarget());
+                    for (String path : FloatingPlacementOverrides.readOnlyHeightmapPaths(placement)) ImGui.textWrapped(path+" (read-only)");
+                }
+            }
+            ImGui.treePop();
+        }
+        ImGui.treePop();
+    }
+    private void changeFloatingHeightmap(FloatingPlacementOverrides.Context context,boolean enable) {
+        try { byte[] current=workspace.read(selected);commitProfileChange(context.heightmapPrefix(),enable ? FloatingPlacementOverrides.enableHeightmap(selected,current,context) : FloatingPlacementOverrides.restoreHeightmap(selected,current,context),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawFloatingPlacementMode(LosslessJson placement,int entry,String list,int index) {
         String current;

@@ -77,7 +77,8 @@ final class FloatingObjectTests {
             byte[] duplicate=FloatingObjectPlacements.change(PATH,original,0,list,RiverProfiles.Action.DUPLICATE,0,null,null,null);check(Arrays.equals(placements(duplicate,list).get(0).sourceBytes(),placements(duplicate,list).get(1).sourceBytes()));
             byte[] moved=FloatingObjectPlacements.change(PATH,original,0,list,RiverProfiles.Action.DOWN,0,null,null,null);check(Arrays.equals(original,FloatingObjectPlacements.change(PATH,moved,0,list,RiverProfiles.Action.UP,1,null,null,null)));
             rejects(() -> FloatingObjectPlacements.change(PATH,original,0,list,RiverProfiles.Action.UP,0,null,null,null));rejects(() -> FloatingObjectPlacements.change(PATH,original,0,list,RiverProfiles.Action.DOWN,1,null,null,null));
-            check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).containsAll(List.of("force","futurePlacement")));
+            check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains("futurePlacement"));
+            check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains("force")!=list.equals("floatingObjects"));
             check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains("translate")!=list.equals("floatingObjects"));
             check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains("rotation")!=list.equals("floatingObjects"));
             if (list.equals("floatingObjects")) {
@@ -116,7 +117,7 @@ final class FloatingObjectTests {
             for (String path : saved.paths()) check(Arrays.equals(saved.read(path),reopened.read(path)) && Arrays.equals(saved.read(path),imported.read(path)));
         }
         rejects(() -> FloatingObjectPlacements.enable(PATH,absent,0,"objects"));rejects(() -> FloatingObjectPlacements.enableScalar(PATH,document("extraObjects","[{}]"),0,"extraObjects",0,"forcePlace"));
-        check(FieldCoverage.fields("objectPlacement").size()==41 && FieldCoverage.fields("objectPlacement").stream().filter(FieldCoverage.Field::implemented).count()==31);
+        check(FieldCoverage.fields("objectPlacement").size()==41 && FieldCoverage.fields("objectPlacement").stream().filter(FieldCoverage.Field::implemented).count()==33);
         check(FieldCoverage.fields("objectTranslate").size()==4 && FieldCoverage.fields("objectTranslate").stream().allMatch(FieldCoverage.Field::implemented));
         System.out.println("PASS: four floating object collections, exact asset catalogs/pools, all modes and chance/density/snow bounds, free-floating translations, anchored guards, raw preservation, scoped drafts and Save/ZIP contracts");
     }

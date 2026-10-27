@@ -113,6 +113,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['stiltSettings'] = set(editable(java_dir, 'FloatingPlacementDeformation', 'STILT_FIELDS'))
     implemented['stiltSettings'].update(editable(java_dir, 'FloatingObjectPalettes', 'STILT_FIELDS'))
     implemented['objectPlacement'].update(editable(java_dir, 'FloatingObjectReplacements', 'LIST_FIELDS'))
+    implemented['objectPlacement'].update(editable(java_dir, 'FloatingPlacementOverrides'))
     implemented['objectReplace'] = set(editable(java_dir, 'FloatingObjectReplacements'))
     implemented['vacuumSettings'] = set(editable(java_dir, 'FloatingPlacementDeformation', 'VACUUM_FIELDS'))
     implemented['objectLimit'] = set(editable(java_dir, 'FloatingPlacementConstraints', 'CLAMP_FIELDS'))

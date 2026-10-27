@@ -17,7 +17,7 @@ public final class NoiseStyleFields {
         public Target(String resourceBase, String objectField, NoiseFields.Target noise) { this(resourceBase, objectField, noise, -1); }
         public Target {
             if (resourceBase == null || objectField == null) throw new IllegalArgumentException("Unsupported style target");
-            boolean valid = noise != null ? "generators".equals(resourceBase) && "style".equals(objectField)
+            boolean valid = noise != null ? noise.resourceBase().equals(resourceBase) && "style".equals(objectField)
                     : "dimensions".equals(resourceBase) && DIMENSION_FIELDS.contains(objectField)
                     || "biomes".equals(resourceBase) && (BIOME_FIELDS.contains(objectField)
                     || objectField.startsWith("terrain3D.") && TERRAIN_FIELDS.contains(objectField.substring("terrain3D.".length())));
@@ -41,7 +41,7 @@ public final class NoiseStyleFields {
             valid = moduleIndex == -1 ? valid : moduleIndex >= 0 && noise == null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.equals("caveProfile.modules.style");
             if (!valid) throw new IllegalArgumentException("Unsupported style target");
         }
-        public static Target noise(NoiseFields.Target target) { return new Target("generators", "style", java.util.Objects.requireNonNull(target)); }
+        public static Target noise(NoiseFields.Target target) { return new Target(java.util.Objects.requireNonNull(target).resourceBase(), "style", target); }
         public static Target dimension(String field) { return new Target("dimensions", field, null); }
         public static Target biome(String field) { return new Target("biomes", field, null); }
         public static Target terrain(String field) { return new Target("biomes","terrain3D."+field,null); }
