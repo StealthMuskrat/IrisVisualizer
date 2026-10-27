@@ -26,7 +26,15 @@ public final class DimensionFields {
             if (RiverPolicyFields.OBJECT_FIELDS.contains(field)) {
                 try {
                     var policy = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    for (String child : policy.fields()) if (!RiverPolicyFields.EDITABLE.contains(child)) paths.add(field+"."+child);
+                    for (String child : policy.fields()) {
+                        if (RiverPolicyFields.EDITABLE.contains(child)) continue;
+                        if (RiverBiomeLists.EDITABLE.contains(child)) {
+                            if (!"null".equals(policy.token(child))) {
+                                try { policy.stringArrayPath(child); }
+                                catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }
+                            }
+                        } else paths.add(field+"."+child);
+                    }
                 } catch (IllegalArgumentException mismatch) { paths.add(field); }
                 continue;
             }

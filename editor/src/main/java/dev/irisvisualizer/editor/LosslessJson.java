@@ -68,6 +68,12 @@ public final class LosslessJson {
         if (span == null) return next.equals("null") ? sourceBytes() : enable(field, next);
         return splice(span.start(), span.end(), next);
     }
+    /** Explicit inheritance/empty selection states; malformed or mixed arrays remain read-only. */
+    byte[] nullableStringArray(String field, boolean inherit) {
+        String old = token(field);
+        if (old != null && !old.equals("null")) stringEntries(field);
+        return nullableScalar(field, inherit ? "null" : "[]");
+    }
     public byte[] integer(String field, long value) {
         Span span = root.get(field);
         if (span == null) throw new IllegalArgumentException("Absent field must be explicitly enabled first");
