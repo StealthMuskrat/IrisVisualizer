@@ -734,7 +734,8 @@ public final class EditorApp extends Application {
         for (String field : RiverChannelRanges.UNDERGROUND_FIELDS) {
             if (ImGui.treeNode(field+" range")) { drawChannelRange(underground,RiverChannelRanges.undergroundKey(field)); ImGui.treePop(); }
         }
-        for (String field : underground.fields()) if (!UndergroundRiverFields.ROOT_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+        if (ImGui.treeNode("Underground bed material")) { drawRiverMaterial(rivers,"underground.bedMaterial"); ImGui.treePop(); }
+        for (String field : underground.fields()) if (!UndergroundRiverFields.ROOT_FIELDS.contains(field) && !RiverMaterialFields.UNDERGROUND_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawUndergroundScalars(LosslessJson object,boolean sources) {
         for (String field : UndergroundRiverFields.fields(sources)) {
@@ -784,11 +785,19 @@ public final class EditorApp extends Application {
                     } else {
                         drawSurfaceRiverScalars(object,section);
                         if (section.equals("banks") && ImGui.treeNode("Excavation limits")) { drawSurfaceExcavation(surface); ImGui.treePop(); }
+                        if (section.equals("banks")) for (String material : RiverMaterialFields.BANK_FIELDS) {
+                            if (ImGui.treeNode(material)) { drawRiverMaterial(rivers,"surface.banks."+material); ImGui.treePop(); }
+                        }
+                        if (section.equals("bed")) for (String material : RiverMaterialFields.BED_FIELDS) {
+                            if (ImGui.treeNode(material)) { drawRiverMaterial(rivers,"surface.bed."+material); ImGui.treePop(); }
+                        }
                         if (section.equals("channel")) for (String field : RiverChannelRanges.OBJECT_FIELDS) {
                             if (ImGui.treeNode(field+" range")) { drawChannelRange(object,field); ImGui.treePop(); }
                         }
                         for (String field : object.fields()) if (!SurfaceRiverFields.fields(section).contains(field)
                                 && !(section.equals("banks") && SurfaceRiverFields.EXCAVATION_OBJECT_FIELDS.contains(field))
+                                && !(section.equals("banks") && RiverMaterialFields.BANK_FIELDS.contains(field))
+                                && !(section.equals("bed") && RiverMaterialFields.BED_FIELDS.contains(field))
                                 && !(section.equals("channel") && RiverChannelRanges.OBJECT_FIELDS.contains(field))) ImGui.textWrapped(field+" (read-only)");
                     }
                 }
@@ -797,6 +806,114 @@ public final class EditorApp extends Application {
         }
         if (ImGui.treeNode("Endpoint ponds")) { drawSurfacePonds(surface); ImGui.treePop(); }
         for (String field : surface.fields()) if (!SurfaceRiverFields.ROOT_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawRiverMaterial(LosslessJson rivers,String target) {
+        ImGui.pushID(target);
+        try {
+            boolean padding=target.equals(RiverMaterialFields.PADDING);
+            LosslessJson object;
+            try { object=RiverMaterialFields.object(rivers,target); }
+            catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored material/palette is a snippet or unsupported value (read-only)."); return; }
+            if (object==null) {
+                ImGui.textWrapped("Absent Iris defaults: "+RiverMaterialFields.creationDefaults(target));
+                if (ImGui.button(padding ? "Create padding palette" : "Create material settings")) {
+                    try {
+                        if (padding) commitMaterialList(target,RiverMaterialFields.createPalette(selected,workspace.read(selected),target),null);
+                        else workspace.replace(selected,RiverMaterialFields.createMaterial(selected,workspace.read(selected),target));
+                        error=null;
+                    } catch (Exception failure) { error=failure.getMessage(); }
+                }
+                return;
+            }
+            if (!padding) {
+                String token=object.token("enabled"),effective=token==null ? RiverMaterialFields.defaultToken("enabled") : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored enabled value is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Paint material (Iris default)" : "Paint material",effective.equals("true")))
+                    applyRoutingExtra(() -> workspace.replace(selected,RiverMaterialFields.setEnabled(selected,workspace.read(selected),target,!effective.equals("true"))));
+                drawRiverMaterialNumber(object,target,-1,"depth");
+                for (String field : object.fields()) if (!RiverMaterialFields.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            }
+            LosslessJson palette;
+            try { palette=RiverMaterialFields.palette(object,target); }
+            catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored palette is a snippet or unsupported value (read-only)."); return; }
+            ImGui.textWrapped("Weighted blocks: at least one entry; weights 1-64. Palette noise and advanced block data are read-only. Runtime block registry, state and solidity validation is pending.");
+            if (palette==null) {
+                ImGui.textWrapped("The absent palette uses STONE. Creation writes an explicit block list.");
+                if (ImGui.button("Create material palette (STONE)")) {
+                    try { commitMaterialList(target,RiverMaterialFields.createPalette(selected,workspace.read(selected),target),null); }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+                return;
+            }
+            for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) ImGui.textWrapped("palette."+field+" (read-only)");
+            List<LosslessJson> entries;
+            try { entries=RiverMaterialFields.entries(palette); }
+            catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Block list contains snippets or unsupported entries (read-only)."); return; }
+            if (entries==null) {
+                ImGui.textWrapped("Missing entries use the palette class default STONE; the native pack validator requires an explicit list.");
+                if (ImGui.button("Enable block list (STONE)")) {
+                    try { commitMaterialList(target,RiverMaterialFields.enableEntries(selected,workspace.read(selected),target),null); }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+                return;
+            }
+            String newKey=RiverMaterialFields.listDraftPrefix(target)+"new.block";
+            ImString newBlock=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));
+            ImGui.inputText("New Minecraft block",newBlock); drafts.update(newKey,"",newBlock.get());
+            if (ImGui.button("Add block")) { changeMaterialEntry(target,RiverMaterialFields.Action.ADD,-1,newBlock.get(),newKey); return; }
+            if (entries.isEmpty()) ImGui.textWrapped("This palette is empty. Add a block to repair the required list.");
+            for (int index=0;index<entries.size();index++) {
+                if (!ImGui.treeNode("Block "+index)) continue;
+                RiverMaterialFields.Action action=null;
+                if (ImGui.button("Duplicate")) action=RiverMaterialFields.Action.DUPLICATE;
+                ImGui.sameLine(); ImGui.beginDisabled(entries.size()<=1);
+                if (ImGui.button("Remove")) action=RiverMaterialFields.Action.REMOVE;
+                ImGui.endDisabled(); ImGui.beginDisabled(index==0);
+                if (ImGui.button("Move up")) action=RiverMaterialFields.Action.UP;
+                ImGui.endDisabled(); ImGui.sameLine(); ImGui.beginDisabled(index==entries.size()-1);
+                if (ImGui.button("Move down")) action=RiverMaterialFields.Action.DOWN;
+                ImGui.endDisabled();
+                if (action!=null) { ImGui.treePop(); changeMaterialEntry(target,action,index,null,null); return; }
+                var entry=entries.get(index); int selectedIndex=index;
+                try {
+                    String block=entry.token("block")==null ? "" : entry.stringToken("block");
+                    String key=RiverMaterialFields.listDraftPrefix(target)+index+".block";
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(block,Math.max(4096,block.getBytes(StandardCharsets.UTF_8).length+1)));
+                    ImGui.inputText(entry.token("block")==null ? "Required block (missing)" : "Block",input); drafts.update(key,block,input.get());
+                    if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,RiverMaterialFields.setBlock(selected,workspace.read(selected),target,selectedIndex,input.get())));
+                } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored block name is not a string (read-only)."); }
+                drawRiverMaterialNumber(entry,target,index,"weight");
+                for (String field : entry.fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                ImGui.treePop();
+            }
+        } finally { ImGui.popID(); }
+    }
+    private void drawRiverMaterialNumber(LosslessJson object,String target,int index,String field) {
+        String token=object.token(field),key=(index<0 ? RiverMaterialFields.draftPrefix(target) : RiverMaterialFields.listDraftPrefix(target)+index+".")+field;
+        ImGui.pushID(key);
+        try {
+            if (token==null) {
+                if (ImGui.button("Enable "+field+" ("+RiverMaterialFields.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,index<0 ? RiverMaterialFields.enableDepth(selected,workspace.read(selected),target) : RiverMaterialFields.enableWeight(selected,workspace.read(selected),target,index)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped(field+" has an unsupported type (read-only).");
+            else {
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText(field+(index<0 ? " (1-8)" : " (1-64)"),input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,index<0 ? RiverMaterialFields.setDepth(selected,workspace.read(selected),target,input.get()) : RiverMaterialFields.setWeight(selected,workspace.read(selected),target,index,input.get())));
+            }
+        } finally { ImGui.popID(); }
+    }
+    private void changeMaterialEntry(String target,RiverMaterialFields.Action action,int index,String block,String appliedKey) {
+        try { commitMaterialList(target,RiverMaterialFields.change(selected,workspace.read(selected),target,action,index,block),appliedKey); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void commitMaterialList(String target,byte[] next,String appliedKey) throws java.io.IOException {
+        String prefix=RiverMaterialFields.listDraftPrefix(target);
+        if (drafts.transitionUnder(prefix,() -> {
+            boolean other=values.keySet().stream().anyMatch(key -> key.startsWith(prefix) && !key.equals(appliedKey) && drafts.contains(key));
+            return !other || JOptionPane.showConfirmDialog(null,"This changes palette list positions and discards other unapplied text in this palette. Continue?","Unapplied text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION;
+        },() -> workspace.replace(selected,next))) {
+            values.keySet().removeIf(key -> key.startsWith(prefix)); error=null;
+        }
     }
     private void drawChannelRange(LosslessJson channel,String field) {
         ImGui.textWrapped(RiverChannelRanges.description(field));
@@ -1913,7 +2030,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

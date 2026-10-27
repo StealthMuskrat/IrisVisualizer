@@ -1373,6 +1373,14 @@
     "excavation": {
       "classification": "generation",
       "reason": "Explicit nested empty excavation creation with bounded dry-bank limits; bank and surface parents must already exist."
+    },
+    "shoreMaterial": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    },
+    "bankMaterial": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
     }
   },
   "surfaceRiverFlow": {
@@ -1477,6 +1485,14 @@
     "padding": {
       "classification": "generation",
       "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "material": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    },
+    "paddingPalette": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
     }
   },
   "riverExcavation": {
@@ -1569,6 +1585,10 @@
     "wideningSources": {
       "classification": "generation",
       "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "bedMaterial": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
     }
   },
   "undergroundRiverSource": {
@@ -1683,6 +1703,36 @@
     "sweepJitterDegrees": {
       "classification": "generation",
       "reason": "Source-defined primitive defaults/types/bounds checked against pinned pack validation; minimum spacing respects twice the coastal radius, and other settings/unknown data remain preserved."
+    }
+  },
+  "riverMaterial": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    },
+    "palette": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    }
+  },
+  "materialPalette": {
+    "palette": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    }
+  },
+  "blockData": {
+    "block": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    },
+    "weight": {
+      "classification": "generation",
+      "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
     }
   }
 }

@@ -121,7 +121,10 @@ public final class SurfaceRiverFields {
                 try {
                     var object=section(surface,field);
                     for (String member : object.fields()) {
-                        if (field.equals("channel") && RiverChannelRanges.OBJECT_FIELDS.contains(member)) {
+                        String materialTarget="surface."+field+"."+member;
+                        if (RiverMaterialFields.MATERIAL_TARGETS.contains(materialTarget) || RiverMaterialFields.PADDING.equals(materialTarget)) {
+                            paths.addAll(RiverMaterialFields.readOnlyPaths(rivers,materialTarget));
+                        } else if (field.equals("channel") && RiverChannelRanges.OBJECT_FIELDS.contains(member)) {
                             for (String path : RiverChannelRanges.readOnlyPaths(object,member)) paths.add("surface.channel."+path);
                         } else if (field.equals("banks") && EXCAVATION_OBJECT_FIELDS.contains(member)) {
                             try {

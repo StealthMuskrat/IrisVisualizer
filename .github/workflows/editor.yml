@@ -283,6 +283,17 @@ jobs:
           python editor/tools/extract_sea_cave_fields.py IrisCoastalRiverGrottoConfig.java IrisSeaCaveConfig.java PackHydrologyValidator.java IrisHydrologySettingsCompiler.java generated-sea-cave.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-sea-cave.properties).Hash -ne (Get-FileHash editor/src/main/resources/sea-cave-fields.properties).Hash) { throw 'Pinned sea-cave definitions differ' }
+      - name: Verify pinned river material and weighted palette definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverMaterialConfig.java' -OutFile IrisRiverMaterialConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisMaterialPalette.java' -OutFile IrisMaterialPalette.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/block/IrisBlockData.java' -OutFile IrisBlockData.java
+          python editor/tools/test_river_material_fields.py IrisRiverMaterialConfig.java IrisMaterialPalette.java IrisBlockData.java IrisSurfaceRiverBankConfig.java IrisSurfaceRiverBedConfig.java IrisUndergroundRiverConfig.java PackHydrologyValidator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_river_material_fields.py IrisRiverMaterialConfig.java IrisMaterialPalette.java IrisBlockData.java IrisSurfaceRiverBankConfig.java IrisSurfaceRiverBedConfig.java IrisUndergroundRiverConfig.java PackHydrologyValidator.java generated-river-material.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-river-material.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-material-fields.properties).Hash) { throw 'Pinned river material definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

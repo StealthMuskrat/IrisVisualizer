@@ -131,7 +131,7 @@ final class UndergroundRiverTests {
             byte[] wrongStyle=bytes(prefix+"{\"min\":1,\"max\":2,\"style\":null}"+suffix);
             rejects(() -> NoiseStyleFields.enable(PATH,wrongStyle,target,"style"));
             check(range(RiverChannelRanges.editBounds(PATH,wrongStyle,key,"3","4"),field).token("style").equals("null"));
-            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).containsAll(List.of("hydrology.rivers.underground."+field+".future","hydrology.rivers.underground."+field+".style.fracture","hydrology.rivers.underground.bedMaterial")));
+            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).containsAll(List.of("hydrology.rivers.underground."+field+".future","hydrology.rivers.underground."+field+".style.fracture","hydrology.rivers.underground.bedMaterial.future")));
             rejects(() -> NoiseStyleFields.enable(PATH,root,target,"style"));
             rejects(() -> RiverChannelRanges.enable(PATH,parent,key));
             rejects(() -> new NoiseStyleFields.Target("biomes",target.objectField(),null));
@@ -165,7 +165,7 @@ final class UndergroundRiverTests {
         RiverChannelRanges.editBounds(PATH,allRanges,"underground.depth","1","2");
         drafts.applied(RiverChannelRanges.draftPrefix("underground.depth")+"min"); drafts.applied(RiverChannelRanges.draftPrefix("underground.depth")+"max");
         check(drafts.count()==4 && drafts.contains(RiverChannelRanges.draftPrefix("depth")+"min") && drafts.contains(NoiseStyleFields.Target.undergroundRange("depth").draftPrefix()+"zoom"));
-        check(FieldCoverage.fields("undergroundRiver").size()==13 && FieldCoverage.fields("undergroundRiver").stream().filter(FieldCoverage.Field::implemented).count()==12);
+        check(FieldCoverage.fields("undergroundRiver").size()==13 && FieldCoverage.fields("undergroundRiver").stream().filter(FieldCoverage.Field::implemented).count()==13);
         check(FieldCoverage.fields("undergroundRiverSource").size()==3 && FieldCoverage.fields("undergroundRiverSource").stream().allMatch(FieldCoverage.Field::implemented));
         var workspace=PackWorkspace.newPack(Map.of(PATH,allRanges,"dimensions/defaults.json",empty));
         workspace.save(temp.resolve("underground-rivers")); workspace.exportZip(temp.resolve("underground-rivers.zip"));

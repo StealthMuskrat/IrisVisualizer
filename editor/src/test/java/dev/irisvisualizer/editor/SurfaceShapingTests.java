@@ -124,7 +124,7 @@ final class SurfaceShapingTests {
         }
         byte[] palettes=bytes("{\"hydrology\":{\"rivers\":{\"surface\":{\"bed\":{\"padding\":2,\"paddingPalette\":[\"clay\",\"dirt\"],\"material\":{\"future\":true}},\"banks\":{\"excavation\":{\"maximumDepth\":8,\"future\":true},\"shoreMaterial\":\"unresolved\"},\"ponds\":{\"source\":{},\"terminal\":{\"minimumRadius\":4}}}}}}");
         check(text(SurfaceRiverFields.setText(PATH,palettes,"bed","padding","0")).equals(text(palettes).replace("\"padding\":2","\"padding\":0")));
-        check(DimensionFields.readOnlyPaths(new LosslessJson(palettes)).containsAll(List.of("hydrology.rivers.surface.bed.paddingPalette","hydrology.rivers.surface.bed.material","hydrology.rivers.surface.banks.excavation.future","hydrology.rivers.surface.banks.shoreMaterial")));
+        check(DimensionFields.readOnlyPaths(new LosslessJson(palettes)).containsAll(List.of("hydrology.rivers.surface.bed.paddingPalette","hydrology.rivers.surface.bed.material.future","hydrology.rivers.surface.banks.excavation.future","hydrology.rivers.surface.banks.shoreMaterial")));
         rejects(() -> SurfaceRiverFields.enableScalar(PATH,palettes,"bed","paddingPalette"));
         rejects(() -> SurfaceRiverFields.setText(PATH,palettes,"banks.excavation","future","1"));
         var drafts=new InspectorDrafts();
@@ -132,7 +132,7 @@ final class SurfaceShapingTests {
         SurfaceRiverFields.enableScalar(PATH,empty,"erosion","style"); check(drafts.count()==5);
         drafts.applied(SurfaceRiverFields.draftPrefix("erosion")+"smoothingRadius");
         check(drafts.count()==4 && drafts.contains(SurfaceRiverFields.draftPrefix("channel")+"smoothingRadius"));
-        for (var entry : Map.of("surfaceRiverErosion",9,"surfaceRiverBed",2,"riverExcavation",3).entrySet()) check(FieldCoverage.fields(entry.getKey()).stream().filter(FieldCoverage.Field::implemented).count()==entry.getValue());
+        for (var entry : Map.of("surfaceRiverErosion",9,"surfaceRiverBed",4,"riverExcavation",3).entrySet()) check(FieldCoverage.fields(entry.getKey()).stream().filter(FieldCoverage.Field::implemented).count()==entry.getValue());
         var workspace=PackWorkspace.newPack(Map.of(PATH,palettes,"dimensions/defaults.json",empty));
         workspace.save(temp.resolve("surface-shaping")); workspace.exportZip(temp.resolve("surface-shaping.zip"));
         var reopened=PackWorkspace.open(temp.resolve("surface-shaping")); var imported=PackWorkspace.importZip(temp.resolve("surface-shaping.zip"));
