@@ -27,7 +27,7 @@ public final class FloatingObjectRotations {
         public String axisPrefix(String axis) { axis(axis);return prefix()+axis+"."; }
     }
     static boolean editable(String list,String field) { return FloatingObjectPlacements.configured(list) && EDITABLE.contains(field); }
-    private static void authorize(String path) { if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Floating rotation is biome-only"); }
+    private static void authorize(String path,Context context) { FloatingObjectPlacements.authorize(path,context.entry(),context.list()); }
     private static void axis(String value) { if (value==null || !AXES.contains(value)) throw new IllegalArgumentException("Unsupported rotation axis"); }
     private static void axisField(String value) { if (value==null || !AXIS_FIELDS.contains(value)) throw new IllegalArgumentException("Unsupported axis field"); }
     public static String help() { return DATA.getProperty("rotation.description",""); }
@@ -43,28 +43,28 @@ public final class FloatingObjectRotations {
     private static byte[] editRotation(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return editPlacement(original,context,p -> p.objectEdit("rotation",action,false)); }
     private static byte[] editAxis(byte[] original,Context context,String axis,Function<LosslessJson,byte[]> action) { axis(axis);return editRotation(original,context,r -> r.objectEdit(axis,action,false)); }
     public static byte[] create(String path,byte[] original,Context context) {
-        authorize(path);return editPlacement(original,context,p -> { if (p.token("rotation")!=null) throw new IllegalArgumentException("Rotation already exists or has an unsupported type");return p.enableObject("rotation"); });
+        authorize(path,context);return editPlacement(original,context,p -> { if (p.token("rotation")!=null) throw new IllegalArgumentException("Rotation already exists or has an unsupported type");return p.enableObject("rotation"); });
     }
     public static byte[] createAxis(String path,byte[] original,Context context,String axis) {
-        authorize(path);axis(axis);return editRotation(original,context,r -> { if (r.token(axis)!=null) throw new IllegalArgumentException("Axis already exists or has an unsupported type");return r.objectEdit(axis,ignored -> creationToken(axis).getBytes(StandardCharsets.UTF_8),true); });
+        authorize(path,context);axis(axis);return editRotation(original,context,r -> { if (r.token(axis)!=null) throw new IllegalArgumentException("Axis already exists or has an unsupported type");return r.objectEdit(axis,ignored -> creationToken(axis).getBytes(StandardCharsets.UTF_8),true); });
     }
-    public static byte[] enableRotationFlag(String path,byte[] original,Context context) { authorize(path);return editRotation(original,context,r -> r.enable("enabled",rotationDefault())); }
-    public static byte[] setRotationFlag(String path,byte[] original,Context context,boolean enabled) { authorize(path);return editRotation(original,context,r -> r.bool("enabled",enabled)); }
+    public static byte[] enableRotationFlag(String path,byte[] original,Context context) { authorize(path,context);return editRotation(original,context,r -> r.enable("enabled",rotationDefault())); }
+    public static byte[] setRotationFlag(String path,byte[] original,Context context,boolean enabled) { authorize(path,context);return editRotation(original,context,r -> r.bool("enabled",enabled)); }
     public static byte[] enableAxisField(String path,byte[] original,Context context,String axis,String member) {
-        authorize(path);axis(axis);if (!List.of("enabled","interval").contains(member)) throw new IllegalArgumentException("Use paired angle bounds");return editAxis(original,context,axis,a -> a.enable(member,axisDefault(member)));
+        authorize(path,context);axis(axis);if (!List.of("enabled","interval").contains(member)) throw new IllegalArgumentException("Use paired angle bounds");return editAxis(original,context,axis,a -> a.enable(member,axisDefault(member)));
     }
-    public static byte[] setAxisFlag(String path,byte[] original,Context context,String axis,boolean enabled) { authorize(path);return editAxis(original,context,axis,a -> a.bool("enabled",enabled)); }
+    public static byte[] setAxisFlag(String path,byte[] original,Context context,String axis,boolean enabled) { authorize(path,context);return editAxis(original,context,axis,a -> a.bool("enabled",enabled)); }
     private static double angle(String field,String input) {
         double value;try { value=Double.parseDouble(input); } catch (NumberFormatException | NullPointerException invalid) { throw new IllegalArgumentException("Enter finite rotation degrees",invalid); }
         if (!Double.isFinite(value) || value<Double.parseDouble(DATA.getProperty("axis."+field+".minimum")) || value>Double.parseDouble(DATA.getProperty("axis."+field+".maximum"))) throw new IllegalArgumentException("Rotation violates pinned angle bounds");return value;
     }
     private static byte[] number(LosslessJson object,String member,double value) { return object.token(member)==null ? object.enable(member,BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()) : object.number(member,value); }
     public static byte[] setAngles(String path,byte[] original,Context context,String axis,String minimum,String maximum) {
-        authorize(path);axis(axis);double min=angle("min",minimum),max=angle("max",maximum);
+        authorize(path,context);axis(axis);double min=angle("min",minimum),max=angle("max",maximum);
         if (min>max) throw new IllegalArgumentException("Use ordered angle bounds; 0/0 means unlimited rotation and equal nonzero bounds lock the angle");
         return editAxis(original,context,axis,a -> number(new LosslessJson(number(a,"min",min)),"max",max));
     }
-    public static byte[] setInterval(String path,byte[] original,Context context,String axis,String input) { authorize(path);axis(axis);double value=angle("interval",input);return editAxis(original,context,axis,a -> a.number("interval",value)); }
+    public static byte[] setInterval(String path,byte[] original,Context context,String axis,String input) { authorize(path,context);axis(axis);double value=angle("interval",input);return editAxis(original,context,axis,a -> a.number("interval",value)); }
     static List<String> readOnlyPaths(LosslessJson placement) {
         var paths=new ArrayList<String>();LosslessJson rotation;
         try { rotation=object(placement); } catch (IllegalArgumentException unsupported) { return List.of("rotation"); }

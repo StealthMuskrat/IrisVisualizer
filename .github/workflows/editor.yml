@@ -510,6 +510,14 @@ jobs:
           python editor/tools/extract_biome_object_fields.py IrisBiome.java IrisObjectPlacement.java MantleObjectComponent.java IrisCaveAnchorMode.java IrisObjectPlacementRunner.java generated-biome-object-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-biome-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-object-fields.properties).Hash) { throw 'Pinned biome object definitions differ' }
+      - name: Verify pinned region object dispatch and cave context
+        shell: pwsh
+        run: |
+          python editor/tools/test_region_object_fields.py IrisRegion.java IrisBiome.java IrisObjectPlacement.java MantleObjectComponent.java IrisCaveAnchorMode.java IrisObjectPlacementRunner.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_region_object_fields.py IrisRegion.java IrisBiome.java IrisObjectPlacement.java MantleObjectComponent.java IrisCaveAnchorMode.java IrisObjectPlacementRunner.java generated-region-object-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-region-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/region-object-fields.properties).Hash) { throw 'Pinned region object definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

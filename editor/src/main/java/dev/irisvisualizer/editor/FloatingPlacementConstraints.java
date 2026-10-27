@@ -30,7 +30,7 @@ public final class FloatingPlacementConstraints {
     }
     private static void field(String value) { if (value==null || !EDITABLE.contains(value)) throw new IllegalArgumentException("Unsupported placement constraint"); }
     static boolean editable(String list,String field) { return EDITABLE.contains(field) && (field.equals("warp") || FloatingObjectPlacements.configured(list)); }
-    private static void authorize(String path,Context context,String field) { field(field);if (!BiomeFields.biome(path) || !editable(context.list(),field)) throw new IllegalArgumentException("Placement guards stay read-only in anchored collections"); }
+    private static void authorize(String path,Context context,String field) { FloatingObjectPlacements.authorize(path,context.entry(),context.list()); field(field);if (!editable(context.list(),field)) throw new IllegalArgumentException("Placement guards stay read-only in anchored collections"); }
     private static void objectField(String value) { if (value==null || !OBJECT_FIELDS.contains(value)) throw new IllegalArgumentException("Unsupported placement bound object"); }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description",""); }
     public static String defaultToken(String field) { field(field);return DATA.getProperty(field+".default"); }
@@ -69,8 +69,9 @@ public final class FloatingPlacementConstraints {
     }
     public static byte[] enableMultiplier(String path,byte[] original,Context context) { authorize(path,context,"warp");return editPlacement(original,context,p -> p.objectEdit("warp",w -> w.enable("multiplier",multiplierDefault()),false)); }
     public static byte[] setMultiplier(String path,byte[] original,Context context,String input) { authorize(path,context,"warp");double value=number(input,"warp.multiplier",false);return editPlacement(original,context,p -> p.objectEdit("warp",w -> w.number("multiplier",value),false)); }
-    static Context warpContext(String path) {
-        var parsed=FloatingObjectPlacements.parsePath(path);
+    static Context warpContext(String path) { return warpContext("biomes",path); }
+    static Context warpContext(String resourceBase,String path) {
+        var parsed=FloatingObjectPlacements.parsePath(resourceBase,path);
         return parsed!=null && parsed.suffix().equals("warp") ? new Context(parsed.entry(),parsed.list(),parsed.placement()) : null;
     }
     static List<String> readOnlyPaths(LosslessJson placement,Context context) {

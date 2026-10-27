@@ -24,7 +24,7 @@ public final class FloatingPlacementEffects {
     }
     private static void field(String value,List<String> fields) { if (value==null || !fields.contains(value)) throw new IllegalArgumentException("Unsupported placement effect"); }
     static boolean editable(String list,String field) { return field!=null && EDITABLE.contains(field) && (ALL_CONTEXT_FIELDS.contains(field) || FloatingObjectPlacements.configured(list)); }
-    private static void authorize(String path,Context context,String field) { field(field,EDITABLE);if (!BiomeFields.biome(path) || !editable(context.list(),field)) throw new IllegalArgumentException("This placement effect stays read-only in anchored collections"); }
+    private static void authorize(String path,Context context,String field) { FloatingObjectPlacements.authorize(path,context.entry(),context.list()); field(field,EDITABLE);if (!editable(context.list(),field)) throw new IllegalArgumentException("This placement effect stays read-only in anchored collections"); }
     public static String help(String field) { field(field,EDITABLE);return DATA.getProperty(field+".description",""); }
     public static String contextHelp(String field) { field(field,EDITABLE);return DATA.getProperty(field+".contextHelp",""); }
     public static String contextHelp(String list,String field) {

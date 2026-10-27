@@ -16,7 +16,7 @@ public final class FloatingObjectPalettes {
         public String stylePath() { return FloatingObjectPlacements.contextPath(entry,list,placement)+(stilt() ? ".stiltSettings.palette.style" : ".edit."+rule+".replace.style"); }
         public GeneralBlockPalettes.Target target() { return GeneralBlockPalettes.Target.objectPalette(this); }
     }
-    private static void authorize(String path) { if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Object palettes are biome-only"); }
+    private static void authorize(String path,Context context) { FloatingObjectPlacements.authorize(path,context.entry(),context.list()); }
     private static String member(Context context) { return context.stilt() ? "palette" : "replace"; }
     private static byte[] editOwner(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return context.stilt() ? FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.objectEdit("stiltSettings",action,false)) : FloatingObjectReplacements.editRule(original,context.owner(),context.rule(),action); }
     static byte[] editPalette(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return editOwner(original,context,o -> o.objectEdit(member(context),action,false)); }
@@ -26,17 +26,18 @@ public final class FloatingObjectPalettes {
         else { var rules=placement.objectArray("edit");if (context.rule()>=rules.size()) throw new IllegalArgumentException("Select a replacement rule");owner=rules.get(context.rule()); }
         String token=owner.token(member(context));return token==null || context.stilt() && token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8));
     }
-    public static byte[] create(String path,byte[] original,Context context) { authorize(path);return editOwner(original,context,o -> { String token=o.token(member(context));if (token!=null && !(context.stilt() && token.equals("null"))) throw new IllegalArgumentException("Palette already exists or has an unsupported type");return o.enableObject(member(context)); }); }
-    public static byte[] restoreStilt(String path,byte[] original,Context context) { authorize(path);if (!context.stilt()) throw new IllegalArgumentException("Required replacement palettes cannot be null");return editOwner(original,context,o -> o.nullObject("palette")); }
-    public static byte[] enableEntries(String path,byte[] original,Context context) { authorize(path);return editPalette(original,context,p -> GeneralBlockPalettes.seed(p,DimensionPalettes.classBlock())); }
-    public static byte[] setBlock(String path,byte[] original,Context context,int index,String value) { authorize(path);return editPalette(original,context,p -> GeneralBlockPalettes.setBlock(p,index,value)); }
-    public static byte[] enableWeight(String path,byte[] original,Context context,int index) { authorize(path);return editPalette(original,context,p -> GeneralBlockPalettes.enableWeight(p,index)); }
-    public static byte[] setWeight(String path,byte[] original,Context context,int index,String input) { authorize(path);return editPalette(original,context,p -> GeneralBlockPalettes.setWeight(p,index,input)); }
-    public static byte[] change(String path,byte[] original,Context context,RiverProfiles.Action action,int index,String value) { authorize(path);return editPalette(original,context,p -> GeneralBlockPalettes.change(p,action,index,value)); }
-    public static byte[] enableZoom(String path,byte[] original,Context context) { authorize(path);return editPalette(original,context,p -> p.enable("zoom",RiverPaletteFields.zoomDefault())); }
-    public static byte[] setZoom(String path,byte[] original,Context context,String input) { authorize(path);double value=RiverPaletteFields.checkedZoom(input);return editPalette(original,context,p -> p.number("zoom",value)); }
-    static Context styleContext(String path) {
-        var parsed=FloatingObjectPlacements.parsePath(path);if (parsed==null) return null;
+    public static byte[] create(String path,byte[] original,Context context) { authorize(path,context);return editOwner(original,context,o -> { String token=o.token(member(context));if (token!=null && !(context.stilt() && token.equals("null"))) throw new IllegalArgumentException("Palette already exists or has an unsupported type");return o.enableObject(member(context)); }); }
+    public static byte[] restoreStilt(String path,byte[] original,Context context) { authorize(path,context);if (!context.stilt()) throw new IllegalArgumentException("Required replacement palettes cannot be null");return editOwner(original,context,o -> o.nullObject("palette")); }
+    public static byte[] enableEntries(String path,byte[] original,Context context) { authorize(path,context);return editPalette(original,context,p -> GeneralBlockPalettes.seed(p,DimensionPalettes.classBlock())); }
+    public static byte[] setBlock(String path,byte[] original,Context context,int index,String value) { authorize(path,context);return editPalette(original,context,p -> GeneralBlockPalettes.setBlock(p,index,value)); }
+    public static byte[] enableWeight(String path,byte[] original,Context context,int index) { authorize(path,context);return editPalette(original,context,p -> GeneralBlockPalettes.enableWeight(p,index)); }
+    public static byte[] setWeight(String path,byte[] original,Context context,int index,String input) { authorize(path,context);return editPalette(original,context,p -> GeneralBlockPalettes.setWeight(p,index,input)); }
+    public static byte[] change(String path,byte[] original,Context context,RiverProfiles.Action action,int index,String value) { authorize(path,context);return editPalette(original,context,p -> GeneralBlockPalettes.change(p,action,index,value)); }
+    public static byte[] enableZoom(String path,byte[] original,Context context) { authorize(path,context);return editPalette(original,context,p -> p.enable("zoom",RiverPaletteFields.zoomDefault())); }
+    public static byte[] setZoom(String path,byte[] original,Context context,String input) { authorize(path,context);double value=RiverPaletteFields.checkedZoom(input);return editPalette(original,context,p -> p.number("zoom",value)); }
+    static Context styleContext(String path) { return styleContext("biomes",path); }
+    static Context styleContext(String resourceBase,String path) {
+        var parsed=FloatingObjectPlacements.parsePath(resourceBase,path);if (parsed==null) return null;
         if (parsed.suffix().equals("stiltSettings.palette.style")) return new Context(parsed.entry(),parsed.list(),parsed.placement(),-1);
         var match=java.util.regex.Pattern.compile("edit\\.(0|[1-9][0-9]*)\\.replace\\.style").matcher(parsed.suffix());
         if (!match.matches()) return null;

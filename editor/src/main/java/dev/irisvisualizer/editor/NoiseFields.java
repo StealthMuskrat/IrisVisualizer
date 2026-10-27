@@ -27,7 +27,7 @@ public final class NoiseFields {
         }
         public static Target heightmap(FloatingPlacementOverrides.Context context) { return new Target("heightmap",-1,java.util.Objects.requireNonNull(context)); }
         public boolean heightmap() { return heightmapContext!=null; }
-        public String resourceBase() { return heightmap() ? "biomes" : "generators"; }
+        public String resourceBase() { return heightmap() ? FloatingObjectPlacements.resourceBase(heightmapContext.entry()) : "generators"; }
         public static Target composite(int index) { return new Target("composite", index); }
         public static Target cliffHeight() { return new Target("cliffHeightGenerator", -1); }
         public String draftPrefix() { return heightmap() ? heightmapContext.heightmapPrefix() : index < 0 ? objectField + "#" : objectField + "#" + index + "."; }

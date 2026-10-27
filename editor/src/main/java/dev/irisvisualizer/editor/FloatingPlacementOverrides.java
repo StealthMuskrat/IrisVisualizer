@@ -22,13 +22,13 @@ public final class FloatingPlacementOverrides {
         public String heightmapPrefix() { return FloatingObjectPlacements.placementPrefix(entry,list,placement)+"heightmap."; }
         public NoiseFields.Target noiseTarget() { return NoiseFields.Target.heightmap(this); }
     }
-    private static void authorize(String path) { if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Floating overrides are biome-only"); }
-    private static void forceContext(String path,Context context) { authorize(path);if (!FloatingObjectPlacements.configured(context.list())) throw new IllegalArgumentException("Anchored force placement stays read-only"); }
+    private static void authorize(String path,Context context) { FloatingObjectPlacements.authorize(path,context.entry(),context.list()); }
+    private static void forceContext(String path,Context context) { authorize(path,context);if (!FloatingObjectPlacements.configured(context.list())) throw new IllegalArgumentException("Anchored force placement stays read-only"); }
     public static String heightmapHelp() { return DATA.getProperty("heightmap.description",""); }
     static LosslessJson heightmap(LosslessJson placement) { String token=placement.token("heightmap");return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     static byte[] editHeightmap(byte[] original,Context context,java.util.function.Function<LosslessJson,byte[]> operation) { return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.objectEdit("heightmap",operation,false)); }
-    public static byte[] enableHeightmap(String path,byte[] original,Context context) { authorize(path);return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.enableObject("heightmap")); }
-    public static byte[] restoreHeightmap(String path,byte[] original,Context context) { authorize(path);return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.nullObject("heightmap")); }
+    public static byte[] enableHeightmap(String path,byte[] original,Context context) { authorize(path,context);return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.enableObject("heightmap")); }
+    public static byte[] restoreHeightmap(String path,byte[] original,Context context) { authorize(path,context);return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.nullObject("heightmap")); }
     static String forceKey(LosslessJson placement) {
         boolean canonical=placement.token(FORCE_KEYS.getFirst())!=null,alias=placement.token(FORCE_KEYS.getLast())!=null;
         if (canonical && alias) throw new IllegalArgumentException("Both native force keys are present; toggle is read-only");

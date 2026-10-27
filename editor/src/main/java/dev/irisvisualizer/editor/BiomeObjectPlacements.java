@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 
-/** Root biome objects use the same native placement type, with their own dispatch and cave anchors. */
+/** Root biome/region objects share native anchor and alignment controls. */
 public final class BiomeObjectPlacements {
     public static final List<String> LIST_FIELDS = List.of("objects");
     public static final List<String> EDITABLE = List.of("caveAnchorMode", "bottom");
@@ -20,16 +20,23 @@ public final class BiomeObjectPlacements {
     public static List<String> anchors() { return List.of(DATA.getProperty("caveAnchorMode.choices").split(",")); }
     public static String anchorHelp(String choice) { if (!anchors().contains(choice)) throw new IllegalArgumentException("Select a native cave anchor");return DATA.getProperty("caveAnchorMode."+choice+".description",""); }
     public static String bottomHelp() { return "Bottom alignment affects native placement at an explicit non-negative Y, except raw structure pieces and floor-aligned calls. Surface placements pass Y=-1, so this flag does not change their alignment. It differs from fromBottom and is not compatible with X/Z rotation."; }
-    public static byte[] setAnchor(String path,byte[] original,int placement,String choice) {
-        if (!BiomeFields.biome(path) || choice==null || !anchors().contains(choice)) throw new IllegalArgumentException("Select a native biome cave anchor");
-        return FloatingObjectPlacements.editPlacement(original,-1,"objects",placement,p -> p.token("caveAnchorMode")==null ? p.enableStringPath("caveAnchorMode",choice) : p.stringValue("caveAnchorMode",choice));
+    private static void authorize(String path,int owner) {
+        if (!FloatingObjectPlacements.root(owner)) throw new IllegalArgumentException("Select a root object collection");
+        FloatingObjectPlacements.authorize(path,owner,"objects");
     }
-    public static byte[] enableBottom(String path,byte[] original,int placement) {
-        if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Biome object placements are biome-only");
-        return FloatingObjectPlacements.editPlacement(original,-1,"objects",placement,p -> p.enable("bottom",DATA.getProperty("bottom.default")));
+    public static byte[] setAnchor(String path,byte[] original,int placement,String choice) { return setAnchor(path,original,FloatingObjectPlacements.BIOME_ROOT,placement,choice); }
+    public static byte[] setAnchor(String path,byte[] original,int owner,int placement,String choice) {
+        authorize(path,owner);if (choice==null || !anchors().contains(choice)) throw new IllegalArgumentException("Select a native cave anchor");
+        return FloatingObjectPlacements.editPlacement(original,owner,"objects",placement,p -> p.token("caveAnchorMode")==null ? p.enableStringPath("caveAnchorMode",choice) : p.stringValue("caveAnchorMode",choice));
     }
-    public static byte[] setBottom(String path,byte[] original,int placement,boolean value) {
-        if (!BiomeFields.biome(path)) throw new IllegalArgumentException("Biome object placements are biome-only");
-        return FloatingObjectPlacements.editPlacement(original,-1,"objects",placement,p -> p.bool("bottom",value));
+    public static byte[] enableBottom(String path,byte[] original,int placement) { return enableBottom(path,original,FloatingObjectPlacements.BIOME_ROOT,placement); }
+    public static byte[] enableBottom(String path,byte[] original,int owner,int placement) {
+        authorize(path,owner);
+        return FloatingObjectPlacements.editPlacement(original,owner,"objects",placement,p -> p.enable("bottom",DATA.getProperty("bottom.default")));
+    }
+    public static byte[] setBottom(String path,byte[] original,int placement,boolean value) { return setBottom(path,original,FloatingObjectPlacements.BIOME_ROOT,placement,value); }
+    public static byte[] setBottom(String path,byte[] original,int owner,int placement,boolean value) {
+        authorize(path,owner);
+        return FloatingObjectPlacements.editPlacement(original,owner,"objects",placement,p -> p.bool("bottom",value));
     }
 }

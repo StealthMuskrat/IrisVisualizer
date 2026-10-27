@@ -11,7 +11,7 @@ Direct nonstatic/nontransient private fields in sixty-one pinned source classes 
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
-| region | 27 | 21 | 15 | 6 |
+| region | 27 | 22 | 16 | 5 |
 | noise | 15 | 14 | 14 | 1 |
 | noiseStyle | 10 | 6 | 6 | 4 |
 | terrain3D | 14 | 14 | 14 | 0 |
@@ -96,7 +96,7 @@ Unclassified: none.
 
 ## region
 
-Unclassified: `depositVariants`, `deposits`, `objects`, `ores`, `proceduralObjects`, `structures`.
+Unclassified: `depositVariants`, `deposits`, `ores`, `proceduralObjects`, `structures`.
 
 ## noise
 
