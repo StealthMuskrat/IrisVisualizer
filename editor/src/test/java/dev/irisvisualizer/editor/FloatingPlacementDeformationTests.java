@@ -72,7 +72,7 @@ final class FloatingPlacementDeformationTests {
             byte[] original=document(list,"{\"mode\":\"UNKNOWN\",\"stiltSettings\":{\"yMax\":0,\"organicJitter\":3e0,\"exclude\":[\"stone\"],\"palette\":\"snippet/palette\",\"futureStilt\":9007199254740993},\"vacuumSettings\":{\"falloff\":2e0,\"futureVacuum\":\"雪\\u0061\"},\"futurePlacement\":true}");byte[] copy=original.clone();
             check(text(FloatingPlacementDeformation.setScalar(PATH,original,context,"stiltSettings","organicJitter","4")).equals(text(original).replace("\"organicJitter\":3e0","\"organicJitter\":4")));
             check(text(FloatingPlacementDeformation.setScalar(PATH,original,context,"vacuumSettings","falloff","4")).equals(text(original).replace("\"falloff\":2e0","\"falloff\":4")));
-            var paths=FloatingPlacementDeformation.readOnlyPaths(placement(original,list),context);check(paths.containsAll(List.of("stiltSettings.palette","stiltSettings.futureStilt","vacuumSettings.futureVacuum")) && paths.contains("stiltSettings.yMax")!=list.equals("floatingObjects"));
+            var paths=FloatingPlacementDeformation.readOnlyPaths(placement(original,list),context);check(paths.containsAll(List.of("stiltSettings.futureStilt","vacuumSettings.futureVacuum")) && paths.contains("stiltSettings.yMax")!=list.equals("floatingObjects"));
             var drafts=new InspectorDrafts();String scalar=context.prefix("stiltSettings")+"organicJitter",exclusion=context.exclusionPrefix()+"0.value",newMaterial=context.exclusionPrefix()+"new",vacuum=context.prefix("vacuumSettings")+"falloff",other=new FloatingPlacementDeformation.Context(1,list,0).prefix("stiltSettings")+"organicJitter";
             for (String key : List.of(scalar,exclusion,newMaterial,vacuum,other)) drafts.update(key,"1","2");
             check(!drafts.transitionUnder(context.exclusionPrefix(),() -> false,() -> { throw new AssertionError(); }) && drafts.count()==5);
@@ -86,7 +86,7 @@ final class FloatingPlacementDeformationTests {
             for (String path : saved.paths()) check(Arrays.equals(saved.read(path),reopened.read(path)) && Arrays.equals(saved.read(path),imported.read(path)));
             check(settings(saved.read(PATH),list,"stiltSettings").stringToken("palette").equals("snippet/palette") && placement(saved.read(PATH),list).stringToken("mode").equals("UNKNOWN"));
         }
-        check(FieldCoverage.fields("stiltSettings").size()==8 && FieldCoverage.fields("stiltSettings").stream().filter(FieldCoverage.Field::implemented).count()==7);
+        check(FieldCoverage.fields("stiltSettings").size()==8 && FieldCoverage.fields("stiltSettings").stream().filter(FieldCoverage.Field::implemented).count()==8);
         check(FieldCoverage.fields("vacuumSettings").size()==5 && FieldCoverage.fields("vacuumSettings").stream().allMatch(FieldCoverage.Field::implemented));
         System.out.println("PASS: optional stilt/vacuum defaults, all eleven scalar bounds/types, anchored classic guards, raw material exclusion operations/null lifecycle, mode/palette preservation, scoped drafts and Save/ZIP contracts");
     }

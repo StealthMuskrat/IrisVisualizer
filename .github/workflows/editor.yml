@@ -482,6 +482,15 @@ jobs:
           python editor/tools/extract_floating_placement_deformation.py IrisObjectPlacement.java IrisStiltSettings.java IrisVacuumSettings.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisObjectVacuum.java IrisObjectShaping.java generated-floating-placement-deformation.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-placement-deformation.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-deformation.properties).Hash) { throw 'Pinned stilt and vacuum definitions differ' }
+      - name: Verify pinned floating object material definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectReplace.java' -OutFile IrisObjectReplace.java
+          python editor/tools/test_floating_object_materials.py IrisObjectPlacement.java IrisStiltSettings.java IrisObjectReplace.java IrisMaterialPalette.java IrisBlockData.java IrisObjectPlacementRunner.java IrisObjectShaping.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_object_materials.py IrisObjectPlacement.java IrisStiltSettings.java IrisObjectReplace.java IrisMaterialPalette.java IrisBlockData.java IrisObjectPlacementRunner.java IrisObjectShaping.java generated-floating-object-materials.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-object-materials.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-object-materials.properties).Hash) { throw 'Pinned object material definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

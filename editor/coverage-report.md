@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in sixty pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in sixty-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -56,14 +56,15 @@ Direct nonstatic/nontransient private fields in sixty pinned source classes only
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
 | floatingBiome | 42 | 42 | 41 | 0 |
-| objectPlacement | 41 | 30 | 30 | 11 |
+| objectPlacement | 41 | 31 | 31 | 10 |
 | objectTranslate | 4 | 4 | 4 | 0 |
 | objectScale | 5 | 5 | 5 | 0 |
 | objectRotation | 4 | 4 | 4 | 0 |
 | axisRotation | 4 | 4 | 4 | 0 |
 | objectLimit | 2 | 2 | 2 | 0 |
-| stiltSettings | 8 | 7 | 7 | 1 |
+| stiltSettings | 8 | 8 | 8 | 0 |
 | vacuumSettings | 5 | 5 | 5 | 0 |
+| objectReplace | 4 | 4 | 4 | 0 |
 
 ## dimension
 
@@ -275,7 +276,7 @@ Unclassified: none.
 
 ## objectPlacement
 
-Unclassified: `bottom`, `caveAnchorMode`, `edit`, `forcePlace`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `overrideGlobalLoot`, `trees`, `vanillaLoot`.
+Unclassified: `bottom`, `caveAnchorMode`, `forcePlace`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `overrideGlobalLoot`, `trees`, `vanillaLoot`.
 
 ## objectTranslate
 
@@ -299,8 +300,12 @@ Unclassified: none.
 
 ## stiltSettings
 
-Unclassified: `palette`.
+Unclassified: none.
 
 ## vacuumSettings
+
+Unclassified: none.
+
+## objectReplace
 
 Unclassified: none.
