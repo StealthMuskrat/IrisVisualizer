@@ -420,7 +420,7 @@ public final class EditorApp extends Application {
         ImGui.textWrapped(target.strictBounds() ? "This density style requires positive cellular zoom even when cellular frequency is zero."
                 : "Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
-            ImGui.textWrapped("Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
+            ImGui.textWrapped(target.optionalFloating() ? "Absent or null disables this style. Explicit enablement uses the generator-style class defaults ("+NoiseStyleFields.contextDefaultLabel(target)+")." : "Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
             if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefaultLabel(target) + ")")) enableStyle(target, "style");
             return;
         }
@@ -525,7 +525,7 @@ public final class EditorApp extends Application {
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
         ImGui.textWrapped(FloatingBiomes.description());
-        ImGui.textWrapped("This editor authors applied settings without sampling islands. Nested noise styles, custom underside palettes and object-placement lists remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
+        ImGui.textWrapped("This editor authors applied settings without sampling islands. Custom underside palettes and object-placement lists remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
         List<LosslessJson> entries;
         try { entries=FloatingBiomes.entries(document); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored floating list contains snippets or unsupported entries (read-only).");return; }
@@ -559,9 +559,35 @@ public final class EditorApp extends Application {
             }
             for (String field : FloatingBiomes.ENUMS) drawFloatingMode(entry,index,field);
             drawFloatingLiteral(entry,index,"carving");drawFloatingLiteral(entry,index,"fluidBlock");drawFloatingFluidHeight(entry,index);
-            if (ImGui.treeNode("Other floating data (read-only)")) { for (String field : FloatingBiomes.readOnlyFields(entry)) ImGui.textWrapped(field);ImGui.treePop(); }
+            drawFloatingNoise(entry,index);
+            if (ImGui.treeNode("Other floating data (read-only)")) {
+                for (String field : FloatingBiomes.readOnlyFields(entry)) ImGui.textWrapped(field);
+                for (String path : FloatingNoiseStyles.readOnlyPaths(entry,index)) ImGui.textWrapped(path);
+                ImGui.treePop();
+            }
             ImGui.treePop();
         }
+    }
+    private void drawFloatingNoise(LosslessJson entry,int index) {
+        if (!ImGui.treeNode("Floating noise styles")) return;
+        ImGui.textWrapped("Style effects depend on top-shape mode, edge amplitude and carving references. A configured carving reference overrides direct carveStyle noise. These controls do not sample noise or enable world previews.");
+        for (String field : FloatingNoiseStyles.EDITABLE) {
+            if (!ImGui.treeNode(field)) continue;
+            var target=NoiseStyleFields.Target.floating(index,field);drawStyleFields(entry,target);
+            if (target.optionalFloating()) {
+                try {
+                    if (NoiseStyleFields.object(entry,target)!=null) {
+                        ImGui.textWrapped("Disable replaces this entire style object with null.");
+                        if (ImGui.button("Disable style (write null)")) {
+                            try { commitProfileChange(target.draftPrefix(),FloatingNoiseStyles.disable(selected,workspace.read(selected),index,field),null); }
+                            catch (Exception failure) { error=failure.getMessage(); }
+                        }
+                    }
+                } catch (IllegalArgumentException unsupported) { /* The shared inspector already explains the read-only type. */ }
+            }
+            ImGui.treePop();
+        }
+        ImGui.treePop();
     }
     private void changeFloatingBiome(RiverProfiles.Action action,int index) {
         try { commitProfileChange(FloatingBiomes.prefix(),FloatingBiomes.change(selected,workspace.read(selected),action,index),null); }

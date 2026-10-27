@@ -256,6 +256,13 @@ public final class LosslessJson {
         Span span = root.get(field);
         return splice(span.start(),span.end(),"{}");
     }
+    /** Explicit optional-object disable. Preserve absence/null; unsupported stored types remain untouched. */
+    byte[] nullObject(String field) {
+        String original = token(field);
+        if (original == null || original.equals("null")) return sourceBytes();
+        new LosslessJson(original.getBytes(StandardCharsets.UTF_8));
+        return nullableScalar(field,"null");
+    }
     byte[] objectArrayEdit(String field, int index, java.util.function.Function<LosslessJson, byte[]> operation) {
         List<LosslessJson> objects = objectArray(field);
         if (index < 0 || index >= objects.size()) throw new IllegalArgumentException("Array index out of range");

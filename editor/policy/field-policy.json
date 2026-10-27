@@ -2065,6 +2065,38 @@
     "bottomObjectMode": {
       "classification": "generation",
       "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "footprintStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "edgeTaperVariationStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "pickerStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "altitudeStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "topShapeStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "bottomStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "wallWarpStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "carveStyle": {
+      "classification": "generation",
+      "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
     }
   }
 }

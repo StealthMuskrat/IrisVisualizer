@@ -92,6 +92,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biome'].update(editable(java_dir, 'BiomeSlabWall', 'OBJECT_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'FloatingBiomes', 'LIST_FIELDS'))
     implemented['floatingBiome'] = set(editable(java_dir, 'FloatingBiomes'))
+    implemented['floatingBiome'].update(editable(java_dir, 'FloatingNoiseStyles'))
     implemented['biome'].update(editable(java_dir, 'Terrain3DFields', 'OBJECT_FIELDS'))
     for group in ['dimension','region','biome']:
         implemented[group].update(editable(java_dir, 'CaveProfileFields', 'OBJECT_FIELDS'))

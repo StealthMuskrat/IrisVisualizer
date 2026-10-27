@@ -399,6 +399,14 @@ jobs:
           python editor/tools/extract_floating_biome_fields.py IrisBiome.java IrisFloatingChildBiomes.java FloatingIslandEdgeProfile.java FloatingIslandSample.java TopShapeMode.java FloatingBottomPaletteMode.java OverrideMode.java generated-floating-biome.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-biome.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-biome-fields.properties).Hash) { throw 'Pinned floating biome definitions differ' }
+      - name: Verify pinned floating biome noise definitions
+        shell: pwsh
+        run: |
+          python editor/tools/test_floating_noise_fields.py IrisFloatingChildBiomes.java IrisGeneratorStyle.java FloatingIslandSample.java FloatingIslandEdgeProfile.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_noise_fields.py IrisFloatingChildBiomes.java IrisGeneratorStyle.java FloatingIslandSample.java FloatingIslandEdgeProfile.java generated-floating-noise.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-noise.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-noise-fields.properties).Hash) { throw 'Pinned floating noise definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

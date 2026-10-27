@@ -33,6 +33,7 @@ public final class NoiseStyleFields {
             valid = valid || noise==null && "dimensions".equals(resourceBase) && List.of("rockPalette.style","fluidPalette.style").contains(objectField);
             valid = valid || noise==null && "biomes".equals(resourceBase) && BiomeLayers.styleTarget(objectField)!=null;
             valid = valid || noise==null && "biomes".equals(resourceBase) && List.of("slab.style","wall.style").contains(objectField);
+            valid = valid || noise==null && "biomes".equals(resourceBase) && FloatingNoiseStyles.context(objectField)!=null;
             valid = moduleIndex == -1 ? valid : moduleIndex >= 0 && noise == null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.equals("caveProfile.modules.style");
             if (!valid) throw new IllegalArgumentException("Unsupported style target");
         }
@@ -58,6 +59,10 @@ public final class NoiseStyleFields {
             if (!RiverChannelRanges.UNDERGROUND_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported underground range style");
             return new Target("dimensions","hydrology.rivers.underground."+field+".style",null);
         }
+        public static Target floating(int index,String field) { FloatingNoiseStyles.field(field);if (index<0) throw new IllegalArgumentException("Select a floating entry");return new Target("biomes","floatingChildBiomes."+index+"."+field,null); }
+        public boolean floating() { return FloatingNoiseStyles.context(objectField)!=null; }
+        public FloatingNoiseStyles.Context floatingContext() { var context=FloatingNoiseStyles.context(objectField);if (context==null) throw new IllegalArgumentException("Not a floating style");return context; }
+        public boolean optionalFloating() { return floating() && FloatingNoiseStyles.optional(floatingContext().field()); }
         public static Target slabWall(String field) { BiomeSlabWall.field(field);return new Target("biomes",field+".style",null); }
         public boolean slabWall() { return List.of("slab.style","wall.style").contains(objectField); }
         public String slabWallField() { if (!slabWall()) throw new IllegalArgumentException("Not a slab/wall style");return objectField.substring(0,objectField.length()-".style".length()); }
@@ -91,8 +96,8 @@ public final class NoiseStyleFields {
         public boolean cave() { return objectField.startsWith("caveProfile."); }
         public boolean threshold() { return objectField.equals("caveProfile.densityThreshold.style"); }
         public boolean module() { return moduleIndex >= 0; }
-        public String member() { return slabWall() || biomeLayer() || dimensionPalette() || deepHeight() || deepPalette() ? "style" : poolPalette() ? "style" : profilePalette() ? "style" : palette() ? "style" : riverRange() ? "style" : banks() ? "densityStyle" : module() || threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
-        public String draftPrefix() { return slabWall() ? BiomeSlabWall.noisePrefix(slabWallField())+"style." : biomeLayer() ? BiomeLayers.noisePrefix(layerTarget().field(),layerTarget().index())+"style." : dimensionPalette() ? DimensionPalettes.noisePrefix(dimensionPaletteField())+"style." : deepHeight() ? DeepFluids.systemPrefix(deepIndex())+"height.style." : deepPalette() ? DeepFluids.noisePrefix(deepIndex())+"style." : poolPalette() ? SurfacePools.noisePrefix(poolIndex())+"style." : profilePalette() ? RiverProfiles.noisePrefix(profileIndex())+"style." : palette() ? RiverPaletteFields.draftPrefix(paletteTarget())+"style." : riverRange() ? RiverChannelRanges.draftPrefix(rangeField())+"style." : banks() ? RiverBankFields.draftPrefix()+"densityStyle." : module() ? CaveModules.draftPrefix(resourceBase,moduleIndex)+"style." : threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
+        public String member() { return floating() ? floatingContext().field() : slabWall() || biomeLayer() || dimensionPalette() || deepHeight() || deepPalette() ? "style" : poolPalette() ? "style" : profilePalette() ? "style" : palette() ? "style" : riverRange() ? "style" : banks() ? "densityStyle" : module() || threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
+        public String draftPrefix() { return floating() ? FloatingNoiseStyles.prefix(floatingContext().index(),floatingContext().field()) : slabWall() ? BiomeSlabWall.noisePrefix(slabWallField())+"style." : biomeLayer() ? BiomeLayers.noisePrefix(layerTarget().field(),layerTarget().index())+"style." : dimensionPalette() ? DimensionPalettes.noisePrefix(dimensionPaletteField())+"style." : deepHeight() ? DeepFluids.systemPrefix(deepIndex())+"height.style." : deepPalette() ? DeepFluids.noisePrefix(deepIndex())+"style." : poolPalette() ? SurfacePools.noisePrefix(poolIndex())+"style." : profilePalette() ? RiverProfiles.noisePrefix(profileIndex())+"style." : palette() ? RiverPaletteFields.draftPrefix(paletteTarget())+"style." : riverRange() ? RiverChannelRanges.draftPrefix(rangeField())+"style." : banks() ? RiverBankFields.draftPrefix()+"densityStyle." : module() ? CaveModules.draftPrefix(resourceBase,moduleIndex)+"style." : threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
     }
     private static final Properties DEFINITIONS = new Properties();
     private static final List<String> CHOICES;
@@ -112,6 +117,8 @@ public final class NoiseStyleFields {
             if (!"finiteNonnegative".equals(DEFINITIONS.getProperty("cellularFrequency.runtimeRule"))
                     || !"positiveFiniteReciprocalWhenActive".equals(DEFINITIONS.getProperty("cellularZoom.runtimeRule")))
                 throw new IOException("Missing pinned cellular validation rules");
+            if (!FloatingNoiseStyles.classStyle().equals(objectDefault())) throw new IOException("Floating optional style class default differs");
+            for (String field : FloatingNoiseStyles.EDITABLE) if (!CHOICES.contains(FloatingNoiseStyles.creationStyle(field))) throw new IOException("Invalid floating style default");
             if (!CHOICES.contains(BiomeLayers.styleDefault())) throw new IOException("Invalid biome layer style default");
             if (!CHOICES.contains(DeepFluids.heightClassStyle())) throw new IOException("Invalid deep-fluid height style default");
             if (!CHOICES.contains(RiverPaletteFields.styleDefault()) || !objectDefault().equals(RiverPaletteFields.styleObjectDefault())) throw new IOException("Missing pinned palette style default");
@@ -135,10 +142,13 @@ public final class NoiseStyleFields {
     public static List<String> choices() { return CHOICES; }
     public static String noiseDefault() { return DEFINITIONS.getProperty("noiseDefault"); }
     public static String objectDefault() { return DEFINITIONS.getProperty("objectDefault"); }
-    public static String contextDefault(Target target) { return target.slabWall() || target.biomeLayer() ? BiomeLayers.styleDefault() : target.deepHeight() ? DeepFluids.heightClassStyle() : target.dimensionPalette() || target.deepPalette() || target.poolPalette() || target.profilePalette() || target.palette() ? RiverPaletteFields.styleDefault() : target.riverRange() ? RiverChannelRanges.classStyle() : target.banks() ? RiverBankFields.styleDefault() : target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
-    public static String contextDescription(Target target) { return target.slabWall() || target.biomeLayer() ? BiomeLayers.styleDescription() : target.deepHeight() ? RiverChannelRanges.styleDescription() : target.dimensionPalette() || target.deepPalette() || target.poolPalette() || target.profilePalette() || target.palette() ? RiverPaletteFields.description("style") : target.riverRange() ? RiverChannelRanges.styleDescription() : target.banks() ? RiverBankFields.description("densityStyle") : target.module() ? CaveModules.help("style") : target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
+    public static String contextDefault(Target target) { return target.floating() ? FloatingNoiseStyles.creationStyle(target.floatingContext().field()) : target.slabWall() || target.biomeLayer() ? BiomeLayers.styleDefault() : target.deepHeight() ? DeepFluids.heightClassStyle() : target.dimensionPalette() || target.deepPalette() || target.poolPalette() || target.profilePalette() || target.palette() ? RiverPaletteFields.styleDefault() : target.riverRange() ? RiverChannelRanges.classStyle() : target.banks() ? RiverBankFields.styleDefault() : target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
+    public static String contextDescription(Target target) { return target.floating() ? FloatingNoiseStyles.description(target.floatingContext().field()) : target.slabWall() || target.biomeLayer() ? BiomeLayers.styleDescription() : target.deepHeight() ? RiverChannelRanges.styleDescription() : target.dimensionPalette() || target.deepPalette() || target.poolPalette() || target.profilePalette() || target.palette() ? RiverPaletteFields.description("style") : target.riverRange() ? RiverChannelRanges.styleDescription() : target.banks() ? RiverBankFields.description("densityStyle") : target.module() ? CaveModules.help("style") : target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
+    private static String contextZoomOverride(Target target) {
+        return target.floating() ? FloatingNoiseStyles.zoomOverride(target.floatingContext().field()) : target.cave() && !target.threshold() && !target.module() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
+    }
     public static String contextDefaultLabel(Target target) {
-        String override=target.cave() && !target.threshold() && !target.module() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
+        String override=contextZoomOverride(target);
         return contextDefault(target)+(override==null ? "" : ", zoom "+override);
     }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
@@ -169,9 +179,11 @@ public final class NoiseStyleFields {
     public static byte[] enable(String path, byte[] original, Target target, String field) {
         authorize(path, target, field);
         return editContainer(original, target, container -> {
-            if (container.token(target.member()) == null) {
+            String stored=container.token(target.member());
+            if (stored == null || target.optionalFloating() && stored.equals("null")) {
+                if (stored!=null) container=new LosslessJson(container.enableObject(target.member()));
                 byte[] seeded = container.enableStringPath(target.member()+".style", contextDefault(target));
-                String override=target.cave() && !target.threshold() && !target.module() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
+                String override=contextZoomOverride(target);
                 if (override!=null) seeded=new LosslessJson(seeded).enablePath(target.member()+".zoom",override);
                 if (field.equals("style") || new LosslessJson(seeded).tokenPath(target.member()+"."+field)!=null) return seeded;
                 container = new LosslessJson(seeded);
@@ -229,6 +241,7 @@ public final class NoiseStyleFields {
         }
     }
     private static byte[] editContainer(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+        if (target.floating()) return FloatingBiomes.editEntry(original,target.floatingContext().index(),operation);
         if (target.slabWall()) return BiomeSlabWall.editObject(original,target.slabWallField(),operation);
         if (target.biomeLayer()) return BiomeLayers.editLayer(original,target.layerTarget().field(),target.layerTarget().index(),operation);
         if (target.dimensionPalette()) return DimensionPalettes.editPalette(original,target.dimensionPaletteField(),operation);
@@ -249,6 +262,7 @@ public final class NoiseStyleFields {
         return objectAt(noise, "style");
     }
     static LosslessJson object(LosslessJson container, Target target) {
+        if (target.optionalFloating() && "null".equals(container.token(target.member()))) return null;
         return objectAt(container, target.member());
     }
     private static LosslessJson objectAt(LosslessJson container, String field) {
