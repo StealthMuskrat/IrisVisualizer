@@ -1,10 +1,10 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in sixty-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in sixty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 49 | 43 | 33 |
+| dimension | 82 | 51 | 45 | 31 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 37 | 31 | 5 |
@@ -68,10 +68,13 @@ Direct nonstatic/nontransient private fields in sixty-four pinned source classes
 | oreGenerator | 5 | 5 | 5 | 0 |
 | depositGenerator | 21 | 21 | 21 | 0 |
 | depositVariant | 3 | 3 | 3 | 0 |
+| staticObject | 9 | 9 | 8 | 0 |
+| staticObjectRotation | 3 | 3 | 3 | 0 |
+| position | 3 | 3 | 3 | 0 |
 
 ## dimension
 
-Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
+Unclassified: `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
 
 ## importedStructures
 
@@ -322,5 +325,17 @@ Unclassified: none.
 Unclassified: none.
 
 ## depositVariant
+
+Unclassified: none.
+
+## staticObject
+
+Unclassified: none.
+
+## staticObjectRotation
+
+Unclassified: none.
+
+## position
 
 Unclassified: none.

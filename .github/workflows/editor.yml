@@ -553,6 +553,18 @@ jobs:
           python editor/tools/extract_deposit_variant_fields.py IrisDepositVariant.java IrisDepositModifier.java IrisDepositGenerator.java IrisBiomeOres.java IrisDimension.java IrisRegion.java IrisBiome.java generated-deposit-variant-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-deposit-variant-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/deposit-variant-fields.properties).Hash) { throw 'Pinned variant/host definitions differ' }
+      - name: Verify pinned static object definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisStaticObject.java' -OutFile IrisStaticObject.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisStaticObjectRotation.java' -OutFile IrisStaticObjectRotation.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/value/IrisPosition.java' -OutFile IrisPosition.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisStaticObjectLayer.java' -OutFile IrisStaticObjectLayer.java
+          python editor/tools/test_static_object_fields.py IrisStaticObject.java IrisStaticObjectRotation.java IrisPosition.java IrisDimension.java IrisObjectScale.java IrisStaticObjectLayer.java IrisObjectPlacementScaleInterpolator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_static_object_fields.py IrisStaticObject.java IrisStaticObjectRotation.java IrisPosition.java IrisDimension.java IrisObjectScale.java IrisStaticObjectLayer.java IrisObjectPlacementScaleInterpolator.java generated-static-object-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-static-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/static-object-fields.properties).Hash) { throw 'Pinned static object definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

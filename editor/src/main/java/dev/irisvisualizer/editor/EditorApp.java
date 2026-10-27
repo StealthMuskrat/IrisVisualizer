@@ -173,6 +173,7 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
+                    drawStaticObjects(document);
                     drawDepositVariants(document,"dimensions");
                     drawDeposits(document,"dimensions");
                     drawOres(document,"dimensions");
@@ -583,6 +584,96 @@ public final class EditorApp extends Application {
         }
     }
     private static String mappingDraft(String source,String target) { return source.length()+":"+source+target; }
+    private void drawStaticObjects(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Fixed dimension objects")) return;
+        ImGui.pushID("staticObjects");
+        ImGui.textWrapped("Static objects use absolute world coordinates around their saved origin. Later entries win overlaps in newly generated chunks. Reloading does not rewrite existing chunks. Object content, transformed bounds, registry compatibility and generation are not evaluated; previews remain unavailable.");
+        ImGui.textWrapped(StaticObjects.help("allObjectScaleFactor"));String rootScale=document.token("allObjectScaleFactor");
+        if (rootScale!=null && !LosslessJson.numericToken(rootScale)) ImGui.textWrapped("Dimension object scale has an unsupported type (read-only).");
+        else {
+            String stored=rootScale==null ? "1" : rootScale,key=StaticObjects.scalePrefix()+"value";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText(rootScale==null ? "Dimension object scale (default 1)" : "Dimension object scale",input);drafts.update(key,stored,input.get());
+            if (ImGui.button("Apply dimension object scale")) { try { workspace.replace(selected,StaticObjects.setDimensionScale(selected,workspace.read(selected),input.get()));drafts.applied(key);values.remove(key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+        }
+        List<LosslessJson> entries;
+        try { entries=StaticObjects.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored static objects contain nulls, snippets or unsupported entries (read-only).");ImGui.popID();return; }
+        if (entries==null) {
+            if (ImGui.button("Initialize empty static object list")) { try { commitProfileChange(StaticObjects.listPrefix(),StaticObjects.enable(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            ImGui.popID();return;
+        }
+        var choices=FloatingObjectPlacements.objectChoices(workspace);String newKey=StaticObjects.listPrefix()+"new",objectKey=newKey+".object";ImString choice=objectChoiceState(objectKey,choices);drawObjectChoice("Object for new fixed placement",choice,choices);
+        ImString[] position=new ImString[3];
+        for (int axis=0;axis<3;axis++) { String key=newKey+"."+StaticObjects.AXES.get(axis);position[axis]=values.computeIfAbsent(key,ignored -> new ImString("0",128));ImGui.inputText("New world "+StaticObjects.AXES.get(axis),position[axis]); }
+        String initial=choices.isEmpty() ? "" : choices.getFirst();drafts.update(newKey,staticDraft(initial,"0","0","0"),staticDraft(choice.get(),position[0].get(),position[1].get(),position[2].get()));
+        ImGui.textWrapped("Exact world X/Z: -29999984..29999984. "+StaticObjects.heightLabel(document)+". Seed, rotation, bore and scale defaults stay implicit on Add.");
+        ImGui.beginDisabled(!choices.contains(choice.get()));
+        if (ImGui.button("Add fixed object")) {
+            ImGui.endDisabled();try { commitProfileChange(StaticObjects.listPrefix(),StaticObjects.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,choice.get(),position[0].get(),position[1].get(),position[2].get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return;
+        }
+        ImGui.endDisabled();
+        for (int index=0;index<entries.size();index++) {
+            if (!ImGui.treeNode("Fixed object "+index)) continue;RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate fixed object")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();if (ImGui.button("Remove fixed object")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Fixed object up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Fixed object down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) {
+                ImGui.treePop();try { commitProfileChange(StaticObjects.listPrefix(),StaticObjects.change(selected,workspace.read(selected),action,index,null,null,null,null,workspace),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return;
+            }
+            var context=new StaticObjects.Context(index);var entry=entries.get(index);String current;
+            try { current=entry.stringToken("object");if (ImGui.beginCombo("Object key",current==null ? "Required object missing" : current)) { for (String key : choices) if (ImGui.selectable(key,key.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,StaticObjects.setReference(selected,workspace.read(selected),context,key,workspace)));ImGui.endCombo(); } }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored object reference has an unsupported type (read-only)."); }
+            drawStaticTransform(entry,context,"position");drawStaticTransform(entry,context,"rotation");
+            drawStaticScale(entry,context);drawStaticSeed(entry,context);
+            for (String flag : List.of("bore","smartBore")) {
+                String token=entry.token(flag);if (token!=null && !token.equals("true") && !token.equals("false")) { ImGui.textWrapped(flag+": unsupported type (read-only)");continue; }
+                boolean enabled="true".equals(token);if (token==null) { if (ImGui.button("Enable "+flag+"=false")) applyRoutingExtra(() -> workspace.replace(selected,StaticObjects.setBoolean(selected,workspace.read(selected),context,flag,false))); }
+                else if (ImGui.checkbox(flag,enabled)) applyRoutingExtra(() -> workspace.replace(selected,StaticObjects.setBoolean(selected,workspace.read(selected),context,flag,!enabled)));
+                if (ImGui.isItemHovered()) ImGui.setTooltip(StaticObjects.help(flag));
+            }
+            for (String field : entry.fields()) if (!StaticObjects.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only, preserved)");
+            ImGui.treePop();
+        }
+        ImGui.popID();
+    }
+    private static String staticDraft(String... values) { StringBuilder result=new StringBuilder();for (String value : values) result.append(value.length()).append(':').append(value);return result.toString(); }
+    private void drawStaticTransform(LosslessJson entry,StaticObjects.Context context,String field) {
+        if (!ImGui.treeNode(field)) return;LosslessJson transform;
+        try { transform=StaticObjects.object(entry,field); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored transform is null, a snippet or unsupported (read-only).");ImGui.treePop();return; }
+        ImGui.textWrapped(StaticObjects.help(field));ImGui.textWrapped(field.equals("rotation") ? "Finite degrees -360..360. Absent axes default to zero; Apply writes all three together." : "Exact integers. Apply writes all three coordinates together, within the dimension's stored world height.");
+        String[] stored=new String[3];ImString[] input=new ImString[3];
+        for (int axis=0;axis<3;axis++) {
+            String name=StaticObjects.AXES.get(axis),token=transform==null ? null : transform.token(name);
+            if (token!=null && !LosslessJson.numericToken(token)) { ImGui.textWrapped("Stored "+name+" is not numeric (read-only).");ImGui.treePop();return; }
+            stored[axis]=token==null ? "0" : token;String key=context.prefix()+field+"."+name;String value=stored[axis];input[axis]=values.computeIfAbsent(key,ignored -> new ImString(value,Math.max(128,value.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText(name,input[axis]);drafts.update(key,value,input[axis].get());
+        }
+        if (ImGui.button("Apply fixed "+field)) {
+            try {
+                byte[] next=field.equals("position") ? StaticObjects.setPosition(selected,workspace.read(selected),context,input[0].get(),input[1].get(),input[2].get()) : StaticObjects.setRotation(selected,workspace.read(selected),context,input[0].get(),input[1].get(),input[2].get());workspace.replace(selected,next);
+                for (String axis : StaticObjects.AXES) { String key=context.prefix()+field+"."+axis;drafts.applied(key);values.remove(key); }error=null;
+            } catch (Exception failure) { error=failure.getMessage(); }
+        }
+        if (transform!=null) for (String member : transform.fields()) if (!StaticObjects.AXES.contains(member)) ImGui.textWrapped(member+" (read-only)");ImGui.treePop();
+    }
+    private void drawStaticScale(LosslessJson entry,StaticObjects.Context context) {
+        String token=entry.token("scale"),key=context.prefix()+"scale",stored=token==null || token.equals("null") ? "1" : token;
+        if (!LosslessJson.numericToken(stored)) ImGui.textWrapped("Stored scale has an unsupported type (read-only).");
+        else {
+            ImGui.textWrapped(token==null || token.equals("null") ? "Scale inherits the dimension default. Apply an explicit factor to override it." : "Explicit scale overrides the dimension factor, including 1.");
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Fixed scale (0.01..50)",input);drafts.update(key,stored,input.get());
+            if (ImGui.button("Apply fixed scale")) { try { workspace.replace(selected,StaticObjects.setScale(selected,workspace.read(selected),context,input.get()));drafts.applied(key);values.remove(key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+            if (token!=null && !token.equals("null") && ImGui.button("Inherit dimension scale")) { try { commitProfileChange(context.prefix()+"scale",StaticObjects.setScale(selected,workspace.read(selected),context,null),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        }
+        try {
+            String interpolation=entry.stringToken("scaleInterpolation"),current=interpolation==null ? "NONE" : interpolation;
+            if (ImGui.beginCombo("Scale interpolation",current)) { for (String choice : StaticObjects.interpolations()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,StaticObjects.setInterpolation(selected,workspace.read(selected),context,choice)));ImGui.endCombo(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored interpolation has an unsupported type (read-only)."); }
+    }
+    private void drawStaticSeed(LosslessJson entry,StaticObjects.Context context) {
+        String token=entry.token("seed");if (token!=null && !LosslessJson.numericToken(token)) { ImGui.textWrapped("Stored seed has an unsupported type (read-only).");return; }
+        String stored=token==null ? "0" : token,key=context.prefix()+"seed";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Fixed signed 64-bit seed",input);drafts.update(key,stored,input.get());
+        if (ImGui.button("Apply fixed seed")) { try { workspace.replace(selected,StaticObjects.setSeed(selected,workspace.read(selected),context,input.get()));drafts.applied(key);values.remove(key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+        ImGui.textWrapped(StaticObjects.help("seed"));
+    }
     private void drawDepositVariants(LosslessJson document,String base) {
         if (!ImGui.collapsingHeader("Deposit variants")) return;
         ImGui.textWrapped("Ordered deposit remaps use inclusive absolute world Y. Native placement tries the cave biome at the candidate, then its region, then the dimension; the first rule producing a remap wins. Unmatched candidates use Iris's native fallback. Deposit origin bands use engine-local Y.");
