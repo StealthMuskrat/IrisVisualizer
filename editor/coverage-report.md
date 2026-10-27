@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in twenty pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in twenty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -21,9 +21,12 @@ Direct nonstatic/nontransient private fields in twenty pinned source classes onl
 | range | 2 | 2 | 2 | 0 |
 | riverPolicy | 26 | 26 | 26 | 0 |
 | hydrology | 3 | 1 | 1 | 2 |
-| riverHydrology | 7 | 2 | 2 | 5 |
+| riverHydrology | 7 | 3 | 3 | 4 |
 | riverRouting | 16 | 16 | 16 | 0 |
 | riverRegional | 9 | 9 | 9 | 0 |
+| riverGeometry | 6 | 2 | 2 | 4 |
+| riverMeanders | 7 | 7 | 7 | 0 |
+| riverSurfaceShape | 12 | 12 | 10 | 0 |
 
 ## dimension
 
@@ -95,12 +98,24 @@ Unclassified: `deepFluids`, `surfacePools`.
 
 ## riverHydrology
 
-Unclassified: `geometry`, `grottos`, `profiles`, `surface`, `underground`.
+Unclassified: `grottos`, `profiles`, `surface`, `underground`.
 
 ## riverRouting
 
 Unclassified: none.
 
 ## riverRegional
+
+Unclassified: none.
+
+## riverGeometry
+
+Unclassified: `banks3D`, `drops`, `grottos`, `underground`.
+
+## riverMeanders
+
+Unclassified: none.
+
+## riverSurfaceShape
 
 Unclassified: none.

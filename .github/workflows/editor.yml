@@ -175,6 +175,17 @@ jobs:
           python editor/tools/extract_routing_extras.py IrisRiverRoutingConfig.java IrisRiverRegionalConfig.java IrisRiverInlandOutlet.java generated-routing-extras.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-routing-extras.properties).Hash -ne (Get-FileHash editor/src/main/resources/routing-extras.properties).Hash) { throw 'Pinned routing extras differ' }
+      - name: Verify pinned river meander and surface geometry definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverGeometryConfig.java' -OutFile IrisRiverGeometryConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverMeanderConfig.java' -OutFile IrisRiverMeanderConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisSurfaceRiverShapeConfig.java' -OutFile IrisSurfaceRiverShapeConfig.java
+          python editor/tools/test_river_geometry_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_river_geometry_fields.py IrisRiverHydrology.java IrisRiverGeometryConfig.java IrisRiverMeanderConfig.java IrisSurfaceRiverShapeConfig.java generated-river-geometry.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-river-geometry.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-geometry-fields.properties).Hash) { throw 'Pinned river geometry definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

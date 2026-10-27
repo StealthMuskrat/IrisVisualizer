@@ -12,7 +12,7 @@ import java.util.function.Function;
 public final class HydrologyFields {
     public static final List<String> ROOT_FIELDS = List.of("hydrology");
     public static final List<String> HYDROLOGY_FIELDS = List.of("rivers");
-    public static final List<String> RIVER_FIELDS = List.of("enabled", "routing");
+    public static final List<String> RIVER_FIELDS = List.of("enabled", "routing", "geometry");
     public static final List<String> ROUTING_FIELDS = List.of("tileSize", "sampleSpacing", "maximumRouteLength", "minimumSurfaceCourseLength", "minimumUndergroundCourseLength", "maximumOutletsPerTile", "maximumCoastalOutletsPerTile", "oceanOutlets", "valleyPreference", "uphillPenalty", "slopePenalty", "confluenceAttraction", "lengthPreference", "tributaries");
     private static final Properties DEFINITIONS = new Properties();
     static {
@@ -56,7 +56,7 @@ public final class HydrologyFields {
     public static byte[] setEnabled(String path, byte[] original, boolean value) {
         authorize(path); return editRivers(original,rivers -> rivers.token("enabled")==null ? rivers.enable("enabled",Boolean.toString(value)) : rivers.bool("enabled",value));
     }
-    private static byte[] editRivers(byte[] original, Function<LosslessJson,byte[]> operation) {
+    static byte[] editRivers(byte[] original, Function<LosslessJson,byte[]> operation) {
         return new LosslessJson(original).objectEdit("hydrology",hydro -> hydro.objectEdit("rivers",operation,false),false);
     }
     static byte[] editRouting(byte[] original, Function<LosslessJson,byte[]> operation) { return editRivers(original,rivers -> rivers.objectEdit("routing",operation,false)); }
@@ -98,6 +98,10 @@ public final class HydrologyFields {
                     var rivers=rivers(hydro);
                     for (String riverField : rivers.fields()) {
                         if (riverField.equals("enabled")) continue;
+                        if (RiverGeometryFields.OBJECT_FIELDS.contains(riverField)) {
+                            for (String path : RiverGeometryFields.readOnlyPaths(rivers)) paths.add("hydrology.rivers."+path);
+                            continue;
+                        }
                         if (!riverField.equals("routing")) { paths.add("hydrology.rivers."+riverField); continue; }
                         try {
                             var route=routing(rivers);
