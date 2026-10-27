@@ -183,6 +183,7 @@ public final class EditorApp extends Application {
                     drawDimensionPalettes(document);
                     drawSurfaceLayerFallback(document);
                     drawDimensionHeights(document);
+                    drawWorldBoundary(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
                     drawHydrology(document);
@@ -2175,6 +2176,55 @@ public final class EditorApp extends Application {
     private void changeGeneralBlockPalette(GeneralBlockPalettes.Target target,RiverProfiles.Action action,int index,String value,String appliedKey) {
         try { commitProfileChange(target.listPrefix(),target.change(selected,workspace.read(selected),action,index,value),appliedKey); }
         catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawWorldBoundary(LosslessJson document) {
+        if (!ImGui.collapsingHeader("World border")) return;
+        ImGui.pushID("worldBoundary");ImGui.textWrapped(WorldBoundaryFields.help("worldBoundary"));
+        ImGui.textWrapped("Absent or null leaves the native border unchanged; clearing this configuration does not reset an existing live border. This editor edits pack data only. Diameter is the full border width, not a radius.");
+        LosslessJson boundary;
+        try { boundary=WorldBoundaryFields.object(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored world border is a snippet or unsupported value (read-only).");ImGui.popID();return; }
+        if (boundary==null) {
+            if (ImGui.button("Enable world border (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,WorldBoundaryFields.enable(selected,workspace.read(selected))));
+            ImGui.popID();return;
+        }
+        if (ImGui.treeNode("Center coordinates")) {
+            ImGui.textWrapped("Apply X and Z together. An absent center uses (0, 0); null or snippet centers remain read-only. Center bounds do not clamp the full border extent.");
+            try {
+                var center=WorldBoundaryFields.center(boundary);
+                if (center!=null && (!WorldBoundaryFields.supported(center,"x") || !WorldBoundaryFields.supported(center,"z"))) ImGui.textWrapped("Stored center coordinates have unsupported types (read-only).");
+                else {
+                    String x=center==null || center.token("x")==null ? WorldBoundaryFields.defaultToken("center.x") : center.token("x"),z=center==null || center.token("z")==null ? WorldBoundaryFields.defaultToken("center.z") : center.token("z");
+                    String xKey=WorldBoundaryFields.prefix()+"center.x",zKey=WorldBoundaryFields.prefix()+"center.z";
+                    ImString xInput=values.computeIfAbsent(xKey,ignored -> new ImString(x,Math.max(128,x.length()+1))),zInput=values.computeIfAbsent(zKey,ignored -> new ImString(z,Math.max(128,z.length()+1)));
+                    ImGui.textWrapped(WorldBoundaryFields.constraints("center.x"));ImGui.inputText("Center X",xInput);drafts.update(xKey,x,xInput.get());ImGui.inputText("Center Z",zInput);drafts.update(zKey,z,zInput.get());
+                    if (ImGui.button(center==null ? "Create center pair" : "Apply center pair")) {
+                        try { workspace.replace(selected,WorldBoundaryFields.setCenter(selected,workspace.read(selected),xInput.get(),zInput.get()));drafts.applied(xKey);drafts.applied(zKey);values.remove(xKey);values.remove(zKey);error=null; }
+                        catch (Exception failure) { error=failure.getMessage(); }
+                    }
+                }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored center is null, a snippet or unsupported value (read-only)."); }
+            ImGui.treePop();
+        }
+        for (String field : WorldBoundaryFields.SCALARS) {
+            ImGui.pushID(field);ImGui.textWrapped(WorldBoundaryFields.help(field));ImGui.textWrapped(WorldBoundaryFields.constraints(field));String token=boundary.token(field),key=WorldBoundaryFields.prefix()+field;
+            if (token==null) {
+                if (ImGui.button("Enable "+field+" ("+WorldBoundaryFields.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,WorldBoundaryFields.enableScalar(selected,workspace.read(selected),field)));
+            } else if (!WorldBoundaryFields.supported(boundary,field)) ImGui.textWrapped("Stored value has an unsupported type or integer width (read-only).");
+            else {
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,WorldBoundaryFields.setScalar(selected,workspace.read(selected),field,input.get())));
+            }
+            ImGui.popID();
+        }
+        for (String path : WorldBoundaryFields.readOnlyPaths(document)) ImGui.textWrapped(path+" (read-only)");
+        ImGui.textWrapped("Clear discards the entire inline border configuration, including advanced fields, and writes null.");
+        if (ImGui.button("Clear border configuration (write null)")) {
+            try {
+                if (drafts.transitionUnder(WorldBoundaryFields.prefix(),() -> !drafts.anyUnder(WorldBoundaryFields.prefix()) || JOptionPane.showConfirmDialog(null,"Discard unapplied world-border text and clear the entire border configuration?","Unapplied world-border text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION,() -> workspace.replace(selected,WorldBoundaryFields.disable(selected,workspace.read(selected))))) { values.keySet().removeIf(key -> key.startsWith(WorldBoundaryFields.prefix()));error=null; }
+            } catch (Exception failure) { error=failure.getMessage(); }
+        }
+        ImGui.popID();
     }
     private void drawDimensionHeights(LosslessJson document) {
         if (!ImGui.collapsingHeader("Dimension height")) return;

@@ -32,3 +32,5 @@ Read [the feasibility findings](docs/FEASIBILITY.md) and [the development batche
 ## License
 
 GPL-3.0-or-later; see [LICENSE.md](LICENSE.md). Iris is developed by Volmit Software under GPL-3.0-or-later. The integration compiles against upstream sources rather than duplicating Iris generation algorithms or schemas.
+
+The editor also authors optional dimension world borders: paired center coordinates, full diameter, warning distance and damage settings, using pinned native bounds and preserving advanced data. Null/absence leaves the live native border unchanged; the editor does not apply borders to running worlds. Unsupported previews remain disabled.
