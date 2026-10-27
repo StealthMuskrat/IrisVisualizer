@@ -75,7 +75,7 @@ final class CaveProfileTests {
         rejects(()->CaveProfileFields.editText("biomes/test.json",bytes("{\"caveProfile\":{\"sampleStep\":\"1\"}}"),"sampleStep","2"));
         rejects(()->CaveProfileFields.editBoolean("regions/test.json",bytes("{\"caveProfile\":{\"enabled\":null}}"),"enabled",true));
         var readOnly=DimensionFields.readOnlyPaths(new LosslessJson(source));
-        check(readOnly.equals(List.of("caveProfile.modules","caveProfile.verticalRange","caveProfile.densityThreshold","caveProfile.future","unknown")));
+        check(readOnly.equals(List.of("caveProfile.modules","caveProfile.densityThreshold","caveProfile.future","unknown")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"caveProfile\":\"snippet\"}"))).equals(List.of("caveProfile")));
         var drafts=new InspectorDrafts();
         drafts.update("caveProfile#biomes.sampleStep","1","2");drafts.update("caveProfile#biomes.baseWeight","1","3");drafts.update("children#new","","parent");
@@ -91,6 +91,6 @@ final class CaveProfileTests {
         }
         workspace.replace("biomes/starter.json",bytes("{\"caveProfile\":\"unresolved-snippet\"}"));workspace.save(temp.resolve("cave-controls"));
         check(new LosslessJson(PackWorkspace.open(temp.resolve("cave-controls")).read("biomes/starter.json")).token("caveProfile").equals("\"unresolved-snippet\""));
-        check(FieldCoverage.fields("caveProfile").size()==32 && FieldCoverage.fields("caveProfile").stream().filter(FieldCoverage.Field::implemented).count()==27);
+        check(FieldCoverage.fields("caveProfile").size()==32 && FieldCoverage.fields("caveProfile").stream().filter(FieldCoverage.Field::implemented).count()==30);
     }
 }

@@ -63,6 +63,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['terrain3D'].update(editable(java_dir, 'NoiseStyleFields', 'TERRAIN_FIELDS'))
     implemented['caveProfile'] = set(editable(java_dir, 'CaveProfileFields'))
     implemented['caveProfile'].update(editable(java_dir, 'NoiseStyleFields', 'CAVE_FIELDS'))
+    implemented['caveProfile'].update(editable(java_dir, 'CavePlacementFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']

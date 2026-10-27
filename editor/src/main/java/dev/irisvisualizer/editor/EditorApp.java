@@ -548,6 +548,7 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        drawCavePlacement(profile);
         for (String field:NoiseStyleFields.CAVE_FIELDS) {
             if (ImGui.treeNode(field+" settings")) {
                 drawStyleFields(profile,NoiseStyleFields.Target.cave(ResourceTypes.base(selected),field));
@@ -555,9 +556,77 @@ public final class EditorApp extends Application {
             }
         }
         if (ImGui.treeNode("Other cave settings (read-only)")) {
-            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field) && !NoiseStyleFields.CAVE_FIELDS.contains(field)) ImGui.textWrapped(field);
+            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field) && !CavePlacementFields.EDITABLE.contains(field) && !NoiseStyleFields.CAVE_FIELDS.contains(field)) ImGui.textWrapped(field);
             ImGui.treePop();
         }
+    }
+    private void drawCavePlacement(LosslessJson profile) {
+        if (ImGui.treeNode("Vertical bounds")) {
+            drawCaveRange(profile);
+            ImGui.treePop();
+        }
+        for (String field : CavePlacementFields.ENUM_FIELDS) {
+            ImGui.pushID("cavePlacement#" + field);
+            ImGui.text(field); ImGui.textWrapped(CavePlacementFields.description(field));
+            try {
+                String stored = CavePlacementFields.enumValue(profile, field);
+                boolean absent = profile.token(field) == null;
+                String label = stored == null ? CavePlacementFields.nullable(field) ? "No override (Iris default)" : CavePlacementFields.defaultValue(field) + " (Iris default)"
+                        : stored.length() > 128 ? "Long stored mode" : stored;
+                if (stored != null && !CavePlacementFields.choices(field).contains(stored)) ImGui.textWrapped("Unrecognized stored mode. Choose a listed mode to replace it.");
+                if (ImGui.beginCombo("Mode", label)) {
+                    if (CavePlacementFields.nullable(field) && ImGui.selectable("No override", stored == null)) assignCaveMode(field, null);
+                    for (String choice : CavePlacementFields.choices(field)) {
+                        if (ImGui.selectable(choice, choice.equals(stored))) assignCaveMode(field, choice);
+                        if (ImGui.isItemHovered()) ImGui.setTooltip(CavePlacementFields.choiceDescription(field, choice));
+                    }
+                    ImGui.endCombo();
+                }
+                if (absent) ImGui.textWrapped("Absent: choosing a mode writes it explicitly.");
+            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored mode has an unsupported type (read-only)."); }
+            ImGui.popID();
+        }
+    }
+    private void assignCaveMode(String field, String choice) {
+        try { workspace.replace(selected, CavePlacementFields.assign(selected, workspace.read(selected), field, choice)); error = null; }
+        catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private void drawCaveRange(LosslessJson profile) {
+        ImGui.textWrapped(CavePlacementFields.description("verticalRange"));
+        LosslessJson range;
+        try { range = CavePlacementFields.range(profile); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored range is a snippet or unsupported value (read-only)."); return; }
+        if (range == null) {
+            String bounds = CavePlacementFields.rangeDefault("min", true) + ".." + CavePlacementFields.rangeDefault("max", true);
+            ImGui.textWrapped("Absent range uses " + bounds + ". Enable it explicitly before editing.");
+            if (ImGui.button("Enable vertical bounds (" + bounds + ")")) {
+                try { workspace.replace(selected, CavePlacementFields.enableRange(selected, workspace.read(selected))); error = null; }
+                catch (Exception failure) { error = failure.getMessage(); }
+            }
+            return;
+        }
+        String prefix = CavePlacementFields.draftPrefix(ResourceTypes.base(selected));
+        for (String member : CavePlacementFields.RANGE_MEMBERS) {
+            String token = range.token(member);
+            try { if (token != null) new java.math.BigDecimal(token); }
+            catch (NumberFormatException mismatch) { ImGui.textWrapped("Stored " + member + " is not numeric (read-only)."); return; }
+        }
+        for (String member : CavePlacementFields.RANGE_MEMBERS) {
+            String token = range.token(member), effective = token == null ? CavePlacementFields.rangeDefault(member, false) : token;
+            String key = prefix + member;
+            ImString input = values.computeIfAbsent(key, ignored -> new ImString(effective, Math.max(128, effective.getBytes(StandardCharsets.UTF_8).length + 1)));
+            ImGui.inputText(member + (token == null ? " (Iris default)" : "") + "##" + key, input);
+            drafts.update(key, effective, input.get());
+        }
+        ImGui.textWrapped("Apply writes both bounds, filling absent members. Use finite numbers with minimum at most maximum.");
+        if (ImGui.button("Apply vertical bounds")) {
+            try {
+                workspace.replace(selected, CavePlacementFields.editRange(selected, workspace.read(selected), values.get(prefix + "min").get(), values.get(prefix + "max").get()));
+                for (String member : CavePlacementFields.RANGE_MEMBERS) { drafts.applied(prefix + member); values.remove(prefix + member); }
+                error = null;
+            } catch (Exception failure) { error = failure.getMessage(); }
+        }
+        for (String member : range.fields()) if (!CavePlacementFields.RANGE_MEMBERS.contains(member)) ImGui.textWrapped(member + " (read-only)");
     }
     private void drawTerrain3D(LosslessJson document) {
         ImGui.textWrapped(Terrain3DFields.description());
@@ -910,7 +979,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

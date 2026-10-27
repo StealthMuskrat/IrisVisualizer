@@ -28,7 +28,13 @@ public final class DimensionFields {
                     LosslessJson object = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     for (String child : object.fields()) {
                         if (CaveProfileFields.EDITABLE.contains(child)) continue;
-                        if (NoiseStyleFields.CAVE_FIELDS.contains(child)) {
+                        if (CavePlacementFields.ENUM_FIELDS.contains(child)) continue;
+                        if (child.equals("verticalRange")) {
+                            try {
+                                LosslessJson range = CavePlacementFields.range(object);
+                                for (String member : range.fields()) if (!CavePlacementFields.RANGE_MEMBERS.contains(member)) paths.add(field+"."+child+"."+member);
+                            } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }
+                        } else if (NoiseStyleFields.CAVE_FIELDS.contains(child)) {
                             try {
                                 LosslessJson style=new LosslessJson(object.token(child).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                                 for (String member:style.fields()) if (!NoiseStyleFields.EDITABLE.contains(member)) paths.add(field+"."+child+"."+member);
