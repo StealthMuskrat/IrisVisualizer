@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in thirty-nine pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in forty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -21,7 +21,7 @@ Direct nonstatic/nontransient private fields in thirty-nine pinned source classe
 | range | 2 | 2 | 2 | 0 |
 | riverPolicy | 26 | 26 | 26 | 0 |
 | hydrology | 3 | 1 | 1 | 2 |
-| riverHydrology | 7 | 5 | 5 | 2 |
+| riverHydrology | 7 | 6 | 6 | 1 |
 | riverRouting | 16 | 16 | 16 | 0 |
 | riverRegional | 9 | 9 | 9 | 0 |
 | riverGeometry | 6 | 6 | 6 | 0 |
@@ -43,6 +43,9 @@ Direct nonstatic/nontransient private fields in thirty-nine pinned source classe
 | surfaceRiverPond | 4 | 4 | 4 | 0 |
 | undergroundRiver | 13 | 12 | 12 | 1 |
 | undergroundRiverSource | 3 | 3 | 3 | 0 |
+| riverGrottos | 2 | 2 | 2 | 0 |
+| coastalGrotto | 9 | 8 | 8 | 1 |
+| inlandGrotto | 6 | 6 | 6 | 0 |
 
 ## dimension
 
@@ -114,7 +117,7 @@ Unclassified: `deepFluids`, `surfacePools`.
 
 ## riverHydrology
 
-Unclassified: `grottos`, `profiles`.
+Unclassified: `profiles`.
 
 ## riverRouting
 
@@ -197,5 +200,17 @@ Unclassified: none.
 Unclassified: `bedMaterial`.
 
 ## undergroundRiverSource
+
+Unclassified: none.
+
+## riverGrottos
+
+Unclassified: none.
+
+## coastalGrotto
+
+Unclassified: `seaCaves`.
+
+## inlandGrotto
 
 Unclassified: none.

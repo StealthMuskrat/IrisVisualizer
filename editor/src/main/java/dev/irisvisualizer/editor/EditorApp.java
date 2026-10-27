@@ -553,7 +553,86 @@ public final class EditorApp extends Application {
         if (ImGui.treeNode("River geometry")) { drawRiverGeometry(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("Surface river settings")) { drawSurfaceRiver(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("Underground river settings")) { drawUndergroundRiver(rivers); ImGui.treePop(); }
+        if (ImGui.treeNode("Coastal and inland grotto settings")) { drawGrottoSettings(rivers); ImGui.treePop(); }
         for (String field : rivers.fields()) if (!HydrologyFields.RIVER_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawGrottoSettings(LosslessJson rivers) {
+        ImGui.textWrapped(GrottoFields.description("grottos"));
+        LosslessJson grottos;
+        try { grottos=GrottoFields.grottos(rivers); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored grotto settings have an unsupported type (read-only)."); return; }
+        if (grottos==null) {
+            if (ImGui.button("Create grotto settings (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,GrottoFields.enableGrottos(selected,workspace.read(selected))));
+            return;
+        }
+        for (String section : GrottoFields.SECTIONS) {
+            if (ImGui.treeNode(section+" grotto")) { drawGrottoSection(grottos,section); ImGui.treePop(); }
+        }
+        for (String field : grottos.fields()) if (!GrottoFields.SECTIONS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawGrottoSection(LosslessJson grottos,String section) {
+        ImGui.textWrapped(GrottoFields.description(section));
+        LosslessJson object;
+        try { object=GrottoFields.section(grottos,section); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored grotto section has an unsupported type (read-only)."); return; }
+        if (object==null) {
+            if (ImGui.button("Create "+section+" (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,GrottoFields.enableSection(selected,workspace.read(selected),section)));
+            return;
+        }
+        for (String field : GrottoFields.fields(section)) {
+            String token=object.token(field),key=GrottoFields.draftPrefix(section)+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(GrottoFields.help(section,field));
+            if (GrottoFields.enumField(section,field)) {
+                if (token==null) {
+                    if (ImGui.button("Enable ("+GrottoFields.defaultToken(section,field)+")")) applyRoutingExtra(() -> workspace.replace(selected,GrottoFields.enableScalar(selected,workspace.read(selected),section,field)));
+                } else {
+                    String current=null;
+                    try { current=object.stringToken(field); }
+                    catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored choice is not a string (read-only)."); }
+                    if (current!=null) {
+                        if (!GrottoFields.choices().contains(current)) ImGui.textWrapped("Unrecognized stored choice. Choose a listed option to replace it.");
+                        if (ImGui.beginCombo("Pool level",current.length()>128 ? "Unrecognized choice" : current)) {
+                            for (String choice : GrottoFields.choices()) {
+                                if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,GrottoFields.setEnum(selected,workspace.read(selected),section,field,choice)));
+                                if (ImGui.isItemHovered()) ImGui.setTooltip(GrottoFields.choiceHelp(choice));
+                            }
+                            ImGui.endCombo();
+                        }
+                    }
+                }
+            } else if (GrottoFields.booleanField(section,field)) {
+                String effective=token==null ? GrottoFields.defaultToken(section,field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Enabled (Iris default)" : "Enabled",effective.equals("true")))
+                    applyRoutingExtra(() -> workspace.replace(selected,GrottoFields.setBoolean(selected,workspace.read(selected),section,field,!effective.equals("true"))));
+            } else if (!GrottoFields.nullable(section,field) && token==null) {
+                if (ImGui.button("Enable ("+GrottoFields.defaultToken(section,field)+")")) applyRoutingExtra(() -> workspace.replace(selected,GrottoFields.enableScalar(selected,workspace.read(selected),section,field)));
+            } else {
+                boolean fallback=GrottoFields.nullable(section,field) && (token==null || token.equals("null"));
+                if (!fallback && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+                else {
+                    ImGui.textWrapped(GrottoFields.constraints(section,field));
+                    if (fallback) ImGui.textWrapped(GrottoFields.fallbackHelp());
+                    String stored=fallback ? "" : token;
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+                    ImGui.inputText("Value",input); drafts.update(key,stored,input.get());
+                    if (ImGui.button(GrottoFields.nullable(section,field) ? "Set override" : "Apply")) {
+                        try { workspace.replace(selected,GrottoFields.setText(selected,workspace.read(selected),section,field,input.get())); drafts.applied(key); values.remove(key); error=null; }
+                        catch (Exception failure) { error=failure.getMessage(); }
+                    }
+                    if (GrottoFields.nullable(section,field)) {
+                        ImGui.sameLine();
+                        if (ImGui.button("Use Iris fallback")) {
+                            try { workspace.replace(selected,GrottoFields.reset(selected,workspace.read(selected),section,field)); drafts.applied(key); values.remove(key); error=null; }
+                            catch (Exception failure) { error=failure.getMessage(); }
+                        }
+                    }
+                }
+            }
+            ImGui.popID();
+        }
+        for (String field : object.fields()) if (!GrottoFields.fields(section).contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawUndergroundRiver(LosslessJson rivers) {
         ImGui.textWrapped(UndergroundRiverFields.description("underground"));
@@ -1761,7 +1840,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
