@@ -2235,6 +2235,14 @@
     "fromBottom": {
       "classification": "generation",
       "reason": "Bounded floating placement effect authoring; excavation/meld/waterlogging in all four collections and anchor/water-query flags in floatingObjects only. Native mode/world behavior is unvalidated."
+    },
+    "stiltSettings": {
+      "classification": "generation",
+      "reason": "Optional inline stilt/vacuum authoring across floating collections, preserving native mode fallbacks; classic stilt ranges stay read-only in anchored paths."
+    },
+    "vacuumSettings": {
+      "classification": "generation",
+      "reason": "Optional inline stilt/vacuum authoring across floating collections, preserving native mode fallbacks; classic stilt ranges stay read-only in anchored paths."
     }
   },
   "objectTranslate": {
@@ -2321,6 +2329,58 @@
     "maximumHeight": {
       "classification": "generation",
       "reason": "Exact annotation-bounded height clamp pair in floatingObjects placements only; native force/raw-mode bypasses and world compatibility are not validated."
+    }
+  },
+  "stiltSettings": {
+    "yMax": {
+      "classification": "generation",
+      "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    },
+    "yRand": {
+      "classification": "generation",
+      "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    },
+    "overStilt": {
+      "classification": "generation",
+      "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    },
+    "organicMaxScan": {
+      "classification": "generation",
+      "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    },
+    "organicJitter": {
+      "classification": "generation",
+      "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    },
+    "organicScratch": {
+      "classification": "generation",
+      "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    },
+    "exclude": {
+      "classification": "generation",
+      "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    }
+  },
+  "vacuumSettings": {
+    "radius": {
+      "classification": "generation",
+      "reason": "Source-bounded floating placement vacuum control with native radius/mode fallbacks; full terrain context and deformation remain unvalidated."
+    },
+    "falloff": {
+      "classification": "generation",
+      "reason": "Source-bounded floating placement vacuum control with native radius/mode fallbacks; full terrain context and deformation remain unvalidated."
+    },
+    "organicJitter": {
+      "classification": "generation",
+      "reason": "Source-bounded floating placement vacuum control with native radius/mode fallbacks; full terrain context and deformation remain unvalidated."
+    },
+    "waveAmplitude": {
+      "classification": "generation",
+      "reason": "Source-bounded floating placement vacuum control with native radius/mode fallbacks; full terrain context and deformation remain unvalidated."
+    },
+    "waveScale": {
+      "classification": "generation",
+      "reason": "Source-bounded floating placement vacuum control with native radius/mode fallbacks; full terrain context and deformation remain unvalidated."
     }
   }
 }
