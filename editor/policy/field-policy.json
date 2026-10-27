@@ -1023,6 +1023,10 @@
     "drops": {
       "classification": "generation",
       "reason": "River passage subsection; explicit empty-object creation and bounded primitive edits preserve class defaults and inactive fields."
+    },
+    "banks3D": {
+      "classification": "generation",
+      "reason": "Explicit bank settings creation and bounded scalar/density-style controls preserve river planning and unknown configuration."
     }
   },
   "riverMeanders": {
@@ -1187,6 +1191,36 @@
     "undergroundCascadeRunPerBlock": {
       "classification": "generation",
       "reason": "Source-defined drop scalar with primitive defaults, exact integer parsing where required and finite annotation bounds."
+    }
+  },
+  "riverBank3D": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Source-defined bank scalar default/type with exact integers and native/annotation finite bounds."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Source-defined bank scalar default/type with exact integers and native/annotation finite bounds."
+    },
+    "amplitude": {
+      "classification": "generation",
+      "reason": "Source-defined bank scalar default/type with exact integers and native/annotation finite bounds."
+    },
+    "horizontalScale": {
+      "classification": "generation",
+      "reason": "Source-defined bank scalar default/type with exact integers and native/annotation finite bounds."
+    },
+    "verticalScale": {
+      "classification": "generation",
+      "reason": "Source-defined bank scalar default/type with exact integers and native/annotation finite bounds."
+    },
+    "maximumOverhang": {
+      "classification": "generation",
+      "reason": "Source-defined bank scalar default/type with exact integers and native/annotation finite bounds."
+    },
+    "densityStyle": {
+      "classification": "generation",
+      "reason": "Contextual SIMPLEX default and bounded base style, zoom, exponent and cellular controls; native bank ranges apply while other style fields and fractures remain read-only."
     }
   }
 }

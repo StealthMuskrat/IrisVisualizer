@@ -102,6 +102,10 @@ public final class RiverGeometryFields {
         try {
             var geometry=geometry(rivers); if (geometry==null) return List.of();
             for (String field : geometry.fields()) {
+                if (RiverBankFields.OBJECT_FIELDS.contains(field)) {
+                    for (String path : RiverBankFields.readOnlyPaths(geometry)) paths.add("geometry."+path);
+                    continue;
+                }
                 if (!sections().contains(field)) { paths.add("geometry."+field); continue; }
                 try {
                     var object=section(geometry,field);

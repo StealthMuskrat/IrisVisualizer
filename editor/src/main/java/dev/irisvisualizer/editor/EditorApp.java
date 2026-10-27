@@ -413,7 +413,7 @@ public final class EditorApp extends Application {
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored style is a snippet or unsupported value (read-only)."); return; }
         ImGui.textWrapped(NoiseStyleFields.contextDescription(target));
         ImGui.textWrapped("Expression and image-map settings can override the base style. Those, cache and fracture settings remain read-only.");
-        ImGui.textWrapped(target.terrain() ? "Terrain styles require positive cellular zoom even when cellular frequency is zero."
+        ImGui.textWrapped(target.strictBounds() ? "This density style requires positive cellular zoom even when cellular frequency is zero."
                 : "Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
             ImGui.textWrapped("Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
@@ -444,7 +444,8 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else {
+            } else if (target.banks() && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
                 ImGui.inputText("Value", input); drafts.update(key, token, input.get());
@@ -564,7 +565,44 @@ public final class EditorApp extends Application {
         for (String section : RiverGeometryFields.sections()) {
             if (ImGui.treeNode(section+" settings")) { drawRiverGeometrySection(geometry,section); ImGui.treePop(); }
         }
-        for (String field : geometry.fields()) if (!RiverGeometryFields.sections().contains(field)) ImGui.textWrapped(field+" (read-only)");
+        if (ImGui.treeNode("Bank shelves (banks3D)")) { drawRiverBanks(geometry); ImGui.treePop(); }
+        for (String field : geometry.fields()) if (!RiverGeometryFields.sections().contains(field) && !RiverBankFields.OBJECT_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawRiverBanks(LosslessJson geometry) {
+        ImGui.textWrapped(RiverBankFields.description("banks3D"));
+        LosslessJson bank;
+        try { bank=RiverBankFields.object(geometry); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored bank geometry has an unsupported type (read-only)."); return; }
+        if (bank==null) {
+            ImGui.textWrapped("Absent bank settings use Iris defaults. Creating settings leaves river planning unchanged.");
+            if (ImGui.button("Create bank settings (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,RiverBankFields.enableObject(selected,workspace.read(selected))));
+            return;
+        }
+        for (String field : RiverBankFields.EDITABLE) {
+            String token=bank.token(field), key=RiverBankFields.draftPrefix()+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(RiverBankFields.description(field));
+            if (RiverBankFields.booleanField(field)) {
+                String effective=token==null ? RiverBankFields.defaultToken(field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Enabled (Iris default)" : "Enabled",effective.equals("true")))
+                    applyRoutingExtra(() -> workspace.replace(selected,RiverBankFields.setEnabled(selected,workspace.read(selected),!effective.equals("true"))));
+            } else if (token==null) {
+                if (ImGui.button("Enable ("+RiverBankFields.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,RiverBankFields.enable(selected,workspace.read(selected),field)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            else {
+                ImGui.textWrapped(RiverBankFields.constraints(field));
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Value",input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected,RiverBankFields.setText(selected,workspace.read(selected),field,input.get())); drafts.applied(key); values.remove(key); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        if (ImGui.treeNode("Bank density style")) { drawStyleFields(bank,NoiseStyleFields.Target.bank()); ImGui.treePop(); }
+        for (String field : bank.fields()) if (!RiverBankFields.EDITABLE.contains(field) && !RiverBankFields.STYLE_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawRiverGeometrySection(LosslessJson geometry, String section) {
         ImGui.textWrapped(RiverGeometryFields.description(section));
