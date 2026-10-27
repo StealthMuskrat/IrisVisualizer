@@ -171,6 +171,18 @@
     "dimensionHeight": {
       "classification": "generation",
       "reason": "Paired dimension-height authoring with source native constructor bounds/alignment and read-only logical-height guard; runtime borrowed types remain unresolved."
+    },
+    "rockPalette": {
+      "classification": "generation",
+      "reason": "General dimension block-palette authoring with class/context defaults and annotation weights 1-1000; runtime registry/state/block-role validation remains pending."
+    },
+    "fluidPalette": {
+      "classification": "generation",
+      "reason": "General dimension block-palette authoring with class/context defaults and annotation weights 1-1000; runtime registry/state/block-role validation remains pending."
+    },
+    "surfaceLayerFallback": {
+      "classification": "generation",
+      "reason": "Source-audited surface layer fallback choices with dimension default ROCK and nullable biome inheritance; world ownership/effective fallback is not resolved."
     }
   },
   "biome": {
@@ -253,6 +265,10 @@
     "riverPolicy": {
       "classification": "generation",
       "reason": "Nullable river routing/placement and scalar overrides; bounded editor preserves inheritance and unknown lists without resolving policies or generating rivers."
+    },
+    "surfaceLayerFallback": {
+      "classification": "generation",
+      "reason": "Source-audited surface layer fallback choices with dimension default ROCK and nullable biome inheritance; world ownership/effective fallback is not resolved."
     }
   },
   "generator": {

@@ -338,6 +338,21 @@ jobs:
           python editor/tools/extract_dimension_height_fields.py IrisDimension.java IrisRange.java IrisDimensionType.java PackDimensionValidator.java PackHydrologyValidator.java generated-dimension-height.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-dimension-height.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-height-fields.properties).Hash) { throw 'Pinned dimension height/envelope definitions differ' }
+      - name: Verify pinned general dimension palettes and surface fallbacks
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisSurfaceLayerFallback.java' -OutFile IrisSurfaceLayerFallback.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeLayerGenerator.java' -OutFile IrisBiomeLayerGenerator.java
+          python editor/tools/test_dimension_palette_fields.py IrisDimension.java IrisMaterialPalette.java IrisBlockData.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/test_surface_fallback_fields.py IrisDimension.java IrisBiome.java IrisSurfaceLayerFallback.java IrisBiomeLayerGenerator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_palette_fields.py IrisDimension.java IrisMaterialPalette.java IrisBlockData.java generated-dimension-palette.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_surface_fallback_fields.py IrisDimension.java IrisBiome.java IrisSurfaceLayerFallback.java IrisBiomeLayerGenerator.java generated-surface-fallback.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-palette.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-palette-fields.properties).Hash) { throw 'Pinned dimension palette definitions differ' }
+          if ((Get-FileHash generated-surface-fallback.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-fallback-fields.properties).Hash) { throw 'Pinned surface fallback definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

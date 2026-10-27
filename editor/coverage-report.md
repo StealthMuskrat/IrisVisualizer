@@ -4,10 +4,10 @@ Direct nonstatic/nontransient private fields in forty-nine pinned source classes
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 43 | 37 | 39 |
+| dimension | 82 | 46 | 40 | 36 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 20 | 14 | 22 |
+| biome | 42 | 21 | 15 | 21 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
@@ -56,7 +56,7 @@ Direct nonstatic/nontransient private fields in forty-nine pinned source classes
 
 ## dimension
 
-Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `fluidPalette`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `rockPalette`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `surfaceLayerFallback`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
+Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
 
 ## importedStructures
 
@@ -68,7 +68,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `layers`, `objects`, `ores`, `proceduralObjects`, `seaLayers`, `slab`, `structures`, `surfaceLayerFallback`, `surfaceOreReplaceableBlocks`, `vanillaDerivative`, `wall`.
+Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `layers`, `objects`, `ores`, `proceduralObjects`, `seaLayers`, `slab`, `structures`, `surfaceOreReplaceableBlocks`, `vanillaDerivative`, `wall`.
 
 ## biomeGeneratorLink
 
