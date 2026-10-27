@@ -111,7 +111,11 @@ final class StandingSurfacePoolTests {
             if (!bad.startsWith("\"")) rejects(() -> SurfacePools.setId(PATH,invalid,0,"valid"));
             rejects(() -> SurfacePools.setScalar(PATH,invalid,0,"density","1"));rejects(() -> SurfacePools.setRadii(PATH,invalid,0,"4","7"));
             if (!bad.startsWith("\"")) rejects(() -> SurfacePools.setBiome(PATH,invalid,0,"",workspace));
-            rejects(() -> target.createPalette(PATH,invalid));rejects(() -> target.initialize(PATH,invalid));rejects(() -> NoiseStyleFields.enable(PATH,invalid,styleTarget,"style"));
+            rejects(() -> target.createPalette(PATH,invalid));
+            if (bad.equals("{}")) {
+                check(fluid(target.initialize(PATH,invalid),0).stringToken("block").equals("lava"));
+                check(NoiseStyleFields.object(palette(NoiseStyleFields.enable(PATH,invalid,styleTarget,"style")),styleTarget).stringToken("style").equals("STATIC"));
+            } else { rejects(() -> target.initialize(PATH,invalid));rejects(() -> NoiseStyleFields.enable(PATH,invalid,styleTarget,"style")); }
             check(pool(SurfacePools.enableScalar(PATH,invalid,0,"depth")).token("density").equals(bad));
         }
         byte[] uninspectable=document("[{\"density\":1}]");uninspectable=bytes(text(uninspectable).replace("\"profiles\":[{\"id\":\"river\"}]","\"profiles\":null"));byte[] invalidCatalog=uninspectable;
