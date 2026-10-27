@@ -10,6 +10,7 @@ import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.system.MemoryUtil;
 import java.util.List;
 import imgui.type.ImString;
+import imgui.type.ImBoolean;
 import java.util.HashMap;
 import java.util.Map;
 import javax.swing.JFileChooser;
@@ -621,6 +622,7 @@ public final class EditorApp extends Application {
             drawFloatingPlacementSettings(placement,new FloatingPlacementSettings.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
+            if (list.equals("floatingObjects") && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
             if (ImGui.treeNode("Other placement data (read-only)")) { for (String field : FloatingObjectPlacements.readOnlyFields(placement,list)) ImGui.textWrapped(field);ImGui.treePop(); }
             ImGui.treePop();
         }
@@ -783,6 +785,84 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         for (String field : translate.fields()) if (!FloatingObjectPlacements.TRANSLATION_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawFloatingRotation(LosslessJson placement,FloatingObjectRotations.Context context) {
+        ImGui.textWrapped(FloatingObjectRotations.help());
+        ImGui.textWrapped("This collection preserves configured rotation. Anchored top/bottom collections replace it. Rotation changes placement geometry and block states; native rendering and placement are not previewed.");
+        if ("true".equals(placement.token("rotateTowardsSlope"))) ImGui.textWrapped("rotateTowardsSlope is enabled: Iris derives Y rotation from terrain and the Y minimum, replacing its maximum and interval. That option remains read-only.");
+        LosslessJson rotation;
+        try { rotation=FloatingObjectRotations.object(placement); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored rotation is a snippet or unsupported value (read-only).");return; }
+        if (rotation==null) {
+            ImGui.textWrapped("Absent rotation is enabled in Iris, with X/Z disabled and Y enabled in 90-degree increments. Create explicit rotation to author these settings.");
+            if (ImGui.button("Create rotation with Iris defaults")) {
+                try { commitProfileChange(context.prefix(),FloatingObjectRotations.create(selected,workspace.read(selected),context),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        String enabled=rotation.token("enabled");
+        if (enabled==null) {
+            if (ImGui.button("Enable stored rotation flag (true)")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectRotations.enableRotationFlag(selected,workspace.read(selected),context)));
+        } else if (!enabled.equals("true") && !enabled.equals("false")) ImGui.textWrapped("Stored rotation flag has an unsupported type (read-only).");
+        else {
+            ImBoolean flag=new ImBoolean(Boolean.parseBoolean(enabled));
+            if (ImGui.checkbox("Rotation enabled",flag)) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectRotations.setRotationFlag(selected,workspace.read(selected),context,flag.get())));
+        }
+        for (String axis : FloatingObjectRotations.AXES) if (ImGui.treeNode(axis)) {
+            drawFloatingRotationAxis(rotation,context,axis);ImGui.treePop();
+        }
+        for (String path : FloatingObjectRotations.readOnlyPaths(placement)) ImGui.textWrapped(path+" (read-only)");
+    }
+    private void drawFloatingRotationAxis(LosslessJson rotation,FloatingObjectRotations.Context context,String axis) {
+        ImGui.textWrapped(FloatingObjectRotations.axisHelp(axis));LosslessJson object;
+        try { object=FloatingObjectRotations.axisObject(rotation,axis); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored axis is a snippet or unsupported value (read-only).");return; }
+        if (object==null) {
+            ImGui.textWrapped(axis.equals("yAxis") ? "Absent Y is enabled with interval 90. Creating it preserves those defaults explicitly. An existing empty axis instead uses class defaults: disabled, interval 0." : "Absent axis is disabled with zero angle bounds and interval 0. Creating it retains those defaults.");
+            if (ImGui.button("Create axis with Iris defaults")) {
+                try { commitProfileChange(context.axisPrefix(axis),FloatingObjectRotations.createAxis(selected,workspace.read(selected),context,axis),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        String enabled=object.token("enabled");
+        if (enabled==null) {
+            ImGui.textWrapped("An absent enabled flag in an existing axis defaults to false.");
+            if (ImGui.button("Enable stored axis flag (false)")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectRotations.enableAxisField(selected,workspace.read(selected),context,axis,"enabled")));
+        } else if (!enabled.equals("true") && !enabled.equals("false")) ImGui.textWrapped("Stored axis flag has an unsupported type (read-only).");
+        else {
+            ImBoolean flag=new ImBoolean(Boolean.parseBoolean(enabled));
+            if (ImGui.checkbox("Axis enabled",flag)) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectRotations.setAxisFlag(selected,workspace.read(selected),context,axis,flag.get())));
+        }
+        ImGui.textWrapped("Angle bounds 0/0 allow any angle. Equal nonzero bounds lock the angle. The editor writes ordered bounds; Iris also accepts reversed ranges.");
+        drawFloatingRotationAngles(object,context,axis);
+        ImGui.textWrapped(FloatingObjectRotations.fieldHelp("interval"));ImGui.textWrapped(FloatingObjectRotations.constraints("interval"));
+        String token=object.token("interval"),key=context.axisPrefix(axis)+"interval";
+        if (token==null) {
+            if (ImGui.button("Enable interval (0)")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectRotations.enableAxisField(selected,workspace.read(selected),context,axis,"interval")));
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored interval has an unsupported type (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Interval",input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply interval")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectRotations.setInterval(selected,workspace.read(selected),context,axis,input.get())));
+        }
+    }
+    private void drawFloatingRotationAngles(LosslessJson object,FloatingObjectRotations.Context context,String axis) {
+        String min=object.token("min"),max=object.token("max");
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored angle bounds have unsupported types (read-only).");return; }
+        String storedMin=min==null ? FloatingObjectRotations.axisDefault("min") : min,storedMax=max==null ? FloatingObjectRotations.axisDefault("max") : max;
+        String minKey=context.axisPrefix(axis)+"min",maxKey=context.axisPrefix(axis)+"max";
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImString maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImGui.textWrapped(FloatingObjectRotations.constraints("min"));
+        ImGui.inputText(min==null ? "Minimum (Iris default)" : "Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());
+        ImGui.inputText(max==null ? "Maximum (Iris default)" : "Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        if (ImGui.button("Apply angle bounds")) {
+            try {
+                workspace.replace(selected,FloatingObjectRotations.setAngles(selected,workspace.read(selected),context,axis,minimum.get(),maximum.get()));
+                drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null;
+            } catch (Exception failure) { error=failure.getMessage(); }
+        }
     }
     private void drawFloatingBottomPalette(LosslessJson entry,int index) {
         if (!ImGui.treeNode("Custom underside palette layers")) return;
