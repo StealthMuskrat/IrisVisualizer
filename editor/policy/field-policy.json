@@ -203,6 +203,10 @@
     "allObjectScaleFactor": {
       "classification": "generation",
       "reason": "Finite default object scale used only when an object or placement has no explicit scale; jigsaw structures excluded."
+    },
+    "blockFallbacks": {
+      "classification": "generation",
+      "reason": "Pack-wide missing-block substitutions collected from top-level dimension maps; literal authoring and advisory normalized-source overlaps only, with no runtime registry or winner prediction."
     }
   },
   "biome": {

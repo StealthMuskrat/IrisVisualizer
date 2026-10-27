@@ -24,6 +24,7 @@ public final class EditorApp extends Application {
     private String selected, error;
     private String riverCatalogDimension;
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
+    private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
     private PackWorkspace referenceWorkspace;
     private String referencePath;
     private long referenceRevision = -1;
@@ -173,6 +174,7 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
+                    drawBlockFallbacks(document);
                     drawStaticObjects(document);
                     drawDepositVariants(document,"dimensions");
                     drawDeposits(document,"dimensions");
@@ -584,6 +586,37 @@ public final class EditorApp extends Application {
         }
     }
     private static String mappingDraft(String source,String target) { return source.length()+":"+source+target; }
+    private void drawBlockFallbacks(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Missing-block fallbacks")) return;ImGui.pushID("blockFallbacks");
+        ImGui.textWrapped(BlockFallbacks.help());
+        ImGui.textWrapped("Native resolution tries the registry, then legacy renames, then one fallback target lookup. Fallback targets are not followed through other fallback rules. Source ids use base material identity. Registry readiness, block/state validity, aliases and effective content compatibility are not evaluated here.");
+        ImGui.textWrapped("Iris collects fallback maps from every top-level dimension JSON in the pack. Duplicate and aliased sources can overlap across files or within a map. Native file/property iteration determines the winner; the editor does not predict it. Removing a mapping here leaves other dimension maps intact.");
+        if (ImGui.treeNode("Pack-wide source overlaps")) {
+            var audit=blockFallbackAudits.inspect(workspace);ImGui.text(audit.inspectedDimensions()+" dimensions inspected; "+audit.definitions()+" nonblank definitions; "+audit.overlaps().size()+" overlapping sources.");
+            ImGui.textWrapped("Advisory only: normalized source identity is checked; no target resolution or runtime winner is computed. Unsupported resources are listed below. This check never blocks Save/Export.");
+            for (var overlap : audit.overlaps()) if (ImGui.treeNode(overlap.normalizedSource())) { for (var item : overlap.definitions()) ImGui.textWrapped(item.path()+" | "+item.source()+" -> "+item.target());ImGui.treePop(); }
+            for (var notice : audit.notices()) ImGui.textWrapped(notice.path()+": "+notice.message());ImGui.treePop();
+        }
+        List<LosslessJson.StringProperty> rows;
+        try { rows=BlockFallbacks.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored fallback map is null, mixed, a snippet or unsupported (read-only).");ImGui.popID();return; }
+        if (rows==null) {
+            if (ImGui.button("Initialize empty fallback map")) { try { commitProfileChange(BlockFallbacks.prefix(),BlockFallbacks.enable(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            ImGui.popID();return;
+        }
+        String newKey=BlockFallbacks.prefix()+"new.mapping";ImString source=values.computeIfAbsent(newKey+".source",ignored -> new ImString("",4096)),target=values.computeIfAbsent(newKey+".target",ignored -> new ImString("",4096));
+        ImGui.inputText("New namespaced source id",source);ImGui.inputText("New fallback state",target);drafts.update(newKey,mappingDraft("",""),mappingDraft(source.get(),target.get()));
+        if (ImGui.button("Add fallback mapping")) { try { commitProfileChange(BlockFallbacks.prefix(),BlockFallbacks.add(selected,workspace.read(selected),source.get(),target.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        if (rows.isEmpty()) ImGui.textWrapped("Empty map contributes no fallback definitions from this dimension file.");
+        for (int index=0;index<rows.size();index++) {
+            ImGui.pushID(index);var row=rows.get(index);String key=BlockFallbacks.prefix()+index;
+            ImString from=values.computeIfAbsent(key+".source",ignored -> new ImString(row.key(),Math.max(4096,row.key().getBytes(StandardCharsets.UTF_8).length+1))),to=values.computeIfAbsent(key+".target",ignored -> new ImString(row.value(),Math.max(4096,row.value().getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Source id",from);ImGui.inputText("Fallback state",to);drafts.update(key,mappingDraft(row.key(),row.value()),mappingDraft(from.get(),to.get()));
+            if (ImGui.button("Apply fallback mapping")) { try { commitProfileChange(BlockFallbacks.prefix(),BlockFallbacks.set(selected,workspace.read(selected),row.key(),from.get(),to.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+            if (ImGui.button("Remove fallback mapping")) { ImGui.popID();try { commitProfileChange(BlockFallbacks.prefix(),BlockFallbacks.remove(selected,workspace.read(selected),row.key()),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+            ImGui.popID();
+        }
+        ImGui.popID();
+    }
     private void drawStaticObjects(LosslessJson document) {
         if (!ImGui.collapsingHeader("Fixed dimension objects")) return;
         ImGui.pushID("staticObjects");

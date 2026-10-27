@@ -565,6 +565,16 @@ jobs:
           python editor/tools/extract_static_object_fields.py IrisStaticObject.java IrisStaticObjectRotation.java IrisPosition.java IrisDimension.java IrisObjectScale.java IrisStaticObjectLayer.java IrisObjectPlacementScaleInterpolator.java IrisObjectPlacementRunner.java generated-static-object-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-static-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/static-object-fields.properties).Hash) { throw 'Pinned static object definitions differ' }
+      - name: Verify pinned block fallback definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/validation/ContentGate.java' -OutFile ContentGate.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectIO.java' -OutFile IrisObjectIO.java
+          python editor/tools/test_block_fallback_fields.py IrisDimension.java ContentGate.java IrisBlockData.java IrisObjectIO.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_block_fallback_fields.py IrisDimension.java ContentGate.java IrisBlockData.java IrisObjectIO.java generated-block-fallback-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-block-fallback-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/block-fallback-fields.properties).Hash) { throw 'Pinned block fallback definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

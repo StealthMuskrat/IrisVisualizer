@@ -22,6 +22,7 @@ public final class DimensionFields {
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
         for (String field : document.fields()) {
+            if (BlockFallbacks.OBJECT_FIELDS.contains(field)) continue;
             if (StaticObjects.LIST_FIELDS.contains(field) || StaticObjects.ROOT_FIELDS.contains(field)) continue;
             if (EDITABLE.contains(field) || OreGenerators.LIST_FIELDS.contains(field) || DepositGenerators.LIST_FIELDS.contains(field) || DepositVariants.LIST_FIELDS.contains(field)) continue;
             if (SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field)) continue;
