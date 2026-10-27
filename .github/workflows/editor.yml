@@ -232,6 +232,16 @@ jobs:
           python editor/tools/extract_surface_shaping_fields.py IrisSurfaceRiverConfig.java IrisSurfaceRiverBankConfig.java IrisSurfaceRiverErosionConfig.java IrisSurfaceRiverBedConfig.java IrisRiverExcavationConfig.java IrisRiverBlendStyle.java IrisRiverBedProfile.java generated-surface-shaping.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-surface-shaping.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-shaping-fields.properties).Hash) { throw 'Pinned surface-shaping definitions differ' }
+      - name: Verify pinned endpoint pond defaults and constructor behavior
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisSurfaceRiverPondsConfig.java' -OutFile IrisSurfaceRiverPondsConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisSurfaceRiverPondConfig.java' -OutFile IrisSurfaceRiverPondConfig.java
+          python editor/tools/test_surface_pond_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_surface_pond_fields.py IrisSurfaceRiverConfig.java IrisSurfaceRiverPondsConfig.java IrisSurfaceRiverPondConfig.java generated-surface-pond.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-surface-pond.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-pond-fields.properties).Hash) { throw 'Pinned surface-pond definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

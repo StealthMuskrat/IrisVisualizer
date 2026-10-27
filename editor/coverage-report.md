@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in thirty-five pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in thirty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -30,7 +30,7 @@ Direct nonstatic/nontransient private fields in thirty-five pinned source classe
 | riverChannelShape | 12 | 12 | 12 | 0 |
 | riverDropShape | 8 | 8 | 8 | 0 |
 | riverBank3D | 7 | 7 | 7 | 0 |
-| surfaceRiver | 9 | 8 | 8 | 1 |
+| surfaceRiver | 9 | 9 | 9 | 0 |
 | surfaceRiverSource | 4 | 4 | 4 | 0 |
 | surfaceRiverChannel | 12 | 10 | 10 | 2 |
 | surfaceRiverBank | 10 | 8 | 8 | 2 |
@@ -39,6 +39,8 @@ Direct nonstatic/nontransient private fields in thirty-five pinned source classe
 | surfaceRiverErosion | 9 | 9 | 9 | 0 |
 | surfaceRiverBed | 4 | 2 | 2 | 2 |
 | riverExcavation | 3 | 3 | 3 | 0 |
+| surfaceRiverPonds | 2 | 2 | 2 | 0 |
+| surfaceRiverPond | 4 | 4 | 4 | 0 |
 
 ## dimension
 
@@ -146,7 +148,7 @@ Unclassified: none.
 
 ## surfaceRiver
 
-Unclassified: `ponds`.
+Unclassified: none.
 
 ## surfaceRiverSource
 
@@ -177,5 +179,13 @@ Unclassified: none.
 Unclassified: `material`, `paddingPalette`.
 
 ## riverExcavation
+
+Unclassified: none.
+
+## surfaceRiverPonds
+
+Unclassified: none.
+
+## surfaceRiverPond
 
 Unclassified: none.

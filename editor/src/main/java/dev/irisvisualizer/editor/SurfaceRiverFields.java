@@ -11,7 +11,7 @@ import java.util.function.Function;
 /** Bounded surface-river authoring; inherited policies and physical generation are not evaluated. */
 public final class SurfaceRiverFields {
     public static final List<String> OBJECT_FIELDS = List.of("surface");
-    public static final List<String> ROOT_FIELDS = List.of("enabled", "sources", "channel", "banks", "flow", "mouths", "erosion", "bed");
+    public static final List<String> ROOT_FIELDS = List.of("enabled", "sources", "channel", "banks", "flow", "mouths", "erosion", "bed", "ponds");
     public static final List<String> SECTIONS = List.of("sources", "channel", "banks", "flow", "mouths");
     public static final List<String> ROOT_SCALARS = List.of("enabled");
     public static final List<String> SOURCE_FIELDS = List.of("density", "minimumElevation", "minimumPerTile", "minimumSpacing");
@@ -76,7 +76,7 @@ public final class SurfaceRiverFields {
         return object.enableObject(field);
     }
     public static byte[] enableSurface(String path,byte[] original) { authorize(path); return HydrologyFields.editRivers(original,rivers -> createAbsent(rivers,"surface")); }
-    private static byte[] editSurface(byte[] original,Function<LosslessJson,byte[]> action) { return HydrologyFields.editRivers(original,rivers -> rivers.objectEdit("surface",action,false)); }
+    static byte[] editSurface(byte[] original,Function<LosslessJson,byte[]> action) { return HydrologyFields.editRivers(original,rivers -> rivers.objectEdit("surface",action,false)); }
     private static byte[] editSection(byte[] original,String section,Function<LosslessJson,byte[]> action) { return editSurface(original,surface -> section.equals("banks.excavation") ? surface.objectEdit("banks",bank -> bank.objectEdit("excavation",action,false),false) : section.isEmpty() ? action.apply(surface) : surface.objectEdit(section,action,false)); }
     public static byte[] enableSection(String path,byte[] original,String section) {
         authorize(path); if (!sections().contains(section) && !section.equals("banks.excavation")) throw new IllegalArgumentException("Surface-river section is read-only");
@@ -113,6 +113,10 @@ public final class SurfaceRiverFields {
             var surface=surface(rivers); if (surface==null) return List.of();
             for (String field : surface.fields()) {
                 if (ROOT_SCALARS.contains(field)) continue;
+                if (SurfacePondFields.OBJECT_FIELDS.contains(field)) {
+                    for (String path : SurfacePondFields.readOnlyPaths(surface)) paths.add("surface."+path);
+                    continue;
+                }
                 if (!sections().contains(field)) { paths.add("surface."+field); continue; }
                 try {
                     var object=section(surface,field);
