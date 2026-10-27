@@ -250,6 +250,16 @@ jobs:
           python editor/tools/extract_channel_ranges.py IrisSurfaceRiverChannelConfig.java IrisStyledRange.java IrisGeneratorStyle.java generated-channel-ranges.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-channel-ranges.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-channel-ranges.properties).Hash) { throw 'Pinned channel range definitions differ' }
+      - name: Verify pinned underground river and source definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisUndergroundRiverConfig.java' -OutFile IrisUndergroundRiverConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisUndergroundRiverSourceConfig.java' -OutFile IrisUndergroundRiverSourceConfig.java
+          python editor/tools/test_underground_river_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_underground_river_fields.py IrisRiverHydrology.java IrisUndergroundRiverConfig.java IrisUndergroundRiverSourceConfig.java generated-underground-river.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-underground-river.properties).Hash -ne (Get-FileHash editor/src/main/resources/underground-river-fields.properties).Hash) { throw 'Pinned underground-river definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

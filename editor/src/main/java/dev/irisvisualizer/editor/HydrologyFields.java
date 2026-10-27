@@ -12,7 +12,7 @@ import java.util.function.Function;
 public final class HydrologyFields {
     public static final List<String> ROOT_FIELDS = List.of("hydrology");
     public static final List<String> HYDROLOGY_FIELDS = List.of("rivers");
-    public static final List<String> RIVER_FIELDS = List.of("enabled", "routing", "geometry", "surface");
+    public static final List<String> RIVER_FIELDS = List.of("enabled", "routing", "geometry", "surface", "underground");
     public static final List<String> ROUTING_FIELDS = List.of("tileSize", "sampleSpacing", "maximumRouteLength", "minimumSurfaceCourseLength", "minimumUndergroundCourseLength", "maximumOutletsPerTile", "maximumCoastalOutletsPerTile", "oceanOutlets", "valleyPreference", "uphillPenalty", "slopePenalty", "confluenceAttraction", "lengthPreference", "tributaries");
     private static final Properties DEFINITIONS = new Properties();
     static {
@@ -98,6 +98,10 @@ public final class HydrologyFields {
                     var rivers=rivers(hydro);
                     for (String riverField : rivers.fields()) {
                         if (riverField.equals("enabled")) continue;
+                        if (UndergroundRiverFields.OBJECT_FIELDS.contains(riverField)) {
+                            for (String path : UndergroundRiverFields.readOnlyPaths(rivers)) paths.add("hydrology.rivers."+path);
+                            continue;
+                        }
                         if (SurfaceRiverFields.OBJECT_FIELDS.contains(riverField)) {
                             for (String path : SurfaceRiverFields.readOnlyPaths(rivers)) paths.add("hydrology.rivers."+path);
                             continue;

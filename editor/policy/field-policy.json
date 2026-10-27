@@ -901,6 +901,10 @@
     "surface": {
       "classification": "generation",
       "reason": "Explicit surface-river settings creation and bounded primitive controls preserve river planning and nested physical configuration."
+    },
+    "underground": {
+      "classification": "generation",
+      "reason": "Explicit independent underground settings creation with bounded scalar/source/range controls preserves river planning and unknown configuration."
     }
   },
   "riverRouting": {
@@ -1511,6 +1515,70 @@
     "depth": {
       "classification": "generation",
       "reason": "Source-defined primitive default/type and exact integer annotation bounds; endpoint-specific creation, unknown data and unapplied drafts remain preserved."
+    }
+  },
+  "undergroundRiver": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "sources": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "fluidLevel": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "channelWidth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "headroom": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "connectToExistingCaves": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "mouthLevelingDistance": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "tributaries": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "minimumRockCover": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "minimumFloorCover": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    },
+    "wideningSources": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds or explicit source/range creation; contextual range defaults are retained and cross-field/native validity is not evaluated."
+    }
+  },
+  "undergroundRiverSource": {
+    "density": {
+      "classification": "generation",
+      "reason": "Source-defined underground allocation scalar with finite annotation bounds and exact signed integers where required."
+    },
+    "minimumPerTile": {
+      "classification": "generation",
+      "reason": "Source-defined underground allocation scalar with finite annotation bounds and exact signed integers where required."
+    },
+    "minimumSpacing": {
+      "classification": "generation",
+      "reason": "Source-defined underground allocation scalar with finite annotation bounds and exact signed integers where required."
     }
   }
 }

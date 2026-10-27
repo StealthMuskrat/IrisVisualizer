@@ -444,7 +444,7 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else if ((target.banks() || target.channelRange()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            } else if ((target.banks() || target.riverRange()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
             else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
@@ -552,7 +552,62 @@ public final class EditorApp extends Application {
         if (ImGui.treeNode("Drainage routing settings")) { drawHydrologyRouting(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("River geometry")) { drawRiverGeometry(rivers); ImGui.treePop(); }
         if (ImGui.treeNode("Surface river settings")) { drawSurfaceRiver(rivers); ImGui.treePop(); }
+        if (ImGui.treeNode("Underground river settings")) { drawUndergroundRiver(rivers); ImGui.treePop(); }
         for (String field : rivers.fields()) if (!HydrologyFields.RIVER_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawUndergroundRiver(LosslessJson rivers) {
+        ImGui.textWrapped(UndergroundRiverFields.description("underground"));
+        LosslessJson underground;
+        try { underground=UndergroundRiverFields.underground(rivers); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored underground settings have an unsupported type (read-only)."); return; }
+        if (underground==null) {
+            ImGui.textWrapped("Creating settings leaves river planning unchanged. The underground source budget keeps its enabled Iris default.");
+            if (ImGui.button("Create underground settings (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,UndergroundRiverFields.enableUnderground(selected,workspace.read(selected))));
+            return;
+        }
+        drawUndergroundScalars(underground,false);
+        if (ImGui.treeNode("Underground sources")) {
+            ImGui.textWrapped(UndergroundRiverFields.description("sources"));
+            try {
+                var sources=UndergroundRiverFields.sources(underground);
+                if (sources==null) {
+                    if (ImGui.button("Create source settings (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,UndergroundRiverFields.enableSources(selected,workspace.read(selected))));
+                } else {
+                    drawUndergroundScalars(sources,true);
+                    for (String field : sources.fields()) if (!UndergroundRiverFields.SOURCE_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                }
+            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored sources have an unsupported type (read-only)."); }
+            ImGui.treePop();
+        }
+        for (String field : RiverChannelRanges.UNDERGROUND_FIELDS) {
+            if (ImGui.treeNode(field+" range")) { drawChannelRange(underground,RiverChannelRanges.undergroundKey(field)); ImGui.treePop(); }
+        }
+        for (String field : underground.fields()) if (!UndergroundRiverFields.ROOT_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawUndergroundScalars(LosslessJson object,boolean sources) {
+        for (String field : UndergroundRiverFields.fields(sources)) {
+            String token=object.token(field), key=UndergroundRiverFields.draftPrefix(sources)+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(UndergroundRiverFields.help(sources,field));
+            if (UndergroundRiverFields.booleanField(sources,field)) {
+                String effective=token==null ? UndergroundRiverFields.defaultToken(sources,field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Enabled (Iris default)" : "Enabled",effective.equals("true")))
+                    applyRoutingExtra(() -> workspace.replace(selected,UndergroundRiverFields.setBoolean(selected,workspace.read(selected),sources,field,!effective.equals("true"))));
+            } else if (token==null) {
+                if (ImGui.button("Enable ("+UndergroundRiverFields.defaultToken(sources,field)+")")) applyRoutingExtra(() -> workspace.replace(selected,UndergroundRiverFields.enableScalar(selected,workspace.read(selected),sources,field)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            else {
+                ImGui.textWrapped(UndergroundRiverFields.constraints(sources,field));
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Value",input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected,UndergroundRiverFields.setText(selected,workspace.read(selected),sources,field,input.get())); drafts.applied(key); values.remove(key); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
     }
     private void drawSurfaceRiver(LosslessJson rivers) {
         ImGui.textWrapped(SurfaceRiverFields.description("surface"));
@@ -619,7 +674,7 @@ public final class EditorApp extends Application {
                 } catch (Exception failure) { error=failure.getMessage(); }
             }
         }
-        if (ImGui.treeNode("Range style")) { drawStyleFields(range,NoiseStyleFields.Target.channelRange(field)); ImGui.treePop(); }
+        if (ImGui.treeNode("Range style")) { drawStyleFields(range,RiverChannelRanges.styleTarget(field)); ImGui.treePop(); }
         for (String member : range.fields()) if (!RiverChannelRanges.RANGE_FIELDS.contains(member)) ImGui.textWrapped(member+" (read-only)");
     }
     private void drawSurfacePonds(LosslessJson surface) {
@@ -1706,7 +1761,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }
