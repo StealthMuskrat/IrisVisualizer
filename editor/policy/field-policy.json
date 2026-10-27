@@ -1323,6 +1323,14 @@
     "springExtraDepth": {
       "classification": "generation",
       "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "width": {
+      "classification": "generation",
+      "reason": "Explicit styled range creation preserves contextual bounds/style/zoom; existing ranges use class defaults for absent members. Paired finite bounds and bounded style controls preserve other settings."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Explicit styled range creation preserves contextual bounds/style/zoom; existing ranges use class defaults for absent members. Paired finite bounds and bounded style controls preserve other settings."
     }
   },
   "surfaceRiverBank": {

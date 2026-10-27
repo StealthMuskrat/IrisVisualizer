@@ -24,6 +24,7 @@ public final class NoiseStyleFields {
             valid = valid || noise==null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.startsWith("caveProfile.")
                     && (CAVE_FIELDS.contains(objectField.substring("caveProfile.".length())) || objectField.equals("caveProfile.densityThreshold.style"));
             valid = valid || noise==null && "dimensions".equals(resourceBase) && objectField.equals("hydrology.rivers.geometry.banks3D.densityStyle");
+            valid = valid || noise==null && "dimensions".equals(resourceBase) && (objectField.equals("hydrology.rivers.surface.channel.width.style") || objectField.equals("hydrology.rivers.surface.channel.depth.style"));
             valid = moduleIndex == -1 ? valid : moduleIndex >= 0 && noise == null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.equals("caveProfile.modules.style");
             if (!valid) throw new IllegalArgumentException("Unsupported style target");
         }
@@ -41,14 +42,20 @@ public final class NoiseStyleFields {
             return new Target(context,"caveProfile.modules.style",null,index);
         }
         public static Target bank() { return new Target("dimensions","hydrology.rivers.geometry.banks3D.densityStyle",null); }
+        public static Target channelRange(String field) {
+            if (!RiverChannelRanges.OBJECT_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported channel range style");
+            return new Target("dimensions","hydrology.rivers.surface.channel."+field+".style",null);
+        }
+        public boolean channelRange() { return objectField.equals("hydrology.rivers.surface.channel.width.style") || objectField.equals("hydrology.rivers.surface.channel.depth.style"); }
+        public String rangeField() { if (!channelRange()) throw new IllegalArgumentException("Not a channel range style"); return objectField.substring("hydrology.rivers.surface.channel.".length(),objectField.length()-".style".length()); }
         public boolean banks() { return objectField.equals("hydrology.rivers.geometry.banks3D.densityStyle"); }
         public boolean strictBounds() { return terrain() || banks(); }
         public boolean terrain() { return objectField.startsWith("terrain3D."); }
         public boolean cave() { return objectField.startsWith("caveProfile."); }
         public boolean threshold() { return objectField.equals("caveProfile.densityThreshold.style"); }
         public boolean module() { return moduleIndex >= 0; }
-        public String member() { return banks() ? "densityStyle" : module() || threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
-        public String draftPrefix() { return banks() ? RiverBankFields.draftPrefix()+"densityStyle." : module() ? CaveModules.draftPrefix(resourceBase,moduleIndex)+"style." : threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
+        public String member() { return channelRange() ? "style" : banks() ? "densityStyle" : module() || threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
+        public String draftPrefix() { return channelRange() ? RiverChannelRanges.draftPrefix(rangeField())+"style." : banks() ? RiverBankFields.draftPrefix()+"densityStyle." : module() ? CaveModules.draftPrefix(resourceBase,moduleIndex)+"style." : threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
     }
     private static final Properties DEFINITIONS = new Properties();
     private static final List<String> CHOICES;
@@ -81,14 +88,15 @@ public final class NoiseStyleFields {
             }
             if (!CHOICES.contains(CaveThresholdFields.defaultStyle(false)) || !CHOICES.contains(CaveThresholdFields.defaultStyle(true)))
                 throw new IOException("Invalid pinned cave threshold styles");
+            if (!CHOICES.contains(RiverChannelRanges.classStyle()) || RiverChannelRanges.OBJECT_FIELDS.stream().anyMatch(field -> !CHOICES.contains(RiverChannelRanges.contextStyle(field)))) throw new IOException("Invalid pinned channel range styles");
             if (!CHOICES.contains(CaveModules.styleDefault())) throw new IOException("Invalid pinned cave module style");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static List<String> choices() { return CHOICES; }
     public static String noiseDefault() { return DEFINITIONS.getProperty("noiseDefault"); }
     public static String objectDefault() { return DEFINITIONS.getProperty("objectDefault"); }
-    public static String contextDefault(Target target) { return target.banks() ? RiverBankFields.styleDefault() : target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
-    public static String contextDescription(Target target) { return target.banks() ? RiverBankFields.description("densityStyle") : target.module() ? CaveModules.help("style") : target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
+    public static String contextDefault(Target target) { return target.channelRange() ? RiverChannelRanges.classStyle() : target.banks() ? RiverBankFields.styleDefault() : target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
+    public static String contextDescription(Target target) { return target.channelRange() ? RiverChannelRanges.styleDescription() : target.banks() ? RiverBankFields.description("densityStyle") : target.module() ? CaveModules.help("style") : target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
     public static String contextDefaultLabel(Target target) {
         String override=target.cave() && !target.threshold() && !target.module() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
         return contextDefault(target)+(override==null ? "" : ", zoom "+override);
@@ -181,6 +189,7 @@ public final class NoiseStyleFields {
         }
     }
     private static byte[] editContainer(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+        if (target.channelRange()) return RiverChannelRanges.editRange(original,target.rangeField(),operation);
         if (target.banks()) return RiverBankFields.editObject(original,operation);
         if (target.module()) return CaveModules.editObject(original,target.moduleIndex(),operation);
         if (target.threshold()) return new LosslessJson(original).objectEdit("caveProfile", profile -> profile.objectEdit("densityThreshold",operation,false),false);

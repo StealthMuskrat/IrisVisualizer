@@ -118,6 +118,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['surfaceRiver'] = set(editable(java_dir, 'SurfaceRiverFields', 'ROOT_FIELDS'))
     implemented['surfaceRiverSource'] = set(editable(java_dir, 'SurfaceRiverFields', 'SOURCE_FIELDS'))
     implemented['surfaceRiverChannel'] = set(editable(java_dir, 'SurfaceRiverFields', 'CHANNEL_FIELDS'))
+    implemented['surfaceRiverChannel'].update(editable(java_dir, 'RiverChannelRanges', 'OBJECT_FIELDS'))
     implemented['surfaceRiverBank'] = set(editable(java_dir, 'SurfaceRiverFields', 'BANK_FIELDS'))
     implemented['surfaceRiverFlow'] = set(editable(java_dir, 'SurfaceRiverFields', 'FLOW_FIELDS'))
     implemented['surfaceRiverMouth'] = set(editable(java_dir, 'SurfaceRiverFields', 'MOUTH_FIELDS'))

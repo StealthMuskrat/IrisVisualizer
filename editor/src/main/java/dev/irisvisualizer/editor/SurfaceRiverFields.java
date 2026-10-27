@@ -121,7 +121,9 @@ public final class SurfaceRiverFields {
                 try {
                     var object=section(surface,field);
                     for (String member : object.fields()) {
-                        if (field.equals("banks") && EXCAVATION_OBJECT_FIELDS.contains(member)) {
+                        if (field.equals("channel") && RiverChannelRanges.OBJECT_FIELDS.contains(member)) {
+                            for (String path : RiverChannelRanges.readOnlyPaths(object,member)) paths.add("surface.channel."+path);
+                        } else if (field.equals("banks") && EXCAVATION_OBJECT_FIELDS.contains(member)) {
                             try {
                                 var excavation=child(object,"excavation");
                                 for (String item : excavation.fields()) if (!EXCAVATION_FIELDS.contains(item)) paths.add("surface.banks.excavation."+item);

@@ -444,7 +444,7 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else if (target.banks() && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            } else if ((target.banks() || target.channelRange()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
             else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
@@ -577,8 +577,12 @@ public final class EditorApp extends Application {
                     } else {
                         drawSurfaceRiverScalars(object,section);
                         if (section.equals("banks") && ImGui.treeNode("Excavation limits")) { drawSurfaceExcavation(surface); ImGui.treePop(); }
+                        if (section.equals("channel")) for (String field : RiverChannelRanges.OBJECT_FIELDS) {
+                            if (ImGui.treeNode(field+" range")) { drawChannelRange(object,field); ImGui.treePop(); }
+                        }
                         for (String field : object.fields()) if (!SurfaceRiverFields.fields(section).contains(field)
-                                && !(section.equals("banks") && SurfaceRiverFields.EXCAVATION_OBJECT_FIELDS.contains(field))) ImGui.textWrapped(field+" (read-only)");
+                                && !(section.equals("banks") && SurfaceRiverFields.EXCAVATION_OBJECT_FIELDS.contains(field))
+                                && !(section.equals("channel") && RiverChannelRanges.OBJECT_FIELDS.contains(field))) ImGui.textWrapped(field+" (read-only)");
                     }
                 }
                 ImGui.treePop();
@@ -586,6 +590,37 @@ public final class EditorApp extends Application {
         }
         if (ImGui.treeNode("Endpoint ponds")) { drawSurfacePonds(surface); ImGui.treePop(); }
         for (String field : surface.fields()) if (!SurfaceRiverFields.ROOT_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawChannelRange(LosslessJson channel,String field) {
+        ImGui.textWrapped(RiverChannelRanges.description(field));
+        LosslessJson range;
+        try { range=RiverChannelRanges.object(channel,field); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored range is a snippet or unsupported value (read-only)."); return; }
+        if (range==null) {
+            ImGui.textWrapped("Absent defaults: "+RiverChannelRanges.contextBound(field,"min")+" to "+RiverChannelRanges.contextBound(field,"max")
+                    +", "+RiverChannelRanges.contextStyle(field)+", zoom "+RiverChannelRanges.contextZoom(field)+".");
+            if (ImGui.button("Create range with these defaults")) applyRoutingExtra(() -> workspace.replace(selected,RiverChannelRanges.enable(selected,workspace.read(selected),field)));
+            return;
+        }
+        String min=range.token("min"),max=range.token("max");
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) ImGui.textWrapped("Stored bounds have unsupported types (read-only).");
+        else {
+            String minKey=RiverChannelRanges.draftPrefix(field)+"min",maxKey=RiverChannelRanges.draftPrefix(field)+"max";
+            String storedMin=min==null ? RiverChannelRanges.classBound("min") : min,storedMax=max==null ? RiverChannelRanges.classBound("max") : max;
+            ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImString maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.textWrapped("Finite bounds; minimum must be at most maximum. Absent members of an existing range use class defaults. Physical river limits are not validated here.");
+            ImGui.inputText(min==null ? "Minimum (Iris default)" : "Minimum",minimum); drafts.update(minKey,storedMin,minimum.get());
+            ImGui.inputText(max==null ? "Maximum (Iris default)" : "Maximum",maximum); drafts.update(maxKey,storedMax,maximum.get());
+            if (ImGui.button("Apply bounds")) {
+                try {
+                    workspace.replace(selected,RiverChannelRanges.editBounds(selected,workspace.read(selected),field,minimum.get(),maximum.get()));
+                    drafts.applied(minKey); drafts.applied(maxKey); values.remove(minKey); values.remove(maxKey); error=null;
+                } catch (Exception failure) { error=failure.getMessage(); }
+            }
+        }
+        if (ImGui.treeNode("Range style")) { drawStyleFields(range,NoiseStyleFields.Target.channelRange(field)); ImGui.treePop(); }
+        for (String member : range.fields()) if (!RiverChannelRanges.RANGE_FIELDS.contains(member)) ImGui.textWrapped(member+" (read-only)");
     }
     private void drawSurfacePonds(LosslessJson surface) {
         ImGui.textWrapped(SurfacePondFields.description("ponds"));

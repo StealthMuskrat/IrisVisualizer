@@ -32,7 +32,7 @@ Direct nonstatic/nontransient private fields in thirty-seven pinned source class
 | riverBank3D | 7 | 7 | 7 | 0 |
 | surfaceRiver | 9 | 9 | 9 | 0 |
 | surfaceRiverSource | 4 | 4 | 4 | 0 |
-| surfaceRiverChannel | 12 | 10 | 10 | 2 |
+| surfaceRiverChannel | 12 | 12 | 12 | 0 |
 | surfaceRiverBank | 10 | 8 | 8 | 2 |
 | surfaceRiverFlow | 6 | 6 | 6 | 0 |
 | surfaceRiverMouth | 7 | 7 | 7 | 0 |
@@ -156,7 +156,7 @@ Unclassified: none.
 
 ## surfaceRiverChannel
 
-Unclassified: `depth`, `width`.
+Unclassified: none.
 
 ## surfaceRiverBank
 
