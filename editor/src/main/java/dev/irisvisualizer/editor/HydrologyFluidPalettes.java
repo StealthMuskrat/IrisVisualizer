@@ -9,20 +9,22 @@ import java.util.Properties;
 
 /** Common bounded palette operations; owners authorize the resource path and existing parents. */
 final class HydrologyFluidPalettes {
-    record Target(boolean surfacePool,int index) {
-        Target { if (index<0) throw new IllegalArgumentException("Select an existing fluid-palette owner"); }
-        String defaultFluid() { return surfacePool ? SurfacePools.defaultFluid() : RiverProfiles.defaultFluid(); }
-        String fluidPrefix() { return surfacePool ? SurfacePools.fluidPrefix(index) : RiverProfiles.fluidPrefix(index); }
-        String noisePrefix() { return surfacePool ? SurfacePools.noisePrefix(index) : RiverProfiles.noisePrefix(index); }
-        NoiseStyleFields.Target styleTarget() { return surfacePool ? NoiseStyleFields.Target.poolPalette(index) : NoiseStyleFields.Target.profilePalette(index); }
-        byte[] createPalette(String path,byte[] original) { return surfacePool ? SurfacePools.createPalette(path,original,index) : RiverProfiles.createPalette(path,original,index); }
-        byte[] initialize(String path,byte[] original) { return surfacePool ? SurfacePools.initializeLava(path,original,index) : RiverProfiles.initializeWater(path,original,index); }
-        byte[] setFluid(String path,byte[] original,int entry,String value) { return surfacePool ? SurfacePools.setFluid(path,original,index,entry,value) : RiverProfiles.setFluid(path,original,index,entry,value); }
-        byte[] enableWeight(String path,byte[] original,int entry) { return surfacePool ? SurfacePools.enableWeight(path,original,index,entry) : RiverProfiles.enableWeight(path,original,index,entry); }
-        byte[] setWeight(String path,byte[] original,int entry,String value) { return surfacePool ? SurfacePools.setWeight(path,original,index,entry,value) : RiverProfiles.setWeight(path,original,index,entry,value); }
-        byte[] change(String path,byte[] original,RiverProfiles.Action action,int entry,String value) { return surfacePool ? SurfacePools.changeFluid(path,original,index,action,entry,value) : RiverProfiles.changeFluid(path,original,index,action,entry,value); }
-        byte[] enableZoom(String path,byte[] original) { return surfacePool ? SurfacePools.enableZoom(path,original,index) : RiverProfiles.enableZoom(path,original,index); }
-        byte[] setZoom(String path,byte[] original,String value) { return surfacePool ? SurfacePools.setZoom(path,original,index,value) : RiverProfiles.setZoom(path,original,index,value); }
+    record Target(boolean surfacePool,int index,boolean deepFluid) {
+        Target(boolean surfacePool,int index) { this(surfacePool,index,false); }
+        static Target deep(int index) { return new Target(false,index,true); }
+        Target { if (surfacePool && deepFluid) throw new IllegalArgumentException("Choose one fluid owner");if (index<0) throw new IllegalArgumentException("Select an existing fluid-palette owner"); }
+        String defaultFluid() { return deepFluid ? DeepFluids.defaultFluid() : surfacePool ? SurfacePools.defaultFluid() : RiverProfiles.defaultFluid(); }
+        String fluidPrefix() { return deepFluid ? DeepFluids.fluidPrefix(index) : surfacePool ? SurfacePools.fluidPrefix(index) : RiverProfiles.fluidPrefix(index); }
+        String noisePrefix() { return deepFluid ? DeepFluids.noisePrefix(index) : surfacePool ? SurfacePools.noisePrefix(index) : RiverProfiles.noisePrefix(index); }
+        NoiseStyleFields.Target styleTarget() { return deepFluid ? NoiseStyleFields.Target.deepPalette(index) : surfacePool ? NoiseStyleFields.Target.poolPalette(index) : NoiseStyleFields.Target.profilePalette(index); }
+        byte[] createPalette(String path,byte[] original) { return deepFluid ? DeepFluids.createPalette(path,original,index) : surfacePool ? SurfacePools.createPalette(path,original,index) : RiverProfiles.createPalette(path,original,index); }
+        byte[] initialize(String path,byte[] original) { return deepFluid ? DeepFluids.initializeLava(path,original,index) : surfacePool ? SurfacePools.initializeLava(path,original,index) : RiverProfiles.initializeWater(path,original,index); }
+        byte[] setFluid(String path,byte[] original,int entry,String value) { return deepFluid ? DeepFluids.setFluid(path,original,index,entry,value) : surfacePool ? SurfacePools.setFluid(path,original,index,entry,value) : RiverProfiles.setFluid(path,original,index,entry,value); }
+        byte[] enableWeight(String path,byte[] original,int entry) { return deepFluid ? DeepFluids.enableWeight(path,original,index,entry) : surfacePool ? SurfacePools.enableWeight(path,original,index,entry) : RiverProfiles.enableWeight(path,original,index,entry); }
+        byte[] setWeight(String path,byte[] original,int entry,String value) { return deepFluid ? DeepFluids.setWeight(path,original,index,entry,value) : surfacePool ? SurfacePools.setWeight(path,original,index,entry,value) : RiverProfiles.setWeight(path,original,index,entry,value); }
+        byte[] change(String path,byte[] original,RiverProfiles.Action action,int entry,String value) { return deepFluid ? DeepFluids.changeFluid(path,original,index,action,entry,value) : surfacePool ? SurfacePools.changeFluid(path,original,index,action,entry,value) : RiverProfiles.changeFluid(path,original,index,action,entry,value); }
+        byte[] enableZoom(String path,byte[] original) { return deepFluid ? DeepFluids.enableZoom(path,original,index) : surfacePool ? SurfacePools.enableZoom(path,original,index) : RiverProfiles.enableZoom(path,original,index); }
+        byte[] setZoom(String path,byte[] original,String value) { return deepFluid ? DeepFluids.setZoom(path,original,index,value) : surfacePool ? SurfacePools.setZoom(path,original,index,value) : RiverProfiles.setZoom(path,original,index,value); }
     }
     private static final Properties DATA=new Properties();
     static {

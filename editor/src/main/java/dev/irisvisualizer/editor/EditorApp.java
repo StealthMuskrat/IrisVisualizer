@@ -444,7 +444,7 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else if ((target.banks() || target.riverRange() || target.palette() || target.profilePalette() || target.poolPalette()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            } else if ((target.banks() || target.riverRange() || target.palette() || target.profilePalette() || target.poolPalette() || target.deepPalette() || target.deepHeight()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
             else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
@@ -528,8 +528,127 @@ public final class EditorApp extends Application {
             return;
         }
         if (ImGui.treeNode("River configuration")) { drawHydrologyRivers(hydro); ImGui.treePop(); }
+        if (ImGui.treeNode("Independent deep fluids")) { drawDeepFluids(hydro);ImGui.treePop(); }
         if (ImGui.treeNode("Standing surface pools")) { drawStandingSurfacePools(hydro);ImGui.treePop(); }
         for (String field : hydro.fields()) if (!HydrologyFields.HYDROLOGY_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawDeepFluids(LosslessJson hydro) {
+        ImGui.textWrapped(DeepFluids.description());
+        ImGui.textWrapped("Deep-fluid IDs must be unique, avoid reserved hydrology selectors and differ from river profile IDs. Other references are preserved. Placement and dimension-height envelope validation remain pending.");
+        List<LosslessJson> pools;
+        try { pools=DeepFluids.entries(hydro); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored deep-fluid list contains snippets or unsupported entries (read-only).");return; }
+        if (pools==null) {
+            if (ImGui.button("Enable empty deep-fluid list")) {
+                try { commitProfileChange(DeepFluids.draftPrefix(),DeepFluids.enable(selected,workspace.read(selected)),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        String newKey=DeepFluids.draftPrefix()+"new.id";
+        ImString newId=values.computeIfAbsent(newKey,ignored -> new ImString("",256));
+        ImGui.inputText("New deep-fluid ID",newId);drafts.update(newKey,"",newId.get());
+        ImGui.beginDisabled(pools.size()>=DeepFluids.maximumSystems());
+        if (ImGui.button("Add deep lava system")) { ImGui.endDisabled();changeDeepFluid(RiverProfiles.Action.ADD,-1,newId.get(),newKey);return; }
+        ImGui.endDisabled();
+        for (int index=0;index<pools.size();index++) {
+            if (!ImGui.treeNode("Deep-fluid system "+index)) continue;
+            var pool=pools.get(index);int poolIndex=index;
+            String copyKey=DeepFluids.systemPrefix(index)+"copyId";
+            ImString copyId=values.computeIfAbsent(copyKey,ignored -> new ImString("",256));
+            ImGui.inputText("Duplicate deep-fluid system as ID",copyId);drafts.update(copyKey,"",copyId.get());
+            RiverProfiles.Action action=null;
+            ImGui.beginDisabled(pools.size()>=DeepFluids.maximumSystems());
+            if (ImGui.button("Duplicate deep-fluid system")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.endDisabled();ImGui.sameLine();
+            if (ImGui.button("Remove deep-fluid system")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);
+            if (ImGui.button("Move deep-fluid system up")) action=RiverProfiles.Action.UP;
+            ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==pools.size()-1);
+            if (ImGui.button("Move deep-fluid system down")) action=RiverProfiles.Action.DOWN;
+            ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeDeepFluid(action,index,copyId.get(),action==RiverProfiles.Action.DUPLICATE ? copyKey : null);return; }
+            try {
+                String stored=pool.token("id")==null ? DeepFluids.defaultId() : pool.stringToken("id"),key=DeepFluids.systemPrefix(index)+"id";
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(256,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText(pool.token("id")==null ? "Deep-fluid ID (missing; class default shown)" : "Deep-fluid ID",input);drafts.update(key,stored,input.get());
+                if (ImGui.button("Apply deep-fluid ID")) commitRiverOverride(key,() -> workspace.replace(selected,DeepFluids.setId(selected,workspace.read(selected),poolIndex,input.get())));
+            } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored deep-fluid ID is not a string (read-only)."); }
+            for (String field : DeepFluids.SCALARS) {
+                ImGui.pushID(field);ImGui.textWrapped(DeepFluids.help(field));
+                String token=pool.token(field),key=DeepFluids.systemPrefix(index)+field;
+                if (DeepFluids.booleanField(field)) {
+                    String effective=token==null ? DeepFluids.defaultToken(field) : token;
+                    if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                    else if (ImGui.checkbox(token==null ? field+" (Iris default)" : field,effective.equals("true"))) applyRoutingExtra(() -> workspace.replace(selected,DeepFluids.setBoolean(selected,workspace.read(selected),poolIndex,field,!effective.equals("true"))));
+                } else if (token==null) {
+                    if (ImGui.button("Enable "+field+" ("+DeepFluids.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,DeepFluids.enableScalar(selected,workspace.read(selected),poolIndex,field)));
+                } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored "+field+" has an unsupported type (read-only).");
+                else {
+                    ImGui.textWrapped(DeepFluids.constraints(field));
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                    ImGui.inputText(field,input);drafts.update(key,token,input.get());
+                    if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DeepFluids.setScalar(selected,workspace.read(selected),poolIndex,field,input.get())));
+                }
+                ImGui.popID();
+            }
+            drawDeepGeometry(pool,index);
+            if (ImGui.treeNode("Deep-fluid height")) { drawDeepHeight(pool,index);ImGui.treePop(); }
+            if (ImGui.treeNode("Deep-fluid palette")) { drawHydrologyFluids(pool,HydrologyFluidPalettes.Target.deep(index));ImGui.treePop(); }
+            for (String field : pool.fields()) if (!DeepFluids.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void drawDeepGeometry(LosslessJson object,int index) {
+        ImGui.textWrapped("Apply geometry writes all six values together. Spacing must be at least 2 * (horizontal radius + channel width); depth + headroom must be less than 2 * vertical radius + 1. Dimension-height envelopes are not validated here.");
+        boolean supported=true;var inputs=new java.util.LinkedHashMap<String,ImString>();
+        for (String field : DeepFluids.GEOMETRY) {
+            String token=object.token(field),key=DeepFluids.systemPrefix(index)+field;
+            if (token!=null && !LosslessJson.numericToken(token)) { ImGui.textWrapped(field+" has an unsupported type (read-only).");supported=false;continue; }
+            String stored=token==null ? DeepFluids.defaultToken(field) : token;
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.textWrapped(DeepFluids.constraints(field));ImGui.inputText(token==null ? field+" (Iris default)" : field,input);drafts.update(key,stored,input.get());inputs.put(field,input);
+        }
+        ImGui.beginDisabled(!supported);
+        if (ImGui.button("Apply deep-fluid geometry")) {
+            try {
+                var next=new java.util.LinkedHashMap<String,String>();inputs.forEach((field,input) -> next.put(field,input.get()));
+                workspace.replace(selected,DeepFluids.setGeometry(selected,workspace.read(selected),index,next));
+                for (String field : DeepFluids.GEOMETRY) { String key=DeepFluids.systemPrefix(index)+field;drafts.applied(key);values.remove(key); }error=null;
+            } catch (Exception failure) { error=failure.getMessage(); }
+        }
+        ImGui.endDisabled();
+    }
+    private void drawDeepHeight(LosslessJson object,int index) {
+        LosslessJson height;
+        try { height=DeepFluids.height(object); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored height is a snippet or unsupported value (read-only).");return; }
+        ImGui.textWrapped("The source height default reaches below the standard dimension floor. Review heights for your target dimension; dimension-height envelope validation remains pending.");
+        if (height==null) {
+            ImGui.textWrapped("Absent height: "+DeepFluids.heightCreationLabel()+".");
+            if (ImGui.button("Create deep-fluid height (source defaults)")) applyRoutingExtra(() -> workspace.replace(selected,DeepFluids.createHeight(selected,workspace.read(selected),index)));
+            return;
+        }
+        String min=height.token("min"),max=height.token("max");
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) ImGui.textWrapped("Stored height bound has an unsupported type (read-only).");
+        else {
+            String minKey=DeepFluids.systemPrefix(index)+"height.min",maxKey=DeepFluids.systemPrefix(index)+"height.max";
+            String storedMin=min==null ? DeepFluids.heightDefault("min",false) : min,storedMax=max==null ? DeepFluids.heightDefault("max",false) : max;
+            ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.textWrapped("Finite world-Y bounds -2048 to 2048, minimum <= maximum. Missing members of an existing height object show the range class defaults; Apply writes both bounds explicitly.");
+            ImGui.inputText(min==null ? "Minimum height (range class default)" : "Minimum height",minimum);drafts.update(minKey,storedMin,minimum.get());
+            ImGui.inputText(max==null ? "Maximum height (range class default)" : "Maximum height",maximum);drafts.update(maxKey,storedMax,maximum.get());
+            if (ImGui.button("Apply deep-fluid heights")) {
+                try { workspace.replace(selected,DeepFluids.setHeight(selected,workspace.read(selected),index,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+        }
+        if (ImGui.treeNode("Height generator style")) { drawStyleFields(height,NoiseStyleFields.Target.deepHeight(index));ImGui.treePop(); }
+        for (String field : height.fields()) if (!List.of("min","max","style").contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void changeDeepFluid(RiverProfiles.Action action,int index,String id,String appliedKey) {
+        try { commitProfileChange(DeepFluids.draftPrefix(),DeepFluids.change(selected,workspace.read(selected),action,index,id),appliedKey); }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawStandingSurfacePools(LosslessJson hydro) {
         ImGui.textWrapped(SurfacePools.description());
@@ -2280,7 +2399,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

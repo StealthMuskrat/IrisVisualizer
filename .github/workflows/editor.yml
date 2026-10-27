@@ -319,6 +319,15 @@ jobs:
           python editor/tools/extract_surface_pool_fields.py IrisHydrology.java IrisSurfacePoolConfig.java PackHydrologyValidator.java HydrologyFeatureQuery.java generated-surface-pool.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-surface-pool.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-pool-fields.properties).Hash) { throw 'Pinned standing pool definitions differ' }
+      - name: Verify pinned independent deep-fluid definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisDeepFluidConfig.java' -OutFile IrisDeepFluidConfig.java
+          python editor/tools/test_deep_fluid_fields.py IrisHydrology.java IrisDeepFluidConfig.java IrisStyledRange.java IrisGeneratorStyle.java PackHydrologyValidator.java HydrologyFeatureQuery.java IrisSurfacePoolConfig.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_deep_fluid_fields.py IrisHydrology.java IrisDeepFluidConfig.java IrisStyledRange.java IrisGeneratorStyle.java PackHydrologyValidator.java HydrologyFeatureQuery.java IrisSurfacePoolConfig.java generated-deep-fluid.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-deep-fluid.properties).Hash -ne (Get-FileHash editor/src/main/resources/deep-fluid-fields.properties).Hash) { throw 'Pinned deep-fluid definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

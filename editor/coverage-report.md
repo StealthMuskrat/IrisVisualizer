@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in forty-eight pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in forty-nine pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -20,7 +20,7 @@ Direct nonstatic/nontransient private fields in forty-eight pinned source classe
 | caveModule | 5 | 5 | 5 | 0 |
 | range | 2 | 2 | 2 | 0 |
 | riverPolicy | 26 | 26 | 26 | 0 |
-| hydrology | 3 | 2 | 2 | 1 |
+| hydrology | 3 | 3 | 3 | 0 |
 | riverHydrology | 7 | 7 | 7 | 0 |
 | riverRouting | 16 | 16 | 16 | 0 |
 | riverRegional | 9 | 9 | 9 | 0 |
@@ -52,6 +52,7 @@ Direct nonstatic/nontransient private fields in forty-eight pinned source classe
 | blockData | 6 | 2 | 2 | 4 |
 | riverProfile | 2 | 2 | 2 | 0 |
 | standingSurfacePool | 8 | 8 | 8 | 0 |
+| deepFluid | 12 | 12 | 12 | 0 |
 
 ## dimension
 
@@ -119,7 +120,7 @@ Unclassified: none.
 
 ## hydrology
 
-Unclassified: `deepFluids`.
+Unclassified: none.
 
 ## riverHydrology
 
@@ -242,5 +243,9 @@ Unclassified: `backup`, `data`, `debug`, `tileData`.
 Unclassified: none.
 
 ## standingSurfacePool
+
+Unclassified: none.
+
+## deepFluid
 
 Unclassified: none.
