@@ -518,6 +518,18 @@ jobs:
           python editor/tools/extract_region_object_fields.py IrisRegion.java IrisBiome.java IrisObjectPlacement.java MantleObjectComponent.java IrisCaveAnchorMode.java IrisObjectPlacementRunner.java generated-region-object-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-region-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/region-object-fields.properties).Hash) { throw 'Pinned region object definitions differ' }
+      - name: Verify pinned ore generator defaults and terrain dispatch
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisOreGenerator.java' -OutFile IrisOreGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeOres.java' -OutFile IrisBiomeOres.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisOreBands.java' -OutFile IrisOreBands.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/stage/IrisTerrainNormalActuator.java' -OutFile IrisTerrainNormalActuator.java
+          python editor/tools/test_ore_generator_fields.py IrisOreGenerator.java IrisRange.java IrisMaterialPalette.java IrisBiome.java IrisRegion.java IrisDimension.java IrisBiomeOres.java IrisOreBands.java IrisTerrainNormalActuator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_ore_generator_fields.py IrisOreGenerator.java IrisRange.java IrisMaterialPalette.java IrisBiome.java IrisRegion.java IrisDimension.java IrisBiomeOres.java IrisOreBands.java IrisTerrainNormalActuator.java generated-ore-generator-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-ore-generator-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/ore-generator-fields.properties).Hash) { throw 'Pinned ore generator definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
