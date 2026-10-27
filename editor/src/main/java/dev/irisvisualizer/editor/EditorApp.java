@@ -549,6 +549,10 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         drawCavePlacement(profile);
+        if (ImGui.treeNode("Density threshold")) {
+            drawCaveThreshold(profile);
+            ImGui.treePop();
+        }
         for (String field:NoiseStyleFields.CAVE_FIELDS) {
             if (ImGui.treeNode(field+" settings")) {
                 drawStyleFields(profile,NoiseStyleFields.Target.cave(ResourceTypes.base(selected),field));
@@ -556,7 +560,7 @@ public final class EditorApp extends Application {
             }
         }
         if (ImGui.treeNode("Other cave settings (read-only)")) {
-            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field) && !CavePlacementFields.EDITABLE.contains(field) && !NoiseStyleFields.CAVE_FIELDS.contains(field)) ImGui.textWrapped(field);
+            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field) && !CavePlacementFields.EDITABLE.contains(field) && !CaveThresholdFields.OBJECT_FIELDS.contains(field) && !NoiseStyleFields.CAVE_FIELDS.contains(field)) ImGui.textWrapped(field);
             ImGui.treePop();
         }
     }
@@ -605,28 +609,54 @@ public final class EditorApp extends Application {
             }
             return;
         }
-        String prefix = CavePlacementFields.draftPrefix(ResourceTypes.base(selected));
+        drawCaveBoundInputs(range, false);
+        for (String member : range.fields()) if (!CavePlacementFields.RANGE_MEMBERS.contains(member)) ImGui.textWrapped(member + " (read-only)");
+    }
+    private void drawCaveThreshold(LosslessJson profile) {
+        ImGui.textWrapped(CaveThresholdFields.description());
+        LosslessJson range;
+        try { range = CaveThresholdFields.object(profile); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored threshold is a snippet or unsupported value (read-only)."); return; }
+        if (range == null) {
+            String bounds = CaveThresholdFields.defaultBound("min", true) + ".." + CaveThresholdFields.defaultBound("max", true);
+            ImGui.textWrapped("Absent threshold uses " + bounds + " with " + CaveThresholdFields.defaultStyle(true) + ". Enable it explicitly before editing.");
+            if (ImGui.button("Enable density threshold")) {
+                try { workspace.replace(selected, CaveThresholdFields.enable(selected, workspace.read(selected))); error = null; }
+                catch (Exception failure) { error = failure.getMessage(); }
+            }
+            return;
+        }
+        drawCaveBoundInputs(range, true);
+        if (ImGui.treeNode("Threshold style")) {
+            drawStyleFields(range, NoiseStyleFields.Target.threshold(ResourceTypes.base(selected)));
+            ImGui.treePop();
+        }
+        for (String member : range.fields()) if (!CaveThresholdFields.EDITABLE.contains(member)) ImGui.textWrapped(member + " (read-only)");
+    }
+    private void drawCaveBoundInputs(LosslessJson range, boolean threshold) {
+        String prefix = threshold ? CaveThresholdFields.draftPrefix(ResourceTypes.base(selected)) : CavePlacementFields.draftPrefix(ResourceTypes.base(selected));
         for (String member : CavePlacementFields.RANGE_MEMBERS) {
             String token = range.token(member);
             try { if (token != null) new java.math.BigDecimal(token); }
             catch (NumberFormatException mismatch) { ImGui.textWrapped("Stored " + member + " is not numeric (read-only)."); return; }
         }
         for (String member : CavePlacementFields.RANGE_MEMBERS) {
-            String token = range.token(member), effective = token == null ? CavePlacementFields.rangeDefault(member, false) : token;
+            String token = range.token(member), effective = token == null ? threshold ? CaveThresholdFields.defaultBound(member, false) : CavePlacementFields.rangeDefault(member, false) : token;
             String key = prefix + member;
             ImString input = values.computeIfAbsent(key, ignored -> new ImString(effective, Math.max(128, effective.getBytes(StandardCharsets.UTF_8).length + 1)));
             ImGui.inputText(member + (token == null ? " (Iris default)" : "") + "##" + key, input);
             drafts.update(key, effective, input.get());
         }
         ImGui.textWrapped("Apply writes both bounds, filling absent members. Use finite numbers with minimum at most maximum.");
-        if (ImGui.button("Apply vertical bounds")) {
+        if (ImGui.button(threshold ? "Apply threshold bounds" : "Apply vertical bounds")) {
             try {
-                workspace.replace(selected, CavePlacementFields.editRange(selected, workspace.read(selected), values.get(prefix + "min").get(), values.get(prefix + "max").get()));
+                byte[] original = workspace.read(selected);
+                String min = values.get(prefix + "min").get(), max = values.get(prefix + "max").get();
+                workspace.replace(selected, threshold ? CaveThresholdFields.editRange(selected, original, min, max) : CavePlacementFields.editRange(selected, original, min, max));
                 for (String member : CavePlacementFields.RANGE_MEMBERS) { drafts.applied(prefix + member); values.remove(prefix + member); }
                 error = null;
             } catch (Exception failure) { error = failure.getMessage(); }
         }
-        for (String member : range.fields()) if (!CavePlacementFields.RANGE_MEMBERS.contains(member)) ImGui.textWrapped(member + " (read-only)");
     }
     private void drawTerrain3D(LosslessJson document) {
         ImGui.textWrapped(Terrain3DFields.description());

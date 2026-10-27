@@ -34,6 +34,18 @@ public final class DimensionFields {
                                 LosslessJson range = CavePlacementFields.range(object);
                                 for (String member : range.fields()) if (!CavePlacementFields.RANGE_MEMBERS.contains(member)) paths.add(field+"."+child+"."+member);
                             } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }
+                        } else if (CaveThresholdFields.OBJECT_FIELDS.contains(child)) {
+                            try {
+                                LosslessJson threshold = CaveThresholdFields.object(object);
+                                for (String member : threshold.fields()) {
+                                    if (member.equals("style")) {
+                                        try {
+                                            LosslessJson style = new LosslessJson(threshold.token(member).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                                            for (String setting : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(setting)) paths.add(field+"."+child+".style."+setting);
+                                        } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child+".style"); }
+                                    } else if (!CaveThresholdFields.EDITABLE.contains(member)) paths.add(field+"."+child+"."+member);
+                                }
+                            } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }
                         } else if (NoiseStyleFields.CAVE_FIELDS.contains(child)) {
                             try {
                                 LosslessJson style=new LosslessJson(object.token(child).getBytes(java.nio.charset.StandardCharsets.UTF_8));

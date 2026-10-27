@@ -76,7 +76,7 @@ public final class CavePlacementFields {
             return bound(new LosslessJson(next), "max", max);
         }, false), false);
     }
-    private static byte[] bound(LosslessJson range, String field, double value) {
+    static byte[] bound(LosslessJson range, String field, double value) {
         String old = range.token(field);
         if (old == null) return range.enable(field, BigDecimal.valueOf(value).stripTrailingZeros().toPlainString());
         try {

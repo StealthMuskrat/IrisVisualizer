@@ -26,10 +26,10 @@ public final class FieldCoverage {
         String base = ResourceTypes.base(path);
         if (base == null) return List.of();
         return switch (base) {
-            case "dimensions" -> List.of("dimension", "importedStructures", "importedFeatures", "caveProfile");
-            case "biomes" -> List.of("biome", "biomeGeneratorLink", "terrain3D", "caveProfile");
+            case "dimensions" -> List.of("dimension", "importedStructures", "importedFeatures", "caveProfile", "styledRange");
+            case "biomes" -> List.of("biome", "biomeGeneratorLink", "terrain3D", "caveProfile", "styledRange");
             case "generators" -> List.of("generator", "interpolator", "noise", "noiseStyle");
-            case "regions" -> List.of("region", "caveProfile");
+            case "regions" -> List.of("region", "caveProfile", "styledRange");
             default -> List.of();
         };
     }
