@@ -2243,6 +2243,10 @@
     "vacuumSettings": {
       "classification": "generation",
       "reason": "Optional inline stilt/vacuum authoring across floating collections, preserving native mode fallbacks; classic stilt ranges stay read-only in anchored paths."
+    },
+    "edit": {
+      "classification": "generation",
+      "reason": "Ordered floating object replacement rules with native chance/state matching; object assets and unrelated data remain preserved."
     }
   },
   "objectTranslate": {
@@ -2359,6 +2363,10 @@
     "exclude": {
       "classification": "generation",
       "reason": "Bounded floating stilt authoring; classic ranges in floatingObjects only, organic scalars and material exclusions in all four collections. Palette/native generation validation remains pending."
+    },
+    "palette": {
+      "classification": "generation",
+      "reason": "Optional floating stilt material palette authoring with weighted blocks, zoom and noise styles; native exclusions, sampling and registry validation remain pending."
     }
   },
   "vacuumSettings": {
@@ -2381,6 +2389,24 @@
     "waveScale": {
       "classification": "generation",
       "reason": "Source-bounded floating placement vacuum control with native radius/mode fallbacks; full terrain context and deformation remain unvalidated."
+    }
+  },
+  "objectReplace": {
+    "find": {
+      "classification": "generation",
+      "reason": "Bounded floating replacement rule authoring: unweighted find block-data entries, native state-match flag, finite chance and shared weighted replacement palette. Advanced data and native behavior remain unvalidated."
+    },
+    "replace": {
+      "classification": "generation",
+      "reason": "Bounded floating replacement rule authoring: unweighted find block-data entries, native state-match flag, finite chance and shared weighted replacement palette. Advanced data and native behavior remain unvalidated."
+    },
+    "exact": {
+      "classification": "generation",
+      "reason": "Bounded floating replacement rule authoring: unweighted find block-data entries, native state-match flag, finite chance and shared weighted replacement palette. Advanced data and native behavior remain unvalidated."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Bounded floating replacement rule authoring: unweighted find block-data entries, native state-match flag, finite chance and shared weighted replacement palette. Advanced data and native behavior remain unvalidated."
     }
   }
 }

@@ -623,6 +623,7 @@ public final class EditorApp extends Application {
             drawFloatingPlacementConstraints(placement,new FloatingPlacementConstraints.Context(index,list,placementIndex));
             drawFloatingPlacementEffects(placement,new FloatingPlacementEffects.Context(index,list,placementIndex));
             drawFloatingDeformation(placement,new FloatingPlacementDeformation.Context(index,list,placementIndex));
+            drawFloatingReplacements(placement,new FloatingObjectReplacements.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
@@ -762,7 +763,7 @@ public final class EditorApp extends Application {
         for (String object : FloatingPlacementDeformation.OBJECT_FIELDS) {
             if (!ImGui.treeNode(object)) continue;
             ImGui.textWrapped(FloatingPlacementDeformation.help(object));
-            ImGui.textWrapped(object.equals("stiltSettings") ? "Used by native stilt modes. Anchored collections remap classic stilt modes; their classic ranges stay read-only here. Palette settings remain read-only." : "Used by VACUUM modes when native terrain context is available. Radius 0 chooses the mode default (12, HIGH 20, FAST 8); FAST uses a two-block sampling step. Organic jitter and wave controls apply only to their matching modes.");
+            ImGui.textWrapped(object.equals("stiltSettings") ? "Used by native stilt modes. Anchored collections remap classic stilt modes; their classic ranges stay read-only here. The material palette can override native stilt materials." : "Used by VACUUM modes when native terrain context is available. Radius 0 chooses the mode default (12, HIGH 20, FAST 8); FAST uses a two-block sampling step. Organic jitter and wave controls apply only to their matching modes.");
             ImGui.textWrapped("Authoring settings leaves placement mode unchanged. Deformation is not previewed or validated.");LosslessJson settings;
             try { settings=FloatingPlacementDeformation.object(placement,object); }
             catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored settings are a snippet or unsupported value (read-only).");ImGui.treePop();continue; }
@@ -786,6 +787,7 @@ public final class EditorApp extends Application {
                 ImGui.popID();
             }
             if (object.equals("stiltSettings") && ImGui.treeNode("Material exclusions")) { drawFloatingStiltExclusions(settings,context);ImGui.treePop(); }
+            if (object.equals("stiltSettings") && ImGui.treeNode("Stilt material palette")) { drawFloatingObjectPalette(placement,new FloatingObjectPalettes.Context(context.entry(),context.list(),context.placement(),-1));ImGui.treePop(); }
             for (String path : FloatingPlacementDeformation.readOnlyPaths(placement,context)) if (path.startsWith(object+".")) ImGui.textWrapped(path+" (read-only)");
             ImGui.treePop();
         }
@@ -832,6 +834,100 @@ public final class EditorApp extends Application {
     private void changeFloatingExclusion(FloatingPlacementDeformation.Context context,RiverProfiles.Action action,int index,String material,String appliedKey) {
         try { commitProfileChange(context.exclusionPrefix(),FloatingPlacementDeformation.changeExclusion(selected,workspace.read(selected),context,action,index,material),appliedKey); }
         catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingObjectPalette(LosslessJson placement,FloatingObjectPalettes.Context context) {
+        ImGui.textWrapped(context.stilt() ? "An explicit stilt palette replaces native source-object stilt material. The pinned consumer samples at the placement anchor. Material exclusions still apply after palette replacement." : "Replacement rules use this native weighted material palette. Matching, state merging, tile handling and sampling are not evaluated here.");
+        LosslessJson palette;
+        try { palette=FloatingObjectPalettes.object(placement,context); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored palette is a snippet or unsupported value (read-only).");return; }
+        if (palette==null) {
+            ImGui.textWrapped(context.stilt() ? "Absent/null keeps the source-object material rules. Creating an explicit palette uses STONE, zoom 5 and STATIC defaults." : "An absent replacement palette inherits STONE, zoom 5 and STATIC. Create it explicitly to author those settings.");
+            if (ImGui.button("Create explicit material palette")) {
+                try { commitProfileChange(context.prefix(),FloatingObjectPalettes.create(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        if (context.stilt() && ImGui.button("Restore source-object stilt material (null)")) {
+            try { commitProfileChange(context.prefix(),FloatingObjectPalettes.restoreStilt(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); }
+            return;
+        }
+        drawGeneralBlockPalette(palette,context.target());
+        for (String path : FloatingObjectPalettes.readOnlyPaths(placement,context)) ImGui.textWrapped(path+" (read-only)");
+    }
+    private void drawFloatingReplacements(LosslessJson placement,FloatingObjectReplacements.Context context) {
+        if (!ImGui.treeNode("Object block replacements")) return;
+        ImGui.textWrapped("Rules run in stored order using native chance and state/material matching. Source .iob bytes remain unchanged. Registry, aliases, block states and effective replacements are not resolved here.");List<LosslessJson> rules;
+        try { rules=FloatingObjectReplacements.rules(placement); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored rules contain snippets or unsupported values (read-only).");ImGui.treePop();return; }
+        if (rules==null) {
+            if (ImGui.button("Enable empty replacement list")) {
+                try { commitProfileChange(context.prefix(),FloatingObjectReplacements.enable(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); }
+            }
+            ImGui.treePop();return;
+        }
+        ImGui.textWrapped("New rules inherit chance 1, material-key matching and a STONE replacement palette.");
+        String newKey=context.prefix()+"new.find";ImString first=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("First find block for new rule",first);drafts.update(newKey,"",first.get());
+        if (ImGui.button("Add replacement rule")) { ImGui.treePop();changeFloatingReplacement(context,RiverProfiles.Action.ADD,-1,first.get(),newKey);return; }
+        if (rules.isEmpty()) ImGui.textWrapped("Empty replacement list applies no rules.");
+        for (int index=0;index<rules.size();index++) {
+            if (!ImGui.treeNode("Rule "+index)) continue;
+            int ruleIndex=index;var rule=rules.get(index);RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate rule")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();if (ImGui.button("Remove rule")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move rule up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(index==rules.size()-1);if (ImGui.button("Move rule down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();ImGui.treePop();changeFloatingReplacement(context,action,index,null,null);return; }
+            String exact=rule.token("exact");ImGui.textWrapped("Exact uses native state matching; non-exact compares base material keys. No matching is computed by the editor.");
+            if (exact==null) {
+                if (ImGui.button("Enable state-matching flag (false)")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectReplacements.enableExact(selected,workspace.read(selected),context,ruleIndex)));
+            } else if (!exact.equals("true") && !exact.equals("false")) ImGui.textWrapped("Stored exact flag has an unsupported type (read-only).");
+            else { ImBoolean flag=new ImBoolean(Boolean.parseBoolean(exact));if (ImGui.checkbox("Native state matching",flag)) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectReplacements.setExact(selected,workspace.read(selected),context,ruleIndex,flag.get()))); }
+            String token=rule.token("chance"),key=context.rulePrefix(index)+"chance";
+            if (token==null) {
+                if (ImGui.button("Enable chance (1)")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectReplacements.enableChance(selected,workspace.read(selected),context,ruleIndex)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored chance has an unsupported type (read-only).");
+            else {
+                ImGui.textWrapped("Finite chance from 0 to 1 for each native rule application.");ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Replacement chance",input);drafts.update(key,token,input.get());
+                if (ImGui.button("Apply replacement chance")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectReplacements.setChance(selected,workspace.read(selected),context,ruleIndex,input.get())));
+            }
+            if (ImGui.treeNode("Find blocks")) { drawFloatingFindBlocks(rule,context,index);ImGui.treePop(); }
+            if (ImGui.treeNode("Replacement palette")) { drawFloatingObjectPalette(placement,new FloatingObjectPalettes.Context(context.entry(),context.list(),context.placement(),index));ImGui.treePop(); }
+            for (String field : rule.fields()) if (!FloatingObjectReplacements.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            ImGui.treePop();
+        }
+        ImGui.treePop();
+    }
+    private void changeFloatingReplacement(FloatingObjectReplacements.Context context,RiverProfiles.Action action,int rule,String first,String appliedKey) {
+        try { commitProfileChange(context.prefix(),FloatingObjectReplacements.change(selected,workspace.read(selected),context,action,rule,first),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingFindBlocks(LosslessJson rule,FloatingObjectReplacements.Context context,int ruleIndex) {
+        ImGui.textWrapped("Find blocks are unweighted native block-data matches. Nonblank text is accepted; registry/state resolution is pending. Advanced find data, including weight, stays read-only.");List<LosslessJson> entries;
+        try { entries=FloatingObjectReplacements.find(rule); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored find entries contain snippets or unsupported values (read-only).");return; }
+        if (entries==null) {
+            if (ImGui.button("Enable empty find list")) {
+                try { commitProfileChange(context.findPrefix(ruleIndex),FloatingObjectReplacements.enableFind(selected,workspace.read(selected),context,ruleIndex),null); } catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        String newKey=context.findPrefix(ruleIndex)+"new.block";ImString block=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New find block",block);drafts.update(newKey,"",block.get());
+        if (ImGui.button("Add find block")) { changeFloatingFind(context,ruleIndex,RiverProfiles.Action.ADD,-1,block.get(),newKey);return; }
+        if (entries.isEmpty()) ImGui.textWrapped("Empty find list matches no blocks. Add a block to repair the required list.");
+        for (int index=0;index<entries.size();index++) {
+            ImGui.pushID(index);int findIndex=index;var entry=entries.get(index);
+            try {
+                String stored=entry.token("block")==null ? "" : entry.stringToken("block"),key=context.findPrefix(ruleIndex)+index+".block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(entry.token("block")==null ? "Missing find block" : "Find block",input);drafts.update(key,stored,input.get());
+                if (ImGui.button("Apply find block")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectReplacements.setFindBlock(selected,workspace.read(selected),context,ruleIndex,findIndex,input.get())));
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored find block has an unsupported type (read-only)."); }
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate find")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();ImGui.beginDisabled(entries.size()<=1);if (ImGui.button("Remove find")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
+            ImGui.beginDisabled(index==0);if (ImGui.button("Find up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Find down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            for (String field : entry.fields()) if (!field.equals("block")) ImGui.textWrapped(field+" (read-only)");
+            ImGui.popID();if (action!=null) { changeFloatingFind(context,ruleIndex,action,index,null,null);return; }
+        }
+    }
+    private void changeFloatingFind(FloatingObjectReplacements.Context context,int rule,RiverProfiles.Action action,int index,String block,String appliedKey) {
+        try { commitProfileChange(context.findPrefix(rule),FloatingObjectReplacements.changeFind(selected,workspace.read(selected),context,rule,action,index,block),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawFloatingPlacementMode(LosslessJson placement,int entry,String list,int index) {
         String current;

@@ -60,7 +60,7 @@ final class FloatingPlacementEffectTests {
             check(text(FloatingPlacementEffects.setScalar(PATH,original,context,"boreExtendMinY","-1")).equals(text(original).replace("\"boreExtendMinY\":0e0","\"boreExtendMinY\":-1")));
             check(text(FloatingPlacementEffects.setFlag(PATH,original,context,"smartBore",true)).equals(text(original).replace("\"smartBore\":false","\"smartBore\":true")));
             for (String field : FloatingPlacementEffects.EDITABLE) check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains(field)!=FloatingPlacementEffects.editable(list,field));
-            check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).containsAll(List.of("bottom","force","forcePlace","heightmap","edit","futurePlacement")));
+            check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).containsAll(List.of("bottom","force","forcePlace","heightmap","futurePlacement")));
             var drafts=new InspectorDrafts();String minimum=context.prefix()+"boreExtendMinY",maximum=context.prefix()+"boreExtendMaxY",sibling=new FloatingPlacementEffects.Context(0,list,1).prefix()+"boreExtendMinY",warp=FloatingObjectPlacements.placementPrefix(0,list,0)+"warp.zoom",other=new FloatingPlacementEffects.Context(1,list,0).prefix()+"boreExtendMinY",otherList=FloatingObjectPlacements.placementPrefix(0,list.equals("floatingObjects") ? "extraObjects" : "floatingObjects",0)+"chance";
             for (String key : List.of(minimum,maximum,sibling,warp,other,otherList)) drafts.update(key,"0","1");
             drafts.applied(minimum);check(drafts.count()==5 && drafts.contains(maximum) && drafts.contains(sibling));

@@ -70,7 +70,7 @@ public final class FloatingPlacementDeformation {
     }
     static List<String> readOnlyPaths(LosslessJson placement,Context context) {
         var paths=new ArrayList<String>();
-        for (String object : OBJECT_FIELDS) try { var settings=object(placement,object);if (settings!=null) for (String field : settings.fields()) if (!(object.equals("stiltSettings") ? STILT_FIELDS : VACUUM_FIELDS).contains(field) || !editable(context.list(),object,field)) paths.add(object+"."+field); }
+        for (String object : OBJECT_FIELDS) try { var settings=object(placement,object);if (settings!=null) for (String field : settings.fields()) { if (object.equals("stiltSettings") && FloatingObjectPalettes.STILT_FIELDS.contains(field)) continue;if (!(object.equals("stiltSettings") ? STILT_FIELDS : VACUUM_FIELDS).contains(field) || !editable(context.list(),object,field)) paths.add(object+"."+field); } }
         catch (IllegalArgumentException unsupported) { paths.add(object); }
         return List.copyOf(paths);
     }
