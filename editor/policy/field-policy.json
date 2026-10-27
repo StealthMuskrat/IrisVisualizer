@@ -191,6 +191,10 @@
     "deposits": {
       "classification": "generation",
       "reason": "Native additive IrisDepositGenerator lists consumed in dimension/center-region/center-biome order. Lossless controls author source-bounded settings; clump geometry, registry resolution and effective generation remain unavailable."
+    },
+    "depositVariants": {
+      "classification": "generation",
+      "reason": "Ordered native world-Y remap rules: first successful cave-biome, then region, then dimension mapping. Literal string-map and atomic band controls preserve unsupported data; native material resolution and generation remain unavailable."
     }
   },
   "biome": {
@@ -333,6 +337,14 @@
     "deposits": {
       "classification": "generation",
       "reason": "Native additive IrisDepositGenerator lists consumed in dimension/center-region/center-biome order. Lossless controls author source-bounded settings; clump geometry, registry resolution and effective generation remain unavailable."
+    },
+    "depositVariants": {
+      "classification": "generation",
+      "reason": "Ordered native world-Y remap rules: first successful cave-biome, then region, then dimension mapping. Literal string-map and atomic band controls preserve unsupported data; native material resolution and generation remain unavailable."
+    },
+    "surfaceOreReplaceableBlocks": {
+      "classification": "generation",
+      "reason": "Biome exterior-surface ore-deposit host override. Absence/null inherits per-deposit filters; explicit empty lists forbid eligible surface hosts. Literal list edits preserve unknown entries and other generation settings."
     }
   },
   "generator": {
@@ -497,6 +509,10 @@
     "deposits": {
       "classification": "generation",
       "reason": "Native additive IrisDepositGenerator lists consumed in dimension/center-region/center-biome order. Lossless controls author source-bounded settings; clump geometry, registry resolution and effective generation remain unavailable."
+    },
+    "depositVariants": {
+      "classification": "generation",
+      "reason": "Ordered native world-Y remap rules: first successful cave-biome, then region, then dimension mapping. Literal string-map and atomic band controls preserve unsupported data; native material resolution and generation remain unavailable."
     }
   },
   "importedStructures": {
@@ -2563,6 +2579,20 @@
     "replaceBedrock": {
       "classification": "generation",
       "reason": "Pinned deposit authoring across dimensions, regions and biomes: exact scalar bounds, atomic ranges, native enums, uniform material entries and literal host/biome filters. Existing unsupported values and advanced block data are preserved; native placement is not previewed."
+    }
+  },
+  "depositVariant": {
+    "minHeight": {
+      "classification": "generation",
+      "reason": "Pinned inclusive absolute world-Y bounds and material-identity remap dictionary. Exact integer pairs and lossless literal-key operations author saved settings; source aliases, target resolution and actual placement are unchecked."
+    },
+    "maxHeight": {
+      "classification": "generation",
+      "reason": "Pinned inclusive absolute world-Y bounds and material-identity remap dictionary. Exact integer pairs and lossless literal-key operations author saved settings; source aliases, target resolution and actual placement are unchecked."
+    },
+    "remap": {
+      "classification": "generation",
+      "reason": "Pinned inclusive absolute world-Y bounds and material-identity remap dictionary. Exact integer pairs and lossless literal-key operations author saved settings; source aliases, target resolution and actual placement are unchecked."
     }
   }
 }

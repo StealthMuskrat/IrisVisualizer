@@ -544,6 +544,15 @@ jobs:
           python editor/tools/extract_deposit_generator_fields.py IrisDepositGenerator.java IrisDepositShape.java IrisDepositHeightDistribution.java IrisDepositPlacementScope.java IrisDepositBiomeScope.java IrisDimension.java IrisRegion.java IrisBiome.java IrisDepositModifier.java generated-deposit-generator-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-deposit-generator-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/deposit-generator-fields.properties).Hash) { throw 'Pinned deposit generator definitions differ' }
+      - name: Verify pinned deposit variant and biome surface-host definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisDepositVariant.java' -OutFile IrisDepositVariant.java
+          python editor/tools/test_deposit_variant_fields.py IrisDepositVariant.java IrisDepositModifier.java IrisDepositGenerator.java IrisBiomeOres.java IrisDimension.java IrisRegion.java IrisBiome.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_deposit_variant_fields.py IrisDepositVariant.java IrisDepositModifier.java IrisDepositGenerator.java IrisBiomeOres.java IrisDimension.java IrisRegion.java IrisBiome.java generated-deposit-variant-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-deposit-variant-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/deposit-variant-fields.properties).Hash) { throw 'Pinned variant/host definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

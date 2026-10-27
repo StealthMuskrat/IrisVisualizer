@@ -173,6 +173,7 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
+                    drawDepositVariants(document,"dimensions");
                     drawDeposits(document,"dimensions");
                     drawOres(document,"dimensions");
                     drawDimensionPalettes(document);
@@ -285,6 +286,7 @@ public final class EditorApp extends Application {
         drawCaveProfile(document);
         drawRiverPolicy(document);
         drawRootObjects(document,FloatingObjectPlacements.REGION_ROOT);
+        drawDepositVariants(document,"regions");
         drawDeposits(document,"regions");
         drawOres(document,"regions");
         ImGui.textWrapped("Other region fields remain read-only.");
@@ -512,6 +514,8 @@ public final class EditorApp extends Application {
         drawBiomeLayers(document);
         drawBiomeSlabWall(document);
         drawRootObjects(document,FloatingObjectPlacements.BIOME_ROOT);
+        drawDepositVariants(document,"biomes");
+        drawBiomeOreHosts(document);
         drawDeposits(document,"biomes");
         drawOres(document,"biomes");
         drawFloatingBiomes(document);
@@ -530,7 +534,7 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
@@ -577,6 +581,95 @@ public final class EditorApp extends Application {
             }
             ImGui.treePop();
         }
+    }
+    private static String mappingDraft(String source,String target) { return source.length()+":"+source+target; }
+    private void drawDepositVariants(LosslessJson document,String base) {
+        if (!ImGui.collapsingHeader("Deposit variants")) return;
+        ImGui.textWrapped("Ordered deposit remaps use inclusive absolute world Y. Native placement tries the cave biome at the candidate, then its region, then the dimension; the first rule producing a remap wins. Unmatched candidates use Iris's native fallback. Deposit origin bands use engine-local Y.");
+        ImGui.textWrapped("Sources match material identity. New source keys require a namespaced id without properties. Targets require nonblank text; registry, aliases and state resolution are unchecked. Unresolvable mappings are skipped by Iris. Literal key collisions are rejected; native aliases may still resolve to the same material. Previews remain unavailable.");
+        List<LosslessJson> variants;
+        try { variants=DepositVariants.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored variants contain nulls, snippets or unsupported entries (read-only).");return; }
+        String prefix=DepositVariants.listPrefix(base);
+        if (variants==null) {
+            if (ImGui.button("Initialize empty variant list")) { try { commitProfileChange(prefix,DepositVariants.enable(selected,workspace.read(selected),base),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            return;
+        }
+        String newKey=prefix+"new.mapping";ImString source=values.computeIfAbsent(newKey+".source",ignored -> new ImString("minecraft:iron_ore",4096)),target=values.computeIfAbsent(newKey+".target",ignored -> new ImString("minecraft:deepslate_iron_ore",4096));
+        ImGui.inputText("Source for new variant",source);ImGui.inputText("Target for new variant",target);drafts.update(newKey,mappingDraft("minecraft:iron_ore","minecraft:deepslate_iron_ore"),mappingDraft(source.get(),target.get()));
+        ImGui.textWrapped("A new variant keeps the native 0..0 world-Y band until you apply its heights.");
+        if (ImGui.button("Add variant with mapping")) { changeDepositVariant(base,RiverProfiles.Action.ADD,-1,source.get(),target.get(),newKey);return; }
+        for (int index=0;index<variants.size();index++) {
+            if (!ImGui.treeNode("Variant "+index)) continue;
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate variant")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();if (ImGui.button("Remove variant")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Variant up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==variants.size()-1);if (ImGui.button("Variant down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeDepositVariant(base,action,index,null,null,null);return; }
+            var context=new DepositVariants.Context(base,index);var variant=variants.get(index);drawVariantBand(variant,context);
+            if (ImGui.treeNode("Material remaps")) { drawVariantMap(variant,context);ImGui.treePop(); }
+            for (String field : variant.fields()) if (!DepositVariants.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void changeDepositVariant(String base,RiverProfiles.Action action,int index,String source,String target,String appliedKey) {
+        try { commitProfileChange(DepositVariants.listPrefix(base),DepositVariants.change(selected,workspace.read(selected),base,action,index,source,target),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawVariantBand(LosslessJson variant,DepositVariants.Context context) {
+        ImGui.textWrapped("Apply exact integer world-Y bounds together, from -2048 to 8192. Minimum must be at most maximum; absent values use 0. World compatibility is not evaluated.");
+        String low=variant.token("minHeight"),high=variant.token("maxHeight");
+        if (low!=null && !LosslessJson.numericToken(low) || high!=null && !LosslessJson.numericToken(high)) { ImGui.textWrapped("Stored height bounds have unsupported types (read-only).");return; }
+        String storedLow=low==null ? DepositVariants.defaultHeight("minHeight") : low,storedHigh=high==null ? DepositVariants.defaultHeight("maxHeight") : high,minKey=context.prefix()+"minHeight",maxKey=context.prefix()+"maxHeight";
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedLow,Math.max(128,storedLow.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedHigh,Math.max(128,storedHigh.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImGui.inputText(low==null ? "Minimum world Y (native default)" : "Minimum world Y",minimum);drafts.update(minKey,storedLow,minimum.get());ImGui.inputText(high==null ? "Maximum world Y (native default)" : "Maximum world Y",maximum);drafts.update(maxKey,storedHigh,maximum.get());
+        if (ImGui.button("Apply world-Y band")) { try { workspace.replace(selected,DepositVariants.setBand(selected,workspace.read(selected),context,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+    }
+    private void drawVariantMap(LosslessJson variant,DepositVariants.Context context) {
+        List<LosslessJson.StringProperty> mappings;LosslessJson map;
+        try { map=DepositVariants.remap(variant);mappings=map==null ? null : map.stringProperties(); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored remap is null, mixed or unsupported (read-only).");return; }
+        if (map==null) {
+            if (ImGui.button("Initialize empty remap object")) { try { commitProfileChange(context.mapPrefix(),DepositVariants.enableMap(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            return;
+        }
+        String newKey=context.mapPrefix()+"new.mapping";ImString source=values.computeIfAbsent(newKey+".source",ignored -> new ImString("",4096)),target=values.computeIfAbsent(newKey+".target",ignored -> new ImString("",4096));ImGui.inputText("New source id",source);ImGui.inputText("New target",target);drafts.update(newKey,mappingDraft("",""),mappingDraft(source.get(),target.get()));
+        if (ImGui.button("Add material remap")) { try { commitProfileChange(context.mapPrefix(),DepositVariants.addMapping(selected,workspace.read(selected),context,source.get(),target.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }return; }
+        if (mappings.isEmpty()) ImGui.textWrapped("Empty map: this rule produces no replacement.");
+        for (int index=0;index<mappings.size();index++) {
+            ImGui.pushID(index);var mapping=mappings.get(index);String rowKey=context.mapPrefix()+index;
+            ImString from=values.computeIfAbsent(rowKey+".source",ignored -> new ImString(mapping.key(),Math.max(4096,mapping.key().getBytes(StandardCharsets.UTF_8).length+1))),to=values.computeIfAbsent(rowKey+".target",ignored -> new ImString(mapping.value(),Math.max(4096,mapping.value().getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Source id",from);ImGui.inputText("Target",to);drafts.update(rowKey,mappingDraft(mapping.key(),mapping.value()),mappingDraft(from.get(),to.get()));
+            if (ImGui.button("Apply mapping")) {
+                try { commitProfileChange(context.mapPrefix(),DepositVariants.setMapping(selected,workspace.read(selected),context,mapping.key(),from.get(),to.get()),rowKey); } catch (Exception failure) { error=failure.getMessage(); }
+            }
+            if (ImGui.button("Remove mapping")) { ImGui.popID();try { commitProfileChange(context.mapPrefix(),DepositVariants.removeMapping(selected,workspace.read(selected),context,mapping.key()),null); } catch (Exception failure) { error=failure.getMessage(); }return; }
+            ImGui.popID();
+        }
+    }
+    private void drawBiomeOreHosts(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Biome surface ore hosts")) return;
+        ImGui.textWrapped("For ore deposits at exterior terrain surfaces, this list replaces the deposit surface-host filter. Absent/null inherits deposit settings. An explicit empty list permits no exterior-surface ore hosts. Cave-air walls keep their native rules; material validity and generation are not evaluated.");
+        List<String> hosts;
+        try { hosts=BiomeOreHosts.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored surface hosts are mixed or unsupported (read-only).");return; }
+        if (hosts==null) {
+            ImGui.textWrapped("Inheriting deposit surface-host settings.");
+            if (ImGui.button("Use explicit empty host list (forbid surface ore)")) changeBiomeOreHostMode(false);
+            return;
+        }
+        if (ImGui.button("Inherit deposit surface-host settings")) { changeBiomeOreHostMode(true);return; }
+        if (!hosts.isEmpty() && ImGui.button("Forbid all exterior-surface ore hosts")) { changeBiomeOreHostMode(false);return; }
+        if (hosts.isEmpty()) ImGui.textWrapped("Explicit empty override: no exterior-surface ore hosts are allowed.");
+        String newKey=BiomeOreHosts.prefix()+"new.host";ImString input=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New host block id",input);drafts.update(newKey,"",input.get());
+        if (ImGui.button("Add host")) { changeBiomeOreHost(RiverProfiles.Action.ADD,-1,input.get(),newKey);return; }
+        for (int index=0;index<hosts.size();index++) {
+            ImGui.pushID(index);int row=index;String stored=hosts.get(index),key=BiomeOreHosts.prefix()+index;ImString value=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Host id",value);drafts.update(key,stored,value.get());
+            if (ImGui.button("Apply host")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeOreHosts.set(selected,workspace.read(selected),row,value.get())));
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate host")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();if (ImGui.button("Remove host")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Host up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==hosts.size()-1);if (ImGui.button("Host down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            ImGui.popID();if (action!=null) { changeBiomeOreHost(action,index,null,null);return; }
+        }
+    }
+    private void changeBiomeOreHostMode(boolean inherit) {
+        try { byte[] original=workspace.read(selected);commitProfileChange(BiomeOreHosts.prefix(),inherit ? BiomeOreHosts.inherit(selected,original) : BiomeOreHosts.restrict(selected,original),null); } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void changeBiomeOreHost(RiverProfiles.Action action,int index,String value,String appliedKey) {
+        try { commitProfileChange(BiomeOreHosts.prefix(),BiomeOreHosts.change(selected,workspace.read(selected),action,index,value),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawDeposits(LosslessJson document,String base) {
         if (!ImGui.collapsingHeader("Deposit generators")) return;
