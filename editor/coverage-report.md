@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in forty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in forty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -44,8 +44,9 @@ Direct nonstatic/nontransient private fields in forty-two pinned source classes 
 | undergroundRiver | 13 | 12 | 12 | 1 |
 | undergroundRiverSource | 3 | 3 | 3 | 0 |
 | riverGrottos | 2 | 2 | 2 | 0 |
-| coastalGrotto | 9 | 8 | 8 | 1 |
+| coastalGrotto | 9 | 9 | 9 | 0 |
 | inlandGrotto | 6 | 6 | 6 | 0 |
+| seaCaves | 6 | 6 | 6 | 0 |
 
 ## dimension
 
@@ -209,8 +210,12 @@ Unclassified: none.
 
 ## coastalGrotto
 
-Unclassified: `seaCaves`.
+Unclassified: none.
 
 ## inlandGrotto
+
+Unclassified: none.
+
+## seaCaves
 
 Unclassified: none.

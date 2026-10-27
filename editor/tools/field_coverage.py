@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in forty-two pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in forty-three pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -50,6 +50,7 @@ SOURCES = {
  'riverGrottos': 'generation/hydrology/IrisRiverGrottoConfig.java',
  'coastalGrotto': 'generation/hydrology/IrisCoastalRiverGrottoConfig.java',
  'inlandGrotto': 'generation/hydrology/IrisInlandRiverGrottoConfig.java',
+ 'seaCaves': 'generation/hydrology/IrisSeaCaveConfig.java',
 }
 
 def declared_fields(text):
@@ -138,10 +139,12 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['riverGrottos'] = set(editable(java_dir, 'GrottoFields', 'SECTIONS'))
     implemented['coastalGrotto'] = set(editable(java_dir, 'GrottoFields', 'COASTAL_FIELDS'))
     implemented['inlandGrotto'] = set(editable(java_dir, 'GrottoFields', 'INLAND_FIELDS'))
+    implemented['coastalGrotto'].update(editable(java_dir, 'GrottoFields', 'COASTAL_OBJECT_FIELDS'))
+    implemented['seaCaves'] = set(editable(java_dir, 'SeaCaveFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in forty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in forty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

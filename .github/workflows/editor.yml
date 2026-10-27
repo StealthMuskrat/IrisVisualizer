@@ -272,6 +272,17 @@ jobs:
           python editor/tools/extract_grotto_fields.py IrisRiverHydrology.java IrisRiverGrottoConfig.java IrisCoastalRiverGrottoConfig.java IrisInlandRiverGrottoConfig.java IrisGrottoPoolLevel.java generated-grotto.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-grotto.properties).Hash -ne (Get-FileHash editor/src/main/resources/grotto-fields.properties).Hash) { throw 'Pinned grotto definitions differ' }
+      - name: Verify pinned sea-cave defaults, native validation and compiler gating
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisSeaCaveConfig.java' -OutFile IrisSeaCaveConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/PackHydrologyValidator.java' -OutFile PackHydrologyValidator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/runtime/IrisHydrologySettingsCompiler.java' -OutFile IrisHydrologySettingsCompiler.java
+          python editor/tools/test_sea_cave_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_sea_cave_fields.py IrisCoastalRiverGrottoConfig.java IrisSeaCaveConfig.java PackHydrologyValidator.java IrisHydrologySettingsCompiler.java generated-sea-cave.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-sea-cave.properties).Hash -ne (Get-FileHash editor/src/main/resources/sea-cave-fields.properties).Hash) { throw 'Pinned sea-cave definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

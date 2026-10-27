@@ -1627,6 +1627,10 @@
     "cliffSlopeFactor": {
       "classification": "generation",
       "reason": "Source-derived primitive/enum defaults and bounds, exact integers and nullable cliff-height fallback; controls preserve untouched data without evaluating native outlet acceptance."
+    },
+    "seaCaves": {
+      "classification": "generation",
+      "reason": "Explicit sea-cave object creation and bounded controls preserve parent enablement and enforce the native spacing/radius relation through individual guards and an atomic paired editor."
     }
   },
   "inlandGrotto": {
@@ -1653,6 +1657,32 @@
     "maximumVolume": {
       "classification": "generation",
       "reason": "Source-derived primitive/enum defaults and bounds, exact integers and nullable cliff-height fallback; controls preserve untouched data without evaluating native outlet acceptance."
+    }
+  },
+  "seaCaves": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds checked against pinned pack validation; minimum spacing respects twice the coastal radius, and other settings/unknown data remain preserved."
+    },
+    "maximumPerTile": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds checked against pinned pack validation; minimum spacing respects twice the coastal radius, and other settings/unknown data remain preserved."
+    },
+    "minimumSpacing": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds checked against pinned pack validation; minimum spacing respects twice the coastal radius, and other settings/unknown data remain preserved."
+    },
+    "minimumCoastHeight": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds checked against pinned pack validation; minimum spacing respects twice the coastal radius, and other settings/unknown data remain preserved."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds checked against pinned pack validation; minimum spacing respects twice the coastal radius, and other settings/unknown data remain preserved."
+    },
+    "sweepJitterDegrees": {
+      "classification": "generation",
+      "reason": "Source-defined primitive defaults/types/bounds checked against pinned pack validation; minimum spacing respects twice the coastal radius, and other settings/unknown data remain preserved."
     }
   }
 }
