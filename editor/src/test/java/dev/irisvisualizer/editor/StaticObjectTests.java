@@ -57,10 +57,12 @@ final class StaticObjectTests {
             rejects(() -> StaticObjects.setPosition(PATH,document("{\"position\":"+bad+"}"),CONTEXT,"0","0","0"));rejects(() -> StaticObjects.setRotation(PATH,document("{\"rotation\":"+bad+"}"),CONTEXT,"0","0","0"));
         }
         for (String bad : List.of("null","[]","true","\"1\"")) {
-            rejects(() -> StaticObjects.setSeed(PATH,document("{\"seed\":"+bad+"}"),CONTEXT,"0"));rejects(() -> StaticObjects.setReference(PATH,document("{\"object\":"+bad+"}"),CONTEXT,"other",workspace));
+            rejects(() -> StaticObjects.setSeed(PATH,document("{\"seed\":"+bad+"}"),CONTEXT,"0"));
+            if (!bad.equals("\"1\"")) rejects(() -> StaticObjects.setReference(PATH,document("{\"object\":"+bad+"}"),CONTEXT,"other",workspace));
             rejects(() -> StaticObjects.setDimensionScale(PATH,bytes("{\"allObjectScaleFactor\":"+bad+"}"),"1"));
             for (String flag : List.of("bore","smartBore")) if (!bad.equals("true")) rejects(() -> StaticObjects.setBoolean(PATH,document("{\""+flag+"\":"+bad+"}"),CONTEXT,flag,true));
         }
+        check(entry(StaticObjects.setReference(PATH,document("{\"object\":\"1\"}"),CONTEXT,"other",workspace)).stringToken("object").equals("other"));
         for (String bad : List.of("[]","true","\"1\"")) { rejects(() -> StaticObjects.setScale(PATH,document("{\"scale\":"+bad+"}"),CONTEXT,"1"));rejects(() -> StaticObjects.setScale(PATH,document("{\"scale\":"+bad+"}"),CONTEXT,null)); }
         for (String bad : List.of("null","{}","[null]","[{},1]","[\"snippet/static\"]")) {
             byte[] invalid=bytes("{\"staticObjects\":"+bad+"}");rejects(() -> StaticObjects.entries(new LosslessJson(invalid)));rejects(() -> StaticObjects.enable(PATH,invalid));rejects(() -> StaticObjects.setSeed(PATH,invalid,CONTEXT,"0"));rejects(() -> StaticObjects.change(PATH,invalid,RiverProfiles.Action.ADD,-1,"other","0","0","0",workspace));
