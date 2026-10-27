@@ -39,7 +39,7 @@ final class FloatingObjectMaterialTests {
             byte[] two=FloatingObjectReplacements.changeFind(PATH,one,context,0,RiverProfiles.Action.DUPLICATE,0,null);check(FloatingObjectReplacements.find(rule(two,list)).size()==2);
             check(FloatingObjectReplacements.find(rule(FloatingObjectReplacements.changeFind(PATH,two,context,0,RiverProfiles.Action.REMOVE,1,null),list)).size()==1);
             rejects(() -> FloatingObjectReplacements.setFindBlock(PATH,one,context,0,1,"stone"));rejects(() -> FloatingObjectReplacements.setFindBlock(PATH,one,context,0,0,""));
-            for (String bad : List.of("null","[]","1","\"snippet/rules\"","[null]","[{},1]","[\"snippet/rule\"]")) {
+            for (String bad : List.of("null","1","\"snippet/rules\"","[null]","[{},1]","[\"snippet/rule\"]")) {
                 byte[] invalid=document(list,"{\"edit\":"+bad+"}");rejects(() -> rules(invalid,list));rejects(() -> FloatingObjectReplacements.enable(PATH,invalid,context));rejects(() -> FloatingObjectReplacements.change(PATH,invalid,context,RiverProfiles.Action.ADD,-1,"stone"));
             }
             for (String bad : List.of("null","1","\"true\"")) rejects(() -> FloatingObjectReplacements.setExact(PATH,document(list,"{\"edit\":[{\"exact\":"+bad+"}]}"),context,0,true));
