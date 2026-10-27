@@ -122,7 +122,7 @@ final class RoutingExtrasTests {
         }
         rejects(() -> RoutingExtras.enableScalar(PATH,source,"inlandOutlets"));
         check(Arrays.equals(source,copy));
-        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("hydrology.rivers.routing.regional.future","hydrology.rivers.routing.future","hydrology.surfacePools","unknown")));
+        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("hydrology.rivers.routing.regional.future","hydrology.rivers.routing.future","unknown")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes(prefix+"null"+middle+"[null]"+suffix))).containsAll(List.of("hydrology.rivers.routing.regional","hydrology.rivers.routing.inlandOutlets")));
         var drafts=new InspectorDrafts();
         drafts.update(RoutingExtras.regionalPrefix()+"minimumLength","2048","4096");

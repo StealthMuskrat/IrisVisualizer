@@ -883,6 +883,10 @@
     "rivers": {
       "classification": "generation",
       "reason": "Dimension river configuration; explicit object creation retains disabled planning and source defaults."
+    },
+    "surfacePools": {
+      "classification": "generation",
+      "reason": "Dimension-owned standing pool list authoring; placements and effective policy selections are not evaluated."
     }
   },
   "riverHydrology": {
@@ -1755,6 +1759,40 @@
     "fluidPalette": {
       "classification": "generation",
       "reason": "Bounded river profile ID and explicit weighted fluid palette authoring; full runtime validation remains pending."
+    }
+  },
+  "standingSurfacePool": {
+    "id": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    },
+    "fluidPalette": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    },
+    "spacing": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    },
+    "minimumRadius": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    },
+    "maximumRadius": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
+    },
+    "biome": {
+      "classification": "generation",
+      "reason": "Bounded source-audited standing pool controls, ID and radius guards, exact biome selection and weighted fluid palettes; runtime generation remains pending."
     }
   }
 }

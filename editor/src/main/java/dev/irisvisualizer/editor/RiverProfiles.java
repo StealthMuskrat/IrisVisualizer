@@ -1,11 +1,9 @@
 package dev.irisvisualizer.editor;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Properties;
 import java.util.function.Function;
 
@@ -103,38 +101,10 @@ public final class RiverProfiles {
         });
     }
     public static byte[] initializeWater(String path,byte[] original,int index) { authorize(path);return editPalette(original,index,RiverProfiles::waterEntries); }
-    private static void fluid(String value) {
-        if (value==null || value.isBlank()) throw new IllegalArgumentException("Enter a nonblank fluid block");
-        String normalized=value.trim().toLowerCase(Locale.ROOT);int state=normalized.indexOf('[');if (state>=0) normalized=normalized.substring(0,state);
-        int colon=normalized.indexOf(':');String namespace=colon<0 ? "minecraft" : normalized.substring(0,colon),key=colon<0 ? normalized : normalized.substring(colon+1);
-        if ("minecraft".equals(namespace) && !List.of(DATA.getProperty("fluid.minecraftChoices").split(",")).contains(key)) throw new IllegalArgumentException("Minecraft fluids are water, lava, or bubble_column; custom blocks require runtime validation");
-    }
-    public static byte[] setFluid(String path,byte[] original,int profile,int index,String value) {
-        authorize(path);fluid(value);return editPalette(original,profile,p -> p.objectArrayEdit("palette",index,e -> e.token("block")==null ? e.enableStringPath("block",value) : e.stringValue("block",value)));
-    }
-    public static byte[] enableWeight(String path,byte[] original,int profile,int index) { authorize(path);return editPalette(original,profile,p -> p.objectArrayEdit("palette",index,e -> e.enable("weight",DATA.getProperty("weight.default")))); }
-    public static byte[] setWeight(String path,byte[] original,int profile,int index,String input) {
-        authorize(path);int value;
-        try { value=new BigDecimal(input).intValueExact(); } catch (NumberFormatException | ArithmeticException | NullPointerException invalid) { throw new IllegalArgumentException("Enter an exact integer weight",invalid); }
-        if (value<Integer.parseInt(DATA.getProperty("weight.minimum")) || value>Integer.parseInt(DATA.getProperty("weight.maximum"))) throw new IllegalArgumentException("Fluid weight must be 1-64");
-        return editPalette(original,profile,p -> p.objectArrayEdit("palette",index,e -> e.number("weight",value)));
-    }
-    public static byte[] changeFluid(String path,byte[] original,int profile,Action action,int index,String value) {
-        authorize(path);if (action==null) throw new IllegalArgumentException("Choose a fluid action");if (action==Action.ADD) fluid(value);
-        return editPalette(original,profile,p -> {
-            var entries=p.objectArray("palette");
-            if ((action==Action.ADD || action==Action.DUPLICATE) && entries.size()>=maximumFluids()) throw new IllegalArgumentException("At most 64 fluid entries");
-            if (action==Action.ADD) return p.objectArrayInsert("palette",entries.size(),blockEntry(value));
-            if (index<0 || index>=entries.size()) throw new IllegalArgumentException("Select an existing fluid");
-            return switch(action) {
-                case DUPLICATE -> p.objectArrayInsert("palette",index+1,entries.get(index).sourceBytes());
-                case REMOVE -> { if (entries.size()<=1) throw new IllegalArgumentException("Keep at least one fluid");yield p.objectArrayRemove("palette",index); }
-                case UP -> { if (index==0) throw new IllegalArgumentException("Already first");yield p.objectArrayMove("palette",index,index-1); }
-                case DOWN -> { if (index==entries.size()-1) throw new IllegalArgumentException("Already last");yield p.objectArrayMove("palette",index,index+1); }
-                default -> throw new IllegalArgumentException("Unsupported fluid action");
-            };
-        });
-    }
+    public static byte[] setFluid(String path,byte[] original,int profile,int index,String value) { authorize(path);return editPalette(original,profile,p -> HydrologyFluidPalettes.setFluid(p,index,value)); }
+    public static byte[] enableWeight(String path,byte[] original,int profile,int index) { authorize(path);return editPalette(original,profile,p -> HydrologyFluidPalettes.enableWeight(p,index)); }
+    public static byte[] setWeight(String path,byte[] original,int profile,int index,String input) { authorize(path);return editPalette(original,profile,p -> HydrologyFluidPalettes.setWeight(p,index,input)); }
+    public static byte[] changeFluid(String path,byte[] original,int profile,Action action,int index,String value) { authorize(path);return editPalette(original,profile,p -> HydrologyFluidPalettes.change(p,action,index,value)); }
     public static byte[] enableZoom(String path,byte[] original,int index) { authorize(path);return editPalette(original,index,p -> p.enable("zoom",RiverPaletteFields.zoomDefault())); }
     public static byte[] setZoom(String path,byte[] original,int index,String input) { authorize(path);double value=RiverPaletteFields.checkedZoom(input);return editPalette(original,index,p -> p.number("zoom",value)); }
     static List<String> readOnlyPaths(LosslessJson rivers) {
