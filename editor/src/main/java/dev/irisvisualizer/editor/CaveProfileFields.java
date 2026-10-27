@@ -29,6 +29,8 @@ public final class CaveProfileFields {
     }
     public static String description(String path) { return DEFINITIONS.getProperty(authorize(path)+".description",""); }
     public static String help(String field) { return DEFINITIONS.getProperty(field+".description",""); }
+    public static String styleDefault(String field) { return DEFINITIONS.getProperty(field+".default"); }
+    public static String styleZoomOverride(String field) { return DEFINITIONS.getProperty(field+".zoomOverride"); }
     public static boolean booleanField(String field) { return "boolean".equals(DEFINITIONS.getProperty(field+".type")); }
     public static String defaultToken(String field) {
         if (!EDITABLE.contains(field)) throw new IllegalArgumentException("Cave field is read-only");

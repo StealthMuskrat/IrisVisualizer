@@ -673,6 +673,22 @@
     "allowLava": {
       "classification": "generation",
       "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "baseDensityStyle": {
+      "classification": "generation",
+      "reason": "Controls cave density/warp/surface-break noise using bounded style scalars and enum selection; explicit creation preserves constructor defaults including surface-break zoom override."
+    },
+    "detailDensityStyle": {
+      "classification": "generation",
+      "reason": "Controls cave density/warp/surface-break noise using bounded style scalars and enum selection; explicit creation preserves constructor defaults including surface-break zoom override."
+    },
+    "warpStyle": {
+      "classification": "generation",
+      "reason": "Controls cave density/warp/surface-break noise using bounded style scalars and enum selection; explicit creation preserves constructor defaults including surface-break zoom override."
+    },
+    "surfaceBreakStyle": {
+      "classification": "generation",
+      "reason": "Controls cave density/warp/surface-break noise using bounded style scalars and enum selection; explicit creation preserves constructor defaults including surface-break zoom override."
     }
   }
 }
