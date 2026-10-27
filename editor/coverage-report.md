@@ -1,10 +1,10 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in sixteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in nineteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 41 | 35 | 41 |
+| dimension | 82 | 42 | 36 | 40 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 20 | 14 | 22 |
@@ -20,10 +20,13 @@ Direct nonstatic/nontransient private fields in sixteen pinned source classes on
 | caveModule | 5 | 5 | 5 | 0 |
 | range | 2 | 2 | 2 | 0 |
 | riverPolicy | 26 | 26 | 26 | 0 |
+| hydrology | 3 | 1 | 1 | 2 |
+| riverHydrology | 7 | 2 | 2 | 5 |
+| riverRouting | 16 | 14 | 14 | 2 |
 
 ## dimension
 
-Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionHeight`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `fluidPalette`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `hydrology`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `rockPalette`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `surfaceLayerFallback`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
+Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionHeight`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `fluidPalette`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `rockPalette`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `surfaceLayerFallback`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
 
 ## importedStructures
 
@@ -84,3 +87,15 @@ Unclassified: none.
 ## riverPolicy
 
 Unclassified: none.
+
+## hydrology
+
+Unclassified: `deepFluids`, `surfacePools`.
+
+## riverHydrology
+
+Unclassified: `geometry`, `grottos`, `profiles`, `surface`, `underground`.
+
+## riverRouting
+
+Unclassified: `inlandOutlets`, `regional`.

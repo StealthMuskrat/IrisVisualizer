@@ -23,6 +23,7 @@ public final class DimensionFields {
         List<String> paths = new ArrayList<>();
         for (String field : document.fields()) {
             if (EDITABLE.contains(field)) continue;
+            if (HydrologyFields.ROOT_FIELDS.contains(field)) { paths.addAll(HydrologyFields.readOnlyPaths(document)); continue; }
             if (RiverPolicyFields.OBJECT_FIELDS.contains(field)) {
                 try {
                     var policy = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));

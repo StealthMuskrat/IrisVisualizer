@@ -163,6 +163,10 @@
     "riverPolicy": {
       "classification": "generation",
       "reason": "Nullable river routing/placement and scalar overrides; bounded editor preserves inheritance and unknown lists without resolving policies or generating rivers."
+    },
+    "hydrology": {
+      "classification": "generation",
+      "reason": "Dimension-owned physical hydrology settings; explicit empty-object creation and bounded river routing controls preserve source defaults without executing planning."
     }
   },
   "biome": {
@@ -873,6 +877,80 @@
     "surfacePools": {
       "classification": "generation",
       "reason": "Nullable dimension-owned hydrology ID selection; literal unique-ID catalog assignment and lossless list operations preserve inheritance/empty semantics. Lookup dimensions are explicit for shared resources; runtime ownership, normalization and target validity remain unchecked."
+    }
+  },
+  "hydrology": {
+    "rivers": {
+      "classification": "generation",
+      "reason": "Dimension river configuration; explicit object creation retains disabled planning and source defaults."
+    }
+  },
+  "riverHydrology": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Physical river planning setting; bounded configuration editing requires explicit parents, preserves unknown siblings and never starts generation."
+    },
+    "routing": {
+      "classification": "generation",
+      "reason": "Physical river planning setting; bounded configuration editing requires explicit parents, preserves unknown siblings and never starts generation."
+    }
+  },
+  "riverRouting": {
+    "tileSize": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "sampleSpacing": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "maximumRouteLength": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "minimumSurfaceCourseLength": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "minimumUndergroundCourseLength": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "maximumOutletsPerTile": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "maximumCoastalOutletsPerTile": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "oceanOutlets": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "valleyPreference": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "uphillPenalty": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "slopePenalty": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "confluenceAttraction": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "lengthPreference": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "tributaries": {
+      "classification": "generation",
+      "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
     }
   }
 }
