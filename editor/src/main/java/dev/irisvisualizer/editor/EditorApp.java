@@ -504,6 +504,7 @@ public final class EditorApp extends Application {
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
         drawBiomeSlabWall(document);
+        drawFloatingBiomes(document);
         drawRootStyles(document, false);
         drawCaveProfile(document);
         drawRiverPolicy(document);
@@ -519,7 +520,127 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawFloatingBiomes(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Floating child biomes")) return;
+        ImGui.textWrapped(FloatingBiomes.description());
+        ImGui.textWrapped("This editor authors applied settings without sampling islands. Nested noise styles, custom underside palettes and object-placement lists remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
+        List<LosslessJson> entries;
+        try { entries=FloatingBiomes.entries(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored floating list contains snippets or unsupported entries (read-only).");return; }
+        if (entries==null) {
+            ImGui.textWrapped("Absent: no floating child entries.");
+            if (ImGui.button("Enable empty floating list (Iris default)")) {
+                try { commitProfileChange(FloatingBiomes.prefix(),FloatingBiomes.enable(selected,workspace.read(selected)),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        if (ImGui.button("Add default floating entry (Self)")) { changeFloatingBiome(RiverProfiles.Action.ADD,-1);return; }
+        for (int index=0;index<entries.size();index++) {
+            if (!ImGui.treeNode("Floating entry "+index)) continue;
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate entry")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();if (ImGui.button("Remove entry")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move entry up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Move entry down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeFloatingBiome(action,index);return; }
+            int entryIndex=index;var entry=entries.get(index);drawFloatingBiomeTarget(entry,index);
+            drawFloatingPair(entry,index,"minHeightAboveSurface","maxHeightAboveSurface",false);
+            drawFloatingPair(entry,index,"bottomDepthMin","bottomDepthMax",false);
+            drawFloatingPair(entry,index,"minAbsoluteY","maxAbsoluteY",true);
+            for (String field : FloatingBiomes.SCALARS) drawFloatingScalar(entry,index,field);
+            for (String field : FloatingBiomes.TOGGLES) {
+                String token=entry.token(field),effective=token==null ? FloatingBiomes.defaultToken(field) : token;ImGui.pushID(field);ImGui.textWrapped(FloatingBiomes.help(field));
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle has an unsupported type (read-only).");
+                else if (ImGui.checkbox(field+(token==null ? " (Iris default)" : ""),effective.equals("true"))) applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.setToggle(selected,workspace.read(selected),entryIndex,field,!effective.equals("true"))));
+                ImGui.popID();
+            }
+            for (String field : FloatingBiomes.ENUMS) drawFloatingMode(entry,index,field);
+            drawFloatingLiteral(entry,index,"carving");drawFloatingLiteral(entry,index,"fluidBlock");drawFloatingFluidHeight(entry,index);
+            if (ImGui.treeNode("Other floating data (read-only)")) { for (String field : FloatingBiomes.readOnlyFields(entry)) ImGui.textWrapped(field);ImGui.treePop(); }
+            ImGui.treePop();
+        }
+    }
+    private void changeFloatingBiome(RiverProfiles.Action action,int index) {
+        try { commitProfileChange(FloatingBiomes.prefix(),FloatingBiomes.change(selected,workspace.read(selected),action,index),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingBiomeTarget(LosslessJson entry,int index) {
+        ImGui.textWrapped(FloatingBiomes.help("biome"));String current;
+        try { current=entry.token("biome")==null || entry.token("biome").equals("null") ? "" : entry.stringToken("biome"); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored target biome is not a string or null (read-only).");return; }
+        var choices=FloatingBiomes.biomeChoices(workspace);
+        if (!current.isEmpty() && !choices.contains(current)) ImGui.textWrapped("Stored target is missing from this pack; it is retained until you choose Self or an exact pack key.");
+        if (ImGui.beginCombo("Target biome",current.isEmpty() ? "Self (parent biome)" : current.length()>128 ? "Stored target" : current)) {
+            if (ImGui.selectable("Self (parent biome)",current.isEmpty())) applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.setBiome(selected,workspace.read(selected),index,"",workspace)));
+            for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.setBiome(selected,workspace.read(selected),index,choice,workspace)));
+            ImGui.endCombo();
+        }
+    }
+    private void drawFloatingScalar(LosslessJson entry,int index,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(FloatingBiomes.help(field));ImGui.textWrapped(FloatingBiomes.constraints(field));
+        String token=entry.token(field),key=FloatingBiomes.entryPrefix(index)+field;
+        if (token==null) {
+            if (ImGui.button("Enable "+field+" ("+FloatingBiomes.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.enableScalar(selected,workspace.read(selected),index,field)));
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingBiomes.setScalar(selected,workspace.read(selected),index,field,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void drawFloatingPair(LosslessJson entry,int index,String minField,String maxField,boolean optional) {
+        if (!ImGui.treeNode(optional ? "Optional absolute Y limits" : minField.equals("minHeightAboveSurface") ? "Base altitude (absolute world Y)" : "Bottom depth")) return;
+        if (optional) ImGui.textWrapped("The minimum clips the island bottom upward; the maximum clips its top downward.");
+        else { ImGui.textWrapped(FloatingBiomes.help(minField));ImGui.textWrapped(FloatingBiomes.help(maxField)); }
+        ImGui.textWrapped(optional ? "Exact signed 32-bit integers. Blank means no limit. The editor requires minimum <= maximum when both limits are set; world compatibility is not resolved here." : "Apply both exact integer bounds together. The editor requires minimum <= maximum. Base altitude is 0-2032; bottom depth is 0-512.");
+        String min=entry.token(minField),max=entry.token(maxField);
+        if (min!=null && !(optional && min.equals("null")) && !LosslessJson.numericToken(min) || max!=null && !(optional && max.equals("null")) && !LosslessJson.numericToken(max)) ImGui.textWrapped("Stored bounds have an unsupported type (read-only).");
+        else {
+            String minKey=FloatingBiomes.entryPrefix(index)+minField,maxKey=FloatingBiomes.entryPrefix(index)+maxField,storedMin=min==null || optional && min.equals("null") ? optional ? "" : FloatingBiomes.defaultToken(minField) : min,storedMax=max==null || optional && max.equals("null") ? optional ? "" : FloatingBiomes.defaultToken(maxField) : max;
+            ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());ImGui.inputText("Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+            if (ImGui.button("Apply paired bounds")) {
+                try {
+                    byte[] next=optional ? FloatingBiomes.setAbsoluteBounds(selected,workspace.read(selected),index,minimum.get(),maximum.get()) : FloatingBiomes.setPair(selected,workspace.read(selected),index,minField.equals("minHeightAboveSurface"),minimum.get(),maximum.get());
+                    workspace.replace(selected,next);drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null;
+                } catch (Exception failure) { error=failure.getMessage(); }
+            }
+        }
+        ImGui.treePop();
+    }
+    private void drawFloatingMode(LosslessJson entry,int index,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(FloatingBiomes.help(field));String current;
+        try { current=entry.token(field)==null ? FloatingBiomes.defaultToken(field) : entry.stringToken(field); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored mode is not a string (read-only).");ImGui.popID();return; }
+        if (!FloatingBiomes.choices(field).contains(current)) ImGui.textWrapped("Unknown stored mode is retained until an explicit replacement.");
+        if (ImGui.beginCombo(field,current.length()>128 ? "Unknown stored mode" : current)) {
+            for (String choice : FloatingBiomes.choices(field)) {
+                if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.setMode(selected,workspace.read(selected),index,field,choice)));
+                if (ImGui.isItemHovered()) ImGui.setTooltip(FloatingBiomes.choiceHelp(field,choice));
+            }
+            ImGui.endCombo();
+        }
+        ImGui.popID();
+    }
+    private void drawFloatingLiteral(LosslessJson entry,int index,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(FloatingBiomes.help(field));
+        ImGui.textWrapped(field.equals("carving") ? "Literal dimension carving ID or biome key; dimension IDs resolve first in Iris. Empty disables the reference. Resolution is not performed here." : "Block names require nonblank text; registry/state/fluid validation remains pending.");
+        try {
+            String token=entry.token(field),stored=token==null ? FloatingBiomes.defaultToken(field) : field.equals("carving") && token.equals("null") ? "" : entry.stringToken(field),key=FloatingBiomes.entryPrefix(index)+field;
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,stored,input.get());
+            if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingBiomes.setLiteral(selected,workspace.read(selected),index,field,input.get())));
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored value has an unsupported type (read-only)."); }
+        ImGui.popID();
+    }
+    private void drawFloatingFluidHeight(LosslessJson entry,int index) {
+        ImGui.textWrapped(FloatingBiomes.help("localFluidHeight"));String token=entry.token("localFluidHeight");
+        if (token!=null && !token.equals("null") && !LosslessJson.numericToken(token)) { ImGui.textWrapped("Stored fluid height is not numeric/null (read-only).");return; }
+        String key=FloatingBiomes.entryPrefix(index)+"localFluidHeight",stored=token==null || token.equals("null") ? "" : token;
+        ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Local fluid height (blank = no internal water)",input);drafts.update(key,stored,input.get());
+        if (ImGui.button("Apply fluid height")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingBiomes.setFluidHeight(selected,workspace.read(selected),index,input.get())));
     }
     private void drawBiomeSlabWall(LosslessJson document) {
         if (!ImGui.collapsingHeader("Slab and wall materials")) return;
@@ -2711,7 +2832,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || DimensionHeights.defaultBound("min",true)==null || DimensionPalettes.maximumWeight()!=1000 || SurfaceLayerFallbacks.choices().isEmpty() || BiomeLayers.defaultBlock()==null || BiomeDerivatives.defaultKey()==null || BiomeSlabWall.classBlock()==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || DimensionHeights.defaultBound("min",true)==null || DimensionPalettes.maximumWeight()!=1000 || SurfaceLayerFallbacks.choices().isEmpty() || BiomeLayers.defaultBlock()==null || BiomeDerivatives.defaultKey()==null || BiomeSlabWall.classBlock()==null || FloatingBiomes.defaultToken("rarity")==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

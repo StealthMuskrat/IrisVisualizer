@@ -1,13 +1,13 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in fifty-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in fifty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
 | dimension | 82 | 46 | 40 | 36 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 31 | 25 | 11 |
+| biome | 42 | 32 | 26 | 10 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
@@ -55,6 +55,7 @@ Direct nonstatic/nontransient private fields in fifty-one pinned source classes 
 | deepFluid | 12 | 12 | 12 | 0 |
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
+| floatingBiome | 42 | 29 | 28 | 13 |
 
 ## dimension
 
@@ -70,7 +71,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `floatingChildBiomes`, `objects`, `ores`, `proceduralObjects`, `structures`, `surfaceOreReplaceableBlocks`.
+Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `objects`, `ores`, `proceduralObjects`, `structures`, `surfaceOreReplaceableBlocks`.
 
 ## biomeGeneratorLink
 
@@ -259,3 +260,7 @@ Unclassified: none.
 ## slopeClip
 
 Unclassified: none.
+
+## floatingBiome
+
+Unclassified: `altitudeStyle`, `bottomObjectOverrides`, `bottomPalette`, `bottomStyle`, `carveStyle`, `edgeTaperVariationStyle`, `extraObjects`, `floatingObjects`, `footprintStyle`, `pickerStyle`, `topObjectOverrides`, `topShapeStyle`, `wallWarpStyle`.

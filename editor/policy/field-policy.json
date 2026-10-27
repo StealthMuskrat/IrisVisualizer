@@ -309,6 +309,10 @@
     "wall": {
       "classification": "generation",
       "reason": "Biome wall material palette with empty contextual default and weighted blocks/noise; wall slope and thickness stay read-only."
+    },
+    "floatingChildBiomes": {
+      "classification": "generation",
+      "reason": "Inline floating child entry authoring with source-default lists, geometry, height pairs, exact target selection and bounded placement modes; nested generation/placement data is preserved."
     }
   },
   "generator": {
@@ -1943,6 +1947,124 @@
     "maximumSlope": {
       "classification": "generation",
       "reason": "Source-annotated paired surface slope bounds, with the default no-gate rule documented; terrain slopes are not sampled."
+    }
+  },
+  "floatingBiome": {
+    "biome": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "rarity": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "footprintThreshold": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "edgeTaperWidth": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "edgeTaperExponent": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "edgeTaperVariationAmplitude": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "minHeightAboveSurface": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "maxHeightAboveSurface": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "minAbsoluteY": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "maxAbsoluteY": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "topShapeMode": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "maxTopHeight": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "topShapeAmp": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "bottomDepthMin": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "bottomDepthMax": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "bottomExponent": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "bottomPaletteMode": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "maxThickness": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "wallWarpAmplitude": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "carving": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "carveThreshold": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "localFluidHeight": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "fluidBlock": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "inheritDecorators": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "inheritObjects": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "objectShrinkFactor": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "color": {
+      "classification": "read-only",
+      "reason": "Studio visualization color does not define island generation."
+    },
+    "topObjectMode": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
+    },
+    "bottomObjectMode": {
+      "classification": "generation",
+      "reason": "Bounded floating entry authoring; native world compatibility, generation and referenced content resolution are pending."
     }
   }
 }

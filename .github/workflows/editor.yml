@@ -385,6 +385,20 @@ jobs:
           python editor/tools/extract_biome_slab_wall_fields.py IrisBiome.java IrisBiomePaletteLayer.java IrisPostModifier.java IrisCarveModifier.java SubterrainSurfaceMaterials.java generated-biome-slab-wall.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-biome-slab-wall.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-slab-wall-fields.properties).Hash) { throw 'Pinned biome slab/wall definitions differ' }
+      - name: Verify pinned floating child biome definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisFloatingChildBiomes.java' -OutFile IrisFloatingChildBiomes.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/FloatingIslandSample.java' -OutFile FloatingIslandSample.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/FloatingIslandEdgeProfile.java' -OutFile FloatingIslandEdgeProfile.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/TopShapeMode.java' -OutFile TopShapeMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/FloatingBottomPaletteMode.java' -OutFile FloatingBottomPaletteMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/value/OverrideMode.java' -OutFile OverrideMode.java
+          python editor/tools/test_floating_biome_fields.py IrisBiome.java IrisFloatingChildBiomes.java FloatingIslandEdgeProfile.java FloatingIslandSample.java TopShapeMode.java FloatingBottomPaletteMode.java OverrideMode.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_biome_fields.py IrisBiome.java IrisFloatingChildBiomes.java FloatingIslandEdgeProfile.java FloatingIslandSample.java TopShapeMode.java FloatingBottomPaletteMode.java OverrideMode.java generated-floating-biome.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-biome.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-biome-fields.properties).Hash) { throw 'Pinned floating biome definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
