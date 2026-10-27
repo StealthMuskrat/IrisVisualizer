@@ -15,11 +15,12 @@ final class OreGeneratorTests {
     private static byte[] document(String ore) { return bytes("{\r\n \"ores\":[ "+ore+", {\"futureSibling\":1e2} ],\"objects\":[{\"futureObject\":true}],\"futureRoot\":9007199254740993,\"escaped\":\"雪\\u0061\"\r\n}\r\n"); }
     private static LosslessJson ore(byte[] value) { return new LosslessJson(value).objectArray("ores").getFirst(); }
     private static LosslessJson palette(byte[] value) { return OreGenerators.object(ore(value),"palette"); }
+    private static String resourcePath(String base) { return base.equals("dimensions") ? "dimensions/ore.json" : base+"/nested/ore.json"; }
     static void run(Path temp) throws Exception {
         check(OreGenerators.rangeDefault("min",false).equals("30") && OreGenerators.rangeDefault("max",false).equals("80"));
         check(OreGenerators.rangeDefault("min",true).equals("16") && OreGenerators.rangeDefault("max",true).equals("32"));
         for (String base : OreGenerators.CONTEXTS) {
-            String path=base+"/nested/ore.json";check(FieldCoverage.groups(path).containsAll(List.of("oreGenerator","materialPalette","blockData","noiseStyle","range")));var context=new OreGenerators.Context(base,0);var target=context.paletteTarget();
+            String path=resourcePath(base);check(FieldCoverage.groups(path).containsAll(List.of("oreGenerator","materialPalette","blockData","noiseStyle","range")));var context=new OreGenerators.Context(base,0);var target=context.paletteTarget();
             check(target.ore() && !target.layer() && !target.objectPalette() && target.minimumEntries()==0 && target.defaultBlock().equals("STONE"));
             check(OreGenerators.entries(new LosslessJson(bytes("{}")))==null);byte[] empty=OreGenerators.enable(path,bytes("{}"),base);check(new LosslessJson(empty).objectArray("ores").isEmpty());
             byte[] added=OreGenerators.change(path,empty,base,RiverProfiles.Action.ADD,-1,"minecraft:iron_ore");
@@ -76,7 +77,7 @@ final class OreGeneratorTests {
             for (String invalid : List.of("null","{}","[null]","[{},1]","[\"snippet/ore\"]")) {
                 byte[] source=bytes("{\"ores\":"+invalid+"}");rejects(() -> OreGenerators.entries(new LosslessJson(source)));rejects(() -> OreGenerators.enable(path,source,base));rejects(() -> OreGenerators.change(path,source,base,RiverProfiles.Action.ADD,-1,"stone"));
             }
-            for (String wrong : List.of("generators/ore.json",base+"/ore.txt","ore.json")) rejectOwner(wrong,base,context,original);
+            for (String wrong : List.of("generators/ore.json","dimensions/nested/ore.json",base+"/ore.txt","ore.json")) rejectOwner(wrong,base,context,original);
             for (String wrong : OreGenerators.CONTEXTS) if (!wrong.equals(base)) rejectOwner(wrong+"/ore.json",base,context,original);
             for (String bad : List.of("ores.-1.chanceStyle","ores.01.chanceStyle","ores.2147483648.palette.style","ores.0.palette","ores.0.range.style")) check(OreGenerators.styleContext(base,bad)==null);
             var drafts=new InspectorDrafts();String list=OreGenerators.listPrefix(base),threshold=context.prefix()+"threshold",material=target.listPrefix()+"0.block",noise=context.styleTarget("chanceStyle").draftPrefix()+"zoom",other=OreGenerators.listPrefix(base.equals("biomes") ? "regions" : "biomes")+"0.threshold";
@@ -87,8 +88,8 @@ final class OreGeneratorTests {
             check(drafts.transitionUnder(list,() -> true,() -> {}) && drafts.count()==1 && drafts.contains(other));
             byte[] edited=OreGenerators.setThreshold(path,original,context,"0.25");edited=OreGenerators.setRange(path,edited,context,"-64","160");edited=target.setWeight(path,edited,0,"1000");edited=NoiseStyleFields.editStyle(path,edited,context.styleTarget("chanceStyle"),"SIMPLEX");
             for (String raw : List.of("\"futureSibling\":1e2","\"futureRoot\":9007199254740993","\"futureOre\":\"雪\\u0061\"","\"futureRange\":true","\"futurePalette\":true","\"futureBlock\":9007199254740993","\"imageMap\":\"future/map\"","\"expression\":\"x+z\"","\"data\":{\"future\":true}","\"objects\":[{\"futureObject\":true}]")) check(text(edited).contains(raw));
-            var workspace=PackWorkspace.newPack(Map.of("dimensions/nested/ore.json",original,"regions/nested/ore.json",original,"biomes/nested/ore.json",original,"objects/opaque.iob",new byte[]{0,127,-1,42}));workspace.replace(path,edited);
-            for (String otherBase : OreGenerators.CONTEXTS) if (!otherBase.equals(base)) check(Arrays.equals(workspace.read(otherBase+"/nested/ore.json"),original));
+            var workspace=PackWorkspace.newPack(Map.of("dimensions/ore.json",original,"regions/nested/ore.json",original,"biomes/nested/ore.json",original,"objects/opaque.iob",new byte[]{0,127,-1,42}));workspace.replace(path,edited);
+            for (String otherBase : OreGenerators.CONTEXTS) if (!otherBase.equals(base)) check(Arrays.equals(workspace.read(resourcePath(otherBase)),original));
             workspace.save(temp.resolve("ores-"+base));workspace.exportZip(temp.resolve("ores-"+base+".zip"));var reopened=PackWorkspace.open(temp.resolve("ores-"+base));var imported=PackWorkspace.importZip(temp.resolve("ores-"+base+".zip"));
             for (String resource : workspace.paths()) check(Arrays.equals(workspace.read(resource),reopened.read(resource)) && Arrays.equals(workspace.read(resource),imported.read(resource)));
         }
