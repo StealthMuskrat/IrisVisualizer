@@ -43,6 +43,7 @@ public final class WorkspaceTests {
    DeepFluidTests.run(temp);
    DimensionHeightTests.run(temp);
    DimensionPaletteTests.run(temp);
+   BiomeLayerTests.run(temp);
    var tree=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json","asset.iob"),List.of("empty"),"");
    check(tree.size()==4 && tree.get(0).folder() && tree.get(3).path().equals("asset.iob"));
    var filtered=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json"),List.of(),"A.JSON");
@@ -206,7 +207,7 @@ public final class WorkspaceTests {
    noiseWorkspace.replace("generators/flat.json",NoiseFields.editText("generators/flat.json",noiseWorkspace.read("generators/flat.json"),0,"seed","-9223372036854775808"));
    noiseWorkspace.save(temp.resolve("edited-noise-pack"));
    check(new LosslessJson(PackWorkspace.open(temp.resolve("edited-noise-pack")).read("generators/flat.json")).objectArray("composite").get(0).token("seed").equals("-9223372036854775808"));
-   check(FieldCoverage.groups("biomes/nested/test.json").equals(List.of("biome","biomeGeneratorLink","terrain3D","caveProfile","styledRange","caveModule","range","riverPolicy")));
+   check(FieldCoverage.groups("biomes/nested/test.json").equals(List.of("biome","biomeGeneratorLink","terrain3D","caveProfile","styledRange","caveModule","range","riverPolicy","biomePaletteLayer","slopeClip","blockData","noiseStyle")));
    check(FieldCoverage.groups("asset.iob").isEmpty());
    var dimensionCoverage=FieldCoverage.fields("dimension");
    check(dimensionCoverage.stream().anyMatch(field->field.name().equals("name") && field.classification().equals("read-only") && !field.implemented()));

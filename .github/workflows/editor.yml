@@ -353,6 +353,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-dimension-palette.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-palette-fields.properties).Hash) { throw 'Pinned dimension palette definitions differ' }
           if ((Get-FileHash generated-surface-fallback.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-fallback-fields.properties).Hash) { throw 'Pinned surface fallback definitions differ' }
+      - name: Verify pinned biome material layer definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomePaletteLayer.java' -OutFile IrisBiomePaletteLayer.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisSlopeClip.java' -OutFile IrisSlopeClip.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/schema/annotation/ArrayType.java' -OutFile ArrayType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/PackBiomeLayerValidator.java' -OutFile PackBiomeLayerValidator.java
+          python editor/tools/test_biome_layer_fields.py IrisBiome.java IrisBiomePaletteLayer.java IrisSlopeClip.java ArrayType.java IrisBiomeLayerGenerator.java IrisBlockData.java PackBiomeLayerValidator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_biome_layer_fields.py IrisBiome.java IrisBiomePaletteLayer.java IrisSlopeClip.java ArrayType.java IrisBiomeLayerGenerator.java IrisBlockData.java PackBiomeLayerValidator.java generated-biome-layer.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-biome-layer.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-layer-fields.properties).Hash) { throw 'Pinned biome layer definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

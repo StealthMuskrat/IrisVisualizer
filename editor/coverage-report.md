@@ -1,13 +1,13 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in forty-nine pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in fifty-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
 | dimension | 82 | 46 | 40 | 36 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 21 | 15 | 21 |
+| biome | 42 | 24 | 18 | 18 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
@@ -53,6 +53,8 @@ Direct nonstatic/nontransient private fields in forty-nine pinned source classes
 | riverProfile | 2 | 2 | 2 | 0 |
 | standingSurfacePool | 8 | 8 | 8 | 0 |
 | deepFluid | 12 | 12 | 12 | 0 |
+| biomePaletteLayer | 6 | 6 | 6 | 0 |
+| slopeClip | 2 | 2 | 2 | 0 |
 
 ## dimension
 
@@ -68,7 +70,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `layers`, `objects`, `ores`, `proceduralObjects`, `seaLayers`, `slab`, `structures`, `surfaceOreReplaceableBlocks`, `vanillaDerivative`, `wall`.
+Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `objects`, `ores`, `proceduralObjects`, `slab`, `structures`, `surfaceOreReplaceableBlocks`, `vanillaDerivative`, `wall`.
 
 ## biomeGeneratorLink
 
@@ -247,5 +249,13 @@ Unclassified: none.
 Unclassified: none.
 
 ## deepFluid
+
+Unclassified: none.
+
+## biomePaletteLayer
+
+Unclassified: none.
+
+## slopeClip
 
 Unclassified: none.

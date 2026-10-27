@@ -269,6 +269,18 @@
     "surfaceLayerFallback": {
       "classification": "generation",
       "reason": "Source-audited surface layer fallback choices with dimension default ROCK and nullable biome inheritance; world ownership/effective fallback is not resolved."
+    },
+    "layers": {
+      "classification": "generation",
+      "reason": "Independent inline material layer lists with source defaults, lossless structural operations and scoped drafts; snippets and native generation remain unresolved."
+    },
+    "seaLayers": {
+      "classification": "generation",
+      "reason": "Independent inline material layer lists with source defaults, lossless structural operations and scoped drafts; snippets and native generation remain unresolved."
+    },
+    "caveCeilingLayers": {
+      "classification": "generation",
+      "reason": "Independent inline material layer lists with source defaults, lossless structural operations and scoped drafts; snippets and native generation remain unresolved."
     }
   },
   "generator": {
@@ -1867,6 +1879,42 @@
     "shortChannels": {
       "classification": "generation",
       "reason": "Bounded deep-fluid controls with native scalar/spacing/clearance guards and source height defaults; advisory dimension-height footprint checks are available while full native validation remains pending."
+    }
+  },
+  "biomePaletteLayer": {
+    "style": {
+      "classification": "generation",
+      "reason": "Bounded inline layer thickness/block/noise controls; slope conditions are edited only for surface layers in the pinned generator."
+    },
+    "minHeight": {
+      "classification": "generation",
+      "reason": "Bounded inline layer thickness/block/noise controls; slope conditions are edited only for surface layers in the pinned generator."
+    },
+    "maxHeight": {
+      "classification": "generation",
+      "reason": "Bounded inline layer thickness/block/noise controls; slope conditions are edited only for surface layers in the pinned generator."
+    },
+    "slopeCondition": {
+      "classification": "generation",
+      "reason": "Bounded inline layer thickness/block/noise controls; slope conditions are edited only for surface layers in the pinned generator."
+    },
+    "zoom": {
+      "classification": "generation",
+      "reason": "Bounded inline layer thickness/block/noise controls; slope conditions are edited only for surface layers in the pinned generator."
+    },
+    "palette": {
+      "classification": "generation",
+      "reason": "Bounded inline layer thickness/block/noise controls; slope conditions are edited only for surface layers in the pinned generator."
+    }
+  },
+  "slopeClip": {
+    "minimumSlope": {
+      "classification": "generation",
+      "reason": "Source-annotated paired surface slope bounds, with the default no-gate rule documented; terrain slopes are not sampled."
+    },
+    "maximumSlope": {
+      "classification": "generation",
+      "reason": "Source-annotated paired surface slope bounds, with the default no-gate rule documented; terrain slopes are not sampled."
     }
   }
 }
