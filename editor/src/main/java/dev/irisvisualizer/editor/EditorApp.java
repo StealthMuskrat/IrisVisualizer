@@ -10,6 +10,7 @@ import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.system.MemoryUtil;
 import java.util.List;
 import imgui.type.ImString;
+import imgui.type.ImBoolean;
 import java.util.HashMap;
 import java.util.Map;
 import javax.swing.JFileChooser;
