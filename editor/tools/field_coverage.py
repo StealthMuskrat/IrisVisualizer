@@ -77,6 +77,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['range'] = set(editable(java_dir, 'CavePlacementFields', 'RANGE_MEMBERS'))
     implemented['riverPolicy'] = set(editable(java_dir, 'RiverPolicyFields'))
     implemented['riverPolicy'].update(editable(java_dir, 'RiverBiomeLists'))
+    implemented['riverPolicy'].update(editable(java_dir, 'RiverIdLists'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']

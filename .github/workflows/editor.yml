@@ -144,6 +144,18 @@ jobs:
           python editor/tools/extract_river_policy_fields.py IrisRiverPolicy.java IrisDimension.java IrisRegion.java IrisBiome.java IrisRiverPlacementMode.java IrisRiverRoutingMode.java generated-river-policy.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-river-policy.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-policy-fields.properties).Hash) { throw 'Pinned river policy definitions differ' }
+      - name: Verify pinned dimension river ID catalog definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisHydrology.java' -OutFile IrisHydrology.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverHydrology.java' -OutFile IrisRiverHydrology.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverProfile.java' -OutFile IrisRiverProfile.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisSurfacePoolConfig.java' -OutFile IrisSurfacePoolConfig.java
+          python editor/tools/test_river_id_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_river_id_fields.py IrisRiverPolicy.java IrisDimension.java IrisHydrology.java IrisRiverHydrology.java IrisRiverProfile.java IrisSurfacePoolConfig.java generated-river-id.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-river-id.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-id-fields.properties).Hash) { throw 'Pinned river ID definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

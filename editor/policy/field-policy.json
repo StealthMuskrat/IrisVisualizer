@@ -865,6 +865,14 @@
     "floodedCaveBiomes": {
       "classification": "generation",
       "reason": "River biome selection; exact in-pack biome assignment and lossless list operations preserve null inheritance and explicit-empty clearing. Loader aliases, target contents and effective inheritance remain unchecked."
+    },
+    "profiles": {
+      "classification": "generation",
+      "reason": "Nullable dimension-owned hydrology ID selection; literal unique-ID catalog assignment and lossless list operations preserve inheritance/empty semantics. Lookup dimensions are explicit for shared resources; runtime ownership, normalization and target validity remain unchecked."
+    },
+    "surfacePools": {
+      "classification": "generation",
+      "reason": "Nullable dimension-owned hydrology ID selection; literal unique-ID catalog assignment and lossless list operations preserve inheritance/empty semantics. Lookup dimensions are explicit for shared resources; runtime ownership, normalization and target validity remain unchecked."
     }
   }
 }
