@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in fifty-five pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in fifty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -56,9 +56,11 @@ Direct nonstatic/nontransient private fields in fifty-five pinned source classes
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
 | floatingBiome | 42 | 42 | 41 | 0 |
-| objectPlacement | 41 | 10 | 10 | 31 |
+| objectPlacement | 41 | 11 | 11 | 30 |
 | objectTranslate | 4 | 4 | 4 | 0 |
 | objectScale | 5 | 5 | 5 | 0 |
+| objectRotation | 4 | 4 | 4 | 0 |
+| axisRotation | 4 | 4 | 4 | 0 |
 
 ## dimension
 
@@ -270,12 +272,20 @@ Unclassified: none.
 
 ## objectPlacement
 
-Unclassified: `bore`, `boreExtendMaxY`, `boreExtendMinY`, `bottom`, `carvingSupport`, `caveAnchorMode`, `clamp`, `edit`, `forcePlace`, `fromBottom`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `meld`, `onwater`, `overrideGlobalLoot`, `requireSurfaceSupport`, `rotateTowardsSlope`, `rotation`, `slopeCondition`, `smartBore`, `stiltSettings`, `surfaceSupportBuffer`, `surfaceSupportDepth`, `trees`, `underwater`, `vacuumSettings`, `vanillaLoot`, `warp`, `waterloggable`.
+Unclassified: `bore`, `boreExtendMaxY`, `boreExtendMinY`, `bottom`, `carvingSupport`, `caveAnchorMode`, `clamp`, `edit`, `forcePlace`, `fromBottom`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `meld`, `onwater`, `overrideGlobalLoot`, `requireSurfaceSupport`, `rotateTowardsSlope`, `slopeCondition`, `smartBore`, `stiltSettings`, `surfaceSupportBuffer`, `surfaceSupportDepth`, `trees`, `underwater`, `vacuumSettings`, `vanillaLoot`, `warp`, `waterloggable`.
 
 ## objectTranslate
 
 Unclassified: none.
 
 ## objectScale
+
+Unclassified: none.
+
+## objectRotation
+
+Unclassified: none.
+
+## axisRotation
 
 Unclassified: none.

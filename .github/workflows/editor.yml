@@ -439,6 +439,17 @@ jobs:
           python editor/tools/extract_floating_placement_settings.py IrisObjectPlacement.java IrisObjectScale.java IrisObjectPlacementScaleInterpolator.java IrisStyledRange.java MantleFloatingObjectComponent.java IrisGeneratorStyle.java generated-floating-placement-settings.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-placement-settings.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-settings.properties).Hash) { throw 'Pinned floating density/scale definitions differ' }
+      - name: Verify pinned floating object rotation definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectRotation.java' -OutFile IrisObjectRotation.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisAxisRotationClamp.java' -OutFile IrisAxisRotationClamp.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectPlacementRunner.java' -OutFile IrisObjectPlacementRunner.java
+          python editor/tools/test_floating_object_rotation.py IrisObjectRotation.java IrisAxisRotationClamp.java IrisObjectPlacement.java MantleFloatingObjectComponent.java IrisObjectPlacementRunner.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_object_rotation.py IrisObjectRotation.java IrisAxisRotationClamp.java IrisObjectPlacement.java MantleFloatingObjectComponent.java IrisObjectPlacementRunner.java generated-floating-object-rotation.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-object-rotation.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-object-rotation.properties).Hash) { throw 'Pinned floating rotation definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
