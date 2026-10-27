@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
 
-/** Inline floating child settings; object placements and world sampling stay outside this batch. */
+/** Inline floating child settings; placement families have separate bounded inspectors. */
 public final class FloatingBiomes {
     public static final List<String> LIST_FIELDS = List.of("floatingChildBiomes");
     public static final List<String> EDITABLE = List.of("biome", "rarity", "footprintThreshold", "edgeTaperWidth", "edgeTaperExponent", "edgeTaperVariationAmplitude", "minHeightAboveSurface", "maxHeightAboveSurface", "minAbsoluteY", "maxAbsoluteY", "topShapeMode", "maxTopHeight", "topShapeAmp", "bottomDepthMin", "bottomDepthMax", "bottomExponent", "bottomPaletteMode", "maxThickness", "wallWarpAmplitude", "carving", "carveThreshold", "localFluidHeight", "fluidBlock", "inheritDecorators", "inheritObjects", "objectShrinkFactor", "topObjectMode", "bottomObjectMode");
@@ -81,5 +81,5 @@ public final class FloatingBiomes {
         authorize(path);field(value,List.of("carving","fluidBlock"));if (input==null || value.equals("fluidBlock") && input.isBlank()) throw new IllegalArgumentException("Enter a nonblank block name; carving may be empty");return value.equals("carving") ? editEntry(original,index,e -> e.nullableString(value,input)) : setString(original,index,value,input);
     }
     private static byte[] setString(byte[] original,int index,String value,String input) { return editEntry(original,index,e -> e.token(value)==null ? e.enableStringPath(value,input) : e.stringValue(value,input)); }
-    static List<String> readOnlyFields(LosslessJson entry) { return entry.fields().stream().filter(value -> !EDITABLE.contains(value) && !FloatingNoiseStyles.EDITABLE.contains(value) && !FloatingBottomPalettes.EDITABLE.contains(value)).toList(); }
+    static List<String> readOnlyFields(LosslessJson entry) { return entry.fields().stream().filter(value -> !EDITABLE.contains(value) && !FloatingNoiseStyles.EDITABLE.contains(value) && !FloatingBottomPalettes.EDITABLE.contains(value) && !FloatingObjectPlacements.LIST_FIELDS.contains(value)).toList(); }
 }

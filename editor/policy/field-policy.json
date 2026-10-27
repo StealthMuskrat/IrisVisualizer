@@ -2101,6 +2101,74 @@
     "bottomPalette": {
       "classification": "generation",
       "reason": "Inline CUSTOM underside layer list with default-aware thickness/slope, weighted blocks and style controls; native mode, underside selection and empty/null fallback are preserved."
+    },
+    "extraObjects": {
+      "classification": "generation",
+      "reason": "Inline floating placement collection authoring; exact object/reference pools, bounded chance/density/snow, mode and free-floating translation controls preserve native list/override behavior."
+    },
+    "floatingObjects": {
+      "classification": "generation",
+      "reason": "Inline floating placement collection authoring; exact object/reference pools, bounded chance/density/snow, mode and free-floating translation controls preserve native list/override behavior."
+    },
+    "topObjectOverrides": {
+      "classification": "generation",
+      "reason": "Inline floating placement collection authoring; exact object/reference pools, bounded chance/density/snow, mode and free-floating translation controls preserve native list/override behavior."
+    },
+    "bottomObjectOverrides": {
+      "classification": "generation",
+      "reason": "Inline floating placement collection authoring; exact object/reference pools, bounded chance/density/snow, mode and free-floating translation controls preserve native list/override behavior."
+    }
+  },
+  "objectPlacement": {
+    "place": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "allowedCollisions": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "forbiddenCollisions": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "snow": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    },
+    "translate": {
+      "classification": "generation",
+      "reason": "Bounded floating-placement authoring; translation is editable only in floatingObjects because anchored consumers replace it. Other nested placement/runtime validation is pending."
+    }
+  },
+  "objectTranslate": {
+    "x": {
+      "classification": "generation",
+      "reason": "Exact annotation-bounded translation control in floatingObjects only; anchored top/bottom contexts remain read-only."
+    },
+    "y": {
+      "classification": "generation",
+      "reason": "Exact annotation-bounded translation control in floatingObjects only; anchored top/bottom contexts remain read-only."
+    },
+    "yRandom": {
+      "classification": "generation",
+      "reason": "Exact annotation-bounded translation control in floatingObjects only; anchored top/bottom contexts remain read-only."
+    },
+    "z": {
+      "classification": "generation",
+      "reason": "Exact annotation-bounded translation control in floatingObjects only; anchored top/bottom contexts remain read-only."
     }
   }
 }

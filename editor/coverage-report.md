@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in fifty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in fifty-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -55,7 +55,9 @@ Direct nonstatic/nontransient private fields in fifty-two pinned source classes 
 | deepFluid | 12 | 12 | 12 | 0 |
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
-| floatingBiome | 42 | 38 | 37 | 4 |
+| floatingBiome | 42 | 42 | 41 | 0 |
+| objectPlacement | 41 | 8 | 8 | 33 |
+| objectTranslate | 4 | 4 | 4 | 0 |
 
 ## dimension
 
@@ -263,4 +265,12 @@ Unclassified: none.
 
 ## floatingBiome
 
-Unclassified: `bottomObjectOverrides`, `extraObjects`, `floatingObjects`, `topObjectOverrides`.
+Unclassified: none.
+
+## objectPlacement
+
+Unclassified: `bore`, `boreExtendMaxY`, `boreExtendMinY`, `bottom`, `carvingSupport`, `caveAnchorMode`, `clamp`, `densityStyle`, `edit`, `forcePlace`, `fromBottom`, `heightmap`, `isDolphinTarget`, `loot`, `markers`, `meld`, `onwater`, `overrideGlobalLoot`, `requireSurfaceSupport`, `rotateTowardsSlope`, `rotation`, `scale`, `slopeCondition`, `smartBore`, `stiltSettings`, `surfaceSupportBuffer`, `surfaceSupportDepth`, `trees`, `underwater`, `vacuumSettings`, `vanillaLoot`, `warp`, `waterloggable`.
+
+## objectTranslate
+
+Unclassified: none.
