@@ -460,6 +460,17 @@ jobs:
           python editor/tools/extract_floating_placement_constraints.py IrisObjectPlacement.java IrisObjectLimit.java IrisSlopeClip.java CarvingMode.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisGeneratorStyle.java generated-floating-placement-constraints.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-placement-constraints.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-constraints.properties).Hash) { throw 'Pinned placement guard and warp definitions differ' }
+      - name: Verify pinned floating placement excavation and water definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObject.java' -OutFile IrisObject.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectShaping.java' -OutFile IrisObjectShaping.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisProceduralBlocks.java' -OutFile IrisProceduralBlocks.java
+          python editor/tools/test_floating_placement_effects.py IrisObjectPlacement.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisObject.java IrisObjectShaping.java IrisProceduralBlocks.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_placement_effects.py IrisObjectPlacement.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java IrisObject.java IrisObjectShaping.java IrisProceduralBlocks.java generated-floating-placement-effects.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-placement-effects.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-effects.properties).Hash) { throw 'Pinned placement excavation and water definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

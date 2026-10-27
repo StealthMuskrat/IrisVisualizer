@@ -105,6 +105,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['objectPlacement'].update(editable(java_dir, 'FloatingPlacementSettings', 'OBJECT_FIELDS'))
     implemented['objectPlacement'].update(editable(java_dir, 'FloatingObjectRotations'))
     implemented['objectPlacement'].update(editable(java_dir, 'FloatingPlacementConstraints'))
+    implemented['objectPlacement'].update(editable(java_dir, 'FloatingPlacementEffects'))
     implemented['objectLimit'] = set(editable(java_dir, 'FloatingPlacementConstraints', 'CLAMP_FIELDS'))
     implemented['objectRotation'] = set(editable(java_dir, 'FloatingObjectRotations', 'ROTATION_FIELDS'))
     implemented['axisRotation'] = set(editable(java_dir, 'FloatingObjectRotations', 'AXIS_FIELDS'))
