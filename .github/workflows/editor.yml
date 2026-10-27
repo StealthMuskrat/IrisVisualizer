@@ -491,6 +491,15 @@ jobs:
           python editor/tools/extract_floating_object_materials.py IrisObjectPlacement.java IrisStiltSettings.java IrisObjectReplace.java IrisMaterialPalette.java IrisBlockData.java IrisObjectPlacementRunner.java IrisObjectShaping.java generated-floating-object-materials.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-object-materials.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-object-materials.properties).Hash) { throw 'Pinned object material definitions differ' }
+      - name: Verify pinned virtual heightmap and force override definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/HeightmapObjectPlacer.java' -OutFile HeightmapObjectPlacer.java
+          python editor/tools/test_floating_placement_overrides.py IrisObjectPlacement.java IrisNoiseGenerator.java HeightmapObjectPlacer.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_placement_overrides.py IrisObjectPlacement.java IrisNoiseGenerator.java HeightmapObjectPlacer.java IrisObjectPlacementRunner.java MantleFloatingObjectComponent.java generated-floating-placement-overrides.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-placement-overrides.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-overrides.properties).Hash) { throw 'Pinned virtual heightmap/force definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

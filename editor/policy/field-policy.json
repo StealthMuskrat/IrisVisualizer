@@ -2247,6 +2247,14 @@
     "edit": {
       "classification": "generation",
       "reason": "Ordered floating object replacement rules with native chance/state matching; object assets and unrelated data remain preserved."
+    },
+    "heightmap": {
+      "classification": "generation",
+      "reason": "Optional floating placement virtual height queries using the existing noise/style controls, with strict inline ancestors and null restoration. Native sampling/world-height validation is pending."
+    },
+    "forcePlace": {
+      "classification": "generation",
+      "reason": "FloatingObjects-only native force boolean, editing a single stored canonical/alternate key in place. Ambiguous dual keys and anchored overrides remain read-only."
     }
   },
   "objectTranslate": {
