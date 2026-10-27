@@ -11,6 +11,7 @@ FIELDS = ['surfaceSourceDensity','surfaceSourceSpacing','surfaceTributaries','su
 ENUMS = {'placement':'IrisRiverPlacementMode','routing':'IrisRiverRoutingMode'}
 INTEGERS = {'surfaceSourceSpacing','surfaceTributaries','surfaceInlandOutlets','surfaceCoastalOutlets','surfaceMinimumCourseLength','surfaceMaximumIncision'}
 BOOLEANS = {'outletAdmission','erosion','confined'}
+BIOME_LISTS = ['surfaceBiomes','mouthBiomes','shoreBiomes','bankBiomes','floodedCaveBiomes']
 
 
 def extract(policy, owners, placement, routing):
@@ -46,6 +47,19 @@ def extract(policy, owners, placement, routing):
                 if kind not in ['Double','Integer']:
                     raise ValueError('Bounds on nonnumeric river field')
                 values[name+'.'+key] = str(Decimal(bound.group(1).removesuffix('D')))
+    for name in BIOME_LISTS:
+        field = re.search(r'((?:    @[^\n]+\n)+)    private KList<String> '+name+r' = null;',source)
+        annotations = re.fullmatch(r'    @RegistryListResource\(IrisBiome.class\)\n    @ArrayType\(type = String.class\)\n    @Description\(("(?:[^"\\]|\\.)*")\)\n',field.group(1)) if field else None
+        if not annotations:
+            raise ValueError('Changed nullable biome list registry/type/annotations: '+name)
+        description = json.loads(annotations.group(1))
+        if 'An empty list explicitly clears the inherited selection.' not in description:
+            raise ValueError('Changed empty river biome list meaning')
+        values[name+'.type'] = 'biomeArray'
+        values[name+'.default'] = 'null'
+        values[name+'.referenceFamily'] = 'biomes'
+        values[name+'.emptyClearsInheritance'] = 'true'
+        values[name+'.description'] = description
     for name, raw in [('placement',placement),('routing',routing)]:
         choices = enum_values(raw,ENUMS[name])
         values[name+'.sourceSha256'] = hashlib.sha256(raw).hexdigest()

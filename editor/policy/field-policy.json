@@ -845,6 +845,26 @@
     "confined": {
       "classification": "generation",
       "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "surfaceBiomes": {
+      "classification": "generation",
+      "reason": "River biome selection; exact in-pack biome assignment and lossless list operations preserve null inheritance and explicit-empty clearing. Loader aliases, target contents and effective inheritance remain unchecked."
+    },
+    "mouthBiomes": {
+      "classification": "generation",
+      "reason": "River biome selection; exact in-pack biome assignment and lossless list operations preserve null inheritance and explicit-empty clearing. Loader aliases, target contents and effective inheritance remain unchecked."
+    },
+    "shoreBiomes": {
+      "classification": "generation",
+      "reason": "River biome selection; exact in-pack biome assignment and lossless list operations preserve null inheritance and explicit-empty clearing. Loader aliases, target contents and effective inheritance remain unchecked."
+    },
+    "bankBiomes": {
+      "classification": "generation",
+      "reason": "River biome selection; exact in-pack biome assignment and lossless list operations preserve null inheritance and explicit-empty clearing. Loader aliases, target contents and effective inheritance remain unchecked."
+    },
+    "floodedCaveBiomes": {
+      "classification": "generation",
+      "reason": "River biome selection; exact in-pack biome assignment and lossless list operations preserve null inheritance and explicit-empty clearing. Loader aliases, target contents and effective inheritance remain unchecked."
     }
   }
 }

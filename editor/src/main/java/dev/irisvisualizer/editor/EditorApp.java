@@ -563,9 +563,88 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        drawRiverBiomeLists(policy);
         if (ImGui.treeNode("Other river settings (read-only)")) {
-            for (String field : policy.fields()) if (!RiverPolicyFields.EDITABLE.contains(field)) ImGui.textWrapped(field);
+            for (String field : policy.fields()) if (!RiverPolicyFields.EDITABLE.contains(field) && !RiverBiomeLists.EDITABLE.contains(field)) ImGui.textWrapped(field);
             ImGui.treePop();
+        }
+    }
+    private void drawRiverBiomeLists(LosslessJson policy) {
+        for (String field : RiverBiomeLists.EDITABLE) {
+            if (!ImGui.treeNode(field + " selection")) continue;
+            ImGui.textWrapped(RiverBiomeLists.description(field));
+            String token = policy.token(field), prefix = RiverBiomeLists.draftPrefix(ResourceTypes.base(selected),field);
+            if (token == null || token.equals("null")) {
+                ImGui.textWrapped("Inherit: the effective biome selection is not resolved here.");
+                if (ImGui.button("Override with empty selection")) setRiverListState(field,false);
+                ImGui.treePop(); continue;
+            }
+            List<String> entries;
+            try { entries = policy.stringArrayPath(field); }
+            catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored selection is not a string array (read-only)."); ImGui.treePop(); continue; }
+            ImGui.textWrapped(entries.isEmpty() ? "Explicit empty selection: clears inherited biomes." : "Exact in-pack biome keys only; aliases and target contents are unchecked.");
+            boolean inherit = ImGui.button("Inherit"); ImGui.sameLine();
+            boolean clear = ImGui.button("Clear selection");
+            if (inherit || clear) { ImGui.treePop(); setRiverListState(field,inherit); return; }
+            boolean changed = false;
+            for (int index=0;index<entries.size();index++) {
+                ImGui.pushID(index);
+                String current = entries.get(index), key = prefix+index;
+                if (current.length()>4096) ImGui.textWrapped("Long existing entry (read-only).");
+                else {
+                    ImString input = values.computeIfAbsent(key,ignored -> new ImString(current,16_384));
+                    ImGui.inputText("Key",input); drafts.update(key,current,input.get());
+                    riverBiomePicker("Available biomes",input,key,current);
+                    if (ImGui.button("Apply")) editRiverList(field,index,input.get(),false,key);
+                }
+                boolean remove = ImGui.button("Remove");
+                RiverBiomeLists.Action action = null;
+                ImGui.sameLine(); if (ImGui.button("Duplicate")) action = RiverBiomeLists.Action.DUPLICATE;
+                ImGui.beginDisabled(index==0); if (ImGui.button("Move up")) action = RiverBiomeLists.Action.UP;
+                ImGui.endDisabled(); ImGui.sameLine(); ImGui.beginDisabled(index==entries.size()-1);
+                if (ImGui.button("Move down")) action = RiverBiomeLists.Action.DOWN;
+                ImGui.endDisabled(); ImGui.popID();
+                if (remove || action != null) {
+                    if (remove) editRiverList(field,index,null,true,null); else changeRiverList(field,index,action);
+                    changed = true; break;
+                }
+            }
+            if (!changed) {
+                String key = prefix+"new";
+                ImString input = values.computeIfAbsent(key,ignored -> new ImString(16_384));
+                ImGui.inputText("New key",input); drafts.update(key,"",input.get());
+                riverBiomePicker("New biome",input,key,"");
+                if (ImGui.button("Add")) editRiverList(field,entries.size(),input.get(),true,key);
+            }
+            ImGui.treePop();
+        }
+    }
+    private void riverBiomePicker(String label, ImString input, String key, String stored) {
+        if (ImGui.beginCombo(label,"Choose resource")) {
+            for (String choice : RiverBiomeLists.choices(workspace)) if (ImGui.selectable(choice)) { input.set(choice); drafts.update(key,stored,choice); }
+            ImGui.endCombo();
+        }
+    }
+    private void setRiverListState(String field, boolean inherit) {
+        try { commitRiverList(field,RiverBiomeLists.setInherited(selected,workspace.read(selected),field,inherit),true,null); }
+        catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private void editRiverList(String field, int index, String key, boolean structural, String appliedKey) {
+        try { commitRiverList(field,RiverBiomeLists.edit(selected,workspace.read(selected),field,index,key,workspace),structural,appliedKey); }
+        catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private void changeRiverList(String field, int index, RiverBiomeLists.Action action) {
+        try { commitRiverList(field,RiverBiomeLists.change(selected,workspace.read(selected),field,index,action),true,null); }
+        catch (Exception failure) { error = failure.getMessage(); }
+    }
+    private void commitRiverList(String field, byte[] next, boolean structural, String appliedKey) throws java.io.IOException {
+        if (!structural) { workspace.replace(selected,next); drafts.applied(appliedKey); values.remove(appliedKey); error = null; return; }
+        String prefix = RiverBiomeLists.draftPrefix(ResourceTypes.base(selected),field);
+        if (drafts.transitionUnder(prefix,() -> {
+            boolean other = values.keySet().stream().anyMatch(key -> key.startsWith(prefix) && !key.equals(appliedKey) && drafts.contains(key));
+            return !other || JOptionPane.showConfirmDialog(null,"This changes the selection or list positions and discards other unapplied text in this selection. Continue?","Unapplied text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION;
+        },() -> workspace.replace(selected,next))) {
+            values.keySet().removeIf(key -> key.startsWith(prefix)); error = null;
         }
     }
     private void commitRiverOverride(String key, InspectorDrafts.Change action) {
@@ -1168,7 +1247,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

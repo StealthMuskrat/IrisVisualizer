@@ -135,9 +135,9 @@ final class RiverPolicyTests {
         }
         rejects(() -> RiverPolicyFields.reset("biomes/test.json",source,"profiles"));
         rejects(() -> RiverPolicyFields.setText("biomes/test.json",source,"surfaceBiomes","1"));
-        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("riverPolicy.profiles","riverPolicy.surfaceBiomes","riverPolicy.surfacePools","riverPolicy.future","unknown")));
+        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("riverPolicy.profiles","riverPolicy.surfacePools","riverPolicy.future","unknown")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"riverPolicy\":null}"))).equals(List.of("riverPolicy")));
-        check(FieldCoverage.fields("riverPolicy").size()==26 && FieldCoverage.fields("riverPolicy").stream().filter(FieldCoverage.Field::implemented).count()==19);
+        check(FieldCoverage.fields("riverPolicy").size()==26 && FieldCoverage.fields("riverPolicy").stream().filter(FieldCoverage.Field::implemented).count()==24);
         var drafts = new InspectorDrafts();
         for (String prefix : prefixes) {
             drafts.update(prefix+"widthMultiplier","","1.5");
