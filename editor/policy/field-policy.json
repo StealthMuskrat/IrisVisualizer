@@ -357,6 +357,10 @@
     "surfaceOreReplaceableBlocks": {
       "classification": "generation",
       "reason": "Biome exterior-surface ore-deposit host override. Absence/null inherits per-deposit filters; explicit empty lists forbid eligible surface hosts. Literal list edits preserve unknown entries and other generation settings."
+    },
+    "decorators": {
+      "classification": "generation",
+      "reason": "Biome decoration entries grouped by part with native chance/reservoir selection; authoring does not simulate placement."
     }
   },
   "generator": {
@@ -2671,6 +2675,76 @@
     "z": {
       "classification": "generation",
       "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+    }
+  },
+  "decorator": {
+    "variance": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "forcePlace": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "forceBlock": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "whitelist": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "blacklist": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "slopeCondition": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "absoluteMaxStack": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "style": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "heightVariance": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "partOf": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "stackMin": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "stackMax": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "scaleStack": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "palette": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "topPalette": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    },
+    "topThreshold": {
+      "classification": "generation",
+      "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
     }
   }
 }
