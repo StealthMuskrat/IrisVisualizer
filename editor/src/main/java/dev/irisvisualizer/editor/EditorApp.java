@@ -172,6 +172,7 @@ public final class EditorApp extends Application {
                     }
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
+                    drawRiverPolicy(document);
                     List<String> readOnly = DimensionFields.readOnlyPaths(document);
                     if (ImGui.collapsingHeader("Read-only fields (" + readOnly.size() + ")"))
                         for (String path : readOnly) ImGui.textWrapped(path);
@@ -272,6 +273,7 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         drawCaveProfile(document);
+        drawRiverPolicy(document);
         ImGui.textWrapped("Other region fields remain read-only.");
     }
     private void drawGenerator(LosslessJson document) {
@@ -492,6 +494,7 @@ public final class EditorApp extends Application {
         }
         drawRootStyles(document, false);
         drawCaveProfile(document);
+        drawRiverPolicy(document);
         if (ImGui.collapsingHeader("Child biomes")) {
             ImGui.textWrapped(BiomeChildren.description());
             if (document.token("children") == null) {
@@ -504,7 +507,70 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawRiverPolicy(LosslessJson document) {
+        if (!ImGui.collapsingHeader("River policy")) return;
+        ImGui.textWrapped(RiverPolicyFields.description(selected));
+        LosslessJson policy;
+        try { policy = RiverPolicyFields.object(selected,document); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored river policy has an unsupported type (read-only)."); return; }
+        if (policy == null) {
+            ImGui.textWrapped("Create an explicit policy to edit nullable overrides. Creating it writes only an empty object.");
+            if (ImGui.button("Create river policy")) {
+                try { workspace.replace(selected,RiverPolicyFields.enablePolicy(selected,workspace.read(selected))); error = null; }
+                catch (Exception failure) { error = failure.getMessage(); }
+            }
+            return;
+        }
+        ImGui.textWrapped("Absent and null values inherit. Effective hydrology settings and policy hierarchy are not resolved here.");
+        for (String field : RiverPolicyFields.EDITABLE) {
+            String token = policy.token(field), key = RiverPolicyFields.draftPrefix(ResourceTypes.base(selected))+field;
+            boolean inherited = token == null || token.equals("null");
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(RiverPolicyFields.help(field));
+            if (RiverPolicyFields.booleanField(field)) {
+                if (!inherited && !token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored override is not boolean or null (read-only).");
+                else if (ImGui.beginCombo("Value",inherited ? "Inherit" : token)) {
+                    if (ImGui.selectable("Inherit",inherited)) commitRiverOverride(key,() -> workspace.replace(selected,RiverPolicyFields.setBoolean(selected,workspace.read(selected),field,null)));
+                    for (String choice : List.of("true","false")) if (ImGui.selectable(choice,choice.equals(token)))
+                        commitRiverOverride(key,() -> workspace.replace(selected,RiverPolicyFields.setBoolean(selected,workspace.read(selected),field,Boolean.valueOf(choice))));
+                    ImGui.endCombo();
+                }
+            } else if (RiverPolicyFields.enumField(field)) {
+                try {
+                    String current = inherited ? null : policy.stringToken(field);
+                    if (current != null && !RiverPolicyFields.choices(field).contains(current)) ImGui.textWrapped("Unrecognized stored mode. Choose a listed mode or Inherit to replace it.");
+                    if (ImGui.beginCombo("Mode",current == null ? "Inherit" : current.length()>128 ? "Long stored mode" : current)) {
+                        if (ImGui.selectable("Inherit",inherited)) commitRiverOverride(key,() -> workspace.replace(selected,RiverPolicyFields.setMode(selected,workspace.read(selected),field,null)));
+                        for (String choice : RiverPolicyFields.choices(field)) {
+                            if (ImGui.selectable(choice,choice.equals(current))) commitRiverOverride(key,() -> workspace.replace(selected,RiverPolicyFields.setMode(selected,workspace.read(selected),field,choice)));
+                            if (ImGui.isItemHovered()) ImGui.setTooltip(RiverPolicyFields.choiceDescription(field,choice));
+                        }
+                        ImGui.endCombo();
+                    }
+                } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored override is not a string or null (read-only)."); }
+            } else if (!RiverPolicyFields.numericStored(token)) ImGui.textWrapped("Stored override is not numeric or null (read-only).");
+            else {
+                ImGui.textWrapped(RiverPolicyFields.constraints(field));
+                if (inherited) ImGui.textWrapped("Inherit: enter a value to override.");
+                String stored = inherited ? "" : token;
+                ImString input = values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Override",input); drafts.update(key,stored,input.get());
+                if (ImGui.button("Set override")) commitRiverOverride(key,() -> workspace.replace(selected,RiverPolicyFields.setText(selected,workspace.read(selected),field,input.get())));
+                ImGui.sameLine();
+                if (ImGui.button("Inherit")) commitRiverOverride(key,() -> workspace.replace(selected,RiverPolicyFields.reset(selected,workspace.read(selected),field)));
+            }
+            ImGui.popID();
+        }
+        if (ImGui.treeNode("Other river settings (read-only)")) {
+            for (String field : policy.fields()) if (!RiverPolicyFields.EDITABLE.contains(field)) ImGui.textWrapped(field);
+            ImGui.treePop();
+        }
+    }
+    private void commitRiverOverride(String key, InspectorDrafts.Change action) {
+        try { action.run(); drafts.applied(key); values.remove(key); error = null; }
+        catch (Exception failure) { error = failure.getMessage(); }
     }
     private void drawCaveProfile(LosslessJson document) {
         if (!ImGui.collapsingHeader("Cave profile")) return;
@@ -1102,7 +1168,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

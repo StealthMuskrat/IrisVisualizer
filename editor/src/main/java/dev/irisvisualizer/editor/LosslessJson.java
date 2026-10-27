@@ -22,7 +22,7 @@ public final class LosslessJson {
         if (!Double.isFinite(value)) throw new IllegalArgumentException("Finite number required");
         var span = root.get(field); if (span == null) throw new IllegalArgumentException("Absent field must be explicitly enabled first");
         String old = token(field);
-        if (!old.matches("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")) throw new IllegalArgumentException("Stored field is not numeric");
+        if (!numericToken(old)) throw new IllegalArgumentException("Stored field is not numeric");
         String next = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
         return (text.substring(0, span.start()) + next + text.substring(span.end())).getBytes(StandardCharsets.UTF_8);
     }
@@ -46,6 +46,27 @@ public final class LosslessJson {
         }
         if (!"null".equals(token(field))) stringToken(field);
         return splice(span.start(), span.end(), value == null ? "null" : quote(value));
+    }
+    static boolean numericToken(String token) {
+        return token != null && token.matches("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?");
+    }
+    /** Nullable numeric override; absence is retained when resetting an absent field. */
+    byte[] nullableNumber(String field, Double value) {
+        String old = token(field);
+        if (old != null && !old.equals("null") && !numericToken(old)) throw new IllegalArgumentException("Stored override is not numeric or null");
+        if (value != null && !Double.isFinite(value)) throw new IllegalArgumentException("Finite number required");
+        String next = value == null ? "null" : java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+        return nullableScalar(field, next);
+    }
+    byte[] nullableBoolean(String field, Boolean value) {
+        String old = token(field);
+        if (old != null && !old.equals("null") && !old.equals("true") && !old.equals("false")) throw new IllegalArgumentException("Stored override is not boolean or null");
+        return nullableScalar(field, value == null ? "null" : value.toString());
+    }
+    private byte[] nullableScalar(String field, String next) {
+        Span span = root.get(field);
+        if (span == null) return next.equals("null") ? sourceBytes() : enable(field, next);
+        return splice(span.start(), span.end(), next);
     }
     public byte[] integer(String field, long value) {
         Span span = root.get(field);
