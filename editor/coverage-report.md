@@ -4,7 +4,7 @@ Direct nonstatic/nontransient private fields in sixty-seven pinned source classe
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 51 | 45 | 31 |
+| dimension | 82 | 52 | 46 | 30 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 37 | 31 | 5 |
@@ -74,7 +74,7 @@ Direct nonstatic/nontransient private fields in sixty-seven pinned source classe
 
 ## dimension
 
-Unclassified: `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
+Unclassified: `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
 
 ## importedStructures
 

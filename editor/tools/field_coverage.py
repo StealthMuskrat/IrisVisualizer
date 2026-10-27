@@ -133,6 +133,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biome'].update(editable(java_dir, 'BiomeOreHosts', 'LIST_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'StaticObjects', 'LIST_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'StaticObjects', 'ROOT_FIELDS'))
+    implemented['dimension'].update(editable(java_dir, 'BlockFallbacks', 'OBJECT_FIELDS'))
     implemented['staticObject'] = set(editable(java_dir, 'StaticObjects'))
     implemented['staticObjectRotation'] = set(editable(java_dir, 'StaticObjects', 'AXES'))
     implemented['position'] = set(editable(java_dir, 'StaticObjects', 'AXES'))
