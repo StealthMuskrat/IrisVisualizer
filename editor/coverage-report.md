@@ -7,7 +7,7 @@ Direct nonstatic/nontransient private fields in fifty-one pinned source classes 
 | dimension | 82 | 46 | 40 | 36 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 29 | 23 | 13 |
+| biome | 42 | 31 | 25 | 11 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
@@ -70,7 +70,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `floatingChildBiomes`, `objects`, `ores`, `proceduralObjects`, `slab`, `structures`, `surfaceOreReplaceableBlocks`, `wall`.
+Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `floatingChildBiomes`, `objects`, `ores`, `proceduralObjects`, `structures`, `surfaceOreReplaceableBlocks`.
 
 ## biomeGeneratorLink
 

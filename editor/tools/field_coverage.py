@@ -88,6 +88,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biome'].update(editable(java_dir, 'BiomeChildren'))
     implemented['biome'].update(editable(java_dir, 'BiomeLayers', 'LIST_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'BiomeDerivatives'))
+    implemented['biome'].update(editable(java_dir, 'BiomeSlabWall', 'OBJECT_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'Terrain3DFields', 'OBJECT_FIELDS'))
     for group in ['dimension','region','biome']:
         implemented[group].update(editable(java_dir, 'CaveProfileFields', 'OBJECT_FIELDS'))

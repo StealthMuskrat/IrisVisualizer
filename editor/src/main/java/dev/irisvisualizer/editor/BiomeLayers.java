@@ -77,13 +77,19 @@ public final class BiomeLayers {
         if (!Double.isFinite(value) || value<Double.parseDouble(DATA.getProperty(field+".minimum")) || value>Double.parseDouble(DATA.getProperty(field+".maximum"))) throw new IllegalArgumentException("Slope violates source bounds");return value;
     }
     public static byte[] setSlope(String path,byte[] original,String list,int index,String minimum,String maximum) {
-        authorize(path,list);surface(list);double min=slopeValue("minimumSlope",minimum),max=slopeValue("maximumSlope",maximum);if (min>max) throw new IllegalArgumentException("Minimum slope must not exceed maximum slope");
-        return editLayer(original,list,index,layer -> layer.objectEdit("slopeCondition",s -> number(new LosslessJson(number(s,"minimumSlope",min)),"maximumSlope",max),false));
+        authorize(path,list);surface(list);return editLayer(original,list,index,layer -> slopeBounds(layer,minimum,maximum));
+    }
+    static byte[] slopeBounds(LosslessJson layer,String minimum,String maximum) {
+        double min=slopeValue("minimumSlope",minimum),max=slopeValue("maximumSlope",maximum);if (min>max) throw new IllegalArgumentException("Minimum slope must not exceed maximum slope");
+        return layer.objectEdit("slopeCondition",s -> number(new LosslessJson(number(s,"minimumSlope",min)),"maximumSlope",max),false);
     }
     public static byte[] enableZoom(String path,byte[] original,String list,int index) { authorize(path,list);return editLayer(original,list,index,layer -> layer.enable("zoom",zoomDefault())); }
     public static byte[] setZoom(String path,byte[] original,String list,int index,String input) {
-        authorize(path,list);double value;try { value=Double.parseDouble(input); } catch (NumberFormatException | NullPointerException invalid) { throw new IllegalArgumentException("Enter a finite layer zoom",invalid); }
-        if (!Double.isFinite(value) || value<Double.parseDouble(DATA.getProperty("zoom.minimum"))) throw new IllegalArgumentException("Layer zoom violates its source minimum");return editLayer(original,list,index,layer -> layer.number("zoom",value));
+        authorize(path,list);double value=checkedZoom(input);return editLayer(original,list,index,layer -> layer.number("zoom",value));
+    }
+    static double checkedZoom(String input) {
+        double value;try { value=Double.parseDouble(input); } catch (NumberFormatException | NullPointerException invalid) { throw new IllegalArgumentException("Enter a finite layer zoom",invalid); }
+        if (!Double.isFinite(value) || value<Double.parseDouble(DATA.getProperty("zoom.minimum"))) throw new IllegalArgumentException("Layer zoom violates its source minimum");return value;
     }
     public static byte[] enableBlocks(String path,byte[] original,String list,int index) { authorize(path,list);return editLayer(original,list,index,layer -> GeneralBlockPalettes.seed(layer,defaultBlock())); }
     public static byte[] setBlock(String path,byte[] original,String list,int layer,int index,String value) { authorize(path,list);return editLayer(original,list,layer,p -> GeneralBlockPalettes.setBlock(p,index,value)); }
