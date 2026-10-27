@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in twenty-six pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in thirty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -21,7 +21,7 @@ Direct nonstatic/nontransient private fields in twenty-six pinned source classes
 | range | 2 | 2 | 2 | 0 |
 | riverPolicy | 26 | 26 | 26 | 0 |
 | hydrology | 3 | 1 | 1 | 2 |
-| riverHydrology | 7 | 3 | 3 | 4 |
+| riverHydrology | 7 | 4 | 4 | 3 |
 | riverRouting | 16 | 16 | 16 | 0 |
 | riverRegional | 9 | 9 | 9 | 0 |
 | riverGeometry | 6 | 6 | 6 | 0 |
@@ -30,6 +30,12 @@ Direct nonstatic/nontransient private fields in twenty-six pinned source classes
 | riverChannelShape | 12 | 12 | 12 | 0 |
 | riverDropShape | 8 | 8 | 8 | 0 |
 | riverBank3D | 7 | 7 | 7 | 0 |
+| surfaceRiver | 9 | 6 | 6 | 3 |
+| surfaceRiverSource | 4 | 4 | 4 | 0 |
+| surfaceRiverChannel | 12 | 10 | 10 | 2 |
+| surfaceRiverBank | 10 | 7 | 7 | 3 |
+| surfaceRiverFlow | 6 | 6 | 6 | 0 |
+| surfaceRiverMouth | 7 | 7 | 7 | 0 |
 
 ## dimension
 
@@ -101,7 +107,7 @@ Unclassified: `deepFluids`, `surfacePools`.
 
 ## riverHydrology
 
-Unclassified: `grottos`, `profiles`, `surface`, `underground`.
+Unclassified: `grottos`, `profiles`, `underground`.
 
 ## riverRouting
 
@@ -132,5 +138,29 @@ Unclassified: none.
 Unclassified: none.
 
 ## riverBank3D
+
+Unclassified: none.
+
+## surfaceRiver
+
+Unclassified: `bed`, `erosion`, `ponds`.
+
+## surfaceRiverSource
+
+Unclassified: none.
+
+## surfaceRiverChannel
+
+Unclassified: `depth`, `width`.
+
+## surfaceRiverBank
+
+Unclassified: `bankMaterial`, `excavation`, `shoreMaterial`.
+
+## surfaceRiverFlow
+
+Unclassified: none.
+
+## surfaceRiverMouth
 
 Unclassified: none.

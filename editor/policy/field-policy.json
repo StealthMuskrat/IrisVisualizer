@@ -897,6 +897,10 @@
     "geometry": {
       "classification": "generation",
       "reason": "Dimension-owned river geometry; explicit parent creation and bounded meander/surface shape controls preserve defaults and unknown settings without evaluating geometry."
+    },
+    "surface": {
+      "classification": "generation",
+      "reason": "Explicit surface-river settings creation and bounded primitive controls preserve river planning and nested physical configuration."
     }
   },
   "riverRouting": {
@@ -1221,6 +1225,178 @@
     "densityStyle": {
       "classification": "generation",
       "reason": "Contextual SIMPLEX default and bounded base style, zoom, exponent and cellular controls; native bank ranges apply while other style fields and fractures remain read-only."
+    }
+  },
+  "surfaceRiver": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Surface source-budget toggle or explicit empty subsection creation; primitive controls preserve absent defaults and untouched nested data."
+    },
+    "sources": {
+      "classification": "generation",
+      "reason": "Surface source-budget toggle or explicit empty subsection creation; primitive controls preserve absent defaults and untouched nested data."
+    },
+    "channel": {
+      "classification": "generation",
+      "reason": "Surface source-budget toggle or explicit empty subsection creation; primitive controls preserve absent defaults and untouched nested data."
+    },
+    "banks": {
+      "classification": "generation",
+      "reason": "Surface source-budget toggle or explicit empty subsection creation; primitive controls preserve absent defaults and untouched nested data."
+    },
+    "flow": {
+      "classification": "generation",
+      "reason": "Surface source-budget toggle or explicit empty subsection creation; primitive controls preserve absent defaults and untouched nested data."
+    },
+    "mouths": {
+      "classification": "generation",
+      "reason": "Surface source-budget toggle or explicit empty subsection creation; primitive controls preserve absent defaults and untouched nested data."
+    }
+  },
+  "surfaceRiverSource": {
+    "density": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "minimumElevation": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "minimumPerTile": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "minimumSpacing": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    }
+  },
+  "surfaceRiverChannel": {
+    "sink": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "maximumIncision": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "roughness": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "roughnessWavelength": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "springWidthRatio": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "springLength": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "smoothingRadius": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "outlineMinimumRatio": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "outlineMaximumRatio": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "springExtraDepth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    }
+  },
+  "surfaceRiverBank": {
+    "shoreWidth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "blendSlope": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "minimumBlendWidth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "maximumBlendWidth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "exposeCutStrata": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "shoreRise": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "blendBaseWidth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    }
+  },
+  "surfaceRiverFlow": {
+    "cascadeRun": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "waterfallMinimumDrop": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "waterfallThalwegFraction": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "plungeBasinMinimumDrop": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "plungeBasinLengthRatio": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "plungeBasinDepth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    }
+  },
+  "surfaceRiverMouth": {
+    "flareRatio": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "maximumOceanApron": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "inletLength": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "inletDepth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "maximumIncision": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "inletCourseFraction": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "inletRampSlope": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
     }
   }
 }
