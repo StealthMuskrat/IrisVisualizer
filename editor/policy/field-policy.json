@@ -893,6 +893,10 @@
     "routing": {
       "classification": "generation",
       "reason": "Physical river planning setting; bounded configuration editing requires explicit parents, preserves unknown siblings and never starts generation."
+    },
+    "geometry": {
+      "classification": "generation",
+      "reason": "Dimension-owned river geometry; explicit parent creation and bounded meander/surface shape controls preserve defaults and unknown settings without evaluating geometry."
     }
   },
   "riverRouting": {
@@ -997,6 +1001,96 @@
     "maximumCoastalIncision": {
       "classification": "generation",
       "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    }
+  },
+  "riverGeometry": {
+    "meanders": {
+      "classification": "generation",
+      "reason": "River geometry subsection; explicit empty-object creation and bounded scalar editing preserve class defaults and nullable channel fallbacks."
+    },
+    "surface": {
+      "classification": "generation",
+      "reason": "River geometry subsection; explicit empty-object creation and bounded scalar editing preserve class defaults and nullable channel fallbacks."
+    }
+  },
+  "riverMeanders": {
+    "primaryWavelength": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "detailWavelength": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "primaryStrength": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "detailStrength": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "maximumOffsetRatio": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "smoothingPasses": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "maximumTurnDegrees": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    }
+  },
+  "riverSurfaceShape": {
+    "bedRoundness": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "bedRoughness": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "wallRoughness": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "roughnessWavelength": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "radialBase": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "radialMinimum": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "radialMaximum": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "primaryLobeStrength": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "detailLobeStrength": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "ceilingRoughness": {
+      "classification": "generation",
+      "reason": "Generation meander/surface geometry scalar; pinned numeric type/default/bounds, exact integers and nullable roughness fallback preservation. Cross-field/native validity remains unchecked."
+    },
+    "aspectMinimum": {
+      "classification": "read-only",
+      "reason": "Pinned source says only grotto chambers consume this shared-record field; no surface-context generation control is exposed."
+    },
+    "aspectRange": {
+      "classification": "read-only",
+      "reason": "Pinned source says only grotto chambers consume this shared-record field; no surface-context generation control is exposed."
     }
   }
 }
