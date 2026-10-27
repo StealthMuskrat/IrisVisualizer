@@ -85,7 +85,7 @@ public final class RiverBankFields {
                 if (!STYLE_FIELDS.contains(field)) { paths.add("banks3D."+field); continue; }
                 try {
                     var style=NoiseStyleFields.object(bank,NoiseStyleFields.Target.bank());
-                    for (String member : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(member)) paths.add("banks3D.densityStyle."+member);
+                    for (String member : style.fields()) if (NoiseStyleFields.readOnly(style,member)) paths.add("banks3D.densityStyle."+member);
                 } catch (IllegalArgumentException mismatch) { paths.add("banks3D.densityStyle"); }
             }
         } catch (IllegalArgumentException mismatch) { paths.add("banks3D"); }

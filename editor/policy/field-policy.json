@@ -648,15 +648,15 @@
   "noiseStyle": {
     "style": {
       "classification": "generation",
-      "reason": "Selects or scales/shapes source-defined base noise; expression, image-map and fracture settings remain read-only."
+      "reason": "Selects or scales/shapes source-defined base noise; source references and cache size have separate typed controls, while fracture remains read-only."
     },
     "zoom": {
       "classification": "generation",
-      "reason": "Selects or scales/shapes source-defined base noise; expression, image-map and fracture settings remain read-only."
+      "reason": "Selects or scales/shapes source-defined base noise; source references and cache size have separate typed controls, while fracture remains read-only."
     },
     "exponent": {
       "classification": "generation",
-      "reason": "Selects or scales/shapes source-defined base noise; expression, image-map and fracture settings remain read-only."
+      "reason": "Selects or scales/shapes source-defined base noise; source references and cache size have separate typed controls, while fracture remains read-only."
     },
     "cellularFrequency": {
       "classification": "generation",
@@ -669,6 +669,18 @@
     "multiplier": {
       "classification": "generation",
       "reason": "Bounded multiplier editing only in floating placement coordinate warps, where native code uses it for horizontal offsets. Other style contexts remain read-only."
+    },
+    "expression": {
+      "classification": "generation",
+      "reason": "Enabled inline styles expose exact in-pack source references or bounded cache-size configuration; native loading, source precedence and caching remain unevaluated."
+    },
+    "imageMap": {
+      "classification": "generation",
+      "reason": "Enabled inline styles expose exact in-pack source references or bounded cache-size configuration; native loading, source precedence and caching remain unevaluated."
+    },
+    "cacheSize": {
+      "classification": "generation",
+      "reason": "Enabled inline styles expose exact in-pack source references or bounded cache-size configuration; native loading, source precedence and caching remain unevaluated."
     }
   },
   "terrain3D": {

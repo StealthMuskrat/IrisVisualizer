@@ -587,6 +587,18 @@ jobs:
           python editor/tools/extract_biome_decorator_fields.py IrisDecorator.java IrisDecorationPart.java IrisBiome.java DecoratorCore.java IrisSurfaceDecorator.java IrisSlopeClip.java IrisBlockData.java IrisGeneratorStyle.java generated-biome-decorator-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-biome-decorator-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/biome-decorator-fields.properties).Hash) { throw 'Pinned decorator definitions differ' }
+      - name: Verify pinned style source and cache definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/IrisExpression.java' -OutFile IrisExpression.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMap.java' -OutFile IrisImageMap.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/loading/IrisData.java' -OutFile IrisData.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/loading/ResourceLoader.java' -OutFile ResourceLoader.java
+          python editor/tools/test_style_source_fields.py IrisGeneratorStyle.java IrisExpression.java IrisImageMap.java IrisData.java ResourceLoader.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_style_source_fields.py IrisGeneratorStyle.java IrisExpression.java IrisImageMap.java IrisData.java ResourceLoader.java generated-style-source-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-style-source-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/style-source-fields.properties).Hash) { throw 'Pinned style source/cache definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

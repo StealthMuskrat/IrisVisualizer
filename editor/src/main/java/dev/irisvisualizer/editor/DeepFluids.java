@@ -166,14 +166,14 @@ public final class DeepFluids {
                     var height=height(pool);
                     if (height!=null) {
                         for (String field : height.fields()) if (!List.of("min","max","style").contains(field)) paths.add(prefix+".height."+field);
-                        try { var style=NoiseStyleFields.object(height,NoiseStyleFields.Target.deepHeight(index));if (style!=null) for (String field : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(field)) paths.add(prefix+".height.style."+field); }
+                        try { var style=NoiseStyleFields.object(height,NoiseStyleFields.Target.deepHeight(index));if (style!=null) for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add(prefix+".height.style."+field); }
                         catch (IllegalArgumentException unsupported) { paths.add(prefix+".height.style"); }
                     }
                 } catch (IllegalArgumentException unsupported) { paths.add(prefix+".height"); }
                 try {
                     var palette=RiverProfiles.palette(pool);if (palette==null) continue;
                     for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) paths.add(prefix+".fluidPalette."+field);
-                    try { var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.deepPalette(index));if (style!=null) for (String field : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(field)) paths.add(prefix+".fluidPalette.style."+field); }
+                    try { var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.deepPalette(index));if (style!=null) for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add(prefix+".fluidPalette.style."+field); }
                     catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.style"); }
                     try { var fluids=RiverProfiles.fluids(palette);if (fluids!=null) for (int i=0;i<fluids.size();i++) for (String field : fluids.get(i).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) paths.add(prefix+".fluidPalette.palette["+i+"]."+field); }
                     catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.palette"); }

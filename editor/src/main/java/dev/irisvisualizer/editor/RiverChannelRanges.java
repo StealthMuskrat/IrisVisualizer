@@ -84,7 +84,7 @@ public final class RiverChannelRanges {
                 if (member.equals("style")) {
                     try {
                         var style=NoiseStyleFields.object(range,styleTarget(field));
-                        for (String setting : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(setting)) paths.add(member(field)+".style."+setting);
+                        for (String setting : style.fields()) if (NoiseStyleFields.readOnly(style,setting)) paths.add(member(field)+".style."+setting);
                     } catch (IllegalArgumentException mismatch) { paths.add(member(field)+".style"); }
                 } else if (!RANGE_FIELDS.contains(member)) paths.add(member(field)+"."+member);
             }

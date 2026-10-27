@@ -48,7 +48,7 @@ public final class RiverPaletteFields {
         var paths=new ArrayList<String>();
         try {
             var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.palette(target));
-            if (style!=null) for (String field : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(field)) paths.add("style."+field);
+            if (style!=null) for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add("style."+field);
         } catch (IllegalArgumentException mismatch) { paths.add("style"); }
         return List.copyOf(paths);
     }

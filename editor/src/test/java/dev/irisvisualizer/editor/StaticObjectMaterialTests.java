@@ -94,7 +94,7 @@ final class StaticObjectMaterialTests {
         byte[] movedRule=FloatingObjectReplacements.change(PATH,original,RULES,RiverProfiles.Action.DOWN,0,null);check(Arrays.equals(original,FloatingObjectReplacements.change(PATH,movedRule,RULES,RiverProfiles.Action.UP,1,null)));
         byte[] movedFind=FloatingObjectReplacements.changeFind(PATH,original,RULES,0,RiverProfiles.Action.DOWN,0,null);check(Arrays.equals(original,FloatingObjectReplacements.changeFind(PATH,movedFind,RULES,0,RiverProfiles.Action.UP,1,null)));
         byte[] rawFind=FloatingObjectReplacements.changeFind(PATH,original,RULES,0,RiverProfiles.Action.DUPLICATE,0,null);check(FloatingObjectReplacements.find(rule(rawFind)).get(1).token("weight").equals("999"));
-        check(FloatingObjectPalettes.readOnlyPaths(entry(original),PALETTE).containsAll(List.of("futurePalette","style.expression")));
+        check(FloatingObjectPalettes.readOnlyPaths(entry(original),PALETTE).containsAll(List.of("futurePalette")));
         for (String wrong : List.of("biomes/static.json","regions/static.json","generators/static.json","dimensions/nested/static.json","dimensions/static.txt","static.json")) rejectOwner(wrong,original);
         for (String invalid : List.of("staticObjects.00.edit.0.replace.style","staticObjects.-1.edit.0.replace.style","staticObjects.0.edit.2147483648.replace.style","staticObjects.2147483648.edit.0.replace.style","staticObjects.0.stiltSettings.palette.style","staticObjects.0.edit.0.replace.style.extra")) rejects(() -> new NoiseStyleFields.Target("dimensions",invalid,null));
         rejects(() -> new NoiseStyleFields.Target("biomes",PALETTE.stylePath(),null));rejects(() -> new NoiseStyleFields.Target("regions",PALETTE.stylePath(),null));

@@ -39,7 +39,7 @@ public final class FloatingNoiseStyles {
         for (String value : EDITABLE) {
             String token=entry.token(value);if (token==null || token.equals("null") && optional(value)) continue;
             String prefix="floatingChildBiomes["+index+"]."+value;
-            try { var style=new LosslessJson(token.getBytes(StandardCharsets.UTF_8));for (String field : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(field)) paths.add(prefix+"."+field); }
+            try { var style=new LosslessJson(token.getBytes(StandardCharsets.UTF_8));for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add(prefix+"."+field); }
             catch (IllegalArgumentException unsupported) { paths.add(prefix); }
         }
         return List.copyOf(paths);

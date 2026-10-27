@@ -63,7 +63,7 @@ final class BiomeSlabWallTests {
                 BiomeSlabWall.setSlope(PATH,slope,field,"0","1024");BiomeSlabWall.setSlope(PATH,slope,field,"0.25","1.5");
                 for (String[] bad : new String[][]{{"-1","10"},{"0","1025"},{"2","1"},{"NaN","10"},{"0","Infinity"}}) rejects(() -> BiomeSlabWall.setSlope(PATH,slope,field,bad[0],bad[1]));
             } else { rejects(() -> BiomeSlabWall.createSlope(PATH,created,field));rejects(() -> BiomeSlabWall.setSlope(PATH,original,field,"1","9")); }
-            var readOnly=BiomeSlabWall.readOnlyPaths(new LosslessJson(original),field);check(readOnly.containsAll(List.of(field+".minHeight",field+".maxHeight",field+".futureMaterial",field+".style.expression",field+".palette[0].data")));
+            var readOnly=BiomeSlabWall.readOnlyPaths(new LosslessJson(original),field);check(readOnly.containsAll(List.of(field+".minHeight",field+".maxHeight",field+".futureMaterial",field+".palette[0].data")));
             check(readOnly.contains(field.equals("slab") ? field+".slopeCondition.futureSlope" : field+".slopeCondition"));
             for (String bad : List.of("null","[]","true","1","\"snippet/biome-palette/x\"")) {
                 byte[] invalid=document(field,bad);rejects(() -> BiomeSlabWall.create(PATH,invalid,field));rejects(() -> target.enableEntries(PATH,invalid));rejects(() -> target.enableZoom(PATH,invalid));

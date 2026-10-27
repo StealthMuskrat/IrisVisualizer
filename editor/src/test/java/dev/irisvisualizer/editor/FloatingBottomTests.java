@@ -65,7 +65,7 @@ final class FloatingBottomTests {
         byte[] copiedBlock=target.change(PATH,original,RiverProfiles.Action.DUPLICATE,0,null);check(Arrays.equals(blocks(copiedBlock).get(0).sourceBytes(),blocks(copiedBlock).get(1).sourceBytes()));
         byte[] movedBlock=target.change(PATH,original,RiverProfiles.Action.DOWN,0,null);check(Arrays.equals(original,target.change(PATH,movedBlock,RiverProfiles.Action.UP,1,null)));
         check(blocks(target.change(PATH,original,RiverProfiles.Action.REMOVE,0,null)).size()==1);
-        var paths=FloatingBottomPalettes.readOnlyPaths(entry(original,0),0);check(paths.containsAll(List.of("floatingChildBiomes[0].bottomPalette[0].futureLayer","floatingChildBiomes[0].bottomPalette[0].style.expression","floatingChildBiomes[0].bottomPalette[0].palette[0].data","floatingChildBiomes[0].bottomPalette[0].slopeCondition.futureSlope")));
+        var paths=FloatingBottomPalettes.readOnlyPaths(entry(original,0),0);check(paths.containsAll(List.of("floatingChildBiomes[0].bottomPalette[0].futureLayer","floatingChildBiomes[0].bottomPalette[0].palette[0].data","floatingChildBiomes[0].bottomPalette[0].slopeCondition.futureSlope")));
         check(FloatingBottomPalettes.readOnlyPaths(entry(document("[{\"slopeCondition\":null}]"),0),0).isEmpty());
         for (String bad : List.of("{}","true","1","\"snippet/palette\"","[null]","[{},1]","[\"snippet/biome-palette\"]")) {
             byte[] invalid=document(bad);rejects(() -> FloatingBottomPalettes.layers(entry(invalid,0)));rejects(() -> FloatingBottomPalettes.enable(PATH,invalid,0));rejects(() -> FloatingBottomPalettes.change(PATH,invalid,0,RiverProfiles.Action.ADD,-1));
