@@ -584,7 +584,61 @@ public final class EditorApp extends Application {
                 ImGui.treePop();
             }
         }
+        if (ImGui.treeNode("Endpoint ponds")) { drawSurfacePonds(surface); ImGui.treePop(); }
         for (String field : surface.fields()) if (!SurfaceRiverFields.ROOT_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawSurfacePonds(LosslessJson surface) {
+        ImGui.textWrapped(SurfacePondFields.description("ponds"));
+        LosslessJson ponds;
+        try { ponds=SurfacePondFields.ponds(surface); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored pond settings have an unsupported type (read-only)."); return; }
+        if (ponds==null) {
+            if (ImGui.button("Create pond settings (endpoint defaults)")) applyRoutingExtra(() -> workspace.replace(selected,SurfacePondFields.enableContainer(selected,workspace.read(selected))));
+            return;
+        }
+        for (String context : SurfacePondFields.CONTEXTS) {
+            if (ImGui.treeNode(context+" pond")) { drawSurfacePond(ponds,context); ImGui.treePop(); }
+        }
+        for (String field : ponds.fields()) if (!SurfacePondFields.CONTEXTS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawSurfacePond(LosslessJson ponds,String context) {
+        ImGui.textWrapped(SurfacePondFields.description(context));
+        LosslessJson pond;
+        try { pond=SurfacePondFields.pond(ponds,context); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored pond has an unsupported type (read-only)."); return; }
+        if (pond==null) {
+            ImGui.textWrapped("Absent endpoint defaults: enabled="+SurfacePondFields.contextDefault(context,"enabled")
+                    +", radius "+SurfacePondFields.contextDefault(context,"minimumRadius")+" to "+SurfacePondFields.contextDefault(context,"maximumRadius")
+                    +", depth "+SurfacePondFields.contextDefault(context,"depth")+".");
+            if (ImGui.button("Create "+context+" pond with these defaults")) applyRoutingExtra(() -> workspace.replace(selected,SurfacePondFields.enablePond(selected,workspace.read(selected),context)));
+            return;
+        }
+        ImGui.textWrapped("Absent members in an existing pond use its class defaults: radius "+SurfacePondFields.defaultToken("minimumRadius")
+                +" to "+SurfacePondFields.defaultToken("maximumRadius")+", depth "+SurfacePondFields.defaultToken("depth")+".");
+        for (String field : SurfacePondFields.EDITABLE) {
+            String token=pond.token(field), key=SurfacePondFields.draftPrefix(context)+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(SurfacePondFields.help(field));
+            if (field.equals("enabled")) {
+                String effective=token==null ? SurfacePondFields.defaultToken(field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle is not boolean (read-only).");
+                else if (ImGui.checkbox(token==null ? "Enabled (Iris default)" : "Enabled",effective.equals("true")))
+                    applyRoutingExtra(() -> workspace.replace(selected,SurfacePondFields.setEnabled(selected,workspace.read(selected),context,!effective.equals("true"))));
+            } else if (token==null) {
+                if (ImGui.button("Enable ("+SurfacePondFields.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,SurfacePondFields.enableScalar(selected,workspace.read(selected),context,field)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            else {
+                ImGui.textWrapped(SurfacePondFields.constraints(field));
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Value",input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected,SurfacePondFields.setText(selected,workspace.read(selected),context,field,input.get())); drafts.applied(key); values.remove(key); error=null; }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+        for (String field : pond.fields()) if (!SurfacePondFields.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawSurfaceExcavation(LosslessJson surface) {
         String section="banks.excavation";
@@ -1617,7 +1671,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

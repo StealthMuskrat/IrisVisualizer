@@ -1259,6 +1259,10 @@
     "bed": {
       "classification": "generation",
       "reason": "Explicit empty surface-shaping subsection creation preserves source defaults, unknown settings and river planning."
+    },
+    "ponds": {
+      "classification": "generation",
+      "reason": "Explicit endpoint pond settings preserve contextual constructor defaults; scalar edits require existing parents."
     }
   },
   "surfaceRiverSource": {
@@ -1471,6 +1475,34 @@
     "maximumVolumePerBlock": {
       "classification": "generation",
       "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    }
+  },
+  "surfaceRiverPonds": {
+    "source": {
+      "classification": "generation",
+      "reason": "Explicit pond creation writes only overrides needed to retain endpoint constructor defaults; existing objects use class defaults for absent members."
+    },
+    "terminal": {
+      "classification": "generation",
+      "reason": "Explicit pond creation writes only overrides needed to retain endpoint constructor defaults; existing objects use class defaults for absent members."
+    }
+  },
+  "surfaceRiverPond": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and exact integer annotation bounds; endpoint-specific creation, unknown data and unapplied drafts remain preserved."
+    },
+    "minimumRadius": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and exact integer annotation bounds; endpoint-specific creation, unknown data and unapplied drafts remain preserved."
+    },
+    "maximumRadius": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and exact integer annotation bounds; endpoint-specific creation, unknown data and unapplied drafts remain preserved."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type and exact integer annotation bounds; endpoint-specific creation, unknown data and unapplied drafts remain preserved."
     }
   }
 }
