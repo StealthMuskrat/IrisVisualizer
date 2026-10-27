@@ -159,7 +159,7 @@ final class CaveModuleTests {
         rejects(() -> new NoiseStyleFields.Target("biomes","caveProfile.modules.style.fracture",null,0));
         rejects(() -> CaveModules.defaultToken("modules"));
         var paths = DimensionFields.readOnlyPaths(new LosslessJson(source));
-        check(paths.equals(List.of("caveProfile.modules[0].style.expression","caveProfile.modules[0].style.fracture","caveProfile.modules[0].verticalRange.future","caveProfile.modules[0].future","caveProfile.modules[1].future","unknown")));
+        check(paths.equals(List.of("caveProfile.modules[0].style.fracture","caveProfile.modules[0].verticalRange.future","caveProfile.modules[0].future","caveProfile.modules[1].future","unknown")));
         var drafts = new InspectorDrafts();
         String scope = CaveModules.draftPrefix("biomes");
         drafts.update(CaveModules.draftPrefix("biomes",0)+"weight","1","2");

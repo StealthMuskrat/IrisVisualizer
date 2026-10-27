@@ -106,7 +106,7 @@ final class RiverChannelRangeTests {
             }
             for (String unsupported : List.of("expression","imageMap","fracture","cacheSize","multiplier")) {
                 rejects(() -> NoiseStyleFields.editText(PATH,original,target,unsupported,"1"));
-                check(DimensionFields.readOnlyPaths(new LosslessJson(original)).contains("hydrology.rivers.surface.channel."+field+".style."+unsupported));
+                check(DimensionFields.readOnlyPaths(new LosslessJson(original)).contains("hydrology.rivers.surface.channel."+field+".style."+unsupported) == List.of("fracture","multiplier").contains(unsupported));
             }
             check(DimensionFields.readOnlyPaths(new LosslessJson(original)).contains("hydrology.rivers.surface.channel."+field+".future"));
             for (String missing : List.of("{}","{\"hydrology\":{}}","{\"hydrology\":{\"rivers\":{}}}","{\"hydrology\":{\"rivers\":{\"surface\":{}}}}")) rejects(() -> RiverChannelRanges.enable(PATH,bytes(missing),field));

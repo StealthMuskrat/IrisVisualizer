@@ -70,7 +70,7 @@ final class BiomeLayerTests {
                 for (String[] bad : new String[][]{{"-1","10"},{"0","1025"},{"2","1"},{"NaN","10"},{"0","Infinity"}}) rejects(() -> BiomeLayers.setSlope(PATH,slope,list,0,bad[0],bad[1]));
             } else { rejects(() -> BiomeLayers.createSlope(PATH,added,list,0));rejects(() -> BiomeLayers.setSlope(PATH,original,list,0,"1","9")); }
             var readOnly=BiomeLayers.readOnlyPaths(new LosslessJson(original),list);
-            check(readOnly.containsAll(List.of(list+"[0].futureLayer",list+"[0].style.expression",list+"[0].palette[0].data")));
+            check(readOnly.containsAll(List.of(list+"[0].futureLayer",list+"[0].palette[0].data")));
             check(readOnly.contains(list.equals("layers") ? list+"[0].slopeCondition.futureSlope" : list+"[0].slopeCondition"));
             for (String bad : List.of("null","{}","true","1","\"snippet/biome-palette/x\"","[null]","[{},1]","[\"snippet/biome-palette/x\"]")) {
                 byte[] invalid=document(list,bad);rejects(() -> BiomeLayers.enable(PATH,invalid,list));rejects(() -> BiomeLayers.change(PATH,invalid,list,RiverProfiles.Action.ADD,-1));

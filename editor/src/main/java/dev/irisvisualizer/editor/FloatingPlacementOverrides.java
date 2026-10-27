@@ -48,7 +48,7 @@ public final class FloatingPlacementOverrides {
     static List<String> readOnlyHeightmapPaths(LosslessJson placement) {
         var paths=new ArrayList<String>();try { var noise=heightmap(placement);if (noise==null) return List.of();
             for (String field : noise.fields()) if (!NoiseFields.EDITABLE.contains(field) && !field.equals("style")) paths.add("heightmap."+field);
-            try { var style=NoiseStyleFields.object(noise);if (style!=null) for (String field : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(field)) paths.add("heightmap.style."+field); } catch (IllegalArgumentException unsupported) { paths.add("heightmap.style"); }
+            try { var style=NoiseStyleFields.object(noise);if (style!=null) for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add("heightmap.style."+field); } catch (IllegalArgumentException unsupported) { paths.add("heightmap.style"); }
         } catch (IllegalArgumentException unsupported) { paths.add("heightmap"); }return List.copyOf(paths);
     }
 }

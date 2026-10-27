@@ -13,7 +13,7 @@ Direct nonstatic/nontransient private fields in sixty-eight pinned source classe
 | interpolator | 2 | 2 | 2 | 0 |
 | region | 27 | 25 | 19 | 2 |
 | noise | 15 | 14 | 14 | 1 |
-| noiseStyle | 10 | 6 | 6 | 4 |
+| noiseStyle | 10 | 9 | 9 | 1 |
 | terrain3D | 14 | 14 | 14 | 0 |
 | caveProfile | 32 | 32 | 32 | 0 |
 | styledRange | 3 | 3 | 3 | 0 |
@@ -111,7 +111,7 @@ Unclassified: `fracture`.
 
 ## noiseStyle
 
-Unclassified: `cacheSize`, `expression`, `fracture`, `imageMap`.
+Unclassified: `fracture`.
 
 ## terrain3D
 

@@ -168,6 +168,7 @@ public final class NoiseStyleFields {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static List<String> choices() { return CHOICES; }
+    static boolean readOnly(LosslessJson style,String field) { return !EDITABLE.contains(field) && !NoiseStyleSources.supported(style,field); }
     public static String noiseDefault() { return DEFINITIONS.getProperty("noiseDefault"); }
     public static String objectDefault() { return DEFINITIONS.getProperty("objectDefault"); }
     public static String contextDefault(Target target) { return target.decorator() ? BiomeDecorators.styleDefault() : target.ore() ? OreGenerators.styleDefault() : target.objectPalette() ? RiverPaletteFields.styleDefault() : target.placementWarp() ? FloatingPlacementConstraints.warpDefault() : target.placementDensity() ? FloatingPlacementSettings.styleDefault() : target.floating() ? FloatingNoiseStyles.creationStyle(target.floatingContext().field()) : target.floatingBottom() || target.slabWall() || target.biomeLayer() ? BiomeLayers.styleDefault() : target.deepHeight() ? DeepFluids.heightClassStyle() : target.dimensionPalette() || target.deepPalette() || target.poolPalette() || target.profilePalette() || target.palette() ? RiverPaletteFields.styleDefault() : target.riverRange() ? RiverChannelRanges.classStyle() : target.banks() ? RiverBankFields.styleDefault() : target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
@@ -268,7 +269,7 @@ public final class NoiseStyleFields {
             if (target.strictBounds()) validateNumber(target,"cellularZoom",zoom);
         }
     }
-    private static byte[] editContainer(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+    static byte[] editContainer(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
         if (target.decorator()) return BiomeDecorators.editEntry(original,target.decoratorContext().owner(),operation);
         if (target.ore()) { var context=target.oreContext();return context.field().equals("palette") ? OreGenerators.editPalette(original,context.owner(),operation) : OreGenerators.editEntry(original,context.owner(),operation); }
         if (target.objectPalette()) return FloatingObjectPalettes.editPalette(original,target.objectPaletteContext(),operation);

@@ -50,7 +50,7 @@ final class FloatingNoiseTests {
             for (String[] bad : new String[][]{{"zoom","0"},{"zoom","0.000001"},{"exponent","0.015"},{"exponent","65"},{"cellularFrequency","-1"},{"zoom","NaN"},{"cellularZoom","Infinity"}}) rejects(() -> NoiseStyleFields.editText(PATH,original,target,bad[0],bad[1]));
             byte[] inactive=NoiseStyleFields.editText(PATH,original,target,"cellularZoom","0");rejects(() -> NoiseStyleFields.editText(PATH,inactive,target,"cellularFrequency","1"));
             byte[] active=NoiseStyleFields.editText(PATH,original,target,"cellularFrequency","1");rejects(() -> NoiseStyleFields.editText(PATH,active,target,"cellularZoom","0"));rejects(() -> NoiseStyleFields.editText(PATH,active,target,"cellularZoom","4.9e-324"));
-            var readOnly=FloatingNoiseStyles.readOnlyPaths(entry(original),0);check(readOnly.containsAll(List.of("floatingChildBiomes[0]."+field+".expression","floatingChildBiomes[0]."+field+".imageMap","floatingChildBiomes[0]."+field+".cacheSize","floatingChildBiomes[0]."+field+".fracture","floatingChildBiomes[0]."+field+".futureNoise")));
+            var readOnly=FloatingNoiseStyles.readOnlyPaths(entry(original),0);check(readOnly.containsAll(List.of("floatingChildBiomes[0]."+field+".cacheSize","floatingChildBiomes[0]."+field+".fracture","floatingChildBiomes[0]."+field+".futureNoise")));
             check(!FloatingBiomes.readOnlyFields(entry(original)).contains(field));
             if (optional) {
                 byte[] disabled=FloatingNoiseStyles.disable(PATH,original,0,field);check(text(disabled).equals(text(original).replace(raw,"null")));

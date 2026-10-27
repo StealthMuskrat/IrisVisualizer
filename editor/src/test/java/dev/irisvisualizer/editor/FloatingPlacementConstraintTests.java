@@ -82,7 +82,7 @@ final class FloatingPlacementConstraintTests {
             String fixture="{\"warp\":{\"style\":\"UNKNOWN\",\"zoom\":1e0,\"multiplier\":1e0,\"expression\":\"x + z\",\"futureWarp\":9007199254740993},\"clamp\":{\"minimumHeight\":-1e2,\"maximumHeight\":1e2,\"futureClamp\":true},\"slopeCondition\":{\"minimumSlope\":0,\"maximumSlope\":1e1,\"futureSlope\":\"雪\\u0061\"},\"rotateTowardsSlope\":false,\"surfaceSupportBuffer\":2,\"force\":true,\"futurePlacement\":9007199254740993}";
             byte[] original=document(list,fixture),copy=original.clone();check(text(FloatingPlacementConstraints.setMultiplier(PATH,original,context,"2")).equals(text(original).replace("\"multiplier\":1e0","\"multiplier\":2")));
             check(text(NoiseStyleFields.editText(PATH,original,target,"zoom","2")).equals(text(original).replace("\"zoom\":1e0","\"zoom\":2")));
-            var paths=FloatingPlacementConstraints.readOnlyPaths(placement(original,list),context);check(paths.containsAll(List.of("warp.expression","warp.futureWarp")) && !paths.contains("warp.multiplier"));
+            var paths=FloatingPlacementConstraints.readOnlyPaths(placement(original,list),context);check(paths.containsAll(List.of("warp.futureWarp")) && !paths.contains("warp.multiplier"));
             check(FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains("clamp")!=list.equals("floatingObjects"));
             if (list.equals("floatingObjects")) {
                 check(paths.containsAll(List.of("clamp.futureClamp","slopeCondition.futureSlope")));

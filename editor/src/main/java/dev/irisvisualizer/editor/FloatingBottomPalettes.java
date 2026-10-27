@@ -48,7 +48,7 @@ public final class FloatingBottomPalettes {
             for (int i=0;i<layers.size();i++) {
                 var layer=layers.get(i);String layerPath=prefix+"["+i+"]";
                 for (String field : layer.fields()) if (!BiomeLayers.EDITABLE.contains(field)) paths.add(layerPath+"."+field);
-                try { var style=NoiseStyleFields.object(layer);if (style!=null) for (String field : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(field)) paths.add(layerPath+".style."+field); }
+                try { var style=NoiseStyleFields.object(layer);if (style!=null) for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add(layerPath+".style."+field); }
                 catch (IllegalArgumentException unsupported) { paths.add(layerPath+".style"); }
                 try { var blocks=DimensionPalettes.entries(layer);if (blocks!=null) for (int j=0;j<blocks.size();j++) for (String field : blocks.get(j).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) paths.add(layerPath+".palette["+j+"]."+field); }
                 catch (IllegalArgumentException unsupported) { paths.add(layerPath+".palette"); }

@@ -25,6 +25,7 @@ public final class EditorApp extends Application {
     private String riverCatalogDimension;
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
     private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
+    private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
     private PackWorkspace referenceWorkspace;
     private String referencePath;
     private long referenceRevision = -1;
@@ -428,7 +429,7 @@ public final class EditorApp extends Application {
         try { style = NoiseStyleFields.object(container, target); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored style is a snippet or unsupported value (read-only)."); return; }
         ImGui.textWrapped(NoiseStyleFields.contextDescription(target));
-        ImGui.textWrapped("Expression and image-map settings can override the base style. Those, cache and fracture settings remain read-only.");
+        ImGui.textWrapped("Expression and image-map references can override the base style. Fracture settings remain read-only; no style source is loaded or sampled here.");
         ImGui.textWrapped(target.strictBounds() ? "This density style requires positive cellular zoom even when cellular frequency is zero."
                 : "Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
@@ -472,6 +473,29 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        drawStyleSources(style,target);
+    }
+    private void drawStyleSources(LosslessJson style,NoiseStyleFields.Target target) {
+        if (!ImGui.treeNode("Sources and cache##"+target.draftPrefix())) return;
+        ImGui.textWrapped("A non-null expression takes priority over imageMap. If the expression cannot load, Iris falls back to the base style without trying the image map. Clear expression to allow imageMap. File presence is checked; content, image-map type, parser and runtime compatibility are not validated.");
+        for (String field : NoiseStyleSources.REFERENCES) {
+            ImGui.pushID(field);String token=style.token(field);
+            if (!NoiseStyleSources.supported(style,field)) ImGui.textWrapped(field+": stored type mismatch (read-only)");
+            else {
+                String current=token==null || token.equals("null") ? null : style.stringToken(field);var choices=styleSourceCatalogs.choices(workspace,field);
+                if (current!=null && !choices.contains(current)) ImGui.textWrapped("Stored reference is outside the exact in-pack catalog and is preserved until replaced or cleared.");
+                if (ImGui.beginCombo(field,current==null ? "Absent/null" : current.length()>128 ? "Stored reference" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.setReference(selected,workspace.read(selected),target,field,choice,workspace)));ImGui.endCombo(); }
+                if (current!=null && ImGui.button("Clear reference (null)")) applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.setReference(selected,workspace.read(selected),target,field,null,workspace)));
+                if (choices.isEmpty()) ImGui.textWrapped("No exact "+NoiseStyleSources.family(field)+" JSON resources in this pack.");
+            }
+            ImGui.popID();
+        }
+        ImGui.textWrapped("Cache size is an exact integer 0..8192. Positive values override the caller fallback; 0 uses that fallback when present. Native Iris may persist cache files. This editor does not create or manage native noise caches.");
+        String token=style.token("cacheSize"),key=target.draftPrefix()+"cacheSize";
+        if (token==null) { if (ImGui.button("Enable cache size "+NoiseStyleSources.cacheDefault())) applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.enableCache(selected,workspace.read(selected),target))); }
+        else if (!NoiseStyleSources.supported(style,"cacheSize")) ImGui.textWrapped("Stored cache size has an unsupported type or integer width (read-only).");
+        else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Cache size",input);drafts.update(key,token,input.get());if (ImGui.button("Apply cache size")) commitRiverOverride(key,() -> workspace.replace(selected,NoiseStyleSources.setCache(selected,workspace.read(selected),target,input.get()))); }
+        ImGui.treePop();
     }
     private void enableStyle(NoiseStyleFields.Target target, String field) {
         try { workspace.replace(selected, NoiseStyleFields.enable(selected, workspace.read(selected), target, field)); error = null; }
@@ -612,7 +636,7 @@ public final class EditorApp extends Application {
             for (String field : BiomeDecorators.BLOCK_LISTS) if (ImGui.treeNode(field)) { drawDecoratorBlocks(decorator,context,field);ImGui.treePop(); }
             for (String field : BiomeDecorators.STYLES) if (ImGui.treeNode(field)) {
                 var target=context.styleTarget(field);drawStyleFields(decorator,target);
-                try { var style=NoiseStyleFields.object(decorator,target);if (style!=null) for (String child : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(child)) ImGui.textWrapped(child+" (read-only)"); } catch (IllegalArgumentException unsupported) { }
+                try { var style=NoiseStyleFields.object(decorator,target);if (style!=null) for (String child : style.fields()) if (NoiseStyleFields.readOnly(style,child)) ImGui.textWrapped(child+" (read-only)"); } catch (IllegalArgumentException unsupported) { }
                 ImGui.treePop();
             }
             for (String field : decorator.fields()) if (!BiomeDecorators.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");ImGui.treePop();

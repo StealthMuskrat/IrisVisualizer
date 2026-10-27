@@ -62,7 +62,7 @@ public final class DimensionFields {
                                     if (member.equals("style")) {
                                         try {
                                             LosslessJson style = new LosslessJson(threshold.token(member).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                                            for (String setting : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(setting)) paths.add(field+"."+child+".style."+setting);
+                                            for (String setting : style.fields()) if (NoiseStyleFields.readOnly(style,setting)) paths.add(field+"."+child+".style."+setting);
                                         } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child+".style"); }
                                     } else if (!CaveThresholdFields.EDITABLE.contains(member)) paths.add(field+"."+child+"."+member);
                                 }
@@ -72,7 +72,7 @@ public final class DimensionFields {
                         } else if (NoiseStyleFields.CAVE_FIELDS.contains(child)) {
                             try {
                                 LosslessJson style=new LosslessJson(object.token(child).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                                for (String member:style.fields()) if (!NoiseStyleFields.EDITABLE.contains(member)) paths.add(field+"."+child+"."+member);
+                                for (String member:style.fields()) if (NoiseStyleFields.readOnly(style,member)) paths.add(field+"."+child+"."+member);
                             } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }
                         } else paths.add(field+"."+child);
                     }
@@ -82,7 +82,7 @@ public final class DimensionFields {
             if (NoiseStyleFields.DIMENSION_FIELDS.contains(field)) {
                 try {
                     LosslessJson object = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    for (String child : object.fields()) if (!NoiseStyleFields.EDITABLE.contains(child)) paths.add(field+"."+child);
+                    for (String child : object.fields()) if (NoiseStyleFields.readOnly(object,child)) paths.add(field+"."+child);
                 } catch (IllegalArgumentException mismatch) { paths.add(field); }
                 continue;
             }

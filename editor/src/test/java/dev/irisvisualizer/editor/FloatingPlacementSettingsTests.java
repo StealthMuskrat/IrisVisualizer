@@ -91,7 +91,7 @@ final class FloatingPlacementSettingsTests {
             byte[] original=document(list,fixture),copy=original.clone();
             check(text(FloatingPlacementSettings.setScaleScalar(PATH,original,context,"size","2")).equals(text(original).replace("\"size\":1e0","\"size\":2")));
             check(text(NoiseStyleFields.editText(PATH,original,target,"zoom","2")).equals(text(original).replace("\"zoom\":1e0","\"zoom\":2")));
-            check(FloatingPlacementSettings.readOnlyPaths(placement(original,list)).containsAll(List.of("scale.futureScale","densityStyle.futureRange","densityStyle.style.expression","densityStyle.style.futureStyle")));
+            check(FloatingPlacementSettings.readOnlyPaths(placement(original,list)).containsAll(List.of("scale.futureScale","densityStyle.futureRange","densityStyle.style.futureStyle")));
             check(!FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains("scale") && !FloatingObjectPlacements.readOnlyFields(placement(original,list),list).contains("densityStyle"));
             var drafts=new InspectorDrafts();String densityKey=context.prefix("densityStyle")+"min",styleKey=target.draftPrefix()+"zoom",scaleKey=context.prefix("scale")+"size",chance=FloatingObjectPlacements.placementPrefix(0,list,0)+"chance",other=new FloatingPlacementSettings.Context(1,list,0).prefix("scale")+"size";
             for (String key : List.of(densityKey,styleKey,scaleKey,chance,other)) drafts.update(key,"1","2");

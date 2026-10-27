@@ -103,7 +103,7 @@ final class DeepFluidTests {
         rejects(() -> DeepFluids.change(PATH,original,RiverProfiles.Action.UP,0,null));rejects(() -> DeepFluids.change(PATH,original,RiverProfiles.Action.DOWN,1,null));
         rejects(() -> DeepFluids.setId(PATH,document("[{}, {\"id\":\"other\"}]"),1,"deep_lava"));
         var readOnly=DimensionFields.readOnlyPaths(new LosslessJson(original));
-        check(readOnly.containsAll(List.of("hydrology.deepFluids[0].futureSystem","hydrology.deepFluids[0].height.futureRange","hydrology.deepFluids[0].height.style.expression","hydrology.deepFluids[0].fluidPalette.futurePalette","hydrology.deepFluids[0].fluidPalette.palette[0].data")));
+        check(readOnly.containsAll(List.of("hydrology.deepFluids[0].futureSystem","hydrology.deepFluids[0].height.futureRange","hydrology.deepFluids[0].fluidPalette.futurePalette","hydrology.deepFluids[0].fluidPalette.palette[0].data")));
         for (String bad : List.of("null","{}","true","1","\"snippet\"","[null]","[{},1]")) {
             byte[] invalid=document(bad);rejects(() -> DeepFluids.enable(PATH,invalid));rejects(() -> DeepFluids.change(PATH,invalid,RiverProfiles.Action.ADD,-1,"valid"));check(DimensionFields.readOnlyPaths(new LosslessJson(invalid)).contains("hydrology.deepFluids"));
         }
