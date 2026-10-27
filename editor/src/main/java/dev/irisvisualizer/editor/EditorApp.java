@@ -620,6 +620,7 @@ public final class EditorApp extends Application {
             drawFloatingPlacementMode(placement,index,list,placementIndex);
             for (String field : FloatingObjectPlacements.SCALARS) drawFloatingPlacementScalar(placement,index,list,placementIndex,field);
             drawFloatingPlacementSettings(placement,new FloatingPlacementSettings.Context(index,list,placementIndex));
+            drawFloatingPlacementConstraints(placement,new FloatingPlacementConstraints.Context(index,list,placementIndex));
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
             if (list.equals("floatingObjects") && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
@@ -645,6 +646,89 @@ public final class EditorApp extends Application {
             if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectPlacements.setScalar(selected,workspace.read(selected),entry,list,index,field,input.get())));
         }
         ImGui.popID();
+    }
+    private void drawFloatingPlacementConstraints(LosslessJson placement,FloatingPlacementConstraints.Context context) {
+        if (ImGui.treeNode("Coordinate warp")) {
+            drawStyleFields(placement,context.warpTarget());
+            LosslessJson warp=null;
+            try { warp=NoiseStyleFields.object(placement,context.warpTarget()); } catch (IllegalArgumentException unsupported) { /* The style inspector explains unsupported parents. */ }
+            if (warp!=null) {
+                ImGui.textWrapped(FloatingPlacementConstraints.multiplierConstraints());String token=warp.token("multiplier"),key=context.prefix("warp")+"multiplier";
+                if (token==null) {
+                    if (ImGui.button("Enable warp multiplier ("+FloatingPlacementConstraints.multiplierDefault()+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementConstraints.enableMultiplier(selected,workspace.read(selected),context)));
+                } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored multiplier has an unsupported type (read-only).");
+                else {
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Warp multiplier",input);drafts.update(key,token,input.get());
+                    if (ImGui.button("Apply warp multiplier")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingPlacementConstraints.setMultiplier(selected,workspace.read(selected),context,input.get())));
+                }
+            }
+            ImGui.treePop();
+        }
+        if (context.list().equals("floatingObjects") && ImGui.treeNode("Placement guards")) {
+            ImGui.textWrapped("These settings retain native mode-dependent behavior. Force placement can bypass clamp, slope and surface-support guards; FLOATING skips carving anchors and surface support. Support also depends on water/from-bottom settings. Effective placement is not validated or previewed.");
+            ImGui.textWrapped("Slope-facing rotation requires native terrain context and replaces Y maximum/interval with a terrain direction plus the Y minimum.");
+            for (String field : FloatingPlacementConstraints.FLAGS) {
+                ImGui.pushID(field);ImGui.textWrapped(FloatingPlacementConstraints.help(field));String token=placement.token(field);
+                if (token==null) {
+                    if (ImGui.button("Enable "+field+" ("+FloatingPlacementConstraints.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementConstraints.enableFlag(selected,workspace.read(selected),context,field)));
+                } else if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored flag has an unsupported type (read-only).");
+                else { ImBoolean value=new ImBoolean(Boolean.parseBoolean(token));if (ImGui.checkbox(field,value)) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementConstraints.setFlag(selected,workspace.read(selected),context,field,value.get()))); }
+                ImGui.popID();
+            }
+            for (String field : FloatingPlacementConstraints.SCALARS) {
+                ImGui.pushID(field);ImGui.textWrapped(FloatingPlacementConstraints.help(field));ImGui.textWrapped(FloatingPlacementConstraints.constraints(field));String token=placement.token(field),key=context.prefix(field)+"value";
+                if (token==null) {
+                    if (ImGui.button("Enable "+field+" ("+FloatingPlacementConstraints.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementConstraints.enableScalar(selected,workspace.read(selected),context,field)));
+                } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored scalar has an unsupported type (read-only).");
+                else {
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+                    if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingPlacementConstraints.setScalar(selected,workspace.read(selected),context,field,input.get())));
+                }
+                ImGui.popID();
+            }
+            String current=null;
+            try { current=placement.token("carvingSupport")==null ? FloatingPlacementConstraints.defaultToken("carvingSupport") : placement.stringToken("carvingSupport"); }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored carving mode has an unsupported type (read-only)."); }
+            if (current!=null && ImGui.beginCombo("Carving support",current.length()>128 ? "Unknown stored mode" : current+(placement.token("carvingSupport")==null ? " (Iris default)" : ""))) {
+                for (String choice : FloatingPlacementConstraints.carvingModes()) {
+                    if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingPlacementConstraints.setCarving(selected,workspace.read(selected),context,choice)));
+                    if (ImGui.isItemHovered()) ImGui.setTooltip(FloatingPlacementConstraints.carvingHelp(choice));
+                }
+                ImGui.endCombo();
+            }
+            for (String field : FloatingPlacementConstraints.OBJECT_FIELDS) if (ImGui.treeNode(field)) { drawFloatingConstraintBounds(placement,context,field);ImGui.treePop(); }
+            ImGui.treePop();
+        }
+        var readOnly=FloatingPlacementConstraints.readOnlyPaths(placement,context);
+        if (!readOnly.isEmpty() && ImGui.treeNode("Other guard/warp data (read-only)")) { for (String path : readOnly) ImGui.textWrapped(path);ImGui.treePop(); }
+    }
+    private void drawFloatingConstraintBounds(LosslessJson placement,FloatingPlacementConstraints.Context context,String field) {
+        ImGui.textWrapped(FloatingPlacementConstraints.help(field));LosslessJson object;
+        try { object=FloatingPlacementConstraints.object(placement,field); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored bound object is a snippet or unsupported value (read-only).");return; }
+        if (object==null) {
+            ImGui.textWrapped(field.equals("clamp") ? "Absent clamp uses -2048 to 2048. Creation retains those defaults." : "Absent slope uses 0 to 10, which bypasses native slope filtering. Creation retains those defaults.");
+            if (ImGui.button("Create bound object with Iris defaults")) {
+                try { commitProfileChange(context.prefix(field),FloatingPlacementConstraints.create(selected,workspace.read(selected),context,field),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        var members=field.equals("clamp") ? FloatingPlacementConstraints.CLAMP_FIELDS : FloatingPlacementConstraints.SLOPE_FIELDS;String minField=members.getFirst(),maxField=members.getLast(),min=object.token(minField),max=object.token(maxField);
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored bounds have unsupported types (read-only).");return; }
+        ImGui.textWrapped(FloatingPlacementConstraints.boundConstraints(field,minField));
+        ImGui.textWrapped("Apply both bounds together. The editor requires minimum at most maximum.");
+        if (field.equals("slopeCondition")) ImGui.textWrapped("Slope minimum 0 with maximum at least 10 bypasses the native slope filter.");
+        String storedMin=min==null ? FloatingPlacementConstraints.boundDefault(field,minField) : min,storedMax=max==null ? FloatingPlacementConstraints.boundDefault(field,maxField) : max;
+        String minKey=context.prefix(field)+minField,maxKey=context.prefix(field)+maxField;
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImString maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImGui.inputText(min==null ? "Minimum (Iris default)" : "Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());
+        ImGui.inputText(max==null ? "Maximum (Iris default)" : "Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        if (ImGui.button("Apply bounds")) {
+            try { workspace.replace(selected,FloatingPlacementConstraints.setBounds(selected,workspace.read(selected),context,field,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
+            catch (Exception failure) { error=failure.getMessage(); }
+        }
     }
     private void drawFloatingPlacementMode(LosslessJson placement,int entry,String list,int index) {
         String current;
@@ -789,7 +873,7 @@ public final class EditorApp extends Application {
     private void drawFloatingRotation(LosslessJson placement,FloatingObjectRotations.Context context) {
         ImGui.textWrapped(FloatingObjectRotations.help());
         ImGui.textWrapped("This collection preserves configured rotation. Anchored top/bottom collections replace it. Rotation changes placement geometry and block states; native rendering and placement are not previewed.");
-        if ("true".equals(placement.token("rotateTowardsSlope"))) ImGui.textWrapped("rotateTowardsSlope is enabled: Iris derives Y rotation from terrain and the Y minimum, replacing its maximum and interval. That option remains read-only.");
+        if ("true".equals(placement.token("rotateTowardsSlope"))) ImGui.textWrapped("rotateTowardsSlope is enabled: Iris derives Y rotation from terrain and the Y minimum, replacing its maximum and interval. Author that option under Placement guards.");
         LosslessJson rotation;
         try { rotation=FloatingObjectRotations.object(placement); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored rotation is a snippet or unsupported value (read-only).");return; }
