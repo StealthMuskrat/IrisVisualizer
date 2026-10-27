@@ -256,6 +256,12 @@ public final class LosslessJson {
         Span span = root.get(field);
         return splice(span.start(),span.end(),"{}");
     }
+    /** Explicitly enables an absent/null array; existing values are never overwritten. */
+    byte[] enableArray(String field) {
+        String original=token(field);
+        if (original!=null && !original.equals("null")) throw new IllegalArgumentException("Array already exists or has an unsupported type");
+        return nullableScalar(field,"[]");
+    }
     /** Explicit optional-object disable. Preserve absence/null; unsupported stored types remain untouched. */
     byte[] nullObject(String field) {
         String original = token(field);

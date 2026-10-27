@@ -55,7 +55,7 @@ Direct nonstatic/nontransient private fields in fifty-two pinned source classes 
 | deepFluid | 12 | 12 | 12 | 0 |
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
-| floatingBiome | 42 | 37 | 36 | 5 |
+| floatingBiome | 42 | 38 | 37 | 4 |
 
 ## dimension
 
@@ -263,4 +263,4 @@ Unclassified: none.
 
 ## floatingBiome
 
-Unclassified: `bottomObjectOverrides`, `bottomPalette`, `extraObjects`, `floatingObjects`, `topObjectOverrides`.
+Unclassified: `bottomObjectOverrides`, `extraObjects`, `floatingObjects`, `topObjectOverrides`.

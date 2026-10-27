@@ -5,32 +5,37 @@ import java.nio.charset.StandardCharsets;
 
 /** General palette entry operations; owner APIs authorize paths and existing containers. */
 final class GeneralBlockPalettes {
-    record Target(String dimensionField,String layerList,int layerIndex,String biomeMaterial) {
+    record Target(String dimensionField,String layerList,int layerIndex,String biomeMaterial,int floatingEntry) {
+        Target(String dimensionField,String layerList,int layerIndex,String biomeMaterial) { this(dimensionField,layerList,layerIndex,biomeMaterial,-1); }
         Target(String dimensionField,String layerList,int layerIndex) { this(dimensionField,layerList,layerIndex,null); }
         Target {
-            if (biomeMaterial!=null) { BiomeSlabWall.field(biomeMaterial);if (dimensionField!=null || layerList!=null || layerIndex!=-1) throw new IllegalArgumentException("Unsupported slab/wall palette target"); }
+            if (floatingEntry < -1) throw new IllegalArgumentException("Unsupported floating entry index");
+            if (floatingEntry>=0) { if (dimensionField!=null || layerList!=null || biomeMaterial!=null || layerIndex<0) throw new IllegalArgumentException("Unsupported floating underside target"); }
+            else if (biomeMaterial!=null) { BiomeSlabWall.field(biomeMaterial);if (dimensionField!=null || layerList!=null || layerIndex!=-1) throw new IllegalArgumentException("Unsupported slab/wall palette target"); }
             else if (dimensionField!=null) { if (!DimensionPalettes.OBJECT_FIELDS.contains(dimensionField) || layerList!=null || layerIndex!=-1) throw new IllegalArgumentException("Unsupported dimension palette target"); }
             else { BiomeLayers.field(layerList);if (layerIndex<0) throw new IllegalArgumentException("Select a layer"); }
         }
         static Target dimension(String field) { return new Target(field,null,-1); }
         static Target layer(String list,int index) { return new Target(null,list,index); }
         static Target slabWall(String field) { return new Target(null,null,-1,field); }
+        static Target floatingBottom(int entry,int layer) { if (entry<0) throw new IllegalArgumentException("Select a floating entry");return new Target(null,null,layer,null,entry); }
+        boolean floatingBottom() { return floatingEntry>=0; }
         boolean slabWall() { return biomeMaterial!=null; }
-        boolean layer() { return dimensionField==null && !slabWall(); }
+        boolean layer() { return dimensionField==null && !slabWall() && !floatingBottom(); }
         int minimumEntries() { return slabWall() ? 0 : DimensionPalettes.minimumEntries(); }
-        String defaultBlock() { return slabWall() ? BiomeSlabWall.classBlock() : layer() ? BiomeLayers.defaultBlock() : DimensionPalettes.classBlock(); }
-        String listPrefix() { return slabWall() ? BiomeSlabWall.blockPrefix(biomeMaterial) : layer() ? BiomeLayers.blockPrefix(layerList,layerIndex) : DimensionPalettes.listPrefix(dimensionField); }
-        String noisePrefix() { return slabWall() ? BiomeSlabWall.noisePrefix(biomeMaterial) : layer() ? BiomeLayers.noisePrefix(layerList,layerIndex) : DimensionPalettes.noisePrefix(dimensionField); }
-        String zoomDefault() { return layer() || slabWall() ? BiomeLayers.zoomDefault() : RiverPaletteFields.zoomDefault(); }
-        String zoomConstraints() { return layer() || slabWall() ? BiomeLayers.zoomConstraints() : RiverPaletteFields.zoomConstraints(); }
-        NoiseStyleFields.Target styleTarget() { return slabWall() ? NoiseStyleFields.Target.slabWall(biomeMaterial) : layer() ? NoiseStyleFields.Target.biomeLayer(layerList,layerIndex) : NoiseStyleFields.Target.dimensionPalette(dimensionField); }
-        byte[] enableEntries(String path,byte[] original) { return slabWall() ? BiomeSlabWall.enableEntries(path,original,biomeMaterial) : layer() ? BiomeLayers.enableBlocks(path,original,layerList,layerIndex) : DimensionPalettes.enableEntries(path,original,dimensionField); }
-        byte[] setBlock(String path,byte[] original,int index,String value) { return slabWall() ? BiomeSlabWall.setBlock(path,original,biomeMaterial,index,value) : layer() ? BiomeLayers.setBlock(path,original,layerList,layerIndex,index,value) : DimensionPalettes.setBlock(path,original,dimensionField,index,value); }
-        byte[] enableWeight(String path,byte[] original,int index) { return slabWall() ? BiomeSlabWall.enableWeight(path,original,biomeMaterial,index) : layer() ? BiomeLayers.enableWeight(path,original,layerList,layerIndex,index) : DimensionPalettes.enableWeight(path,original,dimensionField,index); }
-        byte[] setWeight(String path,byte[] original,int index,String value) { return slabWall() ? BiomeSlabWall.setWeight(path,original,biomeMaterial,index,value) : layer() ? BiomeLayers.setWeight(path,original,layerList,layerIndex,index,value) : DimensionPalettes.setWeight(path,original,dimensionField,index,value); }
-        byte[] change(String path,byte[] original,RiverProfiles.Action action,int index,String value) { return slabWall() ? BiomeSlabWall.change(path,original,biomeMaterial,action,index,value) : layer() ? BiomeLayers.changeBlock(path,original,layerList,layerIndex,action,index,value) : DimensionPalettes.change(path,original,dimensionField,action,index,value); }
-        byte[] enableZoom(String path,byte[] original) { return slabWall() ? BiomeSlabWall.enableZoom(path,original,biomeMaterial) : layer() ? BiomeLayers.enableZoom(path,original,layerList,layerIndex) : DimensionPalettes.enableZoom(path,original,dimensionField); }
-        byte[] setZoom(String path,byte[] original,String value) { return slabWall() ? BiomeSlabWall.setZoom(path,original,biomeMaterial,value) : layer() ? BiomeLayers.setZoom(path,original,layerList,layerIndex,value) : DimensionPalettes.setZoom(path,original,dimensionField,value); }
+        String defaultBlock() { return floatingBottom() ? BiomeLayers.defaultBlock() : slabWall() ? BiomeSlabWall.classBlock() : layer() ? BiomeLayers.defaultBlock() : DimensionPalettes.classBlock(); }
+        String listPrefix() { return floatingBottom() ? FloatingBottomPalettes.blockPrefix(floatingEntry,layerIndex) : slabWall() ? BiomeSlabWall.blockPrefix(biomeMaterial) : layer() ? BiomeLayers.blockPrefix(layerList,layerIndex) : DimensionPalettes.listPrefix(dimensionField); }
+        String noisePrefix() { return floatingBottom() ? FloatingBottomPalettes.noisePrefix(floatingEntry,layerIndex) : slabWall() ? BiomeSlabWall.noisePrefix(biomeMaterial) : layer() ? BiomeLayers.noisePrefix(layerList,layerIndex) : DimensionPalettes.noisePrefix(dimensionField); }
+        String zoomDefault() { return floatingBottom() || layer() || slabWall() ? BiomeLayers.zoomDefault() : RiverPaletteFields.zoomDefault(); }
+        String zoomConstraints() { return floatingBottom() || layer() || slabWall() ? BiomeLayers.zoomConstraints() : RiverPaletteFields.zoomConstraints(); }
+        NoiseStyleFields.Target styleTarget() { return floatingBottom() ? NoiseStyleFields.Target.floatingBottom(floatingEntry,layerIndex) : slabWall() ? NoiseStyleFields.Target.slabWall(biomeMaterial) : layer() ? NoiseStyleFields.Target.biomeLayer(layerList,layerIndex) : NoiseStyleFields.Target.dimensionPalette(dimensionField); }
+        byte[] enableEntries(String path,byte[] original) { return floatingBottom() ? FloatingBottomPalettes.enableBlocks(path,original,floatingEntry,layerIndex) : slabWall() ? BiomeSlabWall.enableEntries(path,original,biomeMaterial) : layer() ? BiomeLayers.enableBlocks(path,original,layerList,layerIndex) : DimensionPalettes.enableEntries(path,original,dimensionField); }
+        byte[] setBlock(String path,byte[] original,int index,String value) { return floatingBottom() ? FloatingBottomPalettes.setBlock(path,original,floatingEntry,layerIndex,index,value) : slabWall() ? BiomeSlabWall.setBlock(path,original,biomeMaterial,index,value) : layer() ? BiomeLayers.setBlock(path,original,layerList,layerIndex,index,value) : DimensionPalettes.setBlock(path,original,dimensionField,index,value); }
+        byte[] enableWeight(String path,byte[] original,int index) { return floatingBottom() ? FloatingBottomPalettes.enableWeight(path,original,floatingEntry,layerIndex,index) : slabWall() ? BiomeSlabWall.enableWeight(path,original,biomeMaterial,index) : layer() ? BiomeLayers.enableWeight(path,original,layerList,layerIndex,index) : DimensionPalettes.enableWeight(path,original,dimensionField,index); }
+        byte[] setWeight(String path,byte[] original,int index,String value) { return floatingBottom() ? FloatingBottomPalettes.setWeight(path,original,floatingEntry,layerIndex,index,value) : slabWall() ? BiomeSlabWall.setWeight(path,original,biomeMaterial,index,value) : layer() ? BiomeLayers.setWeight(path,original,layerList,layerIndex,index,value) : DimensionPalettes.setWeight(path,original,dimensionField,index,value); }
+        byte[] change(String path,byte[] original,RiverProfiles.Action action,int index,String value) { return floatingBottom() ? FloatingBottomPalettes.changeBlock(path,original,floatingEntry,layerIndex,action,index,value) : slabWall() ? BiomeSlabWall.change(path,original,biomeMaterial,action,index,value) : layer() ? BiomeLayers.changeBlock(path,original,layerList,layerIndex,action,index,value) : DimensionPalettes.change(path,original,dimensionField,action,index,value); }
+        byte[] enableZoom(String path,byte[] original) { return floatingBottom() ? FloatingBottomPalettes.enableZoom(path,original,floatingEntry,layerIndex) : slabWall() ? BiomeSlabWall.enableZoom(path,original,biomeMaterial) : layer() ? BiomeLayers.enableZoom(path,original,layerList,layerIndex) : DimensionPalettes.enableZoom(path,original,dimensionField); }
+        byte[] setZoom(String path,byte[] original,String value) { return floatingBottom() ? FloatingBottomPalettes.setZoom(path,original,floatingEntry,layerIndex,value) : slabWall() ? BiomeSlabWall.setZoom(path,original,biomeMaterial,value) : layer() ? BiomeLayers.setZoom(path,original,layerList,layerIndex,value) : DimensionPalettes.setZoom(path,original,dimensionField,value); }
     }
     private static void block(String value) { if (value==null || value.isBlank()) throw new IllegalArgumentException("Enter a nonblank block name; registry/state validation is pending"); }
     private static byte[] entry(String value) { block(value);return new LosslessJson("{}".getBytes(StandardCharsets.UTF_8)).enableStringPath("block",value); }
