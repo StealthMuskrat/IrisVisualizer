@@ -19,12 +19,13 @@ final class RootStyleTests {
     static void run(Path temp) throws Exception {
         var targets = new ArrayList<NoiseStyleFields.Target>();
         for (String field : NoiseStyleFields.DIMENSION_FIELDS) targets.add(NoiseStyleFields.Target.dimension(field));
-        targets.add(NoiseStyleFields.Target.biome("childStyle"));
+        for (String field : NoiseStyleFields.BIOME_FIELDS) targets.add(NoiseStyleFields.Target.biome(field));
         var prefixes = new HashSet<String>();
         for (var target : targets) {
             String path = target.resourceBase().equals("dimensions") ? "dimensions/test.json" : "biomes/nested/test.json";
             String field = target.objectField();
-            check(NoiseStyleFields.contextDefault(target).equals("CELLULAR_IRIS_DOUBLE"));
+            String expectedDefault=field.equals("biomeStyle") ? "SIMPLEX" : "CELLULAR_IRIS_DOUBLE";
+            check(NoiseStyleFields.contextDefault(target).equals(expectedDefault));
             check(!NoiseStyleFields.contextDescription(target).isBlank());
             check(prefixes.add(target.draftPrefix()));
             String style = "{\"style\":\"FUTURE\\u005fSTYLE\",\"zoom\":1e0,\"exponent\":1,\"expression\":\"unresolved\",\"fracture\":{\"style\":\"UNKNOWN\",\"zoom\":9e0},\"unknown\":\"雪\"}";
@@ -45,7 +46,7 @@ final class RootStyleTests {
                 var root = new LosslessJson(enabled);
                 check(root.fields().equals(Set.of(field,"unknown")) && root.token("unknown").equals("\"雪\""));
                 var object = NoiseStyleFields.object(root,target);
-                check(object.stringToken("style").equals("CELLULAR_IRIS_DOUBLE"));
+                check(object.stringToken("style").equals(expectedDefault));
                 check(object.fields().equals(child.equals("style") ? Set.of("style") : Set.of("style",child)));
                 rejects(() -> NoiseStyleFields.enable(path,enabled,target,child));
             }
@@ -65,7 +66,7 @@ final class RootStyleTests {
             rejects(() -> NoiseStyleFields.editStyle("regions/test.json",original,target,"IRIS"));
         }
         rejects(() -> NoiseStyleFields.Target.dimension("regionStyle.zoom"));
-        rejects(() -> NoiseStyleFields.Target.biome("biomeStyle"));
+        rejects(() -> NoiseStyleFields.Target.biome("biomeStyle.zoom"));
         rejects(() -> new NoiseStyleFields.Target("generators","style",null));
         rejects(() -> new NoiseStyleFields.Target("dimensions","regionStyle",NoiseFields.Target.composite(0)));
         rejects(() -> NoiseStyleFields.enable("dimensions/nested/test.json",bytes("{}"),targets.getFirst(),"style"));
@@ -78,9 +79,9 @@ final class RootStyleTests {
         for (var target : targets) drafts.update(target.draftPrefix()+"zoom","1","2");
         drafts.update("composite#0.style.zoom","1","3");
         drafts.transitionUnder("composite#",()->true,()->{});
-        check(drafts.count()==7);
+        check(drafts.count()==targets.size());
         drafts.transitionUnder(targets.getFirst().draftPrefix(),()->true,()->{});
-        check(drafts.count()==6 && !drafts.contains(targets.getFirst().draftPrefix()+"zoom"));
+        check(drafts.count()==targets.size()-1 && !drafts.contains(targets.getFirst().draftPrefix()+"zoom"));
         var workspace = StarterPack.create("root_styles");
         workspace.replace("dimensions/root_styles.json",NoiseStyleFields.enable("dimensions/root_styles.json",workspace.read("dimensions/root_styles.json"),targets.getFirst(),"style"));
         workspace.replace("biomes/starter.json",NoiseStyleFields.enable("biomes/starter.json",workspace.read("biomes/starter.json"),NoiseStyleFields.Target.biome("childStyle"),"style"));
