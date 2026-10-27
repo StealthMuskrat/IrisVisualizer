@@ -207,6 +207,10 @@
     "blockFallbacks": {
       "classification": "generation",
       "reason": "Pack-wide missing-block substitutions collected from top-level dimension maps; literal authoring and advisory normalized-source overlaps only, with no runtime registry or winner prediction."
+    },
+    "worldBoundary": {
+      "classification": "generation",
+      "reason": "Optional native border and image-map domain configuration. Absent/null leaves the live native border unchanged; no runtime border is applied by the editor."
     }
   },
   "biome": {
@@ -2757,6 +2761,38 @@
     "topThreshold": {
       "classification": "generation",
       "reason": "Controls biome decoration placement, stack geometry, host filtering or material/style selection; bounded native defaults and editor subset apply."
+    }
+  },
+  "worldBoundary": {
+    "center": {
+      "classification": "generation",
+      "reason": "Bounded native world-border configuration; full diameter, exact warning distance and finite nonnegative damage settings. Runtime application remains unvalidated."
+    },
+    "size": {
+      "classification": "generation",
+      "reason": "Bounded native world-border configuration; full diameter, exact warning distance and finite nonnegative damage settings. Runtime application remains unvalidated."
+    },
+    "warningDistance": {
+      "classification": "generation",
+      "reason": "Bounded native world-border configuration; full diameter, exact warning distance and finite nonnegative damage settings. Runtime application remains unvalidated."
+    },
+    "damageBuffer": {
+      "classification": "generation",
+      "reason": "Bounded native world-border configuration; full diameter, exact warning distance and finite nonnegative damage settings. Runtime application remains unvalidated."
+    },
+    "damageAmount": {
+      "classification": "generation",
+      "reason": "Bounded native world-border configuration; full diameter, exact warning distance and finite nonnegative damage settings. Runtime application remains unvalidated."
+    }
+  },
+  "worldBoundaryCenter": {
+    "x": {
+      "classification": "generation",
+      "reason": "Finite native border center coordinate within +/-29999984, applied as an atomic X/Z pair; no live world is contacted."
+    },
+    "z": {
+      "classification": "generation",
+      "reason": "Finite native border center coordinate within +/-29999984, applied as an atomic X/Z pair; no live world is contacted."
     }
   }
 }

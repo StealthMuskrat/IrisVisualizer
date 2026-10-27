@@ -599,6 +599,18 @@ jobs:
           python editor/tools/extract_style_source_fields.py IrisGeneratorStyle.java IrisExpression.java IrisImageMap.java IrisData.java ResourceLoader.java generated-style-source-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-style-source-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/style-source-fields.properties).Hash) { throw 'Pinned style source/cache definitions differ' }
+      - name: Verify pinned world-border definitions and runtime consumers
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/world/IrisWorldBoundary.java' -OutFile IrisWorldBoundary.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/world/IrisWorldBoundaryCenter.java' -OutFile IrisWorldBoundaryCenter.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/adapters/bukkit/plugin/src/main/java/art/arcane/iris/world/runtime/BukkitEnginePlatformHooks.java' -OutFile BukkitEnginePlatformHooks.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/adapters/modded-common/src/main/java/art/arcane/iris/modded/service/ModdedStudioHotloadService.java' -OutFile ModdedStudioHotloadService.java
+          python editor/tools/test_world_boundary_fields.py IrisDimension.java IrisWorldBoundary.java IrisWorldBoundaryCenter.java BukkitEnginePlatformHooks.java ModdedStudioHotloadService.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_world_boundary_fields.py IrisDimension.java IrisWorldBoundary.java IrisWorldBoundaryCenter.java BukkitEnginePlatformHooks.java ModdedStudioHotloadService.java generated-world-boundary-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-world-boundary-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/world-boundary-fields.properties).Hash) { throw 'Pinned world-border definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
