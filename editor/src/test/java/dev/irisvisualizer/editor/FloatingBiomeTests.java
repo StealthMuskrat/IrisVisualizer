@@ -86,7 +86,7 @@ final class FloatingBiomeTests {
         byte[] moved=FloatingBiomes.change(PATH,original,RiverProfiles.Action.DOWN,0);check(Arrays.equals(entries(original).getFirst().sourceBytes(),entries(moved).get(1).sourceBytes()));
         check(Arrays.equals(original,FloatingBiomes.change(PATH,moved,RiverProfiles.Action.UP,1)));check(entries(FloatingBiomes.change(PATH,original,RiverProfiles.Action.REMOVE,0)).size()==1);
         rejects(() -> FloatingBiomes.change(PATH,original,RiverProfiles.Action.UP,0));rejects(() -> FloatingBiomes.change(PATH,original,RiverProfiles.Action.DOWN,1));rejects(() -> FloatingBiomes.change(PATH,original,null,0));
-        check(FloatingBiomes.readOnlyFields(entry(original)).containsAll(List.of("bottomPalette","extraObjects","future")));
+        check(FloatingBiomes.readOnlyFields(entry(original)).containsAll(List.of("extraObjects","future")));
         for (String bad : List.of("null","{}","true","1","\"snippet/floating\"","[null]","[{},1]","[\"snippet/floating\"]")) {
             byte[] invalid=document(bad);rejects(() -> FloatingBiomes.entries(new LosslessJson(invalid)));rejects(() -> FloatingBiomes.enable(PATH,invalid));rejects(() -> FloatingBiomes.change(PATH,invalid,RiverProfiles.Action.ADD,-1));
         }
@@ -107,7 +107,7 @@ final class FloatingBiomeTests {
         workspace.replace(PATH,FloatingBiomes.setFluidHeight(PATH,workspace.read(PATH),0,"3"));workspace.replace(PATH,FloatingBiomes.setLiteral(PATH,workspace.read(PATH),0,"carving","dimension-entry"));
         workspace.save(temp.resolve("floating-biomes"));workspace.exportZip(temp.resolve("floating-biomes.zip"));var reopened=PackWorkspace.open(temp.resolve("floating-biomes"));var imported=PackWorkspace.importZip(temp.resolve("floating-biomes.zip"));
         for (String path : workspace.paths()) check(Arrays.equals(workspace.read(path),reopened.read(path)) && Arrays.equals(workspace.read(path),imported.read(path)));
-        check(FieldCoverage.fields("floatingBiome").size()==42 && FieldCoverage.fields("floatingBiome").stream().filter(FieldCoverage.Field::implemented).count()==36);
+        check(FieldCoverage.fields("floatingBiome").size()==42 && FieldCoverage.fields("floatingBiome").stream().filter(FieldCoverage.Field::implemented).count()==37);
         check(FieldCoverage.groups(PATH).contains("floatingBiome"));
         System.out.println("PASS: floating entry defaults/list/raw preservation, all numeric bounds, atomic altitude/depth and optional limits, exact biome refs, literal carving/fluid, every mode/toggle, typed owner/draft guards and Save/ZIP contracts");
     }

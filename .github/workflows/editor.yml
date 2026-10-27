@@ -407,6 +407,15 @@ jobs:
           python editor/tools/extract_floating_noise_fields.py IrisFloatingChildBiomes.java IrisGeneratorStyle.java FloatingIslandSample.java FloatingIslandEdgeProfile.java generated-floating-noise.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-noise.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-noise-fields.properties).Hash) { throw 'Pinned floating noise definitions differ' }
+      - name: Verify pinned floating underside palette definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/stage/IrisFloatingChildBiomeModifier.java' -OutFile IrisFloatingChildBiomeModifier.java
+          python editor/tools/test_floating_bottom_fields.py IrisFloatingChildBiomes.java IrisFloatingChildBiomeModifier.java IrisBiomePaletteLayer.java IrisSlopeClip.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_bottom_fields.py IrisFloatingChildBiomes.java IrisFloatingChildBiomeModifier.java IrisBiomePaletteLayer.java IrisSlopeClip.java generated-floating-bottom.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-bottom.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-bottom-fields.properties).Hash) { throw 'Pinned floating underside definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

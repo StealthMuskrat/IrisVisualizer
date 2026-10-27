@@ -46,7 +46,10 @@ public final class BiomeLayers {
         byte[] next=document.enable(list,"[]");for (int index=0;index<Integer.parseInt(DATA.getProperty(list+".defaultCount"));index++) next=new LosslessJson(next).objectArrayInsert(list,index,"{}".getBytes(StandardCharsets.UTF_8));return next;
     }
     public static byte[] change(String path,byte[] original,String list,RiverProfiles.Action action,int index) {
-        authorize(path,list);if (action==null) throw new IllegalArgumentException("Choose a layer action");var document=new LosslessJson(original);var layers=document.objectArray(list);
+        authorize(path,list);return changeLayers(new LosslessJson(original),list,action,index);
+    }
+    static byte[] changeLayers(LosslessJson document,String list,RiverProfiles.Action action,int index) {
+        if (action==null) throw new IllegalArgumentException("Choose a layer action");var layers=document.objectArray(list);
         if (action==RiverProfiles.Action.ADD) return document.objectArrayInsert(list,layers.size(),"{}".getBytes(StandardCharsets.UTF_8));
         if (index<0 || index>=layers.size()) throw new IllegalArgumentException("Select an existing layer");
         return switch(action) {
@@ -64,8 +67,11 @@ public final class BiomeLayers {
     private static byte[] integer(LosslessJson object,String field,int value) { return object.token(field)==null ? object.enable(field,Integer.toString(value)) : object.number(field,value); }
     private static byte[] number(LosslessJson object,String field,double value) { return object.token(field)==null ? object.enable(field,BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()) : object.number(field,value); }
     public static byte[] setThickness(String path,byte[] original,String list,int index,String minimum,String maximum) {
-        authorize(path,list);int min=thickness("minHeight",minimum),max=thickness("maxHeight",maximum);if (min>max) throw new IllegalArgumentException("Minimum thickness must not exceed maximum thickness");
-        return editLayer(original,list,index,layer -> integer(new LosslessJson(integer(layer,"minHeight",min)),"maxHeight",max));
+        authorize(path,list);return editLayer(original,list,index,layer -> thicknessBounds(layer,minimum,maximum));
+    }
+    static byte[] thicknessBounds(LosslessJson layer,String minimum,String maximum) {
+        int min=thickness("minHeight",minimum),max=thickness("maxHeight",maximum);if (min>max) throw new IllegalArgumentException("Minimum thickness must not exceed maximum thickness");
+        return integer(new LosslessJson(integer(layer,"minHeight",min)),"maxHeight",max);
     }
     static LosslessJson slope(LosslessJson layer) { String token=layer.token("slopeCondition");return token==null ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     private static void surface(String list) { field(list);if (!list.equals("layers")) throw new IllegalArgumentException("Slope gates are authored for surface layers only"); }

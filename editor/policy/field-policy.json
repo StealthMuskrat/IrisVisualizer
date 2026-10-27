@@ -2097,6 +2097,10 @@
     "carveStyle": {
       "classification": "generation",
       "reason": "Source-default floating noise authoring with shared enum/scalar/cellular controls; wall warp and carving support explicit null disablement, while nested advanced style data remains read-only."
+    },
+    "bottomPalette": {
+      "classification": "generation",
+      "reason": "Inline CUSTOM underside layer list with default-aware thickness/slope, weighted blocks and style controls; native mode, underside selection and empty/null fallback are preserved."
     }
   }
 }

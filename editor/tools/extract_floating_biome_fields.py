@@ -71,7 +71,7 @@ def extract(biome,entry,edge,sample,top,bottom,override):
             'int maxThickness = Math.max(1, entry.getMaxThickness());')
     require(d,'double widthLimit = Math.min(clampedWidth - MIN_WIDTH, MAX_WIDTH - clampedWidth);',
             'return Math.max(0.0D, Math.min(Math.min(MAX_VARIATION_AMPLITUDE, widthLimit), amplitude));')
-    values.update({'height.context':'absoluteWorldY','pair.rule':'editorOrdered','nested.policy':'palettesAndObjectsReadOnly'})
+    values.update({'height.context':'absoluteWorldY','pair.rule':'editorOrdered','nested.policy':'objectsReadOnly'})
     return ''.join(key+'='+json.dumps(value,ensure_ascii=True)[1:-1]+'\n' for key,value in values.items()).encode('ascii')
 
 if __name__=='__main__': Path(sys.argv[8]).write_bytes(extract(*(Path(path).read_bytes() for path in sys.argv[1:8])))

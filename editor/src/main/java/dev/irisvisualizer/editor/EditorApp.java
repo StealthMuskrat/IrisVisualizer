@@ -525,7 +525,7 @@ public final class EditorApp extends Application {
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
         ImGui.textWrapped(FloatingBiomes.description());
-        ImGui.textWrapped("This editor authors applied settings without sampling islands. Custom underside palettes and object-placement lists remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
+        ImGui.textWrapped("This editor authors applied settings without sampling islands. Object-placement lists remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
         List<LosslessJson> entries;
         try { entries=FloatingBiomes.entries(document); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored floating list contains snippets or unsupported entries (read-only).");return; }
@@ -559,7 +559,7 @@ public final class EditorApp extends Application {
             }
             for (String field : FloatingBiomes.ENUMS) drawFloatingMode(entry,index,field);
             drawFloatingLiteral(entry,index,"carving");drawFloatingLiteral(entry,index,"fluidBlock");drawFloatingFluidHeight(entry,index);
-            drawFloatingNoise(entry,index);
+            drawFloatingNoise(entry,index);drawFloatingBottomPalette(entry,index);
             if (ImGui.treeNode("Other floating data (read-only)")) {
                 for (String field : FloatingBiomes.readOnlyFields(entry)) ImGui.textWrapped(field);
                 for (String path : FloatingNoiseStyles.readOnlyPaths(entry,index)) ImGui.textWrapped(path);
@@ -567,6 +567,49 @@ public final class EditorApp extends Application {
             }
             ImGui.treePop();
         }
+    }
+    private void drawFloatingBottomPalette(LosslessJson entry,int index) {
+        if (!ImGui.treeNode("Custom underside palette layers")) return;
+        ImGui.textWrapped(FloatingBottomPalettes.description());
+        ImGui.textWrapped("Used only in CUSTOM mode, nearer the underside than the top. Empty or null layers fall back to the existing top palette from the underside. This editor leaves bottomPaletteMode unchanged. Null slope conditions bypass the gate; no slopes or materials are sampled here.");
+        drawFloatingBottomLayers(entry,index);ImGui.treePop();
+    }
+    private void drawFloatingBottomLayers(LosslessJson entry,int index) {
+        List<LosslessJson> layers;
+        try { layers=FloatingBottomPalettes.layers(entry); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored underside list contains snippets or unsupported entries (read-only).");return; }
+        if (layers==null) {
+            if (ImGui.button("Enable empty underside list (source default)")) {
+                try { commitProfileChange(FloatingBottomPalettes.listPrefix(index),FloatingBottomPalettes.enable(selected,workspace.read(selected),index),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        if (ImGui.button("Add underside layer (GRASS_BLOCK)")) { changeFloatingBottomLayer(index,RiverProfiles.Action.ADD,-1);return; }
+        for (int layerIndex=0;layerIndex<layers.size();layerIndex++) {
+            if (!ImGui.treeNode("Underside layer "+layerIndex)) continue;
+            int selectedLayer=layerIndex;RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate layer")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();if (ImGui.button("Remove layer")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(layerIndex==0);if (ImGui.button("Move layer up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(layerIndex==layers.size()-1);if (ImGui.button("Move layer down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeFloatingBottomLayer(index,action,layerIndex);return; }
+            var layer=layers.get(layerIndex);String prefix=FloatingBottomPalettes.layerPrefix(index,layerIndex);
+            drawThicknessBounds(layer,prefix,(minimum,maximum) -> workspace.replace(selected,FloatingBottomPalettes.setThickness(selected,workspace.read(selected),index,selectedLayer,minimum,maximum)));
+            if (ImGui.treeNode("Slope condition")) {
+                drawSlopeCondition(layer,prefix,
+                        () -> workspace.replace(selected,FloatingBottomPalettes.createSlope(selected,workspace.read(selected),index,selectedLayer)),
+                        (minimum,maximum) -> workspace.replace(selected,FloatingBottomPalettes.setSlope(selected,workspace.read(selected),index,selectedLayer,minimum,maximum)),true);
+                ImGui.treePop();
+            }
+            if (ImGui.treeNode("Layer block palette")) { drawGeneralBlockPalette(layer,GeneralBlockPalettes.Target.floatingBottom(index,layerIndex));ImGui.treePop(); }
+            ImGui.treePop();
+        }
+        if (ImGui.treeNode("Other underside data (read-only)")) { for (String path : FloatingBottomPalettes.readOnlyPaths(entry,index)) ImGui.textWrapped(path);ImGui.treePop(); }
+    }
+    private void changeFloatingBottomLayer(int index,RiverProfiles.Action action,int layer) {
+        try { commitProfileChange(FloatingBottomPalettes.listPrefix(index),FloatingBottomPalettes.change(selected,workspace.read(selected),index,action,layer),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawFloatingNoise(LosslessJson entry,int index) {
         if (!ImGui.treeNode("Floating noise styles")) return;
@@ -791,28 +834,35 @@ public final class EditorApp extends Application {
         if (ImGui.treeNode("Other layer data (read-only)")) { for (String path : BiomeLayers.readOnlyPaths(document,list)) ImGui.textWrapped(path);ImGui.treePop(); }
     }
     private void drawLayerThickness(LosslessJson layer,String list,int index) {
+        drawThicknessBounds(layer,BiomeLayers.layerPrefix(list,index),
+                (minimum,maximum) -> workspace.replace(selected,BiomeLayers.setThickness(selected,workspace.read(selected),list,index,minimum,maximum)));
+    }
+    private void drawThicknessBounds(LosslessJson layer,String prefix,BoundWriter writer) {
         String min=layer.token("minHeight"),max=layer.token("maxHeight");
         if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored thickness has an unsupported type (read-only).");return; }
-        String minKey=BiomeLayers.layerPrefix(list,index)+"minHeight",maxKey=BiomeLayers.layerPrefix(list,index)+"maxHeight",storedMin=min==null ? BiomeLayers.defaultHeight("minHeight") : min,storedMax=max==null ? BiomeLayers.defaultHeight("maxHeight") : max;
+        String minKey=prefix+"minHeight",maxKey=prefix+"maxHeight",storedMin=min==null ? BiomeLayers.defaultHeight("minHeight") : min,storedMax=max==null ? BiomeLayers.defaultHeight("maxHeight") : max;
         ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
         ImGui.textWrapped("Thickness: exact integers; minimum 0-2032, maximum 1-2032. The editor requires minimum <= maximum and applies both together.");
         ImGui.inputText(min==null ? "Minimum thickness (Iris default)" : "Minimum thickness",minimum);drafts.update(minKey,storedMin,minimum.get());
         ImGui.inputText(max==null ? "Maximum thickness (Iris default)" : "Maximum thickness",maximum);drafts.update(maxKey,storedMax,maximum.get());
         if (ImGui.button("Apply layer thickness")) {
-            try { workspace.replace(selected,BiomeLayers.setThickness(selected,workspace.read(selected),list,index,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
+            try { writer.apply(minimum.get(),maximum.get());drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
             catch (Exception failure) { error=failure.getMessage(); }
         }
     }
     @FunctionalInterface
-    private interface SlopeWriter { void apply(String minimum,String maximum) throws Exception; }
+    private interface BoundWriter { void apply(String minimum,String maximum) throws Exception; }
     private void drawLayerSlope(LosslessJson layer,String list,int index) {
         drawSlopeCondition(layer,BiomeLayers.layerPrefix(list,index),
                 () -> workspace.replace(selected,BiomeLayers.createSlope(selected,workspace.read(selected),list,index)),
                 (minimum,maximum) -> workspace.replace(selected,BiomeLayers.setSlope(selected,workspace.read(selected),list,index,minimum,maximum)));
     }
-    private void drawSlopeCondition(LosslessJson layer,String prefix,InspectorDrafts.Change create,SlopeWriter writer) {
+    private void drawSlopeCondition(LosslessJson layer,String prefix,InspectorDrafts.Change create,BoundWriter writer) {
+        drawSlopeCondition(layer,prefix,create,writer,false);
+    }
+    private void drawSlopeCondition(LosslessJson layer,String prefix,InspectorDrafts.Change create,BoundWriter writer,boolean nullBypassesGate) {
         LosslessJson slope;
-        try { slope=BiomeLayers.slope(layer); }
+        try { slope=nullBypassesGate && "null".equals(layer.token("slopeCondition")) ? null : BiomeLayers.slope(layer); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored slope condition is a snippet or unsupported value (read-only).");return; }
         ImGui.textWrapped("Slope bounds are finite from 0 to 1024. Minimum 0 with maximum >= 10 disables slope gating; the source defaults are 0 to 10. No terrain slopes are sampled here.");
         if (slope==null) {
@@ -888,7 +938,7 @@ public final class EditorApp extends Application {
             if (ImGui.treeNode("Palette generator style")) { drawStyleFields(palette,target.styleTarget());ImGui.treePop(); }
             ImGui.treePop();
         }
-        for (String item : palette.fields()) if (!target.layer() && !target.slabWall() && !RiverMaterialFields.PALETTE_FIELDS.contains(item)) ImGui.textWrapped(item+" (read-only)");
+        for (String item : palette.fields()) if (!target.layer() && !target.slabWall() && !target.floatingBottom() && !RiverMaterialFields.PALETTE_FIELDS.contains(item)) ImGui.textWrapped(item+" (read-only)");
         List<LosslessJson> entries;
         try { entries=DimensionPalettes.entries(palette); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored palette entries contain snippets or unsupported values (read-only).");return; }
