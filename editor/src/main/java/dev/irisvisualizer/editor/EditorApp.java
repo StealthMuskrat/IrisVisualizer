@@ -515,6 +515,7 @@ public final class EditorApp extends Application {
         drawBiomeDerivatives(document);
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
+        drawBiomeDecorators(document);
         drawBiomeSlabWall(document);
         drawRootObjects(document,FloatingObjectPlacements.BIOME_ROOT);
         drawDepositVariants(document,"biomes");
@@ -537,7 +538,7 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
@@ -585,6 +586,95 @@ public final class EditorApp extends Application {
             ImGui.treePop();
         }
     }
+    private void drawBiomeDecorators(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Biome decorators")) return;ImGui.pushID("biomeDecorators");
+        ImGui.textWrapped("Decoration entries are bucketed by part. Native chance gates select eligible entries, then reservoir sampling picks one. List order is preserved. Sampling, host compatibility, plants, fluids and effective placement are not evaluated; previews remain unavailable.");
+        List<LosslessJson> entries;try { entries=BiomeDecorators.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored decorator list is null, mixed or unsupported (read-only).");ImGui.popID();return; }
+        if (entries==null) { if (ImGui.button("Initialize empty decorator list")) { try { commitProfileChange(BiomeDecorators.listPrefix(),BiomeDecorators.enable(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();return; }
+        String newKey=BiomeDecorators.listPrefix()+"new.block",initial=BiomeDecorators.defaultBlock();ImString material=values.computeIfAbsent(newKey,ignored -> new ImString(initial,4096));ImGui.inputText("Material for new decorator",material);drafts.update(newKey,initial,material.get());
+        if (ImGui.button("Add decorator with material")) { try { commitProfileChange(BiomeDecorators.listPrefix(),BiomeDecorators.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,material.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        for (int index=0;index<entries.size();index++) {
+            if (!ImGui.treeNode("Decorator "+index)) continue;RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate decorator")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();if (ImGui.button("Remove decorator")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Decorator up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Decorator down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();try { commitProfileChange(BiomeDecorators.listPrefix(),BiomeDecorators.change(selected,workspace.read(selected),action,index,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+            var context=new BiomeDecorators.Context(index);var decorator=entries.get(index);
+            try { String stored=decorator.stringToken("partOf"),part=stored==null ? BiomeDecorators.defaultToken("partOf") : stored;if (ImGui.beginCombo("Decoration part",part)) { for (String choice : BiomeDecorators.parts()) if (ImGui.selectable(choice,choice.equals(part))) applyRoutingExtra(() -> workspace.replace(selected,BiomeDecorators.setPart(selected,workspace.read(selected),context,choice)));ImGui.endCombo(); } }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored decoration part has an unsupported type (read-only)."); }
+            for (String field : BiomeDecorators.FLAGS) {
+                String token=decorator.token(field);if (token==null) { if (ImGui.button("Enable "+field+"="+BiomeDecorators.defaultToken(field))) applyRoutingExtra(() -> workspace.replace(selected,BiomeDecorators.enableScalar(selected,workspace.read(selected),context,field))); }
+                else if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped(field+": unsupported type (read-only)");
+                else { boolean current=token.equals("true");if (ImGui.checkbox(field,current)) applyRoutingExtra(() -> workspace.replace(selected,BiomeDecorators.setFlag(selected,workspace.read(selected),context,field,!current))); }
+                if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeDecorators.help(field));
+            }
+            for (String field : BiomeDecorators.SCALARS) drawDecoratorScalar(decorator,context,field);
+            drawDecoratorPair(decorator,context,false);drawDecoratorPair(decorator,context,true);drawDecoratorForce(decorator,context);
+            for (String field : BiomeDecorators.BLOCK_LISTS) if (ImGui.treeNode(field)) { drawDecoratorBlocks(decorator,context,field);ImGui.treePop(); }
+            for (String field : BiomeDecorators.STYLES) if (ImGui.treeNode(field)) {
+                var target=context.styleTarget(field);drawStyleFields(decorator,target);
+                try { var style=NoiseStyleFields.object(decorator,target);if (style!=null) for (String child : style.fields()) if (!NoiseStyleFields.EDITABLE.contains(child)) ImGui.textWrapped(child+" (read-only)"); } catch (IllegalArgumentException unsupported) { }
+                ImGui.treePop();
+            }
+            for (String field : decorator.fields()) if (!BiomeDecorators.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");ImGui.treePop();
+        }
+        ImGui.popID();
+    }
+    private void drawDecoratorScalar(LosslessJson d,BiomeDecorators.Context context,String field) {
+        ImGui.pushID(field);String token=d.token(field),key=context.prefix()+field;ImGui.textWrapped(BiomeDecorators.help(field));
+        if (token==null) { if (ImGui.button("Enable "+field+"="+BiomeDecorators.defaultToken(field))) applyRoutingExtra(() -> workspace.replace(selected,BiomeDecorators.enableScalar(selected,workspace.read(selected),context,field))); }
+        else if (!LosslessJson.numericToken(token)) ImGui.textWrapped(field+": unsupported type (read-only)");
+        else { ImGui.textWrapped(BiomeDecorators.constraints(field));ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setScalar(selected,workspace.read(selected),context,field,input.get()))); }
+        ImGui.popID();
+    }
+    private void drawDecoratorPair(LosslessJson d,BiomeDecorators.Context context,boolean slope) {
+        String object=slope ? "slopeCondition" : "stack";if (!ImGui.treeNode(object)) return;LosslessJson container=d;
+        if (slope) {
+            try { container=BiomeLayers.slope(d); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored slope is null, a snippet or unsupported (read-only).");ImGui.treePop();return; }
+            if (container==null) { if (ImGui.button("Create explicit slope condition")) { try { commitProfileChange(context.prefix()+"slopeCondition.",BiomeDecorators.enableSlope(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.treePop();return; }
+        }
+        ImGui.textWrapped(slope ? "Finite ordered slopes 0..1024. The native default 0..10 bypasses slope testing; forcePlace also bypasses surface slope checks." : "Exact ordered stack heights 1..2032. With scaleStack, heights are percentages of available space, capped by absoluteMaxStack; this is not sampled here.");
+        String low=slope ? "minimumSlope" : "stackMin",high=slope ? "maximumSlope" : "stackMax",a=container.token(low),b=container.token(high);
+        if (a!=null && !LosslessJson.numericToken(a) || b!=null && !LosslessJson.numericToken(b)) { ImGui.textWrapped("Stored pair has unsupported numeric types (read-only).");ImGui.treePop();return; }
+        String first=a==null ? slope ? BiomeLayers.slopeDefault(low) : BiomeDecorators.defaultToken(low) : a,second=b==null ? slope ? BiomeLayers.slopeDefault(high) : BiomeDecorators.defaultToken(high) : b,prefix=context.prefix()+(slope ? "slopeCondition." : ""),minKey=prefix+low,maxKey=prefix+high;
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(first,Math.max(128,first.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(second,Math.max(128,second.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImGui.inputText(low,minimum);drafts.update(minKey,first,minimum.get());ImGui.inputText(high,maximum);drafts.update(maxKey,second,maximum.get());
+        if (ImGui.button("Apply pair")) { try { byte[] next=slope ? BiomeDecorators.setSlope(selected,workspace.read(selected),context,minimum.get(),maximum.get()) : BiomeDecorators.setStack(selected,workspace.read(selected),context,minimum.get(),maximum.get());workspace.replace(selected,next);drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+        if (slope) for (String field : container.fields()) if (!BiomeLayers.SLOPE_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");ImGui.treePop();
+    }
+    private void drawDecoratorForce(LosslessJson d,BiomeDecorators.Context context) {
+        if (!ImGui.treeNode("Forced surface block")) return;LosslessJson block;
+        try { block=BiomeDecorators.forceBlock(d); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored forceBlock is a snippet or unsupported (read-only).");ImGui.treePop();return; }
+        ImGui.textWrapped("Optional surface-block replacement. This does not toggle forcePlace. Native paths can still apply host, fluid and plant guards; effective placement is not validated.");
+        if (block!=null && ImGui.button("Restore no forced surface block (null)")) { try { commitProfileChange(context.prefix()+"forceBlock.",BiomeDecorators.restoreForceBlock(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        try { String stored=block==null || block.token("block")==null ? "" : block.stringToken("block"),key=context.prefix()+"forceBlock.block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(block==null ? "Block for explicit override" : "Surface block",input);drafts.update(key,stored,input.get());if (ImGui.button("Apply forced surface block")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setForceBlock(selected,workspace.read(selected),context,input.get()))); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block text has an unsupported type (read-only)."); }
+        if (block!=null) for (String field : block.fields()) if (!field.equals("block")) ImGui.textWrapped(field+" (read-only)");ImGui.treePop();
+    }
+    private void drawDecoratorBlocks(LosslessJson d,BiomeDecorators.Context context,String field) {
+        ImGui.textWrapped(BiomeDecorators.help(field));List<LosslessJson> entries;
+        try { entries=BiomeDecorators.blocks(d,field); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block list is null, mixed or unsupported (read-only).");return; }
+        if (BiomeDecorators.filter(field)) ImGui.textWrapped(field.equals("whitelist") ? "Absent/null applies no whitelist. Explicit empty whitelist blocks matching surface placement unless forcePlace bypasses it." : "Absent/null/empty applies no blacklist. Native forcePlace paths can bypass host filters.");
+        else ImGui.textWrapped(field.equals("topPalette") ? "Weighted top materials; an empty list falls back to the main palette." : "Weighted material entries. Keep one after population; existing empty lists can be repaired.");
+        if (entries==null) { if (ImGui.button("Enable explicit block list")) { try { commitProfileChange(context.blocksPrefix(field),BiomeDecorators.enableBlocks(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }return; }
+        if (BiomeDecorators.filter(field) && ImGui.button("Restore no filter (null)")) { try { commitProfileChange(context.blocksPrefix(field),BiomeDecorators.restoreFilter(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); }return; }
+        String newKey=context.blocksPrefix(field)+"new.block";ImString next=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New block",next);drafts.update(newKey,"",next.get());
+        if (ImGui.button("Add block")) { changeDecoratorBlock(context,field,RiverProfiles.Action.ADD,-1,next.get(),newKey);return; }
+        for (int index=0;index<entries.size();index++) {
+            ImGui.pushID(index);int blockIndex=index;var entry=entries.get(index);String prefix=context.blocksPrefix(field)+index+".";
+            try { String stored=entry.token("block")==null ? "" : entry.stringToken("block"),key=prefix+"block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Block",input);drafts.update(key,stored,input.get());if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setBlock(selected,workspace.read(selected),context,field,blockIndex,input.get()))); }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block text has an unsupported type (read-only)."); }
+            if (BiomeDecorators.weighted(field)) {
+                String token=entry.token("weight"),key=prefix+"weight";
+                if (token==null) { if (ImGui.button("Enable weight 1")) applyRoutingExtra(() -> workspace.replace(selected,BiomeDecorators.enableWeight(selected,workspace.read(selected),context,field,blockIndex))); }
+                else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored weight has an unsupported type (read-only).");
+                else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Exact weight 1..1000",input);drafts.update(key,token,input.get());if (ImGui.button("Apply weight")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setWeight(selected,workspace.read(selected),context,field,blockIndex,input.get()))); }
+            }
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate block")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(field.equals("palette") && entries.size()<=1);if (ImGui.button("Remove block")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
+            ImGui.beginDisabled(index==0);if (ImGui.button("Block up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Block down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            for (String member : entry.fields()) if (!member.equals("block") && !(BiomeDecorators.weighted(field) && member.equals("weight"))) ImGui.textWrapped(member+" (read-only)");ImGui.popID();if (action!=null) { changeDecoratorBlock(context,field,action,index,null,null);return; }
+        }
+    }
+    private void changeDecoratorBlock(BiomeDecorators.Context context,String field,RiverProfiles.Action action,int index,String value,String appliedKey) { try { commitProfileChange(context.blocksPrefix(field),BiomeDecorators.changeBlock(selected,workspace.read(selected),context,field,action,index,value),appliedKey); } catch (Exception failure) { error=failure.getMessage(); } }
     private static String mappingDraft(String source,String target) { return source.length()+":"+source+target; }
     private void drawBlockFallbacks(LosslessJson document) {
         if (!ImGui.collapsingHeader("Missing-block fallbacks")) return;ImGui.pushID("blockFallbacks");

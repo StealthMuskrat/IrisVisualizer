@@ -102,6 +102,11 @@ public final class LosslessJson {
         if (old != null && !old.equals("null")) stringEntries(field);
         return nullableScalar(field, inherit ? "null" : "[]");
     }
+    /** Explicit optional object-list states; mixed entries remain untouched and read-only. */
+    byte[] nullableObjectArray(String field, boolean inherit) {
+        String old=token(field);if (old!=null && !old.equals("null")) objectArray(field);
+        return nullableScalar(field,inherit ? "null" : "[]");
+    }
     public byte[] integer(String field, long value) {
         Span span = root.get(field);
         if (span == null) throw new IllegalArgumentException("Absent field must be explicitly enabled first");

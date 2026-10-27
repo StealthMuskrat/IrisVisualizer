@@ -52,27 +52,35 @@ final class GeneralBlockPalettes {
         return new LosslessJson(palette.enable("palette","[]")).objectArrayInsert("palette",0,entry(block));
     }
     static byte[] setBlock(LosslessJson p,int index,String value) {
-        block(value);return p.objectArrayEdit("palette",index,e -> e.token("block")==null ? e.enableStringPath("block",value) : e.stringValue("block",value));
+        return setBlock(p,"palette",index,value);
     }
-    static byte[] enableWeight(LosslessJson p,int index) { return p.objectArrayEdit("palette",index,e -> e.enable("weight",DimensionPalettes.weightDefault())); }
+    static byte[] setBlock(LosslessJson p,String field,int index,String value) { block(value);return p.objectArrayEdit(field,index,e -> e.token("block")==null ? e.enableStringPath("block",value) : e.stringValue("block",value)); }
+    static byte[] enableWeight(LosslessJson p,int index) { return enableWeight(p,"palette",index); }
+    static byte[] enableWeight(LosslessJson p,String field,int index) { return p.objectArrayEdit(field,index,e -> e.enable("weight",DimensionPalettes.weightDefault())); }
     static byte[] setWeight(LosslessJson p,int index,String input) {
+        return setWeight(p,"palette",index,input);
+    }
+    static byte[] setWeight(LosslessJson p,String field,int index,String input) {
         int weight;
         try { weight=new BigDecimal(input).intValueExact(); } catch (NumberFormatException | ArithmeticException | NullPointerException invalid) { throw new IllegalArgumentException("Enter an exact integer weight",invalid); }
         if (weight<DimensionPalettes.minimumWeight() || weight>DimensionPalettes.maximumWeight()) throw new IllegalArgumentException("General palette weights must be 1-"+DimensionPalettes.maximumWeight());
-        return p.objectArrayEdit("palette",index,e -> e.number("weight",weight));
+        return p.objectArrayEdit(field,index,e -> e.number("weight",weight));
     }
     static byte[] change(LosslessJson p,RiverProfiles.Action action,int index,String value) { return change(p,action,index,value,DimensionPalettes.minimumEntries()); }
     static byte[] change(LosslessJson p,RiverProfiles.Action action,int index,String value,int minimumEntries) {
+        return change(p,"palette",action,index,value,minimumEntries);
+    }
+    static byte[] change(LosslessJson p,String field,RiverProfiles.Action action,int index,String value,int minimumEntries) {
         if (minimumEntries<0 || minimumEntries>1) throw new IllegalArgumentException("Unsupported palette minimum");
         if (action==null) throw new IllegalArgumentException("Choose a palette action");if (action==RiverProfiles.Action.ADD) block(value);
-        var entries=p.objectArray("palette");
-        if (action==RiverProfiles.Action.ADD) return p.objectArrayInsert("palette",entries.size(),entry(value));
+        var entries=p.objectArray(field);
+        if (action==RiverProfiles.Action.ADD) return p.objectArrayInsert(field,entries.size(),entry(value));
         if (index<0 || index>=entries.size()) throw new IllegalArgumentException("Select an existing block");
         return switch(action) {
-            case DUPLICATE -> p.objectArrayInsert("palette",index+1,entries.get(index).sourceBytes());
-            case REMOVE -> { if (entries.size()<=minimumEntries) throw new IllegalArgumentException("Keep at least one block");yield p.objectArrayRemove("palette",index); }
-            case UP -> { if (index==0) throw new IllegalArgumentException("Already first");yield p.objectArrayMove("palette",index,index-1); }
-            case DOWN -> { if (index==entries.size()-1) throw new IllegalArgumentException("Already last");yield p.objectArrayMove("palette",index,index+1); }
+            case DUPLICATE -> p.objectArrayInsert(field,index+1,entries.get(index).sourceBytes());
+            case REMOVE -> { if (entries.size()<=minimumEntries) throw new IllegalArgumentException("Keep at least one block");yield p.objectArrayRemove(field,index); }
+            case UP -> { if (index==0) throw new IllegalArgumentException("Already first");yield p.objectArrayMove(field,index,index-1); }
+            case DOWN -> { if (index==entries.size()-1) throw new IllegalArgumentException("Already last");yield p.objectArrayMove(field,index,index+1); }
             default -> throw new IllegalArgumentException("Unsupported palette action");
         };
     }
