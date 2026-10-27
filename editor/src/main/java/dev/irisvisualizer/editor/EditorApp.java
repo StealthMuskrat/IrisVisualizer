@@ -623,6 +623,7 @@ public final class EditorApp extends Application {
             catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored object reference has an unsupported type (read-only)."); }
             drawStaticTransform(entry,context,"position");drawStaticTransform(entry,context,"rotation");
             drawStaticScale(entry,context);drawStaticSeed(entry,context);
+            drawFloatingReplacements(entry,context.replacements());
             for (String flag : List.of("bore","smartBore")) {
                 String token=entry.token(flag);if (token!=null && !token.equals("true") && !token.equals("false")) { ImGui.textWrapped(flag+": unsupported type (read-only)");continue; }
                 boolean enabled="true".equals(token);if (token==null) { if (ImGui.button("Enable "+flag+"=false")) applyRoutingExtra(() -> workspace.replace(selected,StaticObjects.setBoolean(selected,workspace.read(selected),context,flag,false))); }
@@ -1275,6 +1276,7 @@ public final class EditorApp extends Application {
     }
     private void drawFloatingReplacements(LosslessJson placement,FloatingObjectReplacements.Context context) {
         if (!ImGui.treeNode("Object block replacements")) return;
+        if (context.fixed()!=null) ImGui.textWrapped("Fixed object rules use this entry's seed. Replacements run on the scaled object before block-state rotation. Native loading requires nonempty find and replacement palettes; empty lists can be repaired here. No object transformation or content compatibility is evaluated.");
         ImGui.textWrapped("Rules run in stored order using native chance and state/material matching. Source .iob bytes remain unchanged. Registry, aliases, block states and effective replacements are not resolved here.");List<LosslessJson> rules;
         try { rules=FloatingObjectReplacements.rules(placement); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored rules contain snippets or unsupported values (read-only).");ImGui.treePop();return; }
@@ -1310,7 +1312,7 @@ public final class EditorApp extends Application {
                 if (ImGui.button("Apply replacement chance")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectReplacements.setChance(selected,workspace.read(selected),context,ruleIndex,input.get())));
             }
             if (ImGui.treeNode("Find blocks")) { drawFloatingFindBlocks(rule,context,index);ImGui.treePop(); }
-            if (ImGui.treeNode("Replacement palette")) { drawFloatingObjectPalette(placement,new FloatingObjectPalettes.Context(context.entry(),context.list(),context.placement(),index));ImGui.treePop(); }
+            if (ImGui.treeNode("Replacement palette")) { drawFloatingObjectPalette(placement,context.palette(index));ImGui.treePop(); }
             for (String field : rule.fields()) if (!FloatingObjectReplacements.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
             ImGui.treePop();
         }

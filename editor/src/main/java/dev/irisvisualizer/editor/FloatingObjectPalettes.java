@@ -8,15 +8,20 @@ import java.util.function.Function;
 /** Shared palette contexts for stilt material overrides and ordered replacement rules. */
 public final class FloatingObjectPalettes {
     public static final List<String> STILT_FIELDS = List.of("palette");
-    public record Context(int entry,String list,int placement,int rule) {
-        public Context { if (rule < -1 || !FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object palette"); }
+    public record Context(int entry,String list,int placement,int rule,StaticObjects.Context fixed) {
+        public Context(int entry,String list,int placement,int rule) { this(entry,list,placement,rule,null); }
+        public Context {
+            if (rule < -1 || fixed!=null && rule<0) throw new IllegalArgumentException("Select an object material palette");
+            new FloatingObjectReplacements.Context(entry,list,placement,fixed);
+        }
         public boolean stilt() { return rule==-1; }
-        public FloatingObjectReplacements.Context owner() { return new FloatingObjectReplacements.Context(entry,list,placement); }
+        public FloatingObjectReplacements.Context owner() { return new FloatingObjectReplacements.Context(entry,list,placement,fixed); }
+        public String resourceBase() { return owner().resourceBase(); }
         public String prefix() { return stilt() ? FloatingObjectPlacements.placementPrefix(entry,list,placement)+"stiltSettings.palette." : owner().rulePrefix(rule)+"replace."; }
-        public String stylePath() { return FloatingObjectPlacements.contextPath(entry,list,placement)+(stilt() ? ".stiltSettings.palette.style" : ".edit."+rule+".replace.style"); }
+        public String stylePath() { return (fixed!=null ? "staticObjects."+fixed.index() : FloatingObjectPlacements.contextPath(entry,list,placement))+(stilt() ? ".stiltSettings.palette.style" : ".edit."+rule+".replace.style"); }
         public GeneralBlockPalettes.Target target() { return GeneralBlockPalettes.Target.objectPalette(this); }
     }
-    private static void authorize(String path,Context context) { FloatingObjectPlacements.authorize(path,context.entry(),context.list()); }
+    private static void authorize(String path,Context context) { FloatingObjectReplacements.authorize(path,context.owner()); }
     private static String member(Context context) { return context.stilt() ? "palette" : "replace"; }
     private static byte[] editOwner(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return context.stilt() ? FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.objectEdit("stiltSettings",action,false)) : FloatingObjectReplacements.editRule(original,context.owner(),context.rule(),action); }
     static byte[] editPalette(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return editOwner(original,context,o -> o.objectEdit(member(context),action,false)); }
@@ -37,6 +42,10 @@ public final class FloatingObjectPalettes {
     public static byte[] setZoom(String path,byte[] original,Context context,String input) { authorize(path,context);double value=RiverPaletteFields.checkedZoom(input);return editPalette(original,context,p -> p.number("zoom",value)); }
     static Context styleContext(String path) { return styleContext("biomes",path); }
     static Context styleContext(String resourceBase,String path) {
+        if ("dimensions".equals(resourceBase) && path!=null) {
+            var fixed=java.util.regex.Pattern.compile("staticObjects\\.(0|[1-9][0-9]*)\\.edit\\.(0|[1-9][0-9]*)\\.replace\\.style").matcher(path);
+            if (fixed.matches()) try { return FloatingObjectReplacements.Context.fixed(new StaticObjects.Context(Integer.parseInt(fixed.group(1)))).palette(Integer.parseInt(fixed.group(2))); } catch (NumberFormatException invalid) { return null; }
+        }
         var parsed=FloatingObjectPlacements.parsePath(resourceBase,path);if (parsed==null) return null;
         if (parsed.suffix().equals("stiltSettings.palette.style")) return new Context(parsed.entry(),parsed.list(),parsed.placement(),-1);
         var match=java.util.regex.Pattern.compile("edit\\.(0|[1-9][0-9]*)\\.replace\\.style").matcher(parsed.suffix());

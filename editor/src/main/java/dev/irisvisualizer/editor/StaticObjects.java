@@ -11,7 +11,7 @@ import java.util.function.Function;
 public final class StaticObjects {
     public static final List<String> LIST_FIELDS = List.of("staticObjects");
     public static final List<String> ROOT_FIELDS = List.of("allObjectScaleFactor");
-    public static final List<String> EDITABLE = List.of("object", "position", "rotation", "scale", "scaleInterpolation", "bore", "smartBore", "seed");
+    public static final List<String> EDITABLE = List.of("object", "position", "rotation", "scale", "scaleInterpolation", "bore", "smartBore", "seed", "edit");
     public static final List<String> AXES = List.of("x", "y", "z");
     private static final Properties DATA=new Properties();
     static {
@@ -23,10 +23,12 @@ public final class StaticObjects {
     public record Context(int index) {
         public Context { if (index<0) throw new IllegalArgumentException("Select a static object"); }
         public String prefix() { return listPrefix()+index+"."; }
+        public FloatingObjectReplacements.Context replacements() { return FloatingObjectReplacements.Context.fixed(this); }
     }
+    static void verifyReplacementDefinitions() { if (!"emptyDisables".equals(DATA.getProperty("edit.policy")) || !"requiredFindAndPalette".equals(DATA.getProperty("edit.validation")) || !"beforeBlockStateRotation".equals(DATA.getProperty("edit.dispatch"))) throw new IllegalStateException("Unsupported fixed replacement policy"); }
     public static String listPrefix() { return "staticObjects#."; }
     public static String scalePrefix() { return "dimensionObjectScale#."; }
-    private static void authorize(String path) { if (!DimensionFields.dimension(path)) throw new IllegalArgumentException("Static objects belong to dimensions"); }
+    static void authorize(String path) { if (!DimensionFields.dimension(path)) throw new IllegalArgumentException("Static objects belong to dimensions"); }
     public static String help(String field) { if (!EDITABLE.contains(field) && !ROOT_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported object field");return DATA.getProperty(field+".description",""); }
     public static List<String> interpolations() { return List.of(DATA.getProperty("interpolation.choices").split(",")); }
     static List<LosslessJson> entries(LosslessJson root) { return root.token("staticObjects")==null ? null : root.objectArray("staticObjects"); }
@@ -34,7 +36,7 @@ public final class StaticObjects {
         if (!List.of("position","rotation").contains(field)) throw new IllegalArgumentException("Select a fixed transform");
         String token=entry.token(field);return token==null ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8));
     }
-    private static byte[] edit(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return new LosslessJson(original).objectArrayEdit("staticObjects",context.index(),action); }
+    static byte[] edit(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return new LosslessJson(original).objectArrayEdit("staticObjects",context.index(),action); }
     private static void reference(String key,PackWorkspace workspace) { if (key==null || !FloatingObjectPlacements.objectChoices(workspace).contains(key)) throw new IllegalArgumentException("Choose an exact .iob key present in this pack; content and registry compatibility are unchecked"); }
     private static int exact(String input) {
         try { return new BigDecimal(input).intValueExact(); } catch (NumberFormatException | ArithmeticException | NullPointerException invalid) { throw new IllegalArgumentException("Enter exact signed 32-bit position integers",invalid); }

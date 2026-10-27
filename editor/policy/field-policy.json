@@ -2637,8 +2637,8 @@
       "reason": "Controls fixed dimension object references, transforms or placement behavior; native content validation and previews remain unavailable."
     },
     "edit": {
-      "classification": "read-only",
-      "reason": "Static replacement rules are preserved; this batch does not route shared replacement-palette controls into fixed placements."
+      "classification": "generation",
+      "reason": "Ordered fixed-object replacement rules with required unweighted find blocks, chance/state matching and weighted replacement palettes; native content and matching remain unevaluated."
     }
   },
   "staticObjectRotation": {

@@ -81,7 +81,7 @@ final class StaticObjectTests {
         workspace.replace(PATH,edited);workspace.save(temp.resolve("static-objects"));workspace.exportZip(temp.resolve("static-objects.zip"));var reopened=PackWorkspace.open(temp.resolve("static-objects"));var imported=PackWorkspace.importZip(temp.resolve("static-objects.zip"));
         for (String path : workspace.paths()) check(Arrays.equals(workspace.read(path),reopened.read(path)) && Arrays.equals(workspace.read(path),imported.read(path)));
         check(Arrays.equals(workspace.read("objects/nested/tree.iob"),asset));check(FieldCoverage.groups(PATH).containsAll(List.of("staticObject","staticObjectRotation","position")));
-        check(FieldCoverage.fields("staticObject").stream().filter(FieldCoverage.Field::implemented).count()==8);check(FieldCoverage.fields("position").stream().allMatch(FieldCoverage.Field::implemented));
+        check(FieldCoverage.fields("staticObject").stream().filter(FieldCoverage.Field::implemented).count()==9);check(FieldCoverage.fields("position").stream().allMatch(FieldCoverage.Field::implemented));
         System.out.println("PASS: static object list/reference lifecycle, absolute world position and exclusive dimension heights, atomic fixed rotation, nullable scale fallback, interpolation/bore flags, exact 64-bit seeds, owner/type guards, raw ordering/preservation, scoped drafts and Save/ZIP");
     }
 }

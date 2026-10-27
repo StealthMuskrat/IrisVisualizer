@@ -68,7 +68,7 @@ Direct nonstatic/nontransient private fields in sixty-seven pinned source classe
 | oreGenerator | 5 | 5 | 5 | 0 |
 | depositGenerator | 21 | 21 | 21 | 0 |
 | depositVariant | 3 | 3 | 3 | 0 |
-| staticObject | 9 | 9 | 8 | 0 |
+| staticObject | 9 | 9 | 9 | 0 |
 | staticObjectRotation | 3 | 3 | 3 | 0 |
 | position | 3 | 3 | 3 | 0 |
 

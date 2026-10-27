@@ -70,7 +70,7 @@ public final class NoiseStyleFields {
         }
         public boolean ore() { return OreGenerators.styleContext(resourceBase,objectField)!=null; }
         public OreGenerators.StyleContext oreContext() { var context=OreGenerators.styleContext(resourceBase,objectField);if (context==null) throw new IllegalArgumentException("Not an ore style");return context; }
-        public static Target objectPalette(FloatingObjectPalettes.Context context) { return new Target(FloatingObjectPlacements.resourceBase(java.util.Objects.requireNonNull(context).entry()),context.stylePath(),null); }
+        public static Target objectPalette(FloatingObjectPalettes.Context context) { return new Target(java.util.Objects.requireNonNull(context).resourceBase(),context.stylePath(),null); }
         public boolean objectPalette() { return FloatingObjectPalettes.styleContext(resourceBase,objectField)!=null; }
         public FloatingObjectPalettes.Context objectPaletteContext() { var context=FloatingObjectPalettes.styleContext(resourceBase,objectField);if (context==null) throw new IllegalArgumentException("Not an object material palette style");return context; }
         public static Target placementWarp(int entry,String list,int placement) { var context=new FloatingPlacementConstraints.Context(entry,list,placement);return new Target(FloatingObjectPlacements.resourceBase(context.entry()),FloatingObjectPlacements.contextPath(context.entry(),context.list(),context.placement())+".warp",null); }
