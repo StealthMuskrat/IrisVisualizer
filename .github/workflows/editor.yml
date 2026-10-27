@@ -260,6 +260,18 @@ jobs:
           python editor/tools/extract_underground_river_fields.py IrisRiverHydrology.java IrisUndergroundRiverConfig.java IrisUndergroundRiverSourceConfig.java generated-underground-river.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-underground-river.properties).Hash -ne (Get-FileHash editor/src/main/resources/underground-river-fields.properties).Hash) { throw 'Pinned underground-river definitions differ' }
+      - name: Verify pinned coastal and inland grotto definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverGrottoConfig.java' -OutFile IrisRiverGrottoConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisCoastalRiverGrottoConfig.java' -OutFile IrisCoastalRiverGrottoConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisInlandRiverGrottoConfig.java' -OutFile IrisInlandRiverGrottoConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisGrottoPoolLevel.java' -OutFile IrisGrottoPoolLevel.java
+          python editor/tools/test_grotto_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_grotto_fields.py IrisRiverHydrology.java IrisRiverGrottoConfig.java IrisCoastalRiverGrottoConfig.java IrisInlandRiverGrottoConfig.java IrisGrottoPoolLevel.java generated-grotto.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-grotto.properties).Hash -ne (Get-FileHash editor/src/main/resources/grotto-fields.properties).Hash) { throw 'Pinned grotto definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
