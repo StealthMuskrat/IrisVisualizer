@@ -1251,6 +1251,14 @@
     "mouths": {
       "classification": "generation",
       "reason": "Surface source-budget toggle or explicit empty subsection creation; primitive controls preserve absent defaults and untouched nested data."
+    },
+    "erosion": {
+      "classification": "generation",
+      "reason": "Explicit empty surface-shaping subsection creation preserves source defaults, unknown settings and river planning."
+    },
+    "bed": {
+      "classification": "generation",
+      "reason": "Explicit empty surface-shaping subsection creation preserves source defaults, unknown settings and river planning."
     }
   },
   "surfaceRiverSource": {
@@ -1341,6 +1349,10 @@
     "blendBaseWidth": {
       "classification": "generation",
       "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    },
+    "excavation": {
+      "classification": "generation",
+      "reason": "Explicit nested empty excavation creation with bounded dry-bank limits; bank and surface parents must already exist."
     }
   },
   "surfaceRiverFlow": {
@@ -1397,6 +1409,68 @@
     "inletRampSlope": {
       "classification": "generation",
       "reason": "Source-defined primitive default/type and finite annotation bounds; exact signed integers where required. Cross-field/native validity is not evaluated."
+    }
+  },
+  "surfaceRiverErosion": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "smoothingRadius": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "thalwegFraction": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "blendCurve": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "bedNoise": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "terraceSteps": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "cliffFraction": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "style": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "bedProfile": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    }
+  },
+  "surfaceRiverBed": {
+    "allowGravityBlocks": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "padding": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    }
+  },
+  "riverExcavation": {
+    "maximumDepth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "maximumWidth": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
+    },
+    "maximumVolumePerBlock": {
+      "classification": "generation",
+      "reason": "Source-defined primitive default/type/bounds or exact enum choices; individual edits preserve untouched fields and do not evaluate native or cross-field validity."
     }
   }
 }
