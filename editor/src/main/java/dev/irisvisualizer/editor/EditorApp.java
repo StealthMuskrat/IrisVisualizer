@@ -173,6 +173,7 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
+                    drawOres(document,"dimensions");
                     drawDimensionPalettes(document);
                     drawSurfaceLayerFallback(document);
                     drawDimensionHeights(document);
@@ -283,6 +284,7 @@ public final class EditorApp extends Application {
         drawCaveProfile(document);
         drawRiverPolicy(document);
         drawRootObjects(document,FloatingObjectPlacements.REGION_ROOT);
+        drawOres(document,"regions");
         ImGui.textWrapped("Other region fields remain read-only.");
     }
     private void drawGenerator(LosslessJson document) {
@@ -508,6 +510,7 @@ public final class EditorApp extends Application {
         drawBiomeLayers(document);
         drawBiomeSlabWall(document);
         drawRootObjects(document,FloatingObjectPlacements.BIOME_ROOT);
+        drawOres(document,"biomes");
         drawFloatingBiomes(document);
         drawRootStyles(document, false);
         drawCaveProfile(document);
@@ -524,7 +527,7 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
@@ -571,6 +574,83 @@ public final class EditorApp extends Application {
             }
             ImGui.treePop();
         }
+    }
+    private void drawOres(LosslessJson document,String base) {
+        if (!ImGui.collapsingHeader("Ore generators")) return;
+        ImGui.textWrapped("Single-block ore noise generators. Generators are tried in list order; the first material wins. Native terrain tries biome, then region, then dimension generators when earlier scopes return no ore. Deposit veins are configured separately.");
+        ImGui.textWrapped("Noise, effective terrain replacement and registry/state validity are not evaluated or previewed here.");
+        List<LosslessJson> entries;
+        try { entries=OreGenerators.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored ores are null, snippets or unsupported entries (read-only).");return; }
+        String prefix=OreGenerators.listPrefix(base);
+        if (entries==null) {
+            if (ImGui.button("Initialize empty ore list")) { try { commitProfileChange(prefix,OreGenerators.enable(selected,workspace.read(selected),base),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            return;
+        }
+        String newKey=prefix+"new.block";ImString block=values.computeIfAbsent(newKey,ignored -> new ImString("minecraft:iron_ore",4096));ImGui.inputText("Material for new ore generator",block);drafts.update(newKey,"minecraft:iron_ore",block.get());
+        if (ImGui.button("Add ore generator with material")) { changeOre(base,RiverProfiles.Action.ADD,-1,block.get(),newKey);return; }
+        for (int index=0;index<entries.size();index++) {
+            if (!ImGui.treeNode("Ore "+index)) continue;
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate generator")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();if (ImGui.button("Remove generator")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Generator up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Generator down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeOre(base,action,index,null,null);return; }
+            var context=new OreGenerators.Context(base,index);var ore=entries.get(index);
+            ImGui.textWrapped("Threshold is a noise cutoff, from 0 (disabled) to 1. Actual coverage depends on the style and native context.");
+            drawOreScalar(ore,context,"threshold");drawOreScalar(ore,context,"generateSurface");
+            if (ImGui.treeNode("Height band")) { drawOreRange(ore,context);ImGui.treePop(); }
+            if (ImGui.treeNode("Ore chance noise")) { drawStyleFields(ore,context.styleTarget("chanceStyle"));ImGui.treePop(); }
+            if (ImGui.treeNode("Ore materials")) {
+                ImGui.textWrapped(OreGenerators.help("palette"));
+                try {
+                    var palette=OreGenerators.object(ore,"palette");
+                    if (palette==null) {
+                        ImGui.textWrapped("Absent palette uses an empty native palette and generates no blocks. Creation keeps that empty default. An existing explicit {} palette uses the material class default STONE.");
+                        if (ImGui.button("Create explicit empty ore palette")) { try { commitProfileChange(context.prefix("palette"),OreGenerators.createPalette(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } }
+                    } else drawGeneralBlockPalette(palette,context.paletteTarget());
+                } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored ore palette is a snippet or unsupported value (read-only)."); }
+                ImGui.treePop();
+            }
+            for (String field : ore.fields()) if (!OreGenerators.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void changeOre(String base,RiverProfiles.Action action,int index,String block,String appliedKey) {
+        try { commitProfileChange(OreGenerators.listPrefix(base),OreGenerators.change(selected,workspace.read(selected),base,action,index,block),appliedKey); } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawOreScalar(LosslessJson ore,OreGenerators.Context context,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(OreGenerators.help(field));String token=ore.token(field);
+        if (field.equals("generateSurface")) ImGui.textWrapped("True selects the surface-pass list; false selects the underground-pass list. The surface pass runs before layers and fluid. Native terrain and host rules determine the resulting blocks.");
+        if (token==null) {
+            if (ImGui.button("Enable "+field+" ("+OreGenerators.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,OreGenerators.enableScalar(selected,workspace.read(selected),context,field)));
+        } else if (field.equals("generateSurface")) {
+            if (!token.equals("true") && !token.equals("false")) ImGui.textWrapped("Stored flag has an unsupported type (read-only).");
+            else { ImBoolean flag=new ImBoolean(Boolean.parseBoolean(token));if (ImGui.checkbox("Surface pass",flag)) applyRoutingExtra(() -> workspace.replace(selected,OreGenerators.setSurface(selected,workspace.read(selected),context,flag.get()))); }
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored threshold has an unsupported type (read-only).");
+        else {
+            String key=context.prefix()+field;ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Threshold",input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply threshold")) commitRiverOverride(key,() -> workspace.replace(selected,OreGenerators.setThreshold(selected,workspace.read(selected),context,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void drawOreRange(LosslessJson ore,OreGenerators.Context context) {
+        ImGui.textWrapped("Inclusive engine-local Y: 0 is the dimension bottom. Editor bounds are -8192 to 8192; Iris does not annotate range limits. Apply both bounds together. World-height compatibility is not evaluated.");
+        LosslessJson range;
+        try { range=OreGenerators.object(ore,"range"); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored range is a snippet or unsupported value (read-only).");return; }
+        if (range==null) {
+            ImGui.textWrapped("Absent band uses native ore defaults 30 to 80. An existing {} range uses class defaults 16 to 32.");
+            if (ImGui.button("Create explicit ore band (30 to 80)")) { try { commitProfileChange(context.prefix("range"),OreGenerators.createRange(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            return;
+        }
+        String min=range.token("min"),max=range.token("max");
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored bounds have unsupported types (read-only).");return; }
+        String storedMin=min==null ? OreGenerators.rangeDefault("min",true) : min,storedMax=max==null ? OreGenerators.rangeDefault("max",true) : max;
+        String minKey=context.prefix("range")+"min",maxKey=context.prefix("range")+"max";
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+        ImGui.inputText(min==null ? "Minimum (class default)" : "Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());ImGui.inputText(max==null ? "Maximum (class default)" : "Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        if (ImGui.button("Apply height band")) { try { workspace.replace(selected,OreGenerators.setRange(selected,workspace.read(selected),context,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+        for (String field : range.fields()) if (!List.of("min","max").contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawRootObjects(LosslessJson document,int owner) {
         if (!ImGui.collapsingHeader(owner==FloatingObjectPlacements.REGION_ROOT ? "Region object placements" : "Biome object placements")) return;
@@ -1605,7 +1685,7 @@ public final class EditorApp extends Application {
         String newKey=target.listPrefix()+"new.block";
         ImString newBlock=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New block",newBlock);drafts.update(newKey,"",newBlock.get());
         if (ImGui.button("Add block")) { changeGeneralBlockPalette(target,RiverProfiles.Action.ADD,-1,newBlock.get(),newKey);return; }
-        if (entries.isEmpty()) ImGui.textWrapped(target.slabWall() ? "Empty palette: no material is selected. Add a block to author a material palette." : "This list is empty. Add a block to repair the required list.");
+        if (entries.isEmpty()) ImGui.textWrapped(target.ore() ? "Empty palette: this ore generator produces no blocks." : target.slabWall() ? "Empty palette: no material is selected. Add a block to author a material palette." : "This list is empty. Add a block to repair the required list.");
         for (int index=0;index<entries.size();index++) {
             if (!ImGui.treeNode("Block "+index)) continue;
             int entryIndex=index;var entry=entries.get(index);RiverProfiles.Action action=null;

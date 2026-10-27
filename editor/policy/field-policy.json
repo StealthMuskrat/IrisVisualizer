@@ -183,6 +183,10 @@
     "surfaceLayerFallback": {
       "classification": "generation",
       "reason": "Source-audited surface layer fallback choices with dimension default ROCK and nullable biome inheritance; world ownership/effective fallback is not resolved."
+    },
+    "ores": {
+      "classification": "generation",
+      "reason": "Ordered native IrisOreGenerator list with exclusive surface/underground filtering and first-result scope precedence. Bounded lossless controls author settings only; native sampling, registry resolution and previews remain unavailable."
     }
   },
   "biome": {
@@ -317,6 +321,10 @@
     "objects": {
       "classification": "generation",
       "reason": "Pinned IrisObjectPlacement collection consumed by biome surface/cave object passes; exact in-pack references and lossless shared placement controls only. Native dispatch, generation and preview remain unavailable."
+    },
+    "ores": {
+      "classification": "generation",
+      "reason": "Ordered native IrisOreGenerator list with exclusive surface/underground filtering and first-result scope precedence. Bounded lossless controls author settings only; native sampling, registry resolution and previews remain unavailable."
     }
   },
   "generator": {
@@ -473,6 +481,10 @@
     "objects": {
       "classification": "generation",
       "reason": "Pinned IrisObjectPlacement collection consumed by region surface/cave passes; exact in-pack object selection, lossless shared controls and region-specific cave-profile dispatch are audited. Native generation and preview remain unavailable."
+    },
+    "ores": {
+      "classification": "generation",
+      "reason": "Ordered native IrisOreGenerator list with exclusive surface/underground filtering and first-result scope precedence. Bounded lossless controls author settings only; native sampling, registry resolution and previews remain unavailable."
     }
   },
   "importedStructures": {
@@ -2431,6 +2443,28 @@
     "chance": {
       "classification": "generation",
       "reason": "Bounded floating replacement rule authoring: unweighted find block-data entries, native state-match flag, finite chance and shared weighted replacement palette. Advanced data and native behavior remain unvalidated."
+    }
+  },
+  "oreGenerator": {
+    "palette": {
+      "classification": "generation",
+      "reason": "Pinned single-block ore authoring: empty contextual versus STONE class palettes, weighted materials/styles, threshold/flag and paired inclusive engine-local height bands. Existing unsupported data is preserved; effective native generation remains unvalidated."
+    },
+    "chanceStyle": {
+      "classification": "generation",
+      "reason": "Pinned single-block ore authoring: empty contextual versus STONE class palettes, weighted materials/styles, threshold/flag and paired inclusive engine-local height bands. Existing unsupported data is preserved; effective native generation remains unvalidated."
+    },
+    "generateSurface": {
+      "classification": "generation",
+      "reason": "Pinned single-block ore authoring: empty contextual versus STONE class palettes, weighted materials/styles, threshold/flag and paired inclusive engine-local height bands. Existing unsupported data is preserved; effective native generation remains unvalidated."
+    },
+    "threshold": {
+      "classification": "generation",
+      "reason": "Pinned single-block ore authoring: empty contextual versus STONE class palettes, weighted materials/styles, threshold/flag and paired inclusive engine-local height bands. Existing unsupported data is preserved; effective native generation remains unvalidated."
+    },
+    "range": {
+      "classification": "generation",
+      "reason": "Pinned single-block ore authoring: empty contextual versus STONE class palettes, weighted materials/styles, threshold/flag and paired inclusive engine-local height bands. Existing unsupported data is preserved; effective native generation remains unvalidated."
     }
   }
 }
