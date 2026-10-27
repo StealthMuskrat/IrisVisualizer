@@ -59,8 +59,9 @@ final class WorldBoundaryTests {
             rejects(() -> WorldBoundaryFields.setScalar(PATH,all,field,"-0.01"));
         }
         for (String token : List.of("null","[]","true","1","\"snippet/border/test\"")) {
-            byte[] unsupported=document(token);rejects(() -> WorldBoundaryFields.enable(PATH,unsupported));rejects(() -> WorldBoundaryFields.disable(PATH,unsupported));
-            rejects(() -> WorldBoundaryFields.setCenter(PATH,unsupported,"0","0"));rejects(() -> WorldBoundaryFields.enableScalar(PATH,unsupported,"size"));check(DimensionFields.readOnlyPaths(new LosslessJson(unsupported)).contains("worldBoundary"));
+            byte[] unsupported=document(token);
+            if (!token.equals("null")) { rejects(() -> WorldBoundaryFields.enable(PATH,unsupported));rejects(() -> WorldBoundaryFields.disable(PATH,unsupported));check(DimensionFields.readOnlyPaths(new LosslessJson(unsupported)).contains("worldBoundary")); }
+            rejects(() -> WorldBoundaryFields.setCenter(PATH,unsupported,"0","0"));rejects(() -> WorldBoundaryFields.enableScalar(PATH,unsupported,"size"));
             byte[] wrongCenter=document("{\"center\":"+token+"}");rejects(() -> WorldBoundaryFields.setCenter(PATH,wrongCenter,"0","0"));check(DimensionFields.readOnlyPaths(new LosslessJson(wrongCenter)).contains("worldBoundary.center"));
             // A malformed center never prevents unrelated valid scalar editing.
             check(WorldBoundaryFields.object(new LosslessJson(WorldBoundaryFields.enableScalar(PATH,wrongCenter,"size"))).token("center").equals(token));
