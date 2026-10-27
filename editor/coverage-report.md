@@ -48,7 +48,7 @@ Direct nonstatic/nontransient private fields in forty-six pinned source classes 
 | inlandGrotto | 6 | 6 | 6 | 0 |
 | seaCaves | 6 | 6 | 6 | 0 |
 | riverMaterial | 3 | 3 | 3 | 0 |
-| materialPalette | 3 | 1 | 1 | 2 |
+| materialPalette | 3 | 3 | 3 | 0 |
 | blockData | 6 | 2 | 2 | 4 |
 
 ## dimension
@@ -229,7 +229,7 @@ Unclassified: none.
 
 ## materialPalette
 
-Unclassified: `style`, `zoom`.
+Unclassified: none.
 
 ## blockData
 
