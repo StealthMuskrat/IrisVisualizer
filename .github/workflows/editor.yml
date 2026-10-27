@@ -416,6 +416,19 @@ jobs:
           python editor/tools/extract_floating_bottom_fields.py IrisFloatingChildBiomes.java IrisFloatingChildBiomeModifier.java IrisBiomePaletteLayer.java IrisSlopeClip.java generated-floating-bottom.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-bottom.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-bottom-fields.properties).Hash) { throw 'Pinned floating underside definitions differ' }
+      - name: Verify pinned floating object placement definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectPlacement.java' -OutFile IrisObjectPlacement.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/ObjectPlaceMode.java' -OutFile ObjectPlaceMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/mantle/MantleFloatingObjectComponent.java' -OutFile MantleFloatingObjectComponent.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/loading/ObjectResourceLoader.java' -OutFile ObjectResourceLoader.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectTranslate.java' -OutFile IrisObjectTranslate.java
+          python editor/tools/test_floating_object_fields.py IrisFloatingChildBiomes.java IrisObjectPlacement.java ObjectPlaceMode.java MantleFloatingObjectComponent.java ObjectResourceLoader.java ArrayType.java IrisObjectTranslate.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_object_fields.py IrisFloatingChildBiomes.java IrisObjectPlacement.java ObjectPlaceMode.java MantleFloatingObjectComponent.java ObjectResourceLoader.java ArrayType.java IrisObjectTranslate.java generated-floating-object.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-object.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-object-fields.properties).Hash) { throw 'Pinned floating object definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

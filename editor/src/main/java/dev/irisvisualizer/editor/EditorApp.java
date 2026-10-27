@@ -525,7 +525,7 @@ public final class EditorApp extends Application {
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;
         ImGui.textWrapped(FloatingBiomes.description());
-        ImGui.textWrapped("This editor authors applied settings without sampling islands. Object-placement lists remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
+        ImGui.textWrapped("This editor authors applied settings without sampling islands. Object placement supports exact asset pools, chance/density, modes and free-floating translations; other placement settings remain read-only. Edge variation is clamped by Iris according to edge width. Height fields named AboveSurface specify absolute world Y.");
         List<LosslessJson> entries;
         try { entries=FloatingBiomes.entries(document); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored floating list contains snippets or unsupported entries (read-only).");return; }
@@ -559,7 +559,7 @@ public final class EditorApp extends Application {
             }
             for (String field : FloatingBiomes.ENUMS) drawFloatingMode(entry,index,field);
             drawFloatingLiteral(entry,index,"carving");drawFloatingLiteral(entry,index,"fluidBlock");drawFloatingFluidHeight(entry,index);
-            drawFloatingNoise(entry,index);drawFloatingBottomPalette(entry,index);
+            drawFloatingNoise(entry,index);drawFloatingBottomPalette(entry,index);drawFloatingObjects(entry,index);
             if (ImGui.treeNode("Other floating data (read-only)")) {
                 for (String field : FloatingBiomes.readOnlyFields(entry)) ImGui.textWrapped(field);
                 for (String path : FloatingNoiseStyles.readOnlyPaths(entry,index)) ImGui.textWrapped(path);
@@ -567,6 +567,151 @@ public final class EditorApp extends Application {
             }
             ImGui.treePop();
         }
+    }
+    private void drawFloatingObjects(LosslessJson entry,int index) {
+        if (!ImGui.treeNode("Floating object placements")) return;
+        ImGui.textWrapped("Select exact object keys from .iob files in this pack. File contents, compatibility and native placement are not resolved here. Top/bottom override modes determine which lists participate; editing a list leaves inheritance settings unchanged. Anchored placements remap some modes and replace translation/rotation in Iris.");
+        for (String list : FloatingObjectPlacements.LIST_FIELDS) if (ImGui.treeNode(list)) { drawFloatingObjectList(entry,index,list);ImGui.treePop(); }
+        ImGui.treePop();
+    }
+    private ImString objectChoiceState(String key,List<String> choices) {
+        int capacity=Math.max(4096,choices.stream().mapToInt(value -> value.getBytes(StandardCharsets.UTF_8).length+1).max().orElse(1));
+        return values.computeIfAbsent(key,ignored -> new ImString(choices.isEmpty() ? "" : choices.getFirst(),capacity));
+    }
+    private void drawObjectChoice(String label,ImString state,List<String> choices) {
+        String current=state.get();
+        if (ImGui.beginCombo(label,current.isEmpty() ? "Select an object" : current.length()>128 ? "Selected object" : current)) {
+            for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) state.set(choice);
+            ImGui.endCombo();
+        }
+    }
+    private void drawFloatingObjectList(LosslessJson entry,int index,String list) {
+        ImGui.textWrapped(FloatingObjectPlacements.listHelp(list));List<LosslessJson> placements;
+        try { placements=FloatingObjectPlacements.placements(entry,list); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list contains snippets or unsupported placements (read-only).");return; }
+        if (placements==null) {
+            if (ImGui.button("Initialize empty placement list")) {
+                try { commitProfileChange(FloatingObjectPlacements.listPrefix(index,list),FloatingObjectPlacements.enable(selected,workspace.read(selected),index,list),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        var choices=FloatingObjectPlacements.objectChoices(workspace);String prefix=FloatingObjectPlacements.listPrefix(index,list);
+        ImString object=objectChoiceState(prefix+"new.object",choices),mode=values.computeIfAbsent(prefix+"new.mode",ignored -> new ImString(FloatingObjectPlacements.creationMode(list),128));
+        drawObjectChoice("Object for new placement",object,choices);
+        if (ImGui.beginCombo("Mode for new placement",mode.get())) {
+            for (String choice : FloatingObjectPlacements.modes()) { if (ImGui.selectable(choice,choice.equals(mode.get()))) mode.set(choice);if (ImGui.isItemHovered()) ImGui.setTooltip(FloatingObjectPlacements.modeHelp(choice)); }
+            ImGui.endCombo();
+        }
+        if (choices.isEmpty()) ImGui.textWrapped("No exact .iob keys are available. Import an object before adding a placement.");
+        ImGui.beginDisabled(!choices.contains(object.get()));
+        if (ImGui.button("Add placement with selected object/mode")) { ImGui.endDisabled();changeFloatingObject(index,list,RiverProfiles.Action.ADD,-1,object.get(),mode.get());return; }
+        ImGui.endDisabled();
+        for (int placementIndex=0;placementIndex<placements.size();placementIndex++) {
+            if (!ImGui.treeNode("Placement "+placementIndex)) continue;
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate placement")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();if (ImGui.button("Remove placement")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(placementIndex==0);if (ImGui.button("Move placement up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(placementIndex==placements.size()-1);if (ImGui.button("Move placement down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeFloatingObject(index,list,action,placementIndex,null,null);return; }
+            var placement=placements.get(placementIndex);
+            drawFloatingPlacementMode(placement,index,list,placementIndex);
+            for (String field : FloatingObjectPlacements.SCALARS) drawFloatingPlacementScalar(placement,index,list,placementIndex,field);
+            for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
+            if (list.equals("floatingObjects") && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
+            if (ImGui.treeNode("Other placement data (read-only)")) { for (String field : FloatingObjectPlacements.readOnlyFields(placement,list)) ImGui.textWrapped(field);ImGui.treePop(); }
+            ImGui.treePop();
+        }
+    }
+    private void changeFloatingObject(int entry,String list,RiverProfiles.Action action,int placement,String object,String mode) {
+        try { commitProfileChange(FloatingObjectPlacements.listPrefix(entry,list),FloatingObjectPlacements.change(selected,workspace.read(selected),entry,list,action,placement,object,mode,workspace),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingPlacementScalar(LosslessJson placement,int entry,String list,int index,String field) {
+        ImGui.pushID(field);
+        ImGui.textWrapped(field.equals("chance") ? "Floating placement tests chance per attempt with native jitter of +/-0.005. Density controls attempts, or densityStyle when configured." : FloatingObjectPlacements.help(field));
+        ImGui.textWrapped(FloatingObjectPlacements.constraints(field));
+        if (field.equals("density") && placement.token("densityStyle")!=null && !placement.token("densityStyle").equals("null")) ImGui.textWrapped("A resolved non-null densityStyle overrides fixed density. The styled range remains read-only.");
+        String token=placement.token(field),key=FloatingObjectPlacements.placementPrefix(entry,list,index)+field;
+        if (token==null) {
+            if (ImGui.button("Enable "+field+" ("+FloatingObjectPlacements.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.enableScalar(selected,workspace.read(selected),entry,list,index,field)));
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored scalar has an unsupported type (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectPlacements.setScalar(selected,workspace.read(selected),entry,list,index,field,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void drawFloatingPlacementMode(LosslessJson placement,int entry,String list,int index) {
+        String current;
+        try { current=placement.token("mode")==null ? FloatingObjectPlacements.defaultToken("mode") : placement.stringToken("mode"); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored mode is not a string (read-only).");return; }
+        if (!FloatingObjectPlacements.modes().contains(current)) ImGui.textWrapped("Unknown stored mode is retained until an explicit selection.");
+        if (ImGui.beginCombo("Placement mode",current.length()>128 ? "Unknown stored mode" : current+(placement.token("mode")==null ? " (Iris default)" : ""))) {
+            for (String choice : FloatingObjectPlacements.modes()) {
+                if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.setMode(selected,workspace.read(selected),entry,list,index,choice)));
+                if (ImGui.isItemHovered()) ImGui.setTooltip(FloatingObjectPlacements.modeHelp(choice));
+            }
+            ImGui.endCombo();
+        }
+    }
+    private void drawFloatingObjectPool(LosslessJson placement,int entry,String list,int index,String pool,List<String> choices) {
+        ImGui.textWrapped(FloatingObjectPlacements.help(pool));List<String> references;
+        try { references=FloatingObjectPlacements.pool(placement,pool); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored pool is not a string array (read-only).");return; }
+        if (references==null) {
+            if (ImGui.button("Enable empty reference pool")) {
+                try { commitProfileChange(FloatingObjectPlacements.poolPrefix(entry,list,index,pool),FloatingObjectPlacements.enablePool(selected,workspace.read(selected),entry,list,index,pool),null); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            return;
+        }
+        ImString object=objectChoiceState(FloatingObjectPlacements.poolPrefix(entry,list,index,pool)+"new.object",choices);drawObjectChoice("New object reference",object,choices);
+        ImGui.beginDisabled(!choices.contains(object.get()));
+        if (ImGui.button("Add reference")) { ImGui.endDisabled();changeFloatingObjectPool(entry,list,index,pool,RiverProfiles.Action.ADD,-1,object.get());return; }
+        ImGui.endDisabled();
+        if (pool.equals("place") && references.isEmpty()) ImGui.textWrapped("Empty place pool selects no object. Add a reference to configure this placement.");
+        for (int referenceIndex=0;referenceIndex<references.size();referenceIndex++) {
+            ImGui.pushID(referenceIndex);int selectedReference=referenceIndex;String current=references.get(referenceIndex);
+            if (!choices.contains(current)) ImGui.textWrapped("Stored reference is missing from the exact .iob catalog and is preserved until replaced.");
+            if (ImGui.beginCombo("Object reference",current.length()>128 ? "Stored object reference" : current)) {
+                for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.setReference(selected,workspace.read(selected),entry,list,index,pool,selectedReference,choice,workspace)));
+                ImGui.endCombo();
+            }
+            RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate reference")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.sameLine();ImGui.beginDisabled(pool.equals("place") && references.size()<=1);if (ImGui.button("Remove reference")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
+            ImGui.beginDisabled(referenceIndex==0);if (ImGui.button("Move reference up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+            ImGui.sameLine();ImGui.beginDisabled(referenceIndex==references.size()-1);if (ImGui.button("Move reference down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            ImGui.popID();if (action!=null) { changeFloatingObjectPool(entry,list,index,pool,action,referenceIndex,null);return; }
+        }
+    }
+    private void changeFloatingObjectPool(int entry,String list,int index,String pool,RiverProfiles.Action action,int reference,String object) {
+        try { commitProfileChange(FloatingObjectPlacements.poolPrefix(entry,list,index,pool),FloatingObjectPlacements.changePool(selected,workspace.read(selected),entry,list,index,pool,action,reference,object,workspace),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawFloatingTranslation(LosslessJson placement,int entry,String list,int index) {
+        ImGui.textWrapped("This floating-object path preserves translation. FLOATING mode uses translate.y for absolute height; other modes retain their native behavior. Anchored top/bottom paths replace transforms and keep them read-only here.");
+        LosslessJson translate;
+        try { translate=FloatingObjectPlacements.translate(placement); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored translation is a snippet or unsupported value (read-only).");return; }
+        if (translate==null) {
+            if (ImGui.button("Create translation (source defaults)")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.createTranslation(selected,workspace.read(selected),entry,list,index)));
+            return;
+        }
+        for (String axis : FloatingObjectPlacements.TRANSLATION_FIELDS) {
+            ImGui.pushID(axis);ImGui.textWrapped(FloatingObjectPlacements.translationHelp(axis));ImGui.textWrapped(FloatingObjectPlacements.translationConstraints(axis));String token=translate.token(axis),key=FloatingObjectPlacements.placementPrefix(entry,list,index)+"translate."+axis;
+            if (token==null) {
+                if (ImGui.button("Enable "+axis+" ("+FloatingObjectPlacements.translationDefault(axis)+")")) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.enableTranslation(selected,workspace.read(selected),entry,list,index,axis)));
+            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored shift has an unsupported type (read-only).");
+            else {
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(axis,input);drafts.update(key,token,input.get());
+                if (ImGui.button("Apply shift")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectPlacements.setTranslation(selected,workspace.read(selected),entry,list,index,axis,input.get())));
+            }
+            ImGui.popID();
+        }
+        for (String field : translate.fields()) if (!FloatingObjectPlacements.TRANSLATION_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawFloatingBottomPalette(LosslessJson entry,int index) {
         if (!ImGui.treeNode("Custom underside palette layers")) return;
