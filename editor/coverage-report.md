@@ -1,24 +1,25 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in eleven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in twelve pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 39 | 33 | 43 |
+| dimension | 82 | 40 | 34 | 42 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 18 | 12 | 24 |
+| biome | 42 | 19 | 13 | 23 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
-| region | 27 | 19 | 13 | 8 |
+| region | 27 | 20 | 14 | 7 |
 | noise | 15 | 14 | 14 | 1 |
 | noiseStyle | 10 | 5 | 5 | 5 |
 | terrain3D | 14 | 14 | 14 | 0 |
+| caveProfile | 32 | 23 | 23 | 9 |
 
 ## dimension
 
-Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `caveProfile`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionHeight`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `fluidPalette`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `hydrology`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `riverPolicy`, `rockPalette`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `surfaceLayerFallback`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
+Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionHeight`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `fluidPalette`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `hydrology`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `ores`, `overlayNoise`, `preventLeafDecay`, `riverPolicy`, `rockPalette`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `surfaceLayerFallback`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
 
 ## importedStructures
 
@@ -30,7 +31,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `caveProfile`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `layers`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `seaLayers`, `slab`, `structures`, `surfaceLayerFallback`, `surfaceOreReplaceableBlocks`, `vanillaDerivative`, `wall`.
+Unclassified: `biomeScatter`, `biomeSkyScatter`, `biomeStyle`, `carvingBiome`, `caveCeilingLayers`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `derivative`, `floatingChildBiomes`, `layers`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `seaLayers`, `slab`, `structures`, `surfaceLayerFallback`, `surfaceOreReplaceableBlocks`, `vanillaDerivative`, `wall`.
 
 ## biomeGeneratorLink
 
@@ -46,7 +47,7 @@ Unclassified: none.
 
 ## region
 
-Unclassified: `caveProfile`, `depositVariants`, `deposits`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `structures`.
+Unclassified: `depositVariants`, `deposits`, `objects`, `ores`, `proceduralObjects`, `riverPolicy`, `structures`.
 
 ## noise
 
@@ -59,3 +60,7 @@ Unclassified: `cacheSize`, `expression`, `fracture`, `imageMap`, `multiplier`.
 ## terrain3D
 
 Unclassified: none.
+
+## caveProfile
+
+Unclassified: `baseDensityStyle`, `defaultObjectAnchor`, `defaultObjectPlaceMode`, `densityThreshold`, `detailDensityStyle`, `modules`, `surfaceBreakStyle`, `verticalRange`, `warpStyle`.

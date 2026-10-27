@@ -155,6 +155,10 @@
     "caveBiomeStyle": {
       "classification": "generation",
       "reason": "Controls region, land/sea or biome distribution using bounded style/zoom/exponent controls; explicit enablement retains the pinned contextual default."
+    },
+    "caveProfile": {
+      "classification": "generation",
+      "reason": "Profile cave carving/placement settings with explicit disabled-default creation and bounded scalar controls; nested profile structures remain read-only."
     }
   },
   "biome": {
@@ -229,6 +233,10 @@
     "terrain3D": {
       "classification": "generation",
       "reason": "Optional volumetric terrain profile with explicit activation and bounded scalar editing; nested density and fissure styles remain read-only."
+    },
+    "caveProfile": {
+      "classification": "generation",
+      "reason": "Profile cave carving/placement settings with explicit disabled-default creation and bounded scalar controls; nested profile structures remain read-only."
     }
   },
   "generator": {
@@ -373,6 +381,10 @@
     "shoreHeightMax": {
       "classification": "generation",
       "reason": "Controls shoreline height interpolation; only the source-defined minimum is enforced."
+    },
+    "caveProfile": {
+      "classification": "generation",
+      "reason": "Profile cave carving/placement settings with explicit disabled-default creation and bounded scalar controls; nested profile structures remain read-only."
     }
   },
   "importedStructures": {
@@ -567,6 +579,100 @@
     "crackStyle": {
       "classification": "generation",
       "reason": "Bounded terrain density/fissure style editing with source-derived SIMPLEX defaults and terrain-specific native style bounds; nested fractures and other unsupported fields remain read-only."
+    }
+  },
+  "caveProfile": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "verticalEdgeFade": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "verticalEdgeFadeStrength": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "baseWeight": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "detailWeight": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "warpStrength": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "thresholdBias": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "sampleStep": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "adaptiveSampling": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "adaptiveSampleStep": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "adaptiveThresholdMargin": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "surfaceClearance": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "allowSurfaceBreak": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "surfaceBreakNoiseThreshold": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "surfaceBreakDepth": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "surfaceBreakThresholdBoost": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "objectMinDepthBelowSurface": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "anchorScanStep": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "anchorSearchAttempts": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "allowFluid": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "fluidMinDepthBelowSurface": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "fluidRequiresFloor": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
+    },
+    "allowLava": {
+      "classification": "generation",
+      "reason": "Controls cave profile carving, density evaluation, surface/fluid rules or cave object anchor search; source annotations and Java numeric types constrain edits."
     }
   }
 }
