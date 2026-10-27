@@ -530,6 +530,20 @@ jobs:
           python editor/tools/extract_ore_generator_fields.py IrisOreGenerator.java IrisRange.java IrisMaterialPalette.java IrisBiome.java IrisRegion.java IrisDimension.java IrisBiomeOres.java IrisOreBands.java IrisTerrainNormalActuator.java generated-ore-generator-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-ore-generator-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/ore-generator-fields.properties).Hash) { throw 'Pinned ore generator definitions differ' }
+      - name: Verify pinned deposit generator fields and native placement contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisDepositGenerator.java' -OutFile IrisDepositGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisDepositShape.java' -OutFile IrisDepositShape.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisDepositHeightDistribution.java' -OutFile IrisDepositHeightDistribution.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisDepositPlacementScope.java' -OutFile IrisDepositPlacementScope.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisDepositBiomeScope.java' -OutFile IrisDepositBiomeScope.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/stage/IrisDepositModifier.java' -OutFile IrisDepositModifier.java
+          python editor/tools/test_deposit_generator_fields.py IrisDepositGenerator.java IrisDepositShape.java IrisDepositHeightDistribution.java IrisDepositPlacementScope.java IrisDepositBiomeScope.java IrisDimension.java IrisRegion.java IrisBiome.java IrisDepositModifier.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_deposit_generator_fields.py IrisDepositGenerator.java IrisDepositShape.java IrisDepositHeightDistribution.java IrisDepositPlacementScope.java IrisDepositBiomeScope.java IrisDimension.java IrisRegion.java IrisBiome.java IrisDepositModifier.java generated-deposit-generator-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-deposit-generator-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/deposit-generator-fields.properties).Hash) { throw 'Pinned deposit generator definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

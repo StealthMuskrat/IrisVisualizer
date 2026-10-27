@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in sixty-two pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in sixty-three pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -70,6 +70,7 @@ SOURCES = {
  'vacuumSettings': 'generation/decoration/IrisVacuumSettings.java',
  'objectReplace': 'structure/object/IrisObjectReplace.java',
  'oreGenerator': 'generation/decoration/IrisOreGenerator.java',
+ 'depositGenerator': 'generation/decoration/IrisDepositGenerator.java',
 }
 
 def declared_fields(text):
@@ -121,6 +122,8 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['objectReplace'] = set(editable(java_dir, 'FloatingObjectReplacements'))
     implemented['oreGenerator'] = set(editable(java_dir, 'OreGenerators'))
     for owner in ['dimension','region','biome']: implemented[owner].update(editable(java_dir, 'OreGenerators', 'LIST_FIELDS'))
+    implemented['depositGenerator'] = set(editable(java_dir, 'DepositGenerators'))
+    for owner in ['dimension','region','biome']: implemented[owner].update(editable(java_dir, 'DepositGenerators', 'LIST_FIELDS'))
     implemented['vacuumSettings'] = set(editable(java_dir, 'FloatingPlacementDeformation', 'VACUUM_FIELDS'))
     implemented['objectLimit'] = set(editable(java_dir, 'FloatingPlacementConstraints', 'CLAMP_FIELDS'))
     implemented['objectRotation'] = set(editable(java_dir, 'FloatingObjectRotations', 'ROTATION_FIELDS'))
@@ -209,7 +212,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in sixty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in sixty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

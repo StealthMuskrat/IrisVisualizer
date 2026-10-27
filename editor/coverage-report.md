@@ -1,17 +1,17 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in sixty-two pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in sixty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 47 | 41 | 35 |
+| dimension | 82 | 48 | 42 | 34 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 34 | 28 | 8 |
+| biome | 42 | 35 | 29 | 7 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
-| region | 27 | 23 | 17 | 4 |
+| region | 27 | 24 | 18 | 3 |
 | noise | 15 | 14 | 14 | 1 |
 | noiseStyle | 10 | 6 | 6 | 4 |
 | terrain3D | 14 | 14 | 14 | 0 |
@@ -66,10 +66,11 @@ Direct nonstatic/nontransient private fields in sixty-two pinned source classes 
 | vacuumSettings | 5 | 5 | 5 | 0 |
 | objectReplace | 4 | 4 | 4 | 0 |
 | oreGenerator | 5 | 5 | 5 | 0 |
+| depositGenerator | 21 | 21 | 21 | 0 |
 
 ## dimension
 
-Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `deposits`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
+Unclassified: `allObjectScaleFactor`, `blockFallbacks`, `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `depositVariants`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `staticObjects`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`, `worldBoundary`.
 
 ## importedStructures
 
@@ -81,7 +82,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `deposits`, `proceduralObjects`, `structures`, `surfaceOreReplaceableBlocks`.
+Unclassified: `carvingBiome`, `customDerivitives`, `decorators`, `depositVariants`, `proceduralObjects`, `structures`, `surfaceOreReplaceableBlocks`.
 
 ## biomeGeneratorLink
 
@@ -97,7 +98,7 @@ Unclassified: none.
 
 ## region
 
-Unclassified: `depositVariants`, `deposits`, `proceduralObjects`, `structures`.
+Unclassified: `depositVariants`, `proceduralObjects`, `structures`.
 
 ## noise
 
@@ -312,5 +313,9 @@ Unclassified: none.
 Unclassified: none.
 
 ## oreGenerator
+
+Unclassified: none.
+
+## depositGenerator
 
 Unclassified: none.
