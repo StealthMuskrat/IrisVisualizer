@@ -242,6 +242,14 @@ jobs:
           python editor/tools/extract_surface_pond_fields.py IrisSurfaceRiverConfig.java IrisSurfaceRiverPondsConfig.java IrisSurfaceRiverPondConfig.java generated-surface-pond.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-surface-pond.properties).Hash -ne (Get-FileHash editor/src/main/resources/surface-pond-fields.properties).Hash) { throw 'Pinned surface-pond definitions differ' }
+      - name: Verify pinned channel range constructors and contextual defaults
+        shell: pwsh
+        run: |
+          python editor/tools/test_channel_ranges.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_channel_ranges.py IrisSurfaceRiverChannelConfig.java IrisStyledRange.java IrisGeneratorStyle.java generated-channel-ranges.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-channel-ranges.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-channel-ranges.properties).Hash) { throw 'Pinned channel range definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
