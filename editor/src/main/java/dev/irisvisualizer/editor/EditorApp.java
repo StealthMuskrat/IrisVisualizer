@@ -561,10 +561,10 @@ public final class EditorApp extends Application {
             if (ImGui.button("Create geometry (Iris defaults)")) applyRoutingExtra(() -> workspace.replace(selected,RiverGeometryFields.enableGeometry(selected,workspace.read(selected))));
             return;
         }
-        for (String section : RiverGeometryFields.GEOMETRY_FIELDS) {
+        for (String section : RiverGeometryFields.sections()) {
             if (ImGui.treeNode(section+" settings")) { drawRiverGeometrySection(geometry,section); ImGui.treePop(); }
         }
-        for (String field : geometry.fields()) if (!RiverGeometryFields.GEOMETRY_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+        for (String field : geometry.fields()) if (!RiverGeometryFields.sections().contains(field)) ImGui.textWrapped(field+" (read-only)");
     }
     private void drawRiverGeometrySection(LosslessJson geometry, String section) {
         ImGui.textWrapped(RiverGeometryFields.description(section));
