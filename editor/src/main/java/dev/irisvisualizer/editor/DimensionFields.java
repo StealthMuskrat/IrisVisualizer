@@ -28,7 +28,7 @@ public final class DimensionFields {
                     var policy = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     for (String child : policy.fields()) {
                         if (RiverPolicyFields.EDITABLE.contains(child)) continue;
-                        if (RiverBiomeLists.EDITABLE.contains(child)) {
+                        if (RiverBiomeLists.EDITABLE.contains(child) || RiverIdLists.EDITABLE.contains(child)) {
                             if (!"null".equals(policy.token(child))) {
                                 try { policy.stringArrayPath(child); }
                                 catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }

@@ -19,7 +19,7 @@ Direct nonstatic/nontransient private fields in sixteen pinned source classes on
 | styledRange | 3 | 3 | 3 | 0 |
 | caveModule | 5 | 5 | 5 | 0 |
 | range | 2 | 2 | 2 | 0 |
-| riverPolicy | 26 | 24 | 24 | 2 |
+| riverPolicy | 26 | 26 | 26 | 0 |
 
 ## dimension
 
@@ -83,4 +83,4 @@ Unclassified: none.
 
 ## riverPolicy
 
-Unclassified: `profiles`, `surfacePools`.
+Unclassified: none.

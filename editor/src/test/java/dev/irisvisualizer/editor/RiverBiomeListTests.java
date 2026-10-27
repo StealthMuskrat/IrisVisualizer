@@ -89,7 +89,7 @@ final class RiverBiomeListTests {
                 rejects(() -> RiverBiomeLists.change(path,original,field,3,RiverBiomeLists.Action.DUPLICATE));
                 rejects(() -> RiverBiomeLists.change(path,original,field,0,null));
                 check(Arrays.equals(original,copy));
-                check(DimensionFields.readOnlyPaths(new LosslessJson(original)).equals(List.of("riverPolicy.profiles","riverPolicy.surfacePools","riverPolicy.future","unknown")));
+                check(DimensionFields.readOnlyPaths(new LosslessJson(original)).equals(List.of("riverPolicy.future","unknown")));
                 check(DimensionFields.readOnlyPaths(new LosslessJson(bytes(prefix+"[null]"+suffix))).contains("riverPolicy."+field));
                 workspace.replace(path,original);
                 long revision = workspace.revision();
@@ -136,7 +136,7 @@ final class RiverBiomeListTests {
         drafts.transitionUnder(scope,() -> true,() -> applied[0]=RiverBiomeLists.change("biomes/lists.json",sample,"surfaceBiomes",0,RiverBiomeLists.Action.DUPLICATE));
         check(drafts.count()==16 && drafts.contains(RiverBiomeLists.draftPrefix("regions","surfaceBiomes")+"0") && drafts.contains(RiverPolicyFields.draftPrefix("biomes")+"widthMultiplier"));
         check(policy(applied[0]).stringArrayPath("surfaceBiomes").equals(List.of("parent","parent")));
-        check(FieldCoverage.fields("riverPolicy").stream().filter(FieldCoverage.Field::implemented).count()==24);
+        check(FieldCoverage.fields("riverPolicy").stream().allMatch(FieldCoverage.Field::implemented));
         for (String path : List.of("dimensions/lists.json","regions/lists.json","biomes/lists.json")) {
             byte[] updated = bytes("{\"riverPolicy\":{\"widthMultiplier\":1e0,\"profiles\":[\"unresolved-profile\"],\"future\":\"雪\"},\"unknown\":9007199254740993}");
             for (String field : RiverBiomeLists.EDITABLE) updated = RiverBiomeLists.setInherited(path,updated,field,false);
