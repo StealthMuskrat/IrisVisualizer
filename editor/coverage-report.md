@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in nineteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in twenty pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -22,7 +22,8 @@ Direct nonstatic/nontransient private fields in nineteen pinned source classes o
 | riverPolicy | 26 | 26 | 26 | 0 |
 | hydrology | 3 | 1 | 1 | 2 |
 | riverHydrology | 7 | 2 | 2 | 5 |
-| riverRouting | 16 | 14 | 14 | 2 |
+| riverRouting | 16 | 16 | 16 | 0 |
+| riverRegional | 9 | 9 | 9 | 0 |
 
 ## dimension
 
@@ -98,4 +99,8 @@ Unclassified: `geometry`, `grottos`, `profiles`, `surface`, `underground`.
 
 ## riverRouting
 
-Unclassified: `inlandOutlets`, `regional`.
+Unclassified: none.
+
+## riverRegional
+
+Unclassified: none.

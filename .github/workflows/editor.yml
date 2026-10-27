@@ -165,6 +165,16 @@ jobs:
           python editor/tools/extract_hydrology_fields.py IrisDimension.java IrisHydrology.java IrisRiverHydrology.java IrisRiverRoutingConfig.java generated-hydrology.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-hydrology.properties).Hash -ne (Get-FileHash editor/src/main/resources/hydrology-fields.properties).Hash) { throw 'Pinned hydrology definitions differ' }
+      - name: Verify pinned regional routing and inland outlet definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverRegionalConfig.java' -OutFile IrisRiverRegionalConfig.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverInlandOutlet.java' -OutFile IrisRiverInlandOutlet.java
+          python editor/tools/test_routing_extras.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_routing_extras.py IrisRiverRoutingConfig.java IrisRiverRegionalConfig.java IrisRiverInlandOutlet.java generated-routing-extras.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-routing-extras.properties).Hash -ne (Get-FileHash editor/src/main/resources/routing-extras.properties).Hash) { throw 'Pinned routing extras differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

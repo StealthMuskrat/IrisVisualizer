@@ -119,7 +119,7 @@ final class HydrologyTests {
         rejects(() -> HydrologyFields.enableScalar(PATH,source,"inlandOutlets"));
         rejects(() -> HydrologyFields.setRoutingText(PATH,source,"regional","1"));
         check(HydrologyFields.readOnlyPaths(new LosslessJson(bytes("{}"))).isEmpty());
-        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("hydrology.rivers.routing.inlandOutlets","hydrology.rivers.routing.regional","hydrology.rivers.routing.future","hydrology.rivers.profiles","hydrology.rivers.geometry","hydrology.rivers.future","hydrology.surfacePools","hydrology.deepFluids","hydrology.future","unknown")));
+        check(DimensionFields.readOnlyPaths(new LosslessJson(source)).equals(List.of("hydrology.rivers.routing.regional.future","hydrology.rivers.routing.future","hydrology.rivers.profiles","hydrology.rivers.geometry","hydrology.rivers.future","hydrology.surfacePools","hydrology.deepFluids","hydrology.future","unknown")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"hydrology\":null}"))).equals(List.of("hydrology")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"hydrology\":{\"rivers\":null}}"))).equals(List.of("hydrology.rivers")));
         check(DimensionFields.readOnlyPaths(new LosslessJson(bytes("{\"hydrology\":{\"rivers\":{\"routing\":null}}}"))).equals(List.of("hydrology.rivers.routing")));
@@ -138,7 +138,7 @@ final class HydrologyTests {
         check(before!=after && before.ids().equals(List.of("native")) && after.ids().equals(before.ids()));
         check(RiverIdLists.catalog(workspace,"dimensions/defaults.json",null,"profiles").ids().equals(List.of("default")));
         check(FieldCoverage.fields("hydrology").size()==3 && FieldCoverage.fields("riverHydrology").size()==7 && FieldCoverage.fields("riverRouting").size()==16);
-        check(FieldCoverage.fields("riverRouting").stream().filter(FieldCoverage.Field::implemented).count()==14);
+        check(FieldCoverage.fields("riverRouting").stream().allMatch(FieldCoverage.Field::implemented));
         workspace.save(temp.resolve("physical-hydrology")); workspace.exportZip(temp.resolve("physical-hydrology.zip"));
         var reopened=PackWorkspace.open(temp.resolve("physical-hydrology")); var imported=PackWorkspace.importZip(temp.resolve("physical-hydrology.zip"));
         for (String path : workspace.paths()) {

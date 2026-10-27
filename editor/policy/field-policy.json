@@ -951,6 +951,52 @@
     "tributaries": {
       "classification": "generation",
       "reason": "Physical drainage routing scalar; source-derived primitive default/type/annotation bounds with explicit enablement and lossless token editing. Cross-field/native validity is not resolved."
+    },
+    "regional": {
+      "classification": "generation",
+      "reason": "Bounded regional routing settings or source-declared inland outlet choices; explicit parent/list creation and lossless edits preserve unsupported data without planning drainage."
+    },
+    "inlandOutlets": {
+      "classification": "generation",
+      "reason": "Bounded regional routing settings or source-declared inland outlet choices; explicit parent/list creation and lossless edits preserve unsupported data without planning drainage."
+    }
+  },
+  "riverRegional": {
+    "enabled": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "sampleSpacing": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "minimumLength": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "maximumTrunks": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "maximumCachedBasins": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "maximumCachedStations": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "coastalChannels": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "coastalChannelChance": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
+    },
+    "maximumCoastalIncision": {
+      "classification": "generation",
+      "reason": "Generation regional drainage setting; source primitive default/annotation bounds, exact integer parsing and documented power-of-two sample spacing. Cross-field/native viability remains unchecked."
     }
   }
 }
