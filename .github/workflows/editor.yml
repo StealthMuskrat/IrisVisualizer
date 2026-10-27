@@ -133,6 +133,17 @@ jobs:
           python editor/tools/extract_cave_module_fields.py IrisCaveProfile.java IrisCaveFieldModule.java IrisRange.java IrisGeneratorStyle.java generated-cave-module.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-cave-module.properties).Hash -ne (Get-FileHash editor/src/main/resources/cave-module-fields.properties).Hash) { throw 'Pinned cave module definitions differ' }
+      - name: Verify pinned river policy definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverPolicy.java' -OutFile IrisRiverPolicy.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverPlacementMode.java' -OutFile IrisRiverPlacementMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverRoutingMode.java' -OutFile IrisRiverRoutingMode.java
+          python editor/tools/test_river_policy_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_river_policy_fields.py IrisRiverPolicy.java IrisDimension.java IrisRegion.java IrisBiome.java IrisRiverPlacementMode.java IrisRiverRoutingMode.java generated-river-policy.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-river-policy.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-policy-fields.properties).Hash) { throw 'Pinned river policy definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

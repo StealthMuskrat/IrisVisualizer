@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in fifteen pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in sixteen pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -23,6 +23,7 @@ SOURCES = {
  'styledRange': 'generation/noise/IrisStyledRange.java',
  'caveModule': 'generation/cave/IrisCaveFieldModule.java',
  'range': 'pack/value/IrisRange.java',
+ 'riverPolicy': 'generation/hydrology/IrisRiverPolicy.java',
 }
 
 def declared_fields(text):
@@ -53,6 +54,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biome'].update(editable(java_dir, 'Terrain3DFields', 'OBJECT_FIELDS'))
     for group in ['dimension','region','biome']:
         implemented[group].update(editable(java_dir, 'CaveProfileFields', 'OBJECT_FIELDS'))
+        implemented[group].update(editable(java_dir, 'RiverPolicyFields', 'OBJECT_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'NoiseStyleFields', 'DIMENSION_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'NoiseStyleFields', 'BIOME_FIELDS'))
     for group in ['importedStructures', 'importedFeatures']:
@@ -73,10 +75,11 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['caveModule'] = set(editable(java_dir, 'CaveModules'))
     implemented['caveModule'].update(editable(java_dir, 'CaveModules', 'OBJECT_FIELDS'))
     implemented['range'] = set(editable(java_dir, 'CavePlacementFields', 'RANGE_MEMBERS'))
+    implemented['riverPolicy'] = set(editable(java_dir, 'RiverPolicyFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in fifteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in sixteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

@@ -159,6 +159,10 @@
     "caveProfile": {
       "classification": "generation",
       "reason": "Profile cave carving/placement settings with explicit disabled-default creation and bounded scalar controls; nested profile structures remain read-only."
+    },
+    "riverPolicy": {
+      "classification": "generation",
+      "reason": "Nullable river routing/placement and scalar overrides; bounded editor preserves inheritance and unknown lists without resolving policies or generating rivers."
     }
   },
   "biome": {
@@ -237,6 +241,10 @@
     "caveProfile": {
       "classification": "generation",
       "reason": "Profile cave carving/placement settings with explicit disabled-default creation and bounded scalar controls; nested profile structures remain read-only."
+    },
+    "riverPolicy": {
+      "classification": "generation",
+      "reason": "Nullable river routing/placement and scalar overrides; bounded editor preserves inheritance and unknown lists without resolving policies or generating rivers."
     }
   },
   "generator": {
@@ -385,6 +393,10 @@
     "caveProfile": {
       "classification": "generation",
       "reason": "Profile cave carving/placement settings with explicit disabled-default creation and bounded scalar controls; nested profile structures remain read-only."
+    },
+    "riverPolicy": {
+      "classification": "generation",
+      "reason": "Nullable river routing/placement and scalar overrides; bounded editor preserves inheritance and unknown lists without resolving policies or generating rivers."
     }
   },
   "importedStructures": {
@@ -755,6 +767,84 @@
     "max": {
       "classification": "generation",
       "reason": "Generation cave profile/module vertical bounds; finite ordered pair controls with pinned contextual/class defaults. Editing is limited to these cave contexts."
+    }
+  },
+  "riverPolicy": {
+    "surfaceSourceDensity": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "surfaceSourceSpacing": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "surfaceTributaries": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "surfaceInlandOutlets": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "surfaceCoastalOutlets": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "surfaceMinimumCourseLength": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "surfaceMaximumIncision": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "placement": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "routing": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "outletAdmission": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "widthMultiplier": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "depthMultiplier": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "incisionMultiplier": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "routingMultiplier": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "bankMultiplier": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "shoreBiomeWidth": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "shoreWidth": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "erosion": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
+    },
+    "confined": {
+      "classification": "generation",
+      "reason": "Generation river policy override; source-derived nullable scalar or enum control with explicit assignment/reset and inherited-value preservation."
     }
   }
 }
