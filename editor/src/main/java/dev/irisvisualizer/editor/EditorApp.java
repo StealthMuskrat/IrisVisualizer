@@ -172,10 +172,12 @@ public final class EditorApp extends Application {
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
+                    drawDimensionHeights(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
                     drawHydrology(document);
                     drawRiverPolicy(document);
+                    drawHydrologyEnvelopes();
                     List<String> readOnly = DimensionFields.readOnlyPaths(document);
                     if (ImGui.collapsingHeader("Read-only fields (" + readOnly.size() + ")"))
                         for (String path : readOnly) ImGui.textWrapped(path);
@@ -513,6 +515,39 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
             for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
+    private void drawDimensionHeights(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Dimension height")) return;
+        ImGui.textWrapped(DimensionHeights.description());ImGui.textWrapped(DimensionHeights.constraints());
+        ImGui.textWrapped("Current logicalHeight: "+DimensionHeights.logicalLabel(document)+" (read-only). Borrowed dimension types and live-world height compatibility are not resolved here.");
+        LosslessJson range;
+        try { range=DimensionHeights.object(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored dimension height is a snippet or unsupported value (read-only).");return; }
+        if (range==null) ImGui.textWrapped("Create the source default pair or supply custom bounds, for example when logicalHeight needs a larger span.");
+        String min=range==null ? null : range.token("min"),max=range==null ? null : range.token("max");
+        if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) ImGui.textWrapped("Stored dimension bound has an unsupported type (read-only).");
+        else {
+            String minKey=DimensionHeights.draftPrefix()+"min",maxKey=DimensionHeights.draftPrefix()+"max",storedMin=min==null ? DimensionHeights.defaultBound("min",range==null) : min,storedMax=max==null ? DimensionHeights.defaultBound("max",range==null) : max;
+            ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText(range==null ? "Minimum dimension Y (source default)" : min==null ? "Minimum dimension Y (range class default)" : "Minimum dimension Y",minimum);drafts.update(minKey,storedMin,minimum.get());
+            ImGui.inputText(range==null ? "Maximum dimension Y (source default)" : max==null ? "Maximum dimension Y (range class default)" : "Maximum dimension Y",maximum);drafts.update(maxKey,storedMax,maximum.get());
+            if (ImGui.button(range==null ? "Create dimension height pair" : "Apply dimension height pair")) {
+                try { workspace.replace(selected,range==null ? DimensionHeights.create(selected,workspace.read(selected),minimum.get(),maximum.get()) : DimensionHeights.set(selected,workspace.read(selected),minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+        }
+        if (range!=null) for (String field : range.fields()) if (!List.of("min","max").contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawHydrologyEnvelopes() {
+        if (!ImGui.collapsingHeader("Deep-fluid footprint checks")) return;
+        ImGui.textWrapped("Checks applied data only. These native pack checks do not validate full geometry, runtime registries, borrowed dimension types or live-world compatibility. Findings do not block Save/Export.");
+        try {
+            var report=HydrologyEnvelopes.inspect(workspace.read(selected));
+            ImGui.text("Deep-fluid systems inspected: "+report.checked());
+            if (report.checked()==0 && report.findings().isEmpty()) ImGui.textWrapped("No explicit deep-fluid systems to inspect.");
+            else if (report.checked()>0 && report.findings().isEmpty()) ImGui.textWrapped("The inspected deep-fluid footprint margins are inside the applied dimension bounds.");
+            for (var finding : report.findings()) ImGui.textWrapped(finding.kind()+": "+finding.path()+" — "+finding.detail());
+        } catch (Exception failure) { ImGui.textWrapped("Footprint check unavailable: "+failure.getMessage()); }
+    }
     private void drawHydrology(LosslessJson document) {
         if (!ImGui.collapsingHeader("Hydrology")) return;
         ImGui.textWrapped(HydrologyFields.description("hydrology"));
@@ -534,7 +569,7 @@ public final class EditorApp extends Application {
     }
     private void drawDeepFluids(LosslessJson hydro) {
         ImGui.textWrapped(DeepFluids.description());
-        ImGui.textWrapped("Deep-fluid IDs must be unique, avoid reserved hydrology selectors and differ from river profile IDs. Other references are preserved. Placement and dimension-height envelope validation remain pending.");
+        ImGui.textWrapped("Deep-fluid IDs must be unique, avoid reserved hydrology selectors and differ from river profile IDs. Other references are preserved. See Deep-fluid footprint checks for dimension-height margins; placement validation remains pending.");
         List<LosslessJson> pools;
         try { pools=DeepFluids.entries(hydro); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored deep-fluid list contains snippets or unsupported entries (read-only).");return; }
@@ -600,7 +635,7 @@ public final class EditorApp extends Application {
         }
     }
     private void drawDeepGeometry(LosslessJson object,int index) {
-        ImGui.textWrapped("Apply geometry writes all six values together. Spacing must be at least 2 * (horizontal radius + channel width); depth + headroom must be less than 2 * vertical radius + 1. Dimension-height envelopes are not validated here.");
+        ImGui.textWrapped("Apply geometry writes all six values together. Spacing must be at least 2 * (horizontal radius + channel width); depth + headroom must be less than 2 * vertical radius + 1. See Deep-fluid footprint checks for applied dimension-height margins.");
         boolean supported=true;var inputs=new java.util.LinkedHashMap<String,ImString>();
         for (String field : DeepFluids.GEOMETRY) {
             String token=object.token(field),key=DeepFluids.systemPrefix(index)+field;
@@ -623,7 +658,7 @@ public final class EditorApp extends Application {
         LosslessJson height;
         try { height=DeepFluids.height(object); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored height is a snippet or unsupported value (read-only).");return; }
-        ImGui.textWrapped("The source height default reaches below the standard dimension floor. Review heights for your target dimension; dimension-height envelope validation remains pending.");
+        ImGui.textWrapped("The source height default reaches below the standard dimension floor. Review heights for your target dimension and inspect the applied Deep-fluid footprint checks.");
         if (height==null) {
             ImGui.textWrapped("Absent height: "+DeepFluids.heightCreationLabel()+".");
             if (ImGui.button("Create deep-fluid height (source defaults)")) applyRoutingExtra(() -> workspace.replace(selected,DeepFluids.createHeight(selected,workspace.read(selected),index)));
@@ -2399,7 +2434,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || RiverProfiles.maximumProfiles()!=64 || SurfacePools.maximumPools()!=64 || DeepFluids.maximumSystems()!=64 || DimensionHeights.defaultBound("min",true)==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

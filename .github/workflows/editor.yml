@@ -328,6 +328,16 @@ jobs:
           python editor/tools/extract_deep_fluid_fields.py IrisHydrology.java IrisDeepFluidConfig.java IrisStyledRange.java IrisGeneratorStyle.java PackHydrologyValidator.java HydrologyFeatureQuery.java IrisSurfacePoolConfig.java generated-deep-fluid.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-deep-fluid.properties).Hash -ne (Get-FileHash editor/src/main/resources/deep-fluid-fields.properties).Hash) { throw 'Pinned deep-fluid definitions differ' }
+      - name: Verify pinned dimension height and deep-fluid envelope definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionType.java' -OutFile IrisDimensionType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/PackDimensionValidator.java' -OutFile PackDimensionValidator.java
+          python editor/tools/test_dimension_height_fields.py IrisDimension.java IrisRange.java IrisDimensionType.java PackDimensionValidator.java PackHydrologyValidator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_height_fields.py IrisDimension.java IrisRange.java IrisDimensionType.java PackDimensionValidator.java PackHydrologyValidator.java generated-dimension-height.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-height.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-height-fields.properties).Hash) { throw 'Pinned dimension height/envelope definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
