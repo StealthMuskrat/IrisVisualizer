@@ -411,8 +411,8 @@ public final class EditorApp extends Application {
         ImGui.textWrapped(target.terrain() ? "Terrain styles require positive cellular zoom even when cellular frequency is zero."
                 : "Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
-            ImGui.textWrapped("Absent style uses " + NoiseStyleFields.contextDefault(target) + ". Enable it explicitly before changing style settings.");
-            if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefault(target) + ")")) enableStyle(target, "style");
+            ImGui.textWrapped("Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
+            if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefaultLabel(target) + ")")) enableStyle(target, "style");
             return;
         }
         for (String field : NoiseStyleFields.EDITABLE) {
@@ -548,8 +548,14 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+        for (String field:NoiseStyleFields.CAVE_FIELDS) {
+            if (ImGui.treeNode(field+" settings")) {
+                drawStyleFields(profile,NoiseStyleFields.Target.cave(ResourceTypes.base(selected),field));
+                ImGui.treePop();
+            }
+        }
         if (ImGui.treeNode("Other cave settings (read-only)")) {
-            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field)) ImGui.textWrapped(field);
+            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field) && !NoiseStyleFields.CAVE_FIELDS.contains(field)) ImGui.textWrapped(field);
             ImGui.treePop();
         }
     }

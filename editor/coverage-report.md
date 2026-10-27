@@ -15,7 +15,7 @@ Direct nonstatic/nontransient private fields in twelve pinned source classes onl
 | noise | 15 | 14 | 14 | 1 |
 | noiseStyle | 10 | 5 | 5 | 5 |
 | terrain3D | 14 | 14 | 14 | 0 |
-| caveProfile | 32 | 23 | 23 | 9 |
+| caveProfile | 32 | 27 | 27 | 5 |
 
 ## dimension
 
@@ -63,4 +63,4 @@ Unclassified: none.
 
 ## caveProfile
 
-Unclassified: `baseDensityStyle`, `defaultObjectAnchor`, `defaultObjectPlaceMode`, `densityThreshold`, `detailDensityStyle`, `modules`, `surfaceBreakStyle`, `verticalRange`, `warpStyle`.
+Unclassified: `defaultObjectAnchor`, `defaultObjectPlaceMode`, `densityThreshold`, `modules`, `verticalRange`.

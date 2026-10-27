@@ -26,7 +26,15 @@ public final class DimensionFields {
             if (CaveProfileFields.OBJECT_FIELDS.contains(field)) {
                 try {
                     LosslessJson object = new LosslessJson(document.token(field).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    for (String child : object.fields()) if (!CaveProfileFields.EDITABLE.contains(child)) paths.add(field+"."+child);
+                    for (String child : object.fields()) {
+                        if (CaveProfileFields.EDITABLE.contains(child)) continue;
+                        if (NoiseStyleFields.CAVE_FIELDS.contains(child)) {
+                            try {
+                                LosslessJson style=new LosslessJson(object.token(child).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                                for (String member:style.fields()) if (!NoiseStyleFields.EDITABLE.contains(member)) paths.add(field+"."+child+"."+member);
+                            } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }
+                        } else paths.add(field+"."+child);
+                    }
                 } catch (IllegalArgumentException mismatch) { paths.add(field); }
                 continue;
             }
