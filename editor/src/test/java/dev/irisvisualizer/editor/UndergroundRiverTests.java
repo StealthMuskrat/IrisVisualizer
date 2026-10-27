@@ -165,7 +165,7 @@ final class UndergroundRiverTests {
         RiverChannelRanges.editBounds(PATH,allRanges,"underground.depth","1","2");
         drafts.applied(RiverChannelRanges.draftPrefix("underground.depth")+"min"); drafts.applied(RiverChannelRanges.draftPrefix("underground.depth")+"max");
         check(drafts.count()==4 && drafts.contains(RiverChannelRanges.draftPrefix("depth")+"min") && drafts.contains(NoiseStyleFields.Target.undergroundRange("depth").draftPrefix()+"zoom"));
-        check(FieldCoverage.fields("undergroundRiver").size()==13 && FieldCoverage.fields("undergroundRiver").stream().filter(FieldCoverage.Field::implemented).count()==12);
+        check(FieldCoverage.fields("undergroundRiver").size()==13 && FieldCoverage.fields("undergroundRiver").stream().filter(FieldCoverage.Field::implemented).count()==13);
         check(FieldCoverage.fields("undergroundRiverSource").size()==3 && FieldCoverage.fields("undergroundRiverSource").stream().allMatch(FieldCoverage.Field::implemented));
         var workspace=PackWorkspace.newPack(Map.of(PATH,allRanges,"dimensions/defaults.json",empty));
         workspace.save(temp.resolve("underground-rivers")); workspace.exportZip(temp.resolve("underground-rivers.zip"));

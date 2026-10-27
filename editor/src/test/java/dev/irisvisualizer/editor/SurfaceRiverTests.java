@@ -164,7 +164,7 @@ final class SurfaceRiverTests {
         drafts.update(HydrologyFields.draftPrefix()+"tileSize","2048","4096");
         drafts.applied(SurfaceRiverFields.draftPrefix("channel")+"maximumIncision");
         check(drafts.count()==3 && drafts.contains(SurfaceRiverFields.draftPrefix("mouths")+"maximumIncision"));
-        Map<String,Integer> coverage=Map.of("surfaceRiver",9,"surfaceRiverSource",4,"surfaceRiverChannel",12,"surfaceRiverBank",8,"surfaceRiverFlow",6,"surfaceRiverMouth",7);
+        Map<String,Integer> coverage=Map.of("surfaceRiver",9,"surfaceRiverSource",4,"surfaceRiverChannel",12,"surfaceRiverBank",10,"surfaceRiverFlow",6,"surfaceRiverMouth",7);
         for (var entry : coverage.entrySet()) check(FieldCoverage.fields(entry.getKey()).stream().filter(FieldCoverage.Field::implemented).count()==entry.getValue());
         var workspace=PackWorkspace.newPack(Map.of(PATH,independent,"dimensions/defaults.json",empty,"dimensions/nested-data.json",nested,"dimensions/unknown.json",lastOriginal));
         workspace.save(temp.resolve("surface-rivers")); workspace.exportZip(temp.resolve("surface-rivers.zip"));

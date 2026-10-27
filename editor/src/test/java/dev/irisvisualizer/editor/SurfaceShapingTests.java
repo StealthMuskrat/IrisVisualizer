@@ -132,7 +132,7 @@ final class SurfaceShapingTests {
         SurfaceRiverFields.enableScalar(PATH,empty,"erosion","style"); check(drafts.count()==5);
         drafts.applied(SurfaceRiverFields.draftPrefix("erosion")+"smoothingRadius");
         check(drafts.count()==4 && drafts.contains(SurfaceRiverFields.draftPrefix("channel")+"smoothingRadius"));
-        for (var entry : Map.of("surfaceRiverErosion",9,"surfaceRiverBed",2,"riverExcavation",3).entrySet()) check(FieldCoverage.fields(entry.getKey()).stream().filter(FieldCoverage.Field::implemented).count()==entry.getValue());
+        for (var entry : Map.of("surfaceRiverErosion",9,"surfaceRiverBed",4,"riverExcavation",3).entrySet()) check(FieldCoverage.fields(entry.getKey()).stream().filter(FieldCoverage.Field::implemented).count()==entry.getValue());
         var workspace=PackWorkspace.newPack(Map.of(PATH,palettes,"dimensions/defaults.json",empty));
         workspace.save(temp.resolve("surface-shaping")); workspace.exportZip(temp.resolve("surface-shaping.zip"));
         var reopened=PackWorkspace.open(temp.resolve("surface-shaping")); var imported=PackWorkspace.importZip(temp.resolve("surface-shaping.zip"));
