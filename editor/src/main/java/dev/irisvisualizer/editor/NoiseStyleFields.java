@@ -35,9 +35,9 @@ public final class NoiseStyleFields {
             valid = valid || noise==null && "biomes".equals(resourceBase) && List.of("slab.style","wall.style").contains(objectField);
             valid = valid || noise==null && "biomes".equals(resourceBase) && FloatingNoiseStyles.context(objectField)!=null;
             valid = valid || noise==null && "biomes".equals(resourceBase) && FloatingBottomPalettes.context(objectField)!=null;
-            valid = valid || noise==null && "biomes".equals(resourceBase) && FloatingPlacementSettings.styleContext(objectField)!=null;
-            valid = valid || noise==null && "biomes".equals(resourceBase) && FloatingPlacementConstraints.warpContext(objectField)!=null;
-            valid = valid || noise==null && "biomes".equals(resourceBase) && FloatingObjectPalettes.styleContext(objectField)!=null;
+            valid = valid || noise==null && FloatingPlacementSettings.styleContext(resourceBase,objectField)!=null;
+            valid = valid || noise==null && FloatingPlacementConstraints.warpContext(resourceBase,objectField)!=null;
+            valid = valid || noise==null && FloatingObjectPalettes.styleContext(resourceBase,objectField)!=null;
             valid = moduleIndex == -1 ? valid : moduleIndex >= 0 && noise == null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.equals("caveProfile.modules.style");
             if (!valid) throw new IllegalArgumentException("Unsupported style target");
         }
@@ -63,15 +63,15 @@ public final class NoiseStyleFields {
             if (!RiverChannelRanges.UNDERGROUND_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported underground range style");
             return new Target("dimensions","hydrology.rivers.underground."+field+".style",null);
         }
-        public static Target objectPalette(FloatingObjectPalettes.Context context) { return new Target("biomes",java.util.Objects.requireNonNull(context).stylePath(),null); }
-        public boolean objectPalette() { return FloatingObjectPalettes.styleContext(objectField)!=null; }
-        public FloatingObjectPalettes.Context objectPaletteContext() { var context=FloatingObjectPalettes.styleContext(objectField);if (context==null) throw new IllegalArgumentException("Not an object material palette style");return context; }
-        public static Target placementWarp(int entry,String list,int placement) { var context=new FloatingPlacementConstraints.Context(entry,list,placement);return new Target("biomes",FloatingObjectPlacements.contextPath(context.entry(),context.list(),context.placement())+".warp",null); }
-        public boolean placementWarp() { return FloatingPlacementConstraints.warpContext(objectField)!=null; }
-        public FloatingPlacementConstraints.Context warpContext() { var context=FloatingPlacementConstraints.warpContext(objectField);if (context==null) throw new IllegalArgumentException("Not a floating placement warp");return context; }
-        public static Target placementDensity(int entry,String list,int placement) { var context=new FloatingPlacementSettings.Context(entry,list,placement);return new Target("biomes",FloatingObjectPlacements.contextPath(context.entry(),context.list(),context.placement())+".densityStyle.style",null); }
-        public boolean placementDensity() { return FloatingPlacementSettings.styleContext(objectField)!=null; }
-        public FloatingPlacementSettings.Context placementContext() { var context=FloatingPlacementSettings.styleContext(objectField);if (context==null) throw new IllegalArgumentException("Not a floating placement density style");return context; }
+        public static Target objectPalette(FloatingObjectPalettes.Context context) { return new Target(FloatingObjectPlacements.resourceBase(java.util.Objects.requireNonNull(context).entry()),context.stylePath(),null); }
+        public boolean objectPalette() { return FloatingObjectPalettes.styleContext(resourceBase,objectField)!=null; }
+        public FloatingObjectPalettes.Context objectPaletteContext() { var context=FloatingObjectPalettes.styleContext(resourceBase,objectField);if (context==null) throw new IllegalArgumentException("Not an object material palette style");return context; }
+        public static Target placementWarp(int entry,String list,int placement) { var context=new FloatingPlacementConstraints.Context(entry,list,placement);return new Target(FloatingObjectPlacements.resourceBase(context.entry()),FloatingObjectPlacements.contextPath(context.entry(),context.list(),context.placement())+".warp",null); }
+        public boolean placementWarp() { return FloatingPlacementConstraints.warpContext(resourceBase,objectField)!=null; }
+        public FloatingPlacementConstraints.Context warpContext() { var context=FloatingPlacementConstraints.warpContext(resourceBase,objectField);if (context==null) throw new IllegalArgumentException("Not a floating placement warp");return context; }
+        public static Target placementDensity(int entry,String list,int placement) { var context=new FloatingPlacementSettings.Context(entry,list,placement);return new Target(FloatingObjectPlacements.resourceBase(context.entry()),FloatingObjectPlacements.contextPath(context.entry(),context.list(),context.placement())+".densityStyle.style",null); }
+        public boolean placementDensity() { return FloatingPlacementSettings.styleContext(resourceBase,objectField)!=null; }
+        public FloatingPlacementSettings.Context placementContext() { var context=FloatingPlacementSettings.styleContext(resourceBase,objectField);if (context==null) throw new IllegalArgumentException("Not a floating placement density style");return context; }
         public static Target floatingBottom(int entry,int layer) { if (entry<0 || layer<0) throw new IllegalArgumentException("Select a floating entry and layer");return new Target("biomes","floatingChildBiomes."+entry+".bottomPalette."+layer+".style",null); }
         public boolean floatingBottom() { return FloatingBottomPalettes.context(objectField)!=null; }
         public FloatingBottomPalettes.Context floatingBottomContext() { var context=FloatingBottomPalettes.context(objectField);if (context==null) throw new IllegalArgumentException("Not a floating underside style");return context; }

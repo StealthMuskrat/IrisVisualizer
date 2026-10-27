@@ -101,6 +101,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biome'].update(editable(java_dir, 'BiomeSlabWall', 'OBJECT_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'FloatingBiomes', 'LIST_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'BiomeObjectPlacements', 'LIST_FIELDS'))
+    implemented['region'].update(editable(java_dir, 'RegionObjectPlacements', 'LIST_FIELDS'))
     implemented['floatingBiome'] = set(editable(java_dir, 'FloatingBiomes'))
     implemented['floatingBiome'].update(editable(java_dir, 'FloatingNoiseStyles'))
     implemented['floatingBiome'].update(editable(java_dir, 'FloatingBottomPalettes'))

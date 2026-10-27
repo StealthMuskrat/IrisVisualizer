@@ -9,6 +9,9 @@ import java.util.function.Function;
 
 /** Lossless biome and floating-entry placement collections; native placement stays outside the inspector. */
 public final class FloatingObjectPlacements {
+    // Negative owner values identify root collections; nonnegative values are floating-entry indices.
+    public static final int BIOME_ROOT = -1;
+    public static final int REGION_ROOT = -2;
     public static final List<String> LIST_FIELDS = List.of("extraObjects", "floatingObjects", "topObjectOverrides", "bottomObjectOverrides");
     public static final List<String> EDITABLE = List.of("place", "allowedCollisions", "forbiddenCollisions", "chance", "density", "snow", "mode", "translate");
     public static final List<String> POOLS = List.of("place", "allowedCollisions", "forbiddenCollisions");
@@ -24,37 +27,41 @@ public final class FloatingObjectPlacements {
     }
     private static void field(String value,List<String> fields) { if (value==null || !fields.contains(value)) throw new IllegalArgumentException("Unsupported floating placement field"); }
     private static void collection(String list) { if (!"objects".equals(list)) field(list,LIST_FIELDS); }
-    static boolean validCollection(int entry,String list) { return list!=null && (entry==-1 ? "objects".equals(list) : entry>=0 && LIST_FIELDS.contains(list)); }
+    static boolean validCollection(int entry,String list) { return list!=null && (root(entry) ? "objects".equals(list) : entry>=0 && LIST_FIELDS.contains(list)); }
+    static boolean root(int entry) { return entry==BIOME_ROOT || entry==REGION_ROOT; }
+    static String resourceBase(int entry) { if (!root(entry) && entry<0) throw new IllegalArgumentException("Unknown placement owner");return entry==REGION_ROOT ? "regions" : "biomes"; }
     static boolean validContext(int entry,String list,int placement) { return placement>=0 && validCollection(entry,list); }
     static boolean configured(String list) { return "objects".equals(list) || "floatingObjects".equals(list); }
-    private static void authorize(String path,int entry,String list) { if (!BiomeFields.biome(path) || !validCollection(entry,list)) throw new IllegalArgumentException("Select a biome object collection"); }
+    static void authorize(String path,int entry,String list) { if (!validCollection(entry,list) || !resourceBase(entry).equals(ResourceTypes.base(path))) throw new IllegalArgumentException("Placement owner does not match this resource"); }
     static byte[] editOwner(byte[] original,int entry,String list,Function<LosslessJson,byte[]> action) {
-        if (!validCollection(entry,list)) throw new IllegalArgumentException("Select a biome object collection");
-        return entry==-1 ? action.apply(new LosslessJson(original)) : FloatingBiomes.editEntry(original,entry,action);
+        if (!validCollection(entry,list)) throw new IllegalArgumentException("Select an object collection");
+        return root(entry) ? action.apply(new LosslessJson(original)) : FloatingBiomes.editEntry(original,entry,action);
     }
     static String contextPath(int entry,String list,int placement) {
-        if (!validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object placement");
-        return entry==-1 ? "objects."+placement : "floatingChildBiomes."+entry+"."+list+"."+placement;
+        if (!validContext(entry,list,placement)) throw new IllegalArgumentException("Select an object placement");
+        return root(entry) ? "objects."+placement : "floatingChildBiomes."+entry+"."+list+"."+placement;
     }
     record PlacementPath(int entry,String list,int placement,String suffix) {}
-    static PlacementPath parsePath(String path) {
-        if (path==null) return null;
+    static PlacementPath parsePath(String path) { return parsePath("biomes",path); }
+    static PlacementPath parsePath(String resourceBase,String path) {
+        if (path==null || !("biomes".equals(resourceBase) || "regions".equals(resourceBase))) return null;
         var root=java.util.regex.Pattern.compile("objects\\.(0|[1-9][0-9]*)\\.(.+)").matcher(path);
         var floating=java.util.regex.Pattern.compile("floatingChildBiomes\\.(0|[1-9][0-9]*)\\.([A-Za-z]+)\\.(0|[1-9][0-9]*)\\.(.+)").matcher(path);
         try {
-            if (root.matches()) return new PlacementPath(-1,"objects",Integer.parseInt(root.group(1)),root.group(2));
-            if (floating.matches() && LIST_FIELDS.contains(floating.group(2))) return new PlacementPath(Integer.parseInt(floating.group(1)),floating.group(2),Integer.parseInt(floating.group(3)),floating.group(4));
+            if (root.matches()) return new PlacementPath("regions".equals(resourceBase) ? REGION_ROOT : BIOME_ROOT,"objects",Integer.parseInt(root.group(1)),root.group(2));
+            if ("biomes".equals(resourceBase) && floating.matches() && LIST_FIELDS.contains(floating.group(2))) return new PlacementPath(Integer.parseInt(floating.group(1)),floating.group(2),Integer.parseInt(floating.group(3)),floating.group(4));
         } catch (NumberFormatException invalid) { return null; }
         return null;
     }
     public static String help(String value) { field(value,EDITABLE);return DATA.getProperty(value+".description",""); }
     public static String listHelp(String list) { collection(list);if (list.equals("objects")) return BiomeObjectPlacements.description();return list.equals("floatingObjects") ? "Placements attempted through the floating-object path. The pinned renderer preserves their configured mode; select FLOATING for free-air placement." : DATA.getProperty(list+".description",""); }
+    public static String listHelp(int entry,String list) { if (!validCollection(entry,list)) throw new IllegalArgumentException("Select an object collection");return entry==REGION_ROOT ? RegionObjectPlacements.description() : listHelp(list); }
     public static String defaultToken(String value) { field(value,EDITABLE);return DATA.getProperty(value+".default"); }
     public static String constraints(String value) { field(value,SCALARS);return (value.equals("density") ? "Exact integer" : "Finite number")+", minimum "+DATA.getProperty(value+".minimum")+", maximum "+DATA.getProperty(value+".maximum"); }
     public static List<String> modes() { return List.of(DATA.getProperty("mode.choices").split(",")); }
     public static String modeHelp(String value) { if (value==null || !modes().contains(value)) throw new IllegalArgumentException("Unknown placement mode");return DATA.getProperty("mode."+value+".description",""); }
     public static String creationMode(String list) { collection(list);return list.equals("floatingObjects") ? DATA.getProperty("newFloatingPreset") : defaultToken("mode"); }
-    public static String listPrefix(int entry,String list) { if (!validCollection(entry,list)) throw new IllegalArgumentException("Select a biome object collection");return entry==-1 ? "biomeObjects#." : FloatingBiomes.entryPrefix(entry)+"objects#"+list+"."; }
+    public static String listPrefix(int entry,String list) { if (!validCollection(entry,list)) throw new IllegalArgumentException("Select an object collection");return root(entry) ? (entry==REGION_ROOT ? "regionObjects#." : "biomeObjects#.") : FloatingBiomes.entryPrefix(entry)+"objects#"+list+"."; }
     public static String placementPrefix(int entry,String list,int placement) { if (placement<0) throw new IllegalArgumentException("Select a placement");return listPrefix(entry,list)+placement+"."; }
     public static String poolPrefix(int entry,String list,int placement,String pool) { field(pool,POOLS);return placementPrefix(entry,list,placement)+"pool#"+pool+"."; }
     public static List<String> objectChoices(PackWorkspace workspace) {
@@ -62,9 +69,9 @@ public final class FloatingObjectPlacements {
                 .map(path -> path.substring("objects/".length(),path.length()-4)).filter(ResourceTypes::referenceKey).sorted().toList();
     }
     private static void object(String key,PackWorkspace workspace) { if (key==null || !objectChoices(workspace).contains(key)) throw new IllegalArgumentException("Choose an exact .iob key present in this pack; target content and loader aliases are unchecked"); }
-    static List<LosslessJson> placements(LosslessJson entry,String list) { collection(list);String token=entry.token(list);if ("objects".equals(list) && "null".equals(token)) throw new IllegalArgumentException("Stored biome objects is null (read-only)");return token==null || token.equals("null") ? null : entry.objectArray(list); }
-    static byte[] editPlacement(byte[] original,int entry,String list,int placement,Function<LosslessJson,byte[]> action) { if (!validContext(entry,list,placement)) throw new IllegalArgumentException("Select a biome object placement");return editOwner(original,entry,list,e -> e.objectArrayEdit(list,placement,action)); }
-    public static byte[] enable(String path,byte[] original,int entry,String list) { authorize(path,entry,list);return editOwner(original,entry,list,e -> entry==-1 ? e.enable(list,"[]") : e.enableArray(list)); }
+    static List<LosslessJson> placements(LosslessJson entry,String list) { collection(list);String token=entry.token(list);if ("objects".equals(list) && "null".equals(token)) throw new IllegalArgumentException("Stored objects is null (read-only)");return token==null || token.equals("null") ? null : entry.objectArray(list); }
+    static byte[] editPlacement(byte[] original,int entry,String list,int placement,Function<LosslessJson,byte[]> action) { if (!validContext(entry,list,placement)) throw new IllegalArgumentException("Select an object placement");return editOwner(original,entry,list,e -> e.objectArrayEdit(list,placement,action)); }
+    public static byte[] enable(String path,byte[] original,int entry,String list) { authorize(path,entry,list);return editOwner(original,entry,list,e -> root(entry) ? e.enable(list,"[]") : e.enableArray(list)); }
     public static byte[] change(String path,byte[] original,int entry,String list,RiverProfiles.Action action,int index,String key,String mode,PackWorkspace workspace) {
         authorize(path,entry,list);if (action==null) throw new IllegalArgumentException("Choose a placement action");
         if (action==RiverProfiles.Action.ADD) {

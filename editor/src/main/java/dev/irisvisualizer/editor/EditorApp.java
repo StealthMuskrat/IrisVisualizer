@@ -282,6 +282,7 @@ public final class EditorApp extends Application {
         }
         drawCaveProfile(document);
         drawRiverPolicy(document);
+        drawRootObjects(document,FloatingObjectPlacements.REGION_ROOT);
         ImGui.textWrapped("Other region fields remain read-only.");
     }
     private void drawGenerator(LosslessJson document) {
@@ -506,11 +507,7 @@ public final class EditorApp extends Application {
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
         drawBiomeSlabWall(document);
-        if (ImGui.collapsingHeader("Biome object placements")) {
-            ImGui.textWrapped("Select exact .iob keys from this pack. Native object loading, collision checks and generation are unavailable here.");
-            ImGui.textWrapped("Carving support selects surface/cave passes. Imports can remap ordinary modes to FAST_MIN_STILT; CENTER_HEIGHT cave placements can inherit the active cave profile mode. Dimension settings also affect surface support. No effective placement is evaluated.");
-            drawFloatingObjectList(document,-1,"objects");
-        }
+        drawRootObjects(document,FloatingObjectPlacements.BIOME_ROOT);
         drawFloatingBiomes(document);
         drawRootStyles(document, false);
         drawCaveProfile(document);
@@ -575,6 +572,13 @@ public final class EditorApp extends Application {
             ImGui.treePop();
         }
     }
+    private void drawRootObjects(LosslessJson document,int owner) {
+        if (!ImGui.collapsingHeader(owner==FloatingObjectPlacements.REGION_ROOT ? "Region object placements" : "Biome object placements")) return;
+        ImGui.textWrapped("Select exact .iob keys from this pack. Native object loading, collision checks and generation are unavailable here.");
+        ImGui.textWrapped("Carving support selects surface/cave passes. Imports can remap ordinary modes to FAST_MIN_STILT; CENTER_HEIGHT cave placements can inherit the active cave profile mode. Dimension settings also affect surface support. No effective placement is evaluated.");
+        if (owner==FloatingObjectPlacements.REGION_ROOT) ImGui.textWrapped(RegionObjectPlacements.caveHelp());
+        drawFloatingObjectList(document,owner,"objects");
+    }
     private void drawFloatingObjects(LosslessJson entry,int index) {
         if (!ImGui.treeNode("Floating object placements")) return;
         ImGui.textWrapped("Select exact object keys from .iob files in this pack. File contents, compatibility and native placement are not resolved here. Top/bottom override modes determine which lists participate; editing a list leaves inheritance settings unchanged. Anchored placements remap some modes and replace translation/rotation in Iris.");
@@ -593,7 +597,7 @@ public final class EditorApp extends Application {
         }
     }
     private void drawFloatingObjectList(LosslessJson entry,int index,String list) {
-        ImGui.textWrapped(FloatingObjectPlacements.listHelp(list));List<LosslessJson> placements;
+        ImGui.textWrapped(FloatingObjectPlacements.listHelp(index,list));List<LosslessJson> placements;
         try { placements=FloatingObjectPlacements.placements(entry,list); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list contains snippets or unsupported placements (read-only).");return; }
         if (placements==null) {
@@ -624,7 +628,7 @@ public final class EditorApp extends Application {
             if (action!=null) { ImGui.treePop();changeFloatingObject(index,list,action,placementIndex,null,null);return; }
             var placement=placements.get(placementIndex);
             drawFloatingPlacementMode(placement,index,list,placementIndex);
-            if (index==-1 && list.equals("objects")) drawBiomeObjectAnchors(placement,placementIndex);
+            if (FloatingObjectPlacements.root(index) && list.equals("objects")) drawRootObjectAnchors(placement,index,placementIndex);
             for (String field : FloatingObjectPlacements.SCALARS) drawFloatingPlacementScalar(placement,index,list,placementIndex,field);
             drawFloatingPlacementSettings(placement,new FloatingPlacementSettings.Context(index,list,placementIndex));
             drawFloatingPlacementConstraints(placement,new FloatingPlacementConstraints.Context(index,list,placementIndex));
@@ -639,7 +643,7 @@ public final class EditorApp extends Application {
             ImGui.treePop();
         }
     }
-    private void drawBiomeObjectAnchors(LosslessJson placement,int index) {
+    private void drawRootObjectAnchors(LosslessJson placement,int owner,int index) {
         if (!ImGui.treeNode("Cave anchors and bottom alignment")) return;
         ImGui.textWrapped("Cave anchors apply when carvingSupport includes carving. PROFILE_DEFAULT uses the active cave profile anchor, falling back to FLOOR. CEILING_HANG forces ceiling anchors. Anchor search, burial and containment can reject a placement.");
         String token=placement.token("caveAnchorMode");
@@ -647,7 +651,7 @@ public final class EditorApp extends Application {
             String current=token==null ? "Absent: "+BiomeObjectPlacements.defaultAnchor() : placement.stringToken("caveAnchorMode");
             if (ImGui.beginCombo("Cave anchor",current.length()>128 ? "Unknown stored anchor" : current)) {
                 for (String choice : BiomeObjectPlacements.anchors()) {
-                    if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.setAnchor(selected,workspace.read(selected),index,choice)));
+                    if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.setAnchor(selected,workspace.read(selected),owner,index,choice)));
                     if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeObjectPlacements.anchorHelp(choice));
                 }
                 ImGui.endCombo();
@@ -655,9 +659,9 @@ public final class EditorApp extends Application {
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored cave anchor has an unsupported type (read-only)."); }
         ImGui.textWrapped(BiomeObjectPlacements.bottomHelp());String bottom=placement.token("bottom");
         if (bottom==null) {
-            if (ImGui.button("Enable bottom alignment (false)")) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.enableBottom(selected,workspace.read(selected),index)));
+            if (ImGui.button("Enable bottom alignment (false)")) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.enableBottom(selected,workspace.read(selected),owner,index)));
         } else if (!bottom.equals("true") && !bottom.equals("false")) ImGui.textWrapped("Stored bottom flag has an unsupported type (read-only).");
-        else { ImBoolean value=new ImBoolean(Boolean.parseBoolean(bottom));if (ImGui.checkbox("Bottom alignment",value)) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.setBottom(selected,workspace.read(selected),index,value.get()))); }
+        else { ImBoolean value=new ImBoolean(Boolean.parseBoolean(bottom));if (ImGui.checkbox("Bottom alignment",value)) applyRoutingExtra(() -> workspace.replace(selected,BiomeObjectPlacements.setBottom(selected,workspace.read(selected),owner,index,value.get()))); }
         ImGui.treePop();
     }
     private void changeFloatingObject(int entry,String list,RiverProfiles.Action action,int placement,String object,String mode) {
