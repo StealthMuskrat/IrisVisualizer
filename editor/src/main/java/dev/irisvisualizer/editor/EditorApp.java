@@ -553,6 +553,10 @@ public final class EditorApp extends Application {
             drawCaveThreshold(profile);
             ImGui.treePop();
         }
+        if (ImGui.treeNode("Cave density modules")) {
+            drawCaveModules(profile);
+            ImGui.treePop();
+        }
         for (String field:NoiseStyleFields.CAVE_FIELDS) {
             if (ImGui.treeNode(field+" settings")) {
                 drawStyleFields(profile,NoiseStyleFields.Target.cave(ResourceTypes.base(selected),field));
@@ -560,7 +564,7 @@ public final class EditorApp extends Application {
             }
         }
         if (ImGui.treeNode("Other cave settings (read-only)")) {
-            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field) && !CavePlacementFields.EDITABLE.contains(field) && !CaveThresholdFields.OBJECT_FIELDS.contains(field) && !NoiseStyleFields.CAVE_FIELDS.contains(field)) ImGui.textWrapped(field);
+            for (String field:profile.fields()) if (!CaveProfileFields.EDITABLE.contains(field) && !CavePlacementFields.EDITABLE.contains(field) && !CaveThresholdFields.OBJECT_FIELDS.contains(field) && !CaveModules.LIST_FIELDS.contains(field) && !NoiseStyleFields.CAVE_FIELDS.contains(field)) ImGui.textWrapped(field);
             ImGui.treePop();
         }
     }
@@ -634,29 +638,118 @@ public final class EditorApp extends Application {
         for (String member : range.fields()) if (!CaveThresholdFields.EDITABLE.contains(member)) ImGui.textWrapped(member + " (read-only)");
     }
     private void drawCaveBoundInputs(LosslessJson range, boolean threshold) {
-        String prefix = threshold ? CaveThresholdFields.draftPrefix(ResourceTypes.base(selected)) : CavePlacementFields.draftPrefix(ResourceTypes.base(selected));
+        drawCaveBoundInputs(range, threshold, -1);
+    }
+    private void drawCaveBoundInputs(LosslessJson range, boolean threshold, int moduleIndex) {
+        boolean module = moduleIndex >= 0;
+        String context = ResourceTypes.base(selected);
+        String prefix = module ? CaveModules.draftPrefix(context,moduleIndex)+"verticalRange." : threshold ? CaveThresholdFields.draftPrefix(context) : CavePlacementFields.draftPrefix(context);
         for (String member : CavePlacementFields.RANGE_MEMBERS) {
             String token = range.token(member);
             try { if (token != null) new java.math.BigDecimal(token); }
             catch (NumberFormatException mismatch) { ImGui.textWrapped("Stored " + member + " is not numeric (read-only)."); return; }
         }
         for (String member : CavePlacementFields.RANGE_MEMBERS) {
-            String token = range.token(member), effective = token == null ? threshold ? CaveThresholdFields.defaultBound(member, false) : CavePlacementFields.rangeDefault(member, false) : token;
+            String token = range.token(member), effective = token;
+            if (effective == null) effective = module ? CaveModules.rangeDefault(member,false) : threshold ? CaveThresholdFields.defaultBound(member, false) : CavePlacementFields.rangeDefault(member, false);
             String key = prefix + member;
-            ImString input = values.computeIfAbsent(key, ignored -> new ImString(effective, Math.max(128, effective.getBytes(StandardCharsets.UTF_8).length + 1)));
+            String stored = effective;
+            ImString input = values.computeIfAbsent(key, ignored -> new ImString(stored, Math.max(128, stored.getBytes(StandardCharsets.UTF_8).length + 1)));
             ImGui.inputText(member + (token == null ? " (Iris default)" : "") + "##" + key, input);
             drafts.update(key, effective, input.get());
         }
         ImGui.textWrapped("Apply writes both bounds, filling absent members. Use finite numbers with minimum at most maximum.");
-        if (ImGui.button(threshold ? "Apply threshold bounds" : "Apply vertical bounds")) {
+        if (ImGui.button(module ? "Apply module bounds" : threshold ? "Apply threshold bounds" : "Apply vertical bounds")) {
             try {
                 byte[] original = workspace.read(selected);
                 String min = values.get(prefix + "min").get(), max = values.get(prefix + "max").get();
-                workspace.replace(selected, threshold ? CaveThresholdFields.editRange(selected, original, min, max) : CavePlacementFields.editRange(selected, original, min, max));
+                workspace.replace(selected, module ? CaveModules.editRange(selected,original,moduleIndex,min,max) : threshold ? CaveThresholdFields.editRange(selected, original, min, max) : CavePlacementFields.editRange(selected, original, min, max));
                 for (String member : CavePlacementFields.RANGE_MEMBERS) { drafts.applied(prefix + member); values.remove(prefix + member); }
                 error = null;
             } catch (Exception failure) { error = failure.getMessage(); }
         }
+    }
+    private void drawCaveModules(LosslessJson profile) {
+        ImGui.textWrapped(CaveModules.description());
+        List<LosslessJson> modules;
+        try { modules = CaveModules.entries(profile); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Module list contains snippets or unsupported entries (read-only)."); return; }
+        ImGui.textWrapped("Add creates an empty module using Iris defaults. Absent and empty lists retain the empty default. Removing entries respects the source minimum of " + CaveModules.minimumEntries() + ".");
+        if (ImGui.button("Add default cave module")) { changeCaveModule(CaveModules.Action.ADD,-1); return; }
+        for (int index = 0; index < modules.size(); index++) {
+            if (!ImGui.treeNode("Module " + index)) continue;
+            CaveModules.Action action = null;
+            if (ImGui.button("Duplicate")) action = CaveModules.Action.DUPLICATE;
+            ImGui.sameLine(); ImGui.beginDisabled(modules.size() <= CaveModules.minimumEntries());
+            if (ImGui.button("Remove")) action = CaveModules.Action.REMOVE;
+            ImGui.endDisabled(); ImGui.beginDisabled(index == 0);
+            if (ImGui.button("Move up")) action = CaveModules.Action.UP;
+            ImGui.endDisabled(); ImGui.sameLine(); ImGui.beginDisabled(index == modules.size()-1);
+            if (ImGui.button("Move down")) action = CaveModules.Action.DOWN;
+            ImGui.endDisabled();
+            if (action != null) { ImGui.treePop(); changeCaveModule(action,index); return; }
+            var module = modules.get(index);
+            drawCaveModuleScalars(module,index);
+            if (ImGui.treeNode("Module vertical bounds")) { drawCaveModuleRange(module,index); ImGui.treePop(); }
+            if (ImGui.treeNode("Module style")) { drawStyleFields(module,NoiseStyleFields.Target.module(ResourceTypes.base(selected),index)); ImGui.treePop(); }
+            for (String field : module.fields()) if (!CaveModules.EDITABLE.contains(field) && !CaveModules.OBJECT_FIELDS.contains(field)) ImGui.textWrapped(field + " (read-only)");
+            ImGui.treePop();
+        }
+    }
+    private void drawCaveModuleScalars(LosslessJson module, int index) {
+        for (String field : CaveModules.EDITABLE) {
+            String token = module.token(field), key = CaveModules.draftPrefix(ResourceTypes.base(selected),index)+field;
+            ImGui.pushID(key); ImGui.text(field);
+            if (ImGui.isItemHovered()) ImGui.setTooltip(CaveModules.help(field));
+            if (CaveModules.booleanField(field)) {
+                String effective = token == null ? CaveModules.defaultToken(field) : token;
+                if (!effective.equals("true") && !effective.equals("false")) ImGui.textWrapped("Stored toggle has an unsupported type (read-only).");
+                else if (ImGui.checkbox(token == null ? "Value (Iris default)" : "Value",effective.equals("true"))) {
+                    try { workspace.replace(selected,CaveModules.editBoolean(selected,workspace.read(selected),index,field,!effective.equals("true"))); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else if (token == null) {
+                if (ImGui.button("Enable (" + CaveModules.defaultToken(field) + ")")) {
+                    try { workspace.replace(selected,CaveModules.enableScalar(selected,workspace.read(selected),index,field)); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            } else {
+                ImGui.textWrapped(CaveModules.constraints(field));
+                ImString input = values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("Value",input); drafts.update(key,token,input.get());
+                if (ImGui.button("Apply")) {
+                    try { workspace.replace(selected,CaveModules.editText(selected,workspace.read(selected),index,field,input.get())); drafts.applied(key); values.remove(key); error = null; }
+                    catch (Exception failure) { error = failure.getMessage(); }
+                }
+            }
+            ImGui.popID();
+        }
+    }
+    private void drawCaveModuleRange(LosslessJson module, int index) {
+        ImGui.textWrapped(CaveModules.help("verticalRange"));
+        LosslessJson range;
+        try { range = CaveModules.range(module); }
+        catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored module range is a snippet or unsupported value (read-only)."); return; }
+        if (range == null) {
+            String bounds = CaveModules.rangeDefault("min",true)+".."+CaveModules.rangeDefault("max",true);
+            ImGui.textWrapped("Absent module range uses " + bounds + ". Enable it explicitly before editing.");
+            if (ImGui.button("Enable module bounds (" + bounds + ")")) {
+                try { workspace.replace(selected,CaveModules.enableRange(selected,workspace.read(selected),index)); error = null; }
+                catch (Exception failure) { error = failure.getMessage(); }
+            }
+            return;
+        }
+        drawCaveBoundInputs(range,false,index);
+        for (String member : range.fields()) if (!CavePlacementFields.RANGE_MEMBERS.contains(member)) ImGui.textWrapped(member + " (read-only)");
+    }
+    private void changeCaveModule(CaveModules.Action action, int index) {
+        try {
+            byte[] next = CaveModules.change(selected,workspace.read(selected),action,index);
+            String prefix = CaveModules.draftPrefix(ResourceTypes.base(selected));
+            if (drafts.transitionUnder(prefix,() -> discardArrayDrafts("caveModules",null),() -> workspace.replace(selected,next))) {
+                values.keySet().removeIf(key -> key.startsWith(prefix)); error = null;
+            }
+        } catch (Exception failure) { error = failure.getMessage(); }
     }
     private void drawTerrain3D(LosslessJson document) {
         ImGui.textWrapped(Terrain3DFields.description());

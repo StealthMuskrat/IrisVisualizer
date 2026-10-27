@@ -46,6 +46,8 @@ public final class DimensionFields {
                                     } else if (!CaveThresholdFields.EDITABLE.contains(member)) paths.add(field+"."+child+"."+member);
                                 }
                             } catch (IllegalArgumentException mismatch) { paths.add(field+"."+child); }
+                        } else if (CaveModules.LIST_FIELDS.contains(child)) {
+                            for (String path : CaveModules.readOnlyPaths(object)) paths.add(field+"."+path);
                         } else if (NoiseStyleFields.CAVE_FIELDS.contains(child)) {
                             try {
                                 LosslessJson style=new LosslessJson(object.token(child).getBytes(java.nio.charset.StandardCharsets.UTF_8));

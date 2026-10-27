@@ -705,6 +705,10 @@
     "densityThreshold": {
       "classification": "generation",
       "reason": "Generation cave carve cutoff; bounded styled-range editing preserves contextual/class defaults and unknown data without evaluating noise."
+    },
+    "modules": {
+      "classification": "generation",
+      "reason": "Additional cave density layers; bounded module scalar/style/range editing and lossless list operations respect the annotated minimum without generating caves."
     }
   },
   "styledRange": {
@@ -719,6 +723,38 @@
     "style": {
       "classification": "generation",
       "reason": "Generation threshold range distribution; bounded style selector/scalars with explicit STATIC class default, without running noise factories."
+    }
+  },
+  "caveModule": {
+    "weight": {
+      "classification": "generation",
+      "reason": "Generation density contribution; finite scalar with pinned minimum/default."
+    },
+    "threshold": {
+      "classification": "generation",
+      "reason": "Generation layer cutoff offset; finite scalar with pinned bounds/default."
+    },
+    "invert": {
+      "classification": "generation",
+      "reason": "Generation layer inversion; default-aware boolean control."
+    },
+    "style": {
+      "classification": "generation",
+      "reason": "Generation module density distribution; bounded shared style editor preserves contextual defaults and unknown settings."
+    },
+    "verticalRange": {
+      "classification": "generation",
+      "reason": "Generation module vertical contribution bounds; explicit contextual defaults and token-preserving finite ordered pair editor."
+    }
+  },
+  "range": {
+    "min": {
+      "classification": "generation",
+      "reason": "Generation cave profile/module vertical bounds; finite ordered pair controls with pinned contextual/class defaults. Editing is limited to these cave contexts."
+    },
+    "max": {
+      "classification": "generation",
+      "reason": "Generation cave profile/module vertical bounds; finite ordered pair controls with pinned contextual/class defaults. Editing is limited to these cave contexts."
     }
   }
 }

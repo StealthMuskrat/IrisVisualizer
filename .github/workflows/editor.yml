@@ -124,6 +124,15 @@ jobs:
           python editor/tools/extract_cave_threshold_fields.py IrisCaveProfile.java IrisStyledRange.java IrisGeneratorStyle.java generated-cave-threshold.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-cave-threshold.properties).Hash -ne (Get-FileHash editor/src/main/resources/cave-threshold-fields.properties).Hash) { throw 'Pinned cave threshold definitions differ' }
+      - name: Verify pinned cave module definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/cave/IrisCaveFieldModule.java' -OutFile IrisCaveFieldModule.java
+          python editor/tools/test_cave_module_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_cave_module_fields.py IrisCaveProfile.java IrisCaveFieldModule.java IrisRange.java IrisGeneratorStyle.java generated-cave-module.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-cave-module.properties).Hash -ne (Get-FileHash editor/src/main/resources/cave-module-fields.properties).Hash) { throw 'Pinned cave module definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
