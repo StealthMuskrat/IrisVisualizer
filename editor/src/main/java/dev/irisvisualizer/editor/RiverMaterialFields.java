@@ -13,7 +13,7 @@ import java.util.function.Function;
 public final class RiverMaterialFields {
     public static final List<String> MATERIAL_TARGETS = List.of("surface.banks.shoreMaterial", "surface.banks.bankMaterial", "surface.bed.material", "underground.bedMaterial");
     public static final List<String> EDITABLE = List.of("enabled", "depth", "palette");
-    public static final List<String> PALETTE_FIELDS = List.of("palette");
+    public static final List<String> PALETTE_FIELDS = List.of("palette", "style", "zoom");
     public static final List<String> ENTRY_FIELDS = List.of("block", "weight");
     public static final List<String> BANK_FIELDS = List.of("shoreMaterial", "bankMaterial");
     public static final List<String> BED_FIELDS = List.of("material", "paddingPalette");
@@ -49,7 +49,7 @@ public final class RiverMaterialFields {
     private static byte[] editMaterial(byte[] original,String target,Function<LosslessJson,byte[]> action) {
         materialTarget(target); return editOwner(original,target,owner -> owner.objectEdit(leaf(target),action,false));
     }
-    private static byte[] editPalette(byte[] original,String target,Function<LosslessJson,byte[]> action) {
+    static byte[] editPalette(byte[] original,String target,Function<LosslessJson,byte[]> action) {
         return target.equals(PADDING) ? editOwner(original,target,owner -> owner.objectEdit(leaf(target),action,false))
                 : editMaterial(original,target,material -> material.objectEdit("palette",action,false));
     }
@@ -153,6 +153,7 @@ public final class RiverMaterialFields {
             var palette=palette(object,target); if (palette==null) return paths;
             String prefix=target+(target.equals(PADDING) ? "" : ".palette");
             for (String field : palette.fields()) if (!PALETTE_FIELDS.contains(field)) paths.add(prefix+"."+field);
+            for (String path : RiverPaletteFields.readOnlyStylePaths(palette,target)) paths.add(prefix+"."+path);
             try {
                 var entries=entries(palette);
                 if (entries!=null) for (int i=0;i<entries.size();i++) for (String field : entries.get(i).fields()) if (!ENTRY_FIELDS.contains(field)) paths.add(prefix+".palette["+i+"]."+field);

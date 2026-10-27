@@ -444,7 +444,7 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else if ((target.banks() || target.riverRange()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            } else if ((target.banks() || target.riverRange() || target.palette()) && !LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
             else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
@@ -836,7 +836,7 @@ public final class EditorApp extends Application {
             LosslessJson palette;
             try { palette=RiverMaterialFields.palette(object,target); }
             catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored palette is a snippet or unsupported value (read-only)."); return; }
-            ImGui.textWrapped("Weighted blocks: at least one entry; weights 1-64. Palette noise and advanced block data are read-only. Runtime block registry, state and solidity validation is pending.");
+            ImGui.textWrapped("Weighted blocks: at least one entry; weights 1-64. Advanced block data is read-only. Runtime block registry, state and solidity validation is pending.");
             if (palette==null) {
                 ImGui.textWrapped("The absent palette uses STONE. Creation writes an explicit block list.");
                 if (ImGui.button("Create material palette (STONE)")) {
@@ -844,6 +844,10 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error=failure.getMessage(); }
                 }
                 return;
+            }
+            if (ImGui.treeNode("Palette noise")) {
+                drawPaletteNoise(palette,target);
+                ImGui.treePop();
             }
             for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) ImGui.textWrapped("palette."+field+" (read-only)");
             List<LosslessJson> entries;
@@ -887,6 +891,20 @@ public final class EditorApp extends Application {
                 ImGui.treePop();
             }
         } finally { ImGui.popID(); }
+    }
+    private void drawPaletteNoise(LosslessJson palette,String target) {
+        ImGui.textWrapped(RiverPaletteFields.description("zoom"));
+        ImGui.textWrapped(RiverPaletteFields.zoomConstraints());
+        String token=palette.token("zoom"),key=RiverPaletteFields.draftPrefix(target)+"zoom";
+        if (token==null) {
+            if (ImGui.button("Enable palette zoom ("+RiverPaletteFields.zoomDefault()+")")) applyRoutingExtra(() -> workspace.replace(selected,RiverPaletteFields.enableZoom(selected,workspace.read(selected),target)));
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored palette zoom has an unsupported type (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Palette zoom",input); drafts.update(key,token,input.get());
+            if (ImGui.button("Apply palette zoom")) commitRiverOverride(key,() -> workspace.replace(selected,RiverPaletteFields.setZoom(selected,workspace.read(selected),target,input.get())));
+        }
+        if (ImGui.treeNode("Palette generator style")) { drawStyleFields(palette,NoiseStyleFields.Target.palette(target)); ImGui.treePop(); }
     }
     private void drawRiverMaterialNumber(LosslessJson object,String target,int index,String field) {
         String token=object.token(field),key=(index<0 ? RiverMaterialFields.draftPrefix(target) : RiverMaterialFields.listDraftPrefix(target)+index+".")+field;
@@ -2030,7 +2048,7 @@ public final class EditorApp extends Application {
         if (args.length == 1 && args[0].equals("--check-installation")) {
             ImGui.createContext();
             try {
-                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
+                if (DimensionFields.EDITABLE.isEmpty() || BiomeFields.EDITABLE.isEmpty() || GeneratorFields.EDITABLE.isEmpty() || RegionFields.EDITABLE.isEmpty() || NoiseFields.EDITABLE.isEmpty() || NoiseStyleFields.choices().isEmpty() || BiomeGeneratorLinks.minimumEntries() != 1 || BiomeGeneratorLinks.defaultGenerator() == null || BiomeChildren.description().isEmpty() || Terrain3DFields.EDITABLE.isEmpty() || CaveProfileFields.EDITABLE.isEmpty() || CavePlacementFields.choices("defaultObjectAnchor").isEmpty() || RiverPolicyFields.choices("placement").isEmpty() || RiverPolicyFields.choices("routing").isEmpty() || RiverBiomeLists.EDITABLE.isEmpty() || RiverIdLists.EDITABLE.isEmpty() || HydrologyFields.ROUTING_FIELDS.isEmpty() || RoutingExtras.outletChoices().isEmpty() || RiverGeometryFields.GEOMETRY_FIELDS.isEmpty() || SurfaceRiverFields.SECTIONS.isEmpty() || SurfacePondFields.CONTEXTS.isEmpty() || UndergroundRiverFields.ROOT_SCALARS.isEmpty() || GrottoFields.SECTIONS.isEmpty() || SeaCaveFields.EDITABLE.isEmpty() || RiverMaterialFields.defaultToken("weight")==null || RiverPaletteFields.zoomDefault()==null || InterpolationFields.choices().isEmpty() || CompositeNoise.minimumEntries() != 1 || FieldCoverage.fields("dimension").isEmpty()) throw new IllegalStateException("Missing field policy");
                 try {
                     if (StarterPack.create("installation_check").paths().size() != 4) throw new IllegalStateException("Missing starter resources");
                 } catch (java.io.IOException failure) { throw new IllegalStateException("Packaged starter unavailable", failure); }

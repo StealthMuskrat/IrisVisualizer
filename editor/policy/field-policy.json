@@ -1723,6 +1723,14 @@
     "palette": {
       "classification": "generation",
       "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    },
+    "style": {
+      "classification": "generation",
+      "reason": "Bounded river material palette noise controls with source-derived zoom and contextual style defaults; runtime generation and registry resolution remain pending."
+    },
+    "zoom": {
+      "classification": "generation",
+      "reason": "Bounded river material palette noise controls with source-derived zoom and contextual style defaults; runtime generation and registry resolution remain pending."
     }
   },
   "blockData": {
