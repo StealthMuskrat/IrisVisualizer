@@ -196,6 +196,15 @@ jobs:
           python editor/tools/extract_river_passage_fields.py IrisRiverGeometryConfig.java IrisRiverChannelShapeConfig.java IrisRiverDropShapeConfig.java generated-river-passage.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-river-passage.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-passage-fields.properties).Hash) { throw 'Pinned river passage definitions differ' }
+      - name: Verify pinned bank geometry and density style definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/hydrology/IrisRiverBank3DConfig.java' -OutFile IrisRiverBank3DConfig.java
+          python editor/tools/test_river_bank_fields.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_river_bank_fields.py IrisRiverGeometryConfig.java IrisRiverBank3DConfig.java generated-river-bank.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-river-bank.properties).Hash -ne (Get-FileHash editor/src/main/resources/river-bank-fields.properties).Hash) { throw 'Pinned bank geometry definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
