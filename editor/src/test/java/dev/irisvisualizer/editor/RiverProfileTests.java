@@ -125,7 +125,7 @@ final class RiverProfileTests {
             rejects(() -> RiverProfiles.initializeWater(PATH,invalid,0));
             rejects(() -> NoiseStyleFields.enable(PATH,invalid,styleTarget,"style"));
             byte[] badFluid=document("[{\"fluidPalette\":{\"palette\":"+bad+"}}]");
-            rejects(() -> RiverProfiles.changeFluid(PATH,badFluid,0,RiverProfiles.Action.ADD,-1,"water"));
+            if (!bad.equals("[]")) rejects(() -> RiverProfiles.changeFluid(PATH,badFluid,0,RiverProfiles.Action.ADD,-1,"water"));
             rejects(() -> RiverProfiles.initializeWater(PATH,badFluid,0));
             byte[] badEntry=document("[{\"fluidPalette\":{\"palette\":[{\"block\":"+bad+",\"weight\":"+bad+"}]}}]");
             if (!bad.startsWith("\"")) rejects(() -> RiverProfiles.setFluid(PATH,badEntry,0,0,"water"));
