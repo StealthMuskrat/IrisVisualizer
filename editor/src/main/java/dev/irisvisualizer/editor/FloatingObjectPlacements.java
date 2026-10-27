@@ -97,6 +97,6 @@ public final class FloatingObjectPlacements {
         if (value<Integer.parseInt(DATA.getProperty("translate."+axis+".minimum")) || value>Integer.parseInt(DATA.getProperty("translate."+axis+".maximum"))) throw new IllegalArgumentException("Translation violates source bounds");
         return editPlacement(original,entry,list,placement,p -> p.objectEdit("translate",tr -> tr.number(axis,value),false));
     }
-    static List<String> readOnlyFields(LosslessJson placement,String list) { field(list,LIST_FIELDS);return placement.fields().stream().filter(value -> !EDITABLE.contains(value) || value.equals("translate") && !list.equals("floatingObjects")).toList(); }
+    static List<String> readOnlyFields(LosslessJson placement,String list) { field(list,LIST_FIELDS);return placement.fields().stream().filter(value -> !EDITABLE.contains(value) && !FloatingPlacementSettings.OBJECT_FIELDS.contains(value) || value.equals("translate") && !list.equals("floatingObjects")).toList(); }
 
 }

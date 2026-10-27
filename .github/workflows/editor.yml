@@ -429,6 +429,16 @@ jobs:
           python editor/tools/extract_floating_object_fields.py IrisFloatingChildBiomes.java IrisObjectPlacement.java ObjectPlaceMode.java MantleFloatingObjectComponent.java ObjectResourceLoader.java ArrayType.java IrisObjectTranslate.java generated-floating-object.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-floating-object.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-object-fields.properties).Hash) { throw 'Pinned floating object definitions differ' }
+      - name: Verify pinned floating density and scale definitions
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectScale.java' -OutFile IrisObjectScale.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectPlacementScaleInterpolator.java' -OutFile IrisObjectPlacementScaleInterpolator.java
+          python editor/tools/test_floating_placement_settings.py IrisObjectPlacement.java IrisObjectScale.java IrisObjectPlacementScaleInterpolator.java IrisStyledRange.java MantleFloatingObjectComponent.java IrisGeneratorStyle.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_floating_placement_settings.py IrisObjectPlacement.java IrisObjectScale.java IrisObjectPlacementScaleInterpolator.java IrisStyledRange.java MantleFloatingObjectComponent.java IrisGeneratorStyle.java generated-floating-placement-settings.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-floating-placement-settings.properties).Hash -ne (Get-FileHash editor/src/main/resources/floating-placement-settings.properties).Hash) { throw 'Pinned floating density/scale definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
