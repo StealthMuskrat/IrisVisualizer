@@ -91,6 +91,6 @@ final class CaveProfileTests {
         }
         workspace.replace("biomes/starter.json",bytes("{\"caveProfile\":\"unresolved-snippet\"}"));workspace.save(temp.resolve("cave-controls"));
         check(new LosslessJson(PackWorkspace.open(temp.resolve("cave-controls")).read("biomes/starter.json")).token("caveProfile").equals("\"unresolved-snippet\""));
-        check(FieldCoverage.fields("caveProfile").size()==32 && FieldCoverage.fields("caveProfile").stream().filter(FieldCoverage.Field::implemented).count()==31);
+        check(FieldCoverage.fields("caveProfile").size()==32 && FieldCoverage.fields("caveProfile").stream().allMatch(FieldCoverage.Field::implemented));
     }
 }

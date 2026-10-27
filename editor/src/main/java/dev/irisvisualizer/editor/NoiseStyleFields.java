@@ -13,7 +13,8 @@ public final class NoiseStyleFields {
     public static final List<String> BIOME_FIELDS = List.of("childStyle");
     public static final List<String> TERRAIN_FIELDS = List.of("densityStyle", "crackStyle");
     public static final List<String> CAVE_FIELDS = List.of("baseDensityStyle", "detailDensityStyle", "warpStyle", "surfaceBreakStyle");
-    public record Target(String resourceBase, String objectField, NoiseFields.Target noise) {
+    public record Target(String resourceBase, String objectField, NoiseFields.Target noise, int moduleIndex) {
+        public Target(String resourceBase, String objectField, NoiseFields.Target noise) { this(resourceBase, objectField, noise, -1); }
         public Target {
             if (resourceBase == null || objectField == null) throw new IllegalArgumentException("Unsupported style target");
             boolean valid = noise != null ? "generators".equals(resourceBase) && "style".equals(objectField)
@@ -22,6 +23,7 @@ public final class NoiseStyleFields {
                     || objectField.startsWith("terrain3D.") && TERRAIN_FIELDS.contains(objectField.substring("terrain3D.".length())));
             valid = valid || noise==null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.startsWith("caveProfile.")
                     && (CAVE_FIELDS.contains(objectField.substring("caveProfile.".length())) || objectField.equals("caveProfile.densityThreshold.style"));
+            valid = moduleIndex == -1 ? valid : moduleIndex >= 0 && noise == null && CaveProfileFields.CONTEXTS.contains(resourceBase) && objectField.equals("caveProfile.modules.style");
             if (!valid) throw new IllegalArgumentException("Unsupported style target");
         }
         public static Target noise(NoiseFields.Target target) { return new Target("generators", "style", java.util.Objects.requireNonNull(target)); }
@@ -33,11 +35,16 @@ public final class NoiseStyleFields {
             return new Target(context,"caveProfile."+field,null);
         }
         public static Target threshold(String context) { return new Target(context,"caveProfile.densityThreshold.style",null); }
+        public static Target module(String context, int index) {
+            if (index < 0) throw new IllegalArgumentException("Invalid cave module index");
+            return new Target(context,"caveProfile.modules.style",null,index);
+        }
         public boolean terrain() { return objectField.startsWith("terrain3D."); }
         public boolean cave() { return objectField.startsWith("caveProfile."); }
         public boolean threshold() { return objectField.equals("caveProfile.densityThreshold.style"); }
-        public String member() { return threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
-        public String draftPrefix() { return threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
+        public boolean module() { return moduleIndex >= 0; }
+        public String member() { return module() || threshold() ? "style" : terrain() ? objectField.substring("terrain3D.".length()) : cave() ? objectField.substring("caveProfile.".length()) : objectField; }
+        public String draftPrefix() { return module() ? CaveModules.draftPrefix(resourceBase,moduleIndex)+"style." : threshold() ? CaveThresholdFields.draftPrefix(resourceBase)+"style." : cave() ? "caveProfile#"+resourceBase+"."+member()+"." : terrain() ? "terrain3D#"+member()+"." : noise == null ? "rootStyle#"+resourceBase+"."+objectField+"." : noise.draftPrefix()+"style."; }
     }
     private static final Properties DEFINITIONS = new Properties();
     private static final List<String> CHOICES;
@@ -69,15 +76,16 @@ public final class NoiseStyleFields {
             }
             if (!CHOICES.contains(CaveThresholdFields.defaultStyle(false)) || !CHOICES.contains(CaveThresholdFields.defaultStyle(true)))
                 throw new IOException("Invalid pinned cave threshold styles");
+            if (!CHOICES.contains(CaveModules.styleDefault())) throw new IOException("Invalid pinned cave module style");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static List<String> choices() { return CHOICES; }
     public static String noiseDefault() { return DEFINITIONS.getProperty("noiseDefault"); }
     public static String objectDefault() { return DEFINITIONS.getProperty("objectDefault"); }
-    public static String contextDefault(Target target) { return target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
-    public static String contextDescription(Target target) { return target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
+    public static String contextDefault(Target target) { return target.module() ? CaveModules.styleDefault() : target.threshold() ? CaveThresholdFields.defaultStyle(false) : target.cave() ? CaveProfileFields.styleDefault(target.member()) : target.terrain() ? Terrain3DFields.styleDefault(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".default") : noiseDefault(); }
+    public static String contextDescription(Target target) { return target.module() ? CaveModules.help("style") : target.threshold() ? CaveThresholdFields.styleDescription() : target.cave() ? CaveProfileFields.help(target.member()) : target.terrain() ? Terrain3DFields.description(target.member()) : target.noise() == null ? DEFINITIONS.getProperty(target.resourceBase()+"."+target.objectField()+".description", "") : description("style"); }
     public static String contextDefaultLabel(Target target) {
-        String override=target.cave() && !target.threshold() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
+        String override=target.cave() && !target.threshold() && !target.module() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
         return contextDefault(target)+(override==null ? "" : ", zoom "+override);
     }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
@@ -110,7 +118,7 @@ public final class NoiseStyleFields {
         return editContainer(original, target, container -> {
             if (container.token(target.member()) == null) {
                 byte[] seeded = container.enableStringPath(target.member()+".style", contextDefault(target));
-                String override=target.cave() && !target.threshold() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
+                String override=target.cave() && !target.threshold() && !target.module() ? CaveProfileFields.styleZoomOverride(target.member()) : null;
                 if (override!=null) seeded=new LosslessJson(seeded).enablePath(target.member()+".zoom",override);
                 if (field.equals("style") || new LosslessJson(seeded).tokenPath(target.member()+"."+field)!=null) return seeded;
                 container = new LosslessJson(seeded);
@@ -168,6 +176,7 @@ public final class NoiseStyleFields {
         }
     }
     private static byte[] editContainer(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
+        if (target.module()) return CaveModules.editObject(original,target.moduleIndex(),operation);
         if (target.threshold()) return new LosslessJson(original).objectEdit("caveProfile", profile -> profile.objectEdit("densityThreshold",operation,false),false);
         if (target.cave()) return new LosslessJson(original).objectEdit("caveProfile",operation,false);
         if (target.terrain()) return new LosslessJson(original).objectEdit("terrain3D",operation,false);
