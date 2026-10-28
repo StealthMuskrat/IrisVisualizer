@@ -123,7 +123,7 @@ public final class RiverProfiles {
                     } catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.style"); }
                     try {
                         var fluids=fluids(palette);
-                        if (fluids!=null) for (int i=0;i<fluids.size();i++) for (String field : fluids.get(i).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) paths.add(prefix+".fluidPalette.palette["+i+"]."+field);
+                        PaletteBlockData.report(paths,fluids,prefix+".fluidPalette.palette");
                     } catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.palette"); }
                 } catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette"); }
             }

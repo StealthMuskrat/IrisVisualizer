@@ -55,6 +55,7 @@ public final class FloatingObjectPalettes {
     static List<String> readOnlyPaths(LosslessJson placement,Context context) {
         var paths=new ArrayList<String>();try { var palette=object(placement,context);if (palette==null) return List.of();
             for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) paths.add(field);
+            PaletteBlockData.report(paths,DimensionPalettes.entries(palette),"palette");
             try { var style=NoiseStyleFields.object(palette);if (style!=null) for (String field : StyleFractures.readOnlyPaths(style)) paths.add("style."+field); } catch (IllegalArgumentException unsupported) { paths.add("style"); }
         } catch (IllegalArgumentException unsupported) { paths.add("palette"); }return List.copyOf(paths);
     }

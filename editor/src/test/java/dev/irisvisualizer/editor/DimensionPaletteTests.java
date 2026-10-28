@@ -57,7 +57,7 @@ final class DimensionPaletteTests {
             check(palette(NoiseStyleFields.enable(PATH,document(field,"{\"style\":{}}"),styleTarget,"style"),field).stringPath("style.style").equals("FLAT"));
             byte[] zero=NoiseStyleFields.editText(PATH,original,styleTarget,"cellularZoom","0");rejects(() -> NoiseStyleFields.editText(PATH,zero,styleTarget,"cellularFrequency","1"));
             byte[] active=NoiseStyleFields.editText(PATH,original,styleTarget,"cellularFrequency","1");rejects(() -> NoiseStyleFields.editText(PATH,active,styleTarget,"cellularZoom","0"));
-            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).containsAll(List.of(field+".futurePalette",field+".palette[0].data",field+".palette[0].backup")));
+            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).containsAll(List.of(field+".futurePalette",field+".palette[0].tileData",field+".palette[0].debug")));
             for (String wrong : List.of("null","[]","true","1","\"snippet/palette/example\"")) {
                 byte[] invalid=document(field,wrong);rejects(() -> DimensionPalettes.create(PATH,invalid,field));rejects(() -> DimensionPalettes.enableEntries(PATH,invalid,field));rejects(() -> NoiseStyleFields.enable(PATH,invalid,styleTarget,"style"));
                 check(DimensionFields.readOnlyPaths(new LosslessJson(invalid)).contains(field));

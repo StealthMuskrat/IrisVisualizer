@@ -156,7 +156,7 @@ public final class RiverMaterialFields {
             for (String path : RiverPaletteFields.readOnlyStylePaths(palette,target)) paths.add(prefix+"."+path);
             try {
                 var entries=entries(palette);
-                if (entries!=null) for (int i=0;i<entries.size();i++) for (String field : entries.get(i).fields()) if (!ENTRY_FIELDS.contains(field)) paths.add(prefix+".palette["+i+"]."+field);
+                PaletteBlockData.report(paths,entries,prefix+".palette");
             } catch (IllegalArgumentException mismatch) { paths.add(prefix+".palette"); }
         } catch (IllegalArgumentException mismatch) { paths.add(target); }
         return List.copyOf(paths);

@@ -50,7 +50,7 @@ public final class FloatingBottomPalettes {
                 for (String field : layer.fields()) if (!BiomeLayers.EDITABLE.contains(field)) paths.add(layerPath+"."+field);
                 try { var style=NoiseStyleFields.object(layer);if (style!=null) for (String field : StyleFractures.readOnlyPaths(style)) paths.add(layerPath+".style."+field); }
                 catch (IllegalArgumentException unsupported) { paths.add(layerPath+".style"); }
-                try { var blocks=DimensionPalettes.entries(layer);if (blocks!=null) for (int j=0;j<blocks.size();j++) for (String field : blocks.get(j).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) paths.add(layerPath+".palette["+j+"]."+field); }
+                try { PaletteBlockData.report(paths,DimensionPalettes.entries(layer),layerPath+".palette"); }
                 catch (IllegalArgumentException unsupported) { paths.add(layerPath+".palette"); }
                 if (layer.token("slopeCondition")!=null && !layer.token("slopeCondition").equals("null")) {
                     try { for (String field : BiomeLayers.slope(layer).fields()) if (!BiomeLayers.SLOPE_FIELDS.contains(field)) paths.add(layerPath+".slopeCondition."+field); }

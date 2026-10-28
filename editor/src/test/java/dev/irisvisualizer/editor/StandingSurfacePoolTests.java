@@ -101,7 +101,7 @@ final class StandingSurfacePoolTests {
         rejects(() -> target.change(PATH,added,RiverProfiles.Action.REMOVE,0,null));
         check(fluid(target.change(PATH,document("[{\"fluidPalette\":{\"palette\":[]}}]"),RiverProfiles.Action.ADD,-1,"water"),0).stringToken("block").equals("water"));
         var readOnly=DimensionFields.readOnlyPaths(new LosslessJson(original));
-        check(readOnly.containsAll(List.of("hydrology.surfacePools[0].futurePool","hydrology.surfacePools[0].fluidPalette.futurePalette","hydrology.surfacePools[0].fluidPalette.palette[0].data")));
+        check(readOnly.containsAll(List.of("hydrology.surfacePools[0].futurePool","hydrology.surfacePools[0].fluidPalette.futurePalette","hydrology.surfacePools[0].fluidPalette.palette[0].large")));
         for (String bad : List.of("null","{}","true","1","\"snippet\"","[null]","[{},1]")) {
             byte[] invalid=document(bad);rejects(() -> SurfacePools.enable(PATH,invalid));rejects(() -> SurfacePools.change(PATH,invalid,RiverProfiles.Action.ADD,-1,"valid"));
             check(DimensionFields.readOnlyPaths(new LosslessJson(invalid)).contains("hydrology.surfacePools"));

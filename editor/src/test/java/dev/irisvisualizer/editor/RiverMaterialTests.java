@@ -117,7 +117,7 @@ final class RiverMaterialTests {
             check(Arrays.equals(source,copy));
             var readOnly=DimensionFields.readOnlyPaths(new LosslessJson(source));
             String palettePath="hydrology.rivers."+target+(standalone ? "" : ".palette");
-            check(readOnly.contains(palettePath+".style") && readOnly.contains(palettePath+".palette[0].data") && readOnly.contains(palettePath+".palette[0].backup"));
+            check(readOnly.contains(palettePath+".style") && readOnly.contains(palettePath+".palette[0].tileData") && readOnly.contains(palettePath+".palette[0].debug"));
             for (String list : List.of("null","{}","\"snippet\"","[{} , 1]","[null]","[\"stone\"]")) {
                 String badPalette="{\"palette\":"+list+"}";
                 byte[] bad=withTarget(target,standalone ? badPalette : "{\"palette\":"+badPalette+"}");

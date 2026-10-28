@@ -2068,11 +2068,11 @@
     },
     "data": {
       "classification": "generation",
-      "reason": "Native block alias resolution uses structured state properties and recursive backups. Controls are available in blocks/ definitions; other nested contexts remain bounded separately."
+      "reason": "Native block-state properties and recursive backups. Controls cover standalone block definitions and supported style-backed palette entries; other nested contexts remain partial."
     },
     "backup": {
       "classification": "generation",
-      "reason": "Native block alias resolution uses structured state properties and recursive backups. Controls are available in blocks/ definitions; other nested contexts remain bounded separately."
+      "reason": "Native block-state properties and recursive backups. Controls cover standalone block definitions and supported style-backed palette entries; other nested contexts remain partial."
     },
     "debug": {
       "classification": "read-only",

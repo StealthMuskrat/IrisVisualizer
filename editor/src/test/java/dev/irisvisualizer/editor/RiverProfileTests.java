@@ -110,7 +110,7 @@ final class RiverProfileTests {
         }
         for (String value : List.of("NaN","Infinity","1e999","0")) rejects(() -> RiverProfiles.setZoom(PATH,original,0,value));
         var readOnly=DimensionFields.readOnlyPaths(new LosslessJson(original));
-        check(readOnly.containsAll(List.of("hydrology.rivers.profiles[0].futureProfile","hydrology.rivers.profiles[0].fluidPalette.futurePalette","hydrology.rivers.profiles[0].fluidPalette.palette[0].data")));
+        check(readOnly.containsAll(List.of("hydrology.rivers.profiles[0].futureProfile","hydrology.rivers.profiles[0].fluidPalette.futurePalette","hydrology.rivers.profiles[0].fluidPalette.palette[0].tileData")));
         for (String bad : List.of("null","{}","1","true","\"snippet\"","[null]","[{},1]")) {
             byte[] invalid=document(bad);
             rejects(() -> RiverProfiles.enable(PATH,invalid));
