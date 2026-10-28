@@ -1,10 +1,12 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in ninety-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in ninety-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 80 | 74 | 2 |
+| dimension | 82 | 81 | 75 | 1 |
+| structurePlacement | 23 | 23 | 21 | 0 |
+| nativeStructureSource | 3 | 3 | 2 | 0 |
 | nativeStructureAdjustment | 6 | 6 | 6 | 0 |
 | structureStilt | 4 | 4 | 4 | 0 |
 | structureTerrain | 11 | 11 | 11 | 0 |
@@ -14,11 +16,11 @@ Direct nonstatic/nontransient private fields in ninety-one pinned source classes
 | importedFeatures | 6 | 6 | 6 | 0 |
 | importedFeatureBiomeRule | 3 | 3 | 3 | 0 |
 | structureSetFrequency | 2 | 2 | 2 | 0 |
-| biome | 42 | 40 | 34 | 2 |
+| biome | 42 | 41 | 35 | 1 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
-| region | 27 | 25 | 19 | 2 |
+| region | 27 | 26 | 20 | 1 |
 | noise | 15 | 15 | 15 | 0 |
 | noiseStyle | 10 | 10 | 10 | 0 |
 | terrain3D | 14 | 14 | 14 | 0 |
@@ -98,7 +100,15 @@ Direct nonstatic/nontransient private fields in ninety-one pinned source classes
 
 ## dimension
 
-Unclassified: `structures`, `treeSettings`.
+Unclassified: `treeSettings`.
+
+## structurePlacement
+
+Unclassified: none.
+
+## nativeStructureSource
+
+Unclassified: none.
 
 ## nativeStructureAdjustment
 
@@ -138,7 +148,7 @@ Unclassified: none.
 
 ## biome
 
-Unclassified: `proceduralObjects`, `structures`.
+Unclassified: `proceduralObjects`.
 
 ## biomeGeneratorLink
 
@@ -154,7 +164,7 @@ Unclassified: none.
 
 ## region
 
-Unclassified: `proceduralObjects`, `structures`.
+Unclassified: `proceduralObjects`.
 
 ## noise
 
