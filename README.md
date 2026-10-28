@@ -4,7 +4,7 @@ Standalone Windows x64 visualizer and generation-focused pack editor for Iris, t
 
 **Status: editor implementation in progress; native world previews disabled.** The Windows x64 ImGui editor opens folders/ZIPs, preserves original/unknown data, edits supported dimension, region, biome and generator settings, and inspects image assets. Full schema coverage and interactive GUI/GPU verification remain pending. No custom replacement terrain generator is included. Native parity has not been established.
 
-See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40606376414](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40606376414). Download its IrisVisualizer-windows-x64 artifact to try the editor.
+See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40608185045](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40608185045). Download its IrisVisualizer-windows-x64 artifact to try the editor.
 
 ## Verify the first batch
 
@@ -37,4 +37,4 @@ The editor also authors optional dimension world borders: paired center coordina
 
 Dimension-type editing includes environment/fullbright and all 13 pinned options, explicit base inheritance and nullable time/cloud behavior, and exact 64-bit fixed times. Runtime registry and existing-world compatibility remain unvalidated; unsupported previews remain disabled.
 
-Noise-fracture trees now support bounded recursive child editing across composite, cliff and placement-heightmap contexts, including lossless list operations and shared noise/style controls. Editor limits are explicit; unsupported previews and style-fracture objects remain disabled/read-only.
+Noise-fracture trees now support bounded recursive child editing across composite, cliff and placement-heightmap contexts, including lossless list operations and shared noise/style controls. Editor limits are explicit. Unsupported previews remain disabled, and style-fracture objects remain read-only.
