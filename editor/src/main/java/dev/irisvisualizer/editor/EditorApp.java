@@ -321,7 +321,7 @@ public final class EditorApp extends Application {
                     drawHydrologyEnvelopes();
                     List<String> readOnly = DimensionFields.readOnlyPaths(document);
                     if (ImGui.collapsingHeader("Read-only fields (" + readOnly.size() + ")"))
-                        for (String path : readOnly) ImGui.textWrapped(path);
+                        for (String path : readOnly) drawReadOnlyField("dimension",path);
                     ImGui.textWrapped("Apply text changes before saving. Toggles apply immediately.");
                 } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
@@ -418,6 +418,9 @@ public final class EditorApp extends Application {
             }
         }
     }
+    private void drawReadOnlyField(String group,String field) {
+        ImGui.textWrapped(InspectorText.label(field,256)+": "+FieldCoverage.readOnlyReason(group,field));
+    }
     private void drawCoverage() {
         List<String> groups = FieldCoverage.groups(selected);
         if (groups.isEmpty() || !ImGui.collapsingHeader("Pinned-source field coverage (partial)")) return;
@@ -426,7 +429,8 @@ public final class EditorApp extends Application {
             var fields = FieldCoverage.fields(group);
             long unclassified = fields.stream().filter(field -> field.classification().equals("unclassified")).count();
             long implemented = fields.stream().filter(FieldCoverage.Field::implemented).count();
-            ImGui.textWrapped(group + ": " + implemented + " implemented, " + unclassified + " unclassified / " + fields.size() + " inventoried");
+            long readOnly=fields.stream().filter(field -> field.classification().equals("read-only")).count();
+            ImGui.textWrapped(group + ": " + implemented + " editable, " + readOnly + " read-only, " + unclassified + " unclassified / " + fields.size() + " inventoried");
             if (ImGui.treeNode("Fields##coverage-" + group)) {
                 for (var field : fields) {
                     String status = field.implemented() ? "editable" : field.classification().equals("generation") ? "generation: control pending" : field.classification();
@@ -2562,7 +2566,7 @@ public final class EditorApp extends Application {
             for (String pool : FloatingObjectPlacements.POOLS) if (ImGui.treeNode(pool)) { drawFloatingObjectPool(placement,index,list,placementIndex,pool,choices);ImGui.treePop(); }
             if (FloatingObjectPlacements.configured(list) && ImGui.treeNode("Translation")) { drawFloatingTranslation(placement,index,list,placementIndex);ImGui.treePop(); }
             if (FloatingObjectPlacements.configured(list) && ImGui.treeNode("Rotation")) { drawFloatingRotation(placement,new FloatingObjectRotations.Context(index,list,placementIndex));ImGui.treePop(); }
-            if (ImGui.treeNode("Other placement data (read-only)")) { for (String field : FloatingObjectPlacements.readOnlyFields(placement,list)) ImGui.textWrapped(field);ImGui.treePop(); }
+            if (ImGui.treeNode("Other placement data (read-only)")) { for (String field : FloatingObjectPlacements.readOnlyFields(placement,list)) drawReadOnlyField("objectPlacement",field);ImGui.treePop(); }
             ImGui.treePop();
         }
     }

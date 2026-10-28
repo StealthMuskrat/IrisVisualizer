@@ -1,0 +1,32 @@
+{
+  "irisRevision": "c3359e0a16438b1bb8468901c6171dcefdf63f7f",
+  "scope": "Consumer audit for the final seven unclassified direct fields; not complete schema coverage or native generation parity.",
+  "fields": {
+    "dimension": {
+      "treeSettings": "generation/terrain/IrisDimension.java"
+    },
+    "objectPlacement": {
+      "isDolphinTarget": "structure/object/IrisObjectPlacement.java",
+      "loot": "structure/object/IrisObjectPlacement.java",
+      "vanillaLoot": "structure/object/IrisObjectPlacement.java",
+      "overrideGlobalLoot": "structure/object/IrisObjectPlacement.java",
+      "markers": "structure/object/IrisObjectPlacement.java",
+      "trees": "structure/object/IrisObjectPlacement.java"
+    }
+  },
+  "sources": {
+    "generation/terrain/IrisDimension.java": "b0bfdff36b44b8e7e61968190ef80c483aa949ce68e57f155c02e1b5c8aacd5d",
+    "structure/object/IrisObjectPlacement.java": "92dbf1083bdf099efa7f5f15af01dc66c0d6b3b93d84dc273a78d99cf0ae6a09",
+    "generation/decoration/tree/IrisTreeSettings.java": "dc34f7b8068c3c7fcd015f5c7d98f61b09b7d22fb21d2abf9759f5feb1127b72",
+    "generation/decoration/tree/IrisTree.java": "267dacad5d247c071ddc492a7883cc8933c29a8a4180e7d34592c941a31d5262",
+    "generation/decoration/tree/TreeBlockMaterial.java": "0804129e1876d4820f454d4c60c13620031bb246c7249bc84d16dade1ebde7ac",
+    "generation/mantle/MantleObjectComponent.java": "3da3ee187aa85a08f7aabd9cf3436681c85cc3785f60cc1295bc4ac19ccf4d78",
+    "structure/object/IrisObjectPlacementRunner.java": "3d6dd034343d67d53a37933b13a7963a4463aead9a17dee556617d0afb8b5d35",
+    "platform/generation/EngineBukkitOps.java": "fed16ecd3b27ff3dd550d645557ab4f56e7269c2fb55135d158eae24fe9fb88a",
+    "world/tree/TreeSVC.java": "20d5d20dce82a1dc0f3644c387e47727df87a575e2757d0bcf24474e46637177",
+    "world/tree/TreeDefinitionIndex.java": "739a97da6a6b656824b404220f91d030ab81631130244d0eb5b84bc2a8e4ec48",
+    "generation/runtime/MarkerSpawnScanner.java": "1dcc15d41663d0d04a015abcd76a87df25ebb7cd363317a5eddb693cf33e1254",
+    "generation/runtime/WorldBlockDropRouter.java": "e51c3cff865ad1791454eaa4d4bf80634908a52f4c8fbce1c57f639418c257b8",
+    "world/entity/IrisMarker.java": "9283cd00e08c5935d45a991f08b9cffb3e4db37809a58bbb3d642998d1ecfc71"
+  }
+}
