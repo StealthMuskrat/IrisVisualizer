@@ -243,6 +243,14 @@
     "carving": {
       "classification": "generation",
       "reason": "Ordered dimension cave-biome overrides with inclusive absolute world-Y roots and local child IDs; native selection is not emulated."
+    },
+    "overlayNoise": {
+      "classification": "generation",
+      "reason": "Authored dimension overlay or external transform configuration; native noise, provider resolution and output are not evaluated."
+    },
+    "terrainTransform": {
+      "classification": "generation",
+      "reason": "Authored dimension overlay or external transform configuration; native noise, provider resolution and output are not evaluated."
     }
   },
   "biome": {
@@ -3047,6 +3055,34 @@
     "childRecursionDepth": {
       "classification": "generation",
       "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    }
+  },
+  "shapedStyle": {
+    "generator": {
+      "classification": "generation",
+      "reason": "Controls fitted terrain overlay offsets or exact external provider descriptor/settings; data authoring only."
+    },
+    "min": {
+      "classification": "generation",
+      "reason": "Controls fitted terrain overlay offsets or exact external provider descriptor/settings; data authoring only."
+    },
+    "max": {
+      "classification": "generation",
+      "reason": "Controls fitted terrain overlay offsets or exact external provider descriptor/settings; data authoring only."
+    }
+  },
+  "terrainTransform": {
+    "id": {
+      "classification": "generation",
+      "reason": "Controls fitted terrain overlay offsets or exact external provider descriptor/settings; data authoring only."
+    },
+    "version": {
+      "classification": "generation",
+      "reason": "Controls fitted terrain overlay offsets or exact external provider descriptor/settings; data authoring only."
+    },
+    "settings": {
+      "classification": "generation",
+      "reason": "Controls fitted terrain overlay offsets or exact external provider descriptor/settings; data authoring only."
     }
   }
 }

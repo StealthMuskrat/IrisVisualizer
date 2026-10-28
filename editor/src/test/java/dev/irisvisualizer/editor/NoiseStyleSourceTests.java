@@ -33,6 +33,7 @@ final class NoiseStyleSourceTests {
         for (String field : NoiseStyleFields.DIMENSION_FIELDS) add(result,NoiseStyleFields.Target.dimension(field));
         add(result,DimensionStacks.styleTarget());
         add(result,DimensionCarvings.styleTarget(0));
+        add(result,TerrainOverlays.styleTarget(0));
         for (String field : NoiseStyleFields.BIOME_FIELDS) add(result,NoiseStyleFields.Target.biome(field));
         for (String field : NoiseStyleFields.TERRAIN_FIELDS) add(result,NoiseStyleFields.Target.terrain(field));
         for (String base : CaveProfileFields.CONTEXTS) {
