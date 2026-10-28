@@ -2,11 +2,13 @@
 
 Iris revision: `c3359e0a16438b1bb8468901c6171dcefdf63f7f`.
 
-This audit resolves the last seven unclassified fields in the existing inventory
-of 1,218 direct fields across 111 classes. It does not expand that inventory to
-all inherited fields, nested classes, resources or schemas. There are now 1,188
-implemented generation fields and 30 read-only fields in this bounded inventory.
-Classifying these fields does not enable previews or establish native parity.
+This audit resolved seven previously unclassified fields in dimension and
+object placement definitions. The inventory of 111 classes at that point held
+1,188 implemented generation fields and 30 read-only fields. See the
+[current generated field inventory](../editor/coverage-report.md) for totals as
+additional classes are audited. This review does not cover all inherited fields,
+nested classes, resources or schemas. Classification does not enable previews
+or establish native parity.
 
 The editing boundary is initial voxel generation. Sapling growth events,
 inventory contents, entity spawning and metadata attached to already placed

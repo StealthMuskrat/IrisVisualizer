@@ -31,6 +31,8 @@ public final class EditorApp extends Application {
     private final ExpressionReferenceAudit.Cache expressionAudits = new ExpressionReferenceAudit.Cache();
     private final ResourceNavigation resourceNavigation = new ResourceNavigation();
     private final NavigationHistory navigationHistory = new NavigationHistory();
+    private final StructureDefinitions.PoolCache structurePools=new StructureDefinitions.PoolCache();
+    private final ImString structurePoolFilter=new ImString(1024);
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
     private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
@@ -185,6 +187,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New image-map definition")) createResource("image-maps");
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
+                if (ImGui.menuItem("New structure definition")) createResource("structures");
                 if (ImGui.menuItem("Import image/object asset")) importAsset();
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
                 if (ImGui.menuItem("Review pack resource links")) showReferenceReview=true;
@@ -349,6 +352,10 @@ public final class EditorApp extends Application {
                 try { drawExpressionDefinition(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && StructureDefinitions.supports(selected)) {
+                try { drawStructureDefinition(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
             if (ExpressionDefinitions.supports(selected) || "image-maps".equals(ResourceTypes.base(selected))) drawExpressionReferenceAudit();
             drawCoverage();
@@ -393,13 +400,13 @@ public final class EditorApp extends Application {
     }
     private void drawReferences() {
         String base = ResourceTypes.base(selected);
-        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps").contains(base)
+        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps", "structures").contains(base)
                 || !ImGui.collapsingHeader("Resource links (partial)")) return;
         if (referenceWorkspace != workspace || referenceRevision != workspace.revision() || !java.util.Objects.equals(referencePath, selected)) {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks exact image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks exact structure start-pool files, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -417,6 +424,54 @@ public final class EditorApp extends Application {
                 catch (Exception failure) { error = failure.getMessage(); }
             }
         }
+    }
+    private void drawStructureDefinition(LosslessJson root) {
+        if (!ImGui.collapsingHeader("Structure assembly definition")) return;
+        ImGui.pushID("structure-definition");
+        ImGui.textWrapped("Root assembly controls only. Pool/piece contents, graph closure, workcells, themes, placement context and native compatibility remain unvalidated. Settings are not adjusted automatically; previews remain disabled.");
+        try {
+            String current=StructureDefinitions.value(root,"startPool");
+            ImGui.textWrapped(StructureDefinitions.help("startPool"));
+            ImGui.inputText("Filter exact pool files",structurePoolFilter);
+            var matches=structurePools.filter(workspace,structurePoolFilter.get());
+            if (ImGui.beginCombo("Start pool",current.isEmpty() ? "Choose an exact pool" : InspectorText.label(current,128))) {
+                int row=0;for (String key : matches.keys()) { ImGui.pushID(row++);if (ImGui.selectable("Choose pool",key.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setPool(selected,workspace.read(selected),key,workspace)));ImGui.sameLine();ImGui.textUnformatted(InspectorText.label(key,256));ImGui.popID(); }
+                ImGui.endCombo();
+            }
+            ImGui.textWrapped(matches.count()+" matching pool files; "+matches.keys().size()+" shown (maximum 200). File presence does not validate a pool or assembly graph.");
+            if (!current.isEmpty() && structurePools.choices(workspace).contains(current) && ImGui.button("Open exact start-pool file")) { try { resourceNavigation.request(workspace,"jigsaw-pools/"+current+".json"); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
+        for (String field : StructureDefinitions.NUMBERS) {
+            ImGui.pushID(field);ImGui.textWrapped(StructureDefinitions.help(field));
+            try {
+                int[] input={Integer.parseInt(StructureDefinitions.value(root,field))};
+                if (root.token(field)==null) ImGui.textUnformatted("Implicit default: "+input[0]);
+                if (ImGui.sliderInt(field,input,StructureDefinitions.minimum(field),StructureDefinitions.maximum(field))) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setInteger(selected,workspace.read(selected),field,Integer.toString(input[0]))));
+                if (root.token(field)==null && ImGui.button("Store displayed default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setInteger(selected,workspace.read(selected),field,StructureDefinitions.defaultValue(field))));
+                if (root.token(field)!=null && ImGui.button("Use class default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.reset(selected,workspace.read(selected),field)));
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
+            ImGui.popID();
+        }
+        for (String field : StructureDefinitions.ENUMS) {
+            ImGui.pushID(field);ImGui.textWrapped(StructureDefinitions.help(field));
+            try {
+                String current=StructureDefinitions.value(root,field);boolean implicit=root.token(field)==null || root.token(field).equals("null");
+                if (ImGui.beginCombo(field,(implicit ? "Default: " : "")+InspectorText.label(current,128))) { for (String choice : StructureDefinitions.choices(field)) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setChoice(selected,workspace.read(selected),field,choice)));ImGui.endCombo(); }
+                if (root.token(field)!=null && ImGui.button("Use class default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.reset(selected,workspace.read(selected),field)));
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
+            ImGui.popID();
+        }
+        try {
+            var caps=new ImBoolean(Boolean.parseBoolean(StructureDefinitions.value(root,"requireCaps")));ImGui.textWrapped(StructureDefinitions.help("requireCaps"));
+            if (root.token("requireCaps")==null) ImGui.textUnformatted("Implicit default: "+caps.get());
+            if (ImGui.checkbox("Require physical terminal caps",caps)) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setCaps(selected,workspace.read(selected),caps.get())));
+            if (root.token("requireCaps")==null && ImGui.button("Store cap default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setCaps(selected,workspace.read(selected),Boolean.parseBoolean(StructureDefinitions.defaultValue("requireCaps")))));
+            if (root.token("requireCaps")!=null && ImGui.button("Use class cap default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.reset(selected,workspace.read(selected),"requireCaps")));
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
+        for (String finding : StructureDefinitions.advisories(root)) ImGui.textWrapped(finding);
+        ImGui.textWrapped("Portability findings cover three local rules only and do not gate Apply, Save or Export. Planar workcells, themes and piece edits remain read-only. Underground placement can override placeMode; multi-piece structures generally retain assembled piece positions.");
+        if (ImGui.treeNode("Other structure data (read-only)")) { for (String field : StructureDefinitions.readOnlyFields(root)) drawReadOnlyField("structureDefinition",field);ImGui.treePop(); }
+        ImGui.popID();
     }
     private void drawReadOnlyField(String group,String field) {
         ImGui.textWrapped(InspectorText.label(field,256)+": "+FieldCoverage.readOnlyReason(group,field));
@@ -5635,7 +5690,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -5695,7 +5750,7 @@ public final class EditorApp extends Application {
     private void drawPackReferenceReview() {
         if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }
         if (ImGui.button("Close resource-link review")) { showReferenceReview=false;ImGui.end();return; }
-        ImGui.textWrapped("Known typed fields in dimension, region, biome and image-map JSON only. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
+        ImGui.textWrapped("Known typed fields in dimension, region, biome, image-map and structure JSON only. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
         if (ImGui.button("Scan / refresh known resource links")) packReferenceReview.refresh(workspace);
         ImGui.sameLine();if (ImGui.button("Clear link scan")) packReferenceReview.clear();
         ImGui.inputText("Source, field, key or target contains",referenceReviewQuery);

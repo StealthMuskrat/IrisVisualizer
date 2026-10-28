@@ -9,7 +9,7 @@ public final class ResourceCreation {
         if (folder == null || folder.contains("\\") || folder.contains(":")) throw new IOException("Unsupported resource folder");
         String[] parts = folder.split("/", -1);
         for (String part : parts) if (part.isEmpty() || part.equals(".") || part.equals("..")) throw new IOException("Unsafe resource folder");
-        if (!Set.of("dimensions", "regions", "biomes", "generators", "image-maps", "blocks", "expressions").contains(parts[0])) throw new IOException("Creation supports dimension, region, biome, generator, image-map, block and expression JSON only");
+        if (!Set.of("dimensions", "regions", "biomes", "generators", "image-maps", "blocks", "expressions", "structures").contains(parts[0])) throw new IOException("Creation supports dimension, region, biome, generator, image-map, block, expression and structure JSON only");
         if (parts[0].equals("dimensions") && parts.length != 1) throw new IOException("Dimensions must stay flat");
         return parts[0];
     }
@@ -19,12 +19,14 @@ public final class ResourceCreation {
             case "regions" -> "biomes";
             case "biomes" -> "generators";
             case "image-maps" -> "images";
+            case "structures" -> "jigsaw-pools";
             default -> null;
         };
     }
     public static List<String> choices(PackWorkspace workspace, String folder) throws IOException {
         String type = dependencyType(folder);
         if (type == null) return List.of();
+        if (base(folder).equals("structures")) return StructureDefinitions.pools(workspace);
         if (base(folder).equals("image-maps")) return ImageMapDefinitions.sources(workspace);
         return ResourceTypes.referenceKeys(workspace,type);
     }
@@ -32,6 +34,7 @@ public final class ResourceCreation {
         String base = base(folder);
         if (dependencyType(folder) != null && !choices(workspace, folder).contains(dependency))
             throw new IOException("Choose an exact existing " + dependencyType(folder) + " key for the new resource");
+        if (base.equals("structures")) return StructureDefinitions.template(workspace,dependency);
         if (base.equals("image-maps")) return ImageMapDefinitions.template(workspace,dependency);
         if (base.equals("blocks")) return BlockDefinitions.template();
         if (base.equals("expressions")) return ExpressionDefinitions.template();

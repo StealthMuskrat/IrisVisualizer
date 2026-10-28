@@ -5092,5 +5092,67 @@
       "classification": "generation",
       "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
     }
+  },
+  "structureDefinition": {
+    "startPool": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "maxDepth": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "maxSizeChunks": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "compatibility": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "branchFailurePolicy": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "requireCaps": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "placeMode": {
+      "classification": "generation",
+      "reason": "Controls authored Iris structure assembly or piece placement. Native graph compilation, pool content and generation remain unvalidated."
+    },
+    "cellSize": {
+      "classification": "generation",
+      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+    },
+    "planarWorkcells": {
+      "classification": "generation",
+      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+    },
+    "themeSets": {
+      "classification": "generation",
+      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+    },
+    "edit": {
+      "classification": "generation",
+      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+    },
+    "spatialWorkcellDisplayName": {
+      "classification": "read-only",
+      "reason": "Studio display metadata; not voxel generation."
+    },
+    "loot": {
+      "classification": "read-only",
+      "reason": "Container inventory loot tables; outside voxel-generation editing."
+    },
+    "vanillaSource": {
+      "classification": "generation",
+      "reason": "Identifies imported vanilla aliases and the native source suppressed by dimension REPLACE_SOURCE placements. Typed authoring is pending; the original value remains read-only and preserved."
+    }
   }
 }
