@@ -23,6 +23,12 @@ public final class ResourceTree {
         for (String path : files) if (path.toLowerCase(Locale.ROOT).contains(filter)) add(root, path, false);
         return root.freeze().children();
     }
+    /** File filters retain matching ancestors; explicit empty folders are shown in the unfiltered view. */
+    public static List<Node> build(PackWorkspace workspace,String query,ResourceFinder.Family family,boolean changedOnly) {
+        Objects.requireNonNull(workspace);Objects.requireNonNull(family);
+        var files=workspace.paths().stream().filter(family::matches).filter(path -> !changedOnly || workspace.changed(path)).toList();
+        return build(files,family==ResourceFinder.Family.ALL && !changedOnly ? workspace.directories() : List.of(),query);
+    }
     private static void add(Entry root, String path, boolean directory) {
         String[] parts = path.split("/"); Entry parent = root; String current = "";
         for (int i=0;i<parts.length;i++) {
