@@ -185,6 +185,7 @@ public final class EditorApp extends Application {
                     drawDimensionHeights(document);
                     drawWorldBoundary(document);
                     drawDimensionType(document);
+                    drawDimensionStack(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
                     drawHydrology(document);
@@ -2240,6 +2241,104 @@ public final class EditorApp extends Application {
     private void changeGeneralBlockPalette(GeneralBlockPalettes.Target target,RiverProfiles.Action action,int index,String value,String appliedKey) {
         try { commitProfileChange(target.listPrefix(),target.change(selected,workspace.read(selected),action,index,value),appliedKey); }
         catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawDimensionStack(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Dimension stack and upper terrain")) return;
+        ImGui.pushID("dimensionStack");var choices=DimensionStacks.choices(workspace);
+        ImGui.textWrapped("Dimension keys are exact files in this pack. Target contents, loader aliases, height/layout compatibility and native generation are unvalidated. These controls do not sample or preview terrain.");
+        ImGui.textWrapped(DimensionStacks.help("upperDimension"));
+        try {
+            String token=document.token("upperDimension"),current=token==null || token.equals("null") ? "none" : document.stringToken("upperDimension");
+            if (DimensionStacks.upperActive(document) && !choices.contains(current)) ImGui.textWrapped("Stored upper dimension is missing from the exact in-pack catalog; it is preserved until replaced or cleared.");
+            if (ImGui.beginCombo("Upper dimension",DimensionStacks.upperActive(document) ? current.length()>128 ? "Stored upper dimension" : current : "None")) {
+                if (ImGui.selectable("None (native disable)",!DimensionStacks.upperActive(document))) applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.setUpper(selected,workspace.read(selected),null,workspace)));
+                ImGui.beginDisabled(document.token("dimensionStack")!=null);
+                for (String choice : choices) if (!choice.equalsIgnoreCase("none") && ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.setUpper(selected,workspace.read(selected),choice,workspace)));
+                ImGui.endDisabled();ImGui.endCombo();
+            }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored upperDimension has an unsupported type (read-only)."); }
+        ImGui.textWrapped("Upper terrain and dimensionStack are mutually exclusive. Remove the stack member before selecting an active upper dimension. Upper gap/carving/object settings remain separate controls.");
+        for (String finding : DimensionStacks.findings(selected,document,workspace)) ImGui.textWrapped("Applied stack check: "+finding+" (does not block Save/Export)");
+        LosslessJson stack;
+        try { stack=DimensionStacks.object(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored dimensionStack is null, a snippet or unsupported value (read-only).");ImGui.popID();return; }
+        ImGui.textWrapped(DimensionStacks.help("dimensionStack"));
+        if (stack==null) {
+            String key=DimensionStacks.prefix()+"new.top";ImString top=values.computeIfAbsent(key,ignored -> new ImString("",4096));
+            if (ImGui.beginCombo("Initial top dimension",top.get().isEmpty() ? "Choose a dimension" : top.get())) {
+                for (String choice : choices) if (!choice.equals(DimensionStacks.host(selected)) && ImGui.selectable(choice,choice.equals(top.get()))) { top.set(choice);drafts.update(key,"",choice); }
+                ImGui.endCombo();
+            }
+            ImGui.textWrapped("Create writes [chosen top, host] in top-to-bottom order. Spacer stays at 32 and blending stays absent until explicitly enabled.");
+            ImGui.beginDisabled(top.get().isEmpty());boolean create=ImGui.button("Create dimension stack");ImGui.endDisabled();
+            if (create) { try { commitProfileChange(DimensionStacks.prefix(),DimensionStacks.create(selected,workspace.read(selected),top.get(),workspace),key); } catch (Exception failure) { error=failure.getMessage(); } }
+            ImGui.popID();return;
+        }
+        drawStackLayers(stack,choices);drawStackScalar(stack,"spacer");
+        if (ImGui.treeNode("Boundary blend")) {
+            ImGui.textWrapped(DimensionStacks.help("blend"));ImGui.textWrapped("Absent blend or amplitude 0 gives a constant nominal gap. Positive amplitude samples separate bounded noise at each seam; this editor does not predict resulting heights or clipping.");
+            try {
+                var blend=DimensionStacks.blend(stack);
+                if (blend==null) {
+                    if (ImGui.button("Enable boundary blend (amplitude 8, SIMPLEX style)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.enableBlend(selected,workspace.read(selected))));
+                } else {
+                    drawStackScalar(blend,"amplitude");drawStyleFields(blend,DimensionStacks.styleTarget());
+                    ImGui.textWrapped("Remove discards this entire blend object, including style/fracture and advanced data, and restores absence.");
+                    if (ImGui.button("Remove boundary blend")) removeStackConfiguration(true);
+                }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored blend is null, a snippet or unsupported value (read-only)."); }
+            ImGui.treePop();
+        }
+        for (String path : DimensionStacks.readOnlyPaths(document)) ImGui.textWrapped(path+" (read-only)");
+        ImGui.textWrapped("Remove stack discards all layer/blend and advanced stack data and restores field absence. This does not change the selected upperDimension reference.");
+        if (ImGui.button("Remove dimension stack")) removeStackConfiguration(false);
+        ImGui.popID();
+    }
+    private void drawStackScalar(LosslessJson object,String field) {
+        ImGui.pushID("stack."+field);ImGui.textWrapped(DimensionStacks.help(field));ImGui.textWrapped("Exact integer 0..256.");String token=object.token(field),key=(field.equals("spacer") ? DimensionStacks.prefix() : DimensionStacks.blendPrefix())+field;
+        if (token==null) {
+            if (ImGui.button("Enable "+field+" ("+DimensionStacks.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.enableScalar(selected,workspace.read(selected),field)));
+        } else if (!DimensionStacks.numericSupported(object,field)) ImGui.textWrapped("Stored value has an unsupported type or integer width (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionStacks.setScalar(selected,workspace.read(selected),field,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void stageStackLayers(String key,String stored,List<String> rows) {
+        String token=DimensionStacks.draftToken(rows);values.put(key,new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));drafts.update(key,stored,token);
+    }
+    private void drawStackLayers(LosslessJson stack,List<String> choices) {
+        ImGui.textWrapped(DimensionStacks.help("dimensions"));ImGui.textWrapped("Stage changes, then Apply the whole order. The host must occur exactly once at the bottom; other dimensions may repeat. Editor limit: 64 layers, separate from native schema limits. Unchanged string tokens retain their original escapes.");
+        List<String> storedRows;
+        try { storedRows=DimensionStacks.layers(stack); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored dimensions contains non-string entries or an unsupported type (read-only).");return; }
+        if (storedRows!=null && storedRows.size()>DimensionStacks.MAXIMUM_LAYERS) { ImGui.textWrapped("Stored layer list exceeds the editor limit (read-only).");return; }
+        String stored=stack.token("dimensions")==null ? "[]" : stack.token("dimensions"),key=DimensionStacks.prefix()+"dimensions";
+        ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));var rows=new java.util.ArrayList<>(DimensionStacks.draftLayers(input.get()));drafts.update(key,stored,input.get());
+        ImGui.beginDisabled(rows.size()>=DimensionStacks.MAXIMUM_LAYERS);boolean add=ImGui.button("Stage another layer (before bottom)");ImGui.endDisabled();
+        if (add) { rows.add(Math.max(0,rows.size()-1),"");stageStackLayers(key,stored,rows);return; }
+        for (int index=0;index<rows.size();index++) {
+            ImGui.pushID("stackLayer"+index);String current=rows.get(index),replacement=null;ImGui.text("Layer "+index+(index==rows.size()-1 ? " (bottom)" : ""));
+            if (ImGui.beginCombo("Dimension",current.isEmpty() ? "Choose a dimension" : current.length()>128 ? "Stored dimension key" : current)) {
+                for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) replacement=choice;
+                ImGui.endCombo();
+            }
+            if (replacement!=null) { rows.set(index,replacement);stageStackLayers(key,stored,rows);ImGui.popID();return; }
+            if (!current.isEmpty() && !choices.contains(current)) ImGui.textWrapped("Stored key is missing; it stays preserved until the whole draft order is successfully applied.");
+            if (ImGui.button("Stage removal")) { rows.remove(index);stageStackLayers(key,stored,rows);ImGui.popID();return; }
+            ImGui.beginDisabled(index==0);boolean up=ImGui.button("Stage move up");ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==rows.size()-1);boolean down=ImGui.button("Stage move down");ImGui.endDisabled();
+            if (up || down) { java.util.Collections.swap(rows,index,up ? index-1 : index+1);stageStackLayers(key,stored,rows);ImGui.popID();return; }
+            ImGui.popID();
+        }
+        if (ImGui.button("Apply whole layer order")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionStacks.replaceLayers(selected,workspace.read(selected),DimensionStacks.draftLayers(input.get()),workspace)));
+        ImGui.sameLine();if (ImGui.button("Discard layer order draft")) { drafts.applied(key);values.remove(key); }
+    }
+    private void removeStackConfiguration(boolean blend) {
+        String prefix=blend ? DimensionStacks.blendPrefix() : DimensionStacks.prefix();
+        try {
+            if (drafts.transitionUnder(prefix,() -> !drafts.anyUnder(prefix) || JOptionPane.showConfirmDialog(null,"Discard unapplied text in this "+(blend ? "boundary blend" : "dimension stack")+" and remove its configuration?","Unapplied dimension-stack text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION,() -> workspace.replace(selected,blend ? DimensionStacks.disableBlend(selected,workspace.read(selected)) : DimensionStacks.disable(selected,workspace.read(selected))))) { values.keySet().removeIf(key -> key.startsWith(prefix));error=null; }
+        } catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawDimensionType(LosslessJson document) {
         if (!ImGui.collapsingHeader("Environment and dimension type")) return;

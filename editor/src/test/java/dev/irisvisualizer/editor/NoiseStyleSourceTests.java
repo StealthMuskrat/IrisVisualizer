@@ -31,6 +31,7 @@ final class NoiseStyleSourceTests {
     static List<Case> cases() {
         var result=new ArrayList<Case>();
         for (String field : NoiseStyleFields.DIMENSION_FIELDS) add(result,NoiseStyleFields.Target.dimension(field));
+        add(result,DimensionStacks.styleTarget());
         for (String field : NoiseStyleFields.BIOME_FIELDS) add(result,NoiseStyleFields.Target.biome(field));
         for (String field : NoiseStyleFields.TERRAIN_FIELDS) add(result,NoiseStyleFields.Target.terrain(field));
         for (String base : CaveProfileFields.CONTEXTS) {

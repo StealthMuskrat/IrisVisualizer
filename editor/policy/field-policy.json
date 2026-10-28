@@ -223,6 +223,14 @@
     "dimensionOptions": {
       "classification": "generation",
       "reason": "Generated dimension-type configuration with native base inheritance and fullbright ambient override; the editor does not resolve registries, hotload or existing-world compatibility."
+    },
+    "dimensionStack": {
+      "classification": "generation",
+      "reason": "Exact in-pack dimension references with native host/order and upper/stack mutual-exclusion guards; optional stack removal restores field absence. No target-content, height/layout or native generation validation."
+    },
+    "upperDimension": {
+      "classification": "generation",
+      "reason": "Exact in-pack dimension references with native host/order and upper/stack mutual-exclusion guards; optional stack removal restores field absence. No target-content, height/layout or native generation validation."
     }
   },
   "biome": {
@@ -2867,6 +2875,30 @@
     "ceiling": {
       "classification": "generation",
       "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    }
+  },
+  "dimensionStack": {
+    "dimensions": {
+      "classification": "generation",
+      "reason": "Bounded ordered terrain stacking: staged atomic layer replacement retains matching raw tokens, requires 2..64 layers (64 is an editor limit), exact host-once-at-bottom and file presence; spacer/blend are independently editable with native bounds."
+    },
+    "spacer": {
+      "classification": "generation",
+      "reason": "Bounded ordered terrain stacking: staged atomic layer replacement retains matching raw tokens, requires 2..64 layers (64 is an editor limit), exact host-once-at-bottom and file presence; spacer/blend are independently editable with native bounds."
+    },
+    "blend": {
+      "classification": "generation",
+      "reason": "Bounded ordered terrain stacking: staged atomic layer replacement retains matching raw tokens, requires 2..64 layers (64 is an editor limit), exact host-once-at-bottom and file presence; spacer/blend are independently editable with native bounds."
+    }
+  },
+  "dimensionStackBlend": {
+    "amplitude": {
+      "classification": "generation",
+      "reason": "Native optional stack-boundary blend with exact amplitude 0..256, contextual SIMPLEX versus inline FLAT defaults and all shared style/source/cache/fracture controls. No seam noise or terrain layout is evaluated."
+    },
+    "style": {
+      "classification": "generation",
+      "reason": "Native optional stack-boundary blend with exact amplitude 0..256, contextual SIMPLEX versus inline FLAT defaults and all shared style/source/cache/fracture controls. No seam noise or terrain layout is evaluated."
     }
   }
 }

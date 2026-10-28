@@ -22,7 +22,9 @@ public final class DimensionFields {
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
         paths.addAll(DimensionTypeFields.readOnlyPaths(document));
+        paths.addAll(DimensionStacks.readOnlyPaths(document));
         for (String field : document.fields()) {
+            if (DimensionStacks.ROOT_FIELDS.contains(field) || DimensionStacks.OBJECT_FIELDS.contains(field)) continue;
             if (DimensionTypeFields.ROOT_FIELDS.contains(field) || DimensionTypeFields.OBJECT_FIELDS.contains(field)) continue;
             if (WorldBoundaryFields.OBJECT_FIELDS.contains(field)) { paths.addAll(WorldBoundaryFields.readOnlyPaths(document));continue; }
             if (BlockFallbacks.OBJECT_FIELDS.contains(field)) continue;

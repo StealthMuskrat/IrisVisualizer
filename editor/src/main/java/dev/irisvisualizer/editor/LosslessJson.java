@@ -192,6 +192,22 @@ public final class LosslessJson {
         }
         return stringEntries(path).stream().map(StringEntry::value).toList();
     }
+    /** Atomic literal array replacement; reuse matching raw string tokens in occurrence order. */
+    byte[] replaceStringArray(String field,List<String> values) {
+        if (values==null || values.stream().anyMatch(java.util.Objects::isNull)) throw new IllegalArgumentException("String values required");
+        if (token(field)==null) return new LosslessJson(enable(field,"[]")).replaceStringArray(field,values);
+        var entries=stringEntries(field);
+        if (entries.stream().map(StringEntry::value).toList().equals(values)) return sourceBytes();
+        boolean[] used=new boolean[entries.size()];var next=new StringJoiner(", ","[","]");
+        for (String value : values) {
+            String token=null;
+            for (int index=0;index<entries.size();index++) if (!used[index] && entries.get(index).value().equals(value)) {
+                used[index]=true;Span span=entries.get(index).span();token=text.substring(span.start(),span.end());break;
+            }
+            next.add(token==null ? quote(value) : token);
+        }
+        Span span=root.get(field);return splice(span.start(),span.end(),next.toString());
+    }
     /** index == size appends; null removes an existing item. Unchanged item tokens remain intact. */
     public byte[] stringArrayPath(String path, int index, String value) {
         return updatePath(path, (doc, field) -> doc.stringArray(field, index, value), false);

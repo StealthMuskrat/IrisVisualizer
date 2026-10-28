@@ -639,6 +639,17 @@ jobs:
           python editor/tools/extract_style_fracture_fields.py IrisGeneratorStyle.java generated-style-fracture-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-style-fracture-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/style-fracture-fields.properties).Hash) { throw 'Pinned style-fracture definitions differ' }
+      - name: Verify pinned dimension-stack fields and native contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionStack.java' -OutFile IrisDimensionStack.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionStackBlend.java' -OutFile IrisDimensionStackBlend.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/DimensionStackContext.java' -OutFile DimensionStackContext.java
+          python editor/tools/test_dimension_stack_fields.py IrisDimension.java IrisDimensionStack.java IrisDimensionStackBlend.java PackDimensionValidator.java DimensionStackContext.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_stack_fields.py IrisDimension.java IrisDimensionStack.java IrisDimensionStackBlend.java PackDimensionValidator.java DimensionStackContext.java generated-dimension-stack-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-stack-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-stack-fields.properties).Hash) { throw 'Pinned dimension-stack definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
