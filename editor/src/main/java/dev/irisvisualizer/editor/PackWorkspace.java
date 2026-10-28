@@ -238,6 +238,36 @@ public final class PackWorkspace {
         for (var entry : files.entrySet()) savedHashes.put(entry.getKey(), hash(entry.getValue()));
         changed.clear(); created.clear(); changedDirectories.clear();
     }
+    /** Full in-memory snapshot to a fresh folder, then adopt its save baseline without clearing edit history. */
+    public void saveAs(Path target) throws IOException {
+        Path destination=freshDestination(target);var snapshot=freshSnapshot();snapshot.save(destination);
+        directory=snapshot.directory;savedHashes.clear();savedHashes.putAll(snapshot.savedHashes);
+        changed.clear();created.clear();changedDirectories.clear();
+    }
+    /** Full in-memory snapshot without changing this workspace's folder, baseline, revisions or history. */
+    public void saveCopy(Path target) throws IOException { Path destination=freshDestination(target);var snapshot=freshSnapshot();snapshot.save(destination); }
+    private PackWorkspace freshSnapshot() throws IOException {
+        validatePaths();var snapshot=empty();
+        // Internal byte arrays are never modified in place. Sharing them avoids a second complete pack allocation.
+        for (var entry : files.entrySet()) { snapshot.add(entry.getKey(),entry.getValue());snapshot.created.add(entry.getKey());snapshot.changed.add(entry.getKey()); }
+        snapshot.directories.addAll(directories);snapshot.changedDirectories.addAll(directories);return snapshot;
+    }
+    private Path freshDestination(Path target) throws IOException {
+        if (target==null) throw new IOException("Choose a new or empty destination folder");
+        target=target.toAbsolutePath().normalize();rejectLinks(target);
+        Path existing=target;var tail=new ArrayDeque<Path>();
+        while (!Files.exists(existing,LinkOption.NOFOLLOW_LINKS)) {
+            if (existing.getFileName()!=null) tail.addFirst(existing.getFileName());existing=existing.getParent();
+            if (existing==null) throw new IOException("No existing destination ancestor");
+        }
+        for (Path part=existing;part!=null;part=part.getParent()) if (Files.exists(part,LinkOption.NOFOLLOW_LINKS) && !Files.isDirectory(part,LinkOption.NOFOLLOW_LINKS)) throw new IOException("Destination path component is not a folder: "+part);
+        Path resolved=existing.toRealPath();for (Path part : tail) resolved=resolved.resolve(part);
+        if (directory!=null && (resolved.startsWith(directory) || directory.startsWith(resolved))) throw new IOException("Choose a folder outside the active pack; ancestor, nested and same-folder destinations are not supported");
+        if (Files.exists(target,LinkOption.NOFOLLOW_LINKS)) {
+            try (var entries=Files.list(target)) { if (entries.findAny().isPresent()) throw new IOException("Destination must be new or empty: "+target); }
+        }
+        return target;
+    }
     public void exportZip(Path archive) throws IOException { exportZip(archive, false); }
     public void exportZip(Path archive, boolean replaceExisting) throws IOException {
         Path destination = archive.toAbsolutePath().normalize();

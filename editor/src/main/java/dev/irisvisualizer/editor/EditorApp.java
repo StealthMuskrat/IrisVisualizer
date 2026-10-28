@@ -122,11 +122,13 @@ public final class EditorApp extends Application {
         if (!styled) { ImGui.styleColorsLight(); styled = true; }
         if (ImGui.beginMainMenuBar()) {
             if (ImGui.beginMenu("File")) {
-                for (String action : new String[]{"New", "Open", "Save", "Import", "Export"})
+                for (String action : new String[]{"New", "Open", "Save", "Save As", "Save Copy", "Import", "Export"})
                     if (ImGui.menuItem(action)) perform(action);
                 if (ImGui.menuItem("New image-map definition")) createResource("image-maps");
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
+                ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
+                ImGui.textWrapped("Save As switches the active folder. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
                 ImGui.endMenu();
             }
             if (ImGui.beginMenu("Edit")) {
@@ -5692,6 +5694,11 @@ public final class EditorApp extends Application {
                     });
                 }
                 case "Save" -> { if (!appliedValuesOnlyAllowed() || !saveWorkspace()) return; }
+                case "Save As", "Save Copy" -> {
+                    if (!appliedValuesOnlyAllowed()) return;
+                    Path path=choose(true,true);if (path==null) return;
+                    if (action.equals("Save As")) workspace.saveAs(path);else workspace.saveCopy(path);
+                }
                 case "Export" -> { if (!appliedValuesOnlyAllowed()) return; Path path = choose(false, true); if (path != null) {
                     boolean exists = java.nio.file.Files.exists(path);
                     if (exists && JOptionPane.showConfirmDialog(null, "Replace existing ZIP?\n" + path, "Export", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
