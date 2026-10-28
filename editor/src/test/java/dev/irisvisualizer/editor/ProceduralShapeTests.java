@@ -52,7 +52,7 @@ final class ProceduralShapeTests {
             byte[] changed=ProceduralObjects.set(path,raw,c,field,value);var pack=PackWorkspace.newPack(Map.of(path,raw,"objects/opaque.iob",new byte[]{0,1,2}));pack.replace(path,changed);String tag=base+"-"+kind;pack.save(temp.resolve("procedural-shapes-"+tag));pack.exportZip(temp.resolve("procedural-shapes-"+tag+".zip"));var saved=PackWorkspace.open(temp.resolve("procedural-shapes-"+tag));var imported=PackWorkspace.importZip(temp.resolve("procedural-shapes-"+tag+".zip"));for (String key : pack.paths()) check(Arrays.equals(pack.read(key),saved.read(key)) && Arrays.equals(pack.read(key),imported.read(key)));
         }
         rejects(() -> ProceduralShapes.fields(null));rejects(() -> ProceduralShapes.fields("unknown"));rejects(() -> ProceduralShapes.setPair("biomes/world.json",bytes("{}"),null,"heightMin","1","2"));
-        check(FieldCoverage.fields("proceduralTree").stream().filter(FieldCoverage.Field::implemented).count()==45 && FieldCoverage.fields("proceduralFormation").stream().filter(FieldCoverage.Field::implemented).count()==40);
+        check(FieldCoverage.fields("proceduralTree").stream().filter(FieldCoverage.Field::implemented).count()==50 && FieldCoverage.fields("proceduralFormation").stream().filter(FieldCoverage.Field::implemented).count()==45);
         System.out.println("PASS: 131 procedural shape controls across six types and two hosts, twelve complete/scoped enums, native defaults/bounds and exact/raw no-ops, eleven atomic equal/reversed range pairs, null/type/width/path/index/size guards, preserved materials/palettes/canopies/siblings, scoped range drafts and lossless Save/ZIP without baking or geometry");
     }
 }
