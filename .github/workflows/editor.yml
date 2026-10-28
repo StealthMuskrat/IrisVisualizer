@@ -623,6 +623,14 @@ jobs:
           python editor/tools/extract_dimension_type_fields.py IrisDimension.java IrisDimensionTypeOptions.java IrisEnvironment.java DataFixerV1192.java IrisDimensionRuntimeContract.java generated-dimension-type-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-dimension-type-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-type-fields.properties).Hash) { throw 'Pinned dimension-type definitions differ' }
+      - name: Verify pinned recursive noise-fracture definitions
+        shell: pwsh
+        run: |
+          python editor/tools/test_noise_fracture_fields.py IrisNoiseGenerator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_noise_fracture_fields.py IrisNoiseGenerator.java generated-noise-fracture-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-noise-fracture-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/noise-fracture-fields.properties).Hash) { throw 'Pinned noise-fracture definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

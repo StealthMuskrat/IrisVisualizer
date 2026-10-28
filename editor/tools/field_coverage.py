@@ -171,6 +171,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['interpolator'] = {path.split('.', 1)[1] for path in ui['generator'] if path.startswith('interpolator.')}
     implemented['interpolator'].update(editable(java_dir, 'InterpolationFields'))
     implemented['noise'] = set(editable(java_dir, 'NoiseFields'))
+    implemented['noise'].update(editable(java_dir, 'NoiseFractures'))
     implemented['noise'].update(editable(java_dir, 'NoiseStyleFields', 'OBJECT_FIELDS'))
     implemented['noiseStyle'] = set(editable(java_dir, 'NoiseStyleFields'))
     implemented['noiseStyle'].update(editable(java_dir, 'NoiseStyleSources'))

@@ -335,7 +335,7 @@ public final class EditorApp extends Application {
             catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Cliff noise is a snippet or unsupported value (read-only)."); }
         }
         if (ImGui.collapsingHeader("Composite noise entries")) drawNoise(document);
-        ImGui.textWrapped("Fracture trees and other unsupported fields remain read-only.");
+        ImGui.textWrapped("Noise fracture lists have bounded recursive controls. Unsupported data remains read-only; no noise is sampled.");
     }
     private void drawInterpolation(LosslessJson document) {
         ImGui.textWrapped(InterpolationFields.description());
@@ -365,7 +365,7 @@ public final class EditorApp extends Application {
         List<LosslessJson> entries;
         try { entries = document.token("composite") == null ? List.of() : document.objectArray("composite"); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Composite contains snippet/non-object entries (read-only)."); return; }
-        ImGui.textWrapped("Add creates an empty object using Iris defaults. Fracture trees remain read-only. List order affects generation.");
+        ImGui.textWrapped("Add creates an empty object using Iris defaults. Noise fracture lists have bounded recursive controls. List order affects generation.");
         if (ImGui.button("Add default noise entry")) { changeNoise(CompositeNoise.Action.ADD, -1); return; }
         for (int index=0;index<entries.size();index++) {
             if (!ImGui.treeNode("Noise entry " + index)) continue;
@@ -416,6 +416,37 @@ public final class EditorApp extends Application {
             drawStyleFields(object, NoiseStyleFields.Target.noise(target));
             ImGui.treePop();
         }
+        drawNoiseFractures(object,target);
+        if (ImGui.treeNode("Other noise data (read-only)##"+target.draftPrefix())) { for (String path : NoiseFractures.readOnlyPaths(object,target.fracturePath().size())) ImGui.textWrapped(path);ImGui.treePop(); }
+    }
+    private void drawNoiseFractures(LosslessJson noise,NoiseFields.Target target) {
+        String prefix=NoiseFractures.listPrefix(target);
+        if (!ImGui.treeNode("Coordinate fracture children##"+prefix)) return;
+        ImGui.textWrapped(NoiseFractures.help());ImGui.textWrapped("Enabled children offset X/Z using child noise and half-opacity centering. List order changes seed salts. No noise is sampled by this editor. Style fracture objects are a separate setting and remain read-only.");
+        ImGui.textWrapped("Editor limits: "+NoiseFractures.MAXIMUM_DEPTH+" nested child levels and "+NoiseFractures.MAXIMUM_CHILDREN+" children per list. These are editor limits, not native schema limits. Snippets, mixed/null lists and deeper or oversized lists remain read-only.");
+        if (target.fracturePath().size()>=NoiseFractures.MAXIMUM_DEPTH) { ImGui.textWrapped("This node's child list is beyond the editor depth limit. Existing data is preserved.");ImGui.treePop();return; }
+        List<LosslessJson> children;
+        try { children=NoiseFractures.entries(noise); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored fracture list is null, a snippet or contains non-object entries (read-only).");ImGui.treePop();return; }
+        if (children!=null && children.size()>NoiseFractures.MAXIMUM_CHILDREN) { ImGui.textWrapped("Stored list exceeds the editor size limit (read-only).");ImGui.treePop();return; }
+        ImGui.textWrapped("Add uses a default child object. Removing the final child removes the fracture member, restoring Iris's absent empty-list default. An existing explicit empty list can be repaired with Add.");
+        ImGui.beginDisabled(children!=null && children.size()>=NoiseFractures.MAXIMUM_CHILDREN);
+        boolean add=ImGui.button("Add default fracture child##"+prefix);ImGui.endDisabled();
+        if (add) { changeNoiseFracture(target,CompositeNoise.Action.ADD,-1);ImGui.treePop();return; }
+        if (children!=null) for (int index=0;index<children.size();index++) {
+            if (!ImGui.treeNode("Fracture child "+index+"##"+prefix+index)) continue;
+            CompositeNoise.Action action=null;ImGui.beginDisabled(children.size()>=NoiseFractures.MAXIMUM_CHILDREN);
+            if (ImGui.button("Duplicate child")) action=CompositeNoise.Action.DUPLICATE;
+            ImGui.endDisabled();ImGui.sameLine();if (ImGui.button(children.size()==1 ? "Remove final child (restore absence)" : "Remove child")) action=CompositeNoise.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move child up")) action=CompositeNoise.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==children.size()-1);if (ImGui.button("Move child down")) action=CompositeNoise.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { ImGui.treePop();changeNoiseFracture(target,action,index);ImGui.treePop();return; }
+            drawNoiseFields(children.get(index),target.child(index));ImGui.treePop();
+        }
+        ImGui.treePop();
+    }
+    private void changeNoiseFracture(NoiseFields.Target target,CompositeNoise.Action action,int index) {
+        try { commitProfileChange(NoiseFractures.listPrefix(target),NoiseFractures.change(selected,workspace.read(selected),target,action,index),null); }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void drawRootStyles(LosslessJson document, boolean dimension) {
         if (!ImGui.collapsingHeader("Distribution styles")) return;
