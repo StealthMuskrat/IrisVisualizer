@@ -17,7 +17,14 @@ for name,old,new in [
  ('IrisBlockData','this.data.containsKey("entitySpawn")','this.data.containsKey("entity")'),
  ('IrisMaterialPalette','i < ix.getWeight()','i < 1'),
  ('IrisMaterialPalette','NativeBlockState bx = ix.getBlockData(rdata);','NativeBlockState bx = null;'),
- ('IrisBiomePaletteLayer','NativeBlockState bx = ix.getBlockData(data);','NativeBlockState bx = null;')]:
+ ('IrisBiomePaletteLayer','NativeBlockState bx = ix.getBlockData(data);','NativeBlockState bx = null;'),
+ ('IrisDepositGenerator','blockData.add(bx);','for (int w=0; w<ix.getWeight(); w++) { blockData.add(bx); }'),
+ ('IrisObjectReplace','i.getBlockDataOrPlaceholder(rdata)','i.getBlockData(rdata)'),
+ ('IrisObjectReplace',"declared.indexOf('[') < 0","declared.indexOf('[') > 0"),
+ ('IrisDecorator','private IrisBlockData forceBlock;','private String forceBlock;'),
+ ('IrisDecorator','n < i.getWeight()','n < 1'),
+ ('IrisDecorator','list.get(i).getBlockData(data)','list.get(0).getBlockData(data)'),
+ ('DecoratorCore','decorator.getForceBlock().getBlockData(irisData)','decorator.getForceBlock()')]:
  raw=sources[name];assert old.encode() in raw;changed=dict(sources);changed[name]=raw.replace(old.encode(),new.encode(),1)
  try:extract(changed)
  except ValueError:pass

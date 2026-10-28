@@ -9,16 +9,17 @@ import java.util.function.Function;
 final class PaletteBlockData {
     static final int MAX_ENTRIES=64;
     static boolean supports(NoiseStyleFields.Target t) { return t!=null && !t.optionalFracture() && t.noise()==null && (t.proceduralPalette() || t.nativeStructurePalette() || t.objectPalette() || t.floatingBottom() || t.slabWall() || t.biomeLayer() || t.dimensionPalette() || t.ore() && t.oreContext().field().equals("palette") || t.deepPalette() || t.poolPalette() || t.profilePalette() || t.palette()); }
-    record Context(NoiseStyleFields.Target target,int index) {
+    record Context(NoiseStyleFields.Target target,int index) implements BlockDefinitions.Context {
         Context { if (!supports(target) || index<0) throw new IllegalArgumentException("Select a supported inline palette block"); }
-        boolean fluid() { return target.deepPalette() || target.poolPalette() || target.profilePalette(); }
+        public boolean weightedRoot() { return true; }
+        public boolean fluid() { return target.deepPalette() || target.poolPalette() || target.profilePalette(); }
         HydrologyFluidPalettes.Target fluidTarget() { if (!fluid()) throw new IllegalArgumentException("Not a hydrology fluid palette");return target.deepPalette() ? HydrologyFluidPalettes.Target.deep(target.deepIndex()) : new HydrologyFluidPalettes.Target(target.poolPalette(),target.poolPalette() ? target.poolIndex() : target.profileIndex()); }
         String listPrefix() { return fluid() ? fluidTarget().fluidPrefix() : target.palette() ? RiverMaterialFields.listDraftPrefix(target.paletteTarget()) : generalTarget(target).listPrefix(); }
-        String prefix() { return listPrefix()+index+".blockData."; }
+        public String prefix() { return listPrefix()+index+".blockData."; }
         BlockDefinitions.Scope scope() { return new BlockDefinitions.Scope(this,0); }
-        String seedBlock() { return fluid() ? fluidTarget().defaultFluid().toLowerCase(java.util.Locale.ROOT) : "minecraft:stone"; }
-        void checkBlock(String value) { if (!BlockDefinitions.blockSyntax(value)) throw new IllegalArgumentException("Use a lowercase Minecraft base block or unnamespaced alias key");if (fluid()) HydrologyFluidPalettes.fluid(value); }
-        byte[] edit(String path,byte[] raw,Function<LosslessJson,byte[]> op) {
+        public String seedBlock() { return fluid() ? fluidTarget().defaultFluid().toLowerCase(java.util.Locale.ROOT) : "minecraft:stone"; }
+        public void checkBlock(String value) { if (!BlockDefinitions.blockSyntax(value)) throw new IllegalArgumentException("Use a lowercase Minecraft base block or unnamespaced alias key");if (fluid()) HydrologyFluidPalettes.fluid(value); }
+        public byte[] edit(String path,byte[] raw,Function<LosslessJson,byte[]> op) {
             if (!target.resourceBase().equals(ResourceTypes.base(path))) throw new IllegalArgumentException("Palette block owner does not match this resource");
             return NoiseStyleFields.editContainer(raw,target,p -> { var entries=p.objectArray("palette");if (entries.size()>MAX_ENTRIES) throw new IllegalArgumentException("Palette block details have a 64-entry editor limit");return p.objectArrayEdit("palette",index,op); },false);
         }

@@ -40,7 +40,7 @@ public final class DepositGenerators {
     public static String choiceHelp(String field,String value) { if (!choices(field).contains(value)) throw new IllegalArgumentException("Select a pinned deposit choice");return DATA.getProperty(field+"."+value+".description",""); }
     public static String pairField(String pair,boolean minimum) { if (pair==null || !PAIRS.contains(pair)) throw new IllegalArgumentException("Select a deposit range");return (minimum ? "min" : "max")+pair; }
     static List<LosslessJson> entries(LosslessJson root) { return root.token("deposits")==null ? null : root.objectArray("deposits"); }
-    private static byte[] edit(byte[] original,Context context,java.util.function.Function<LosslessJson,byte[]> action) { return new LosslessJson(original).objectArrayEdit("deposits",context.index(),action); }
+    static byte[] edit(byte[] original,Context context,java.util.function.Function<LosslessJson,byte[]> action) { return new LosslessJson(original).objectArrayEdit("deposits",context.index(),action); }
     public static byte[] enable(String path,byte[] original,String base) { authorize(path,base);return new LosslessJson(original).enable("deposits","[]"); }
     public static byte[] change(String path,byte[] original,String base,RiverProfiles.Action action,int index,String block) {
         authorize(path,base);if (action==null) throw new IllegalArgumentException("Choose a deposit action");var root=new LosslessJson(original);

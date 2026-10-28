@@ -14,7 +14,15 @@ public final class BlockDefinitions {
     public static final int MAX_DEPTH=8,MAX_STATES=64;
     private static final Properties DATA=new Properties();
     static { try (var input=BlockDefinitions.class.getResourceAsStream("/block-definition-fields.properties")) { if (input==null) throw new IOException("Missing pinned block definitions");DATA.load(input);if (!"blocks".equals(DATA.getProperty("folder")) || !"aliasThenStateThenBackupThenAir".equals(DATA.getProperty("resolution.policy"))) throw new IOException("Unsupported block definition contract"); } catch (IOException failure) { throw new ExceptionInInitializerError(failure); } }
-    public record Scope(PaletteBlockData.Context context,int depth) {
+    sealed interface Context permits PaletteBlockData.Context,InlineBlockData.Context {
+        String prefix();
+        boolean fluid();
+        boolean weightedRoot();
+        String seedBlock();
+        void checkBlock(String value);
+        byte[] edit(String path,byte[] raw,Function<LosslessJson,byte[]> op);
+    }
+    public record Scope(Context context,int depth) {
         public Scope { BlockDefinitions.scope(depth); }
         public boolean standalone() { return context==null; }
         public String prefix() { return standalone() ? BlockDefinitions.scope(depth) : context.prefix()+"backup.".repeat(depth); }
