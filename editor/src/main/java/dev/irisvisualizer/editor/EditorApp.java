@@ -5494,8 +5494,9 @@ public final class EditorApp extends Application {
         } catch (Exception failure) { error = failure.getMessage(); }
     }
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
+        PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null; }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) previous.clearHistory(); }
         return committed;
     }
     private void restoreAppliedEdit(boolean forward) {
