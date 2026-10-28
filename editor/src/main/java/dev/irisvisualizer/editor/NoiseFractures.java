@@ -61,7 +61,7 @@ public final class NoiseFractures {
                     for (int index=0;index<children.size();index++) readOnly(children.get(index),prefix+field+"["+index+"].",depth+1,paths);
                 } catch (IllegalArgumentException unsupported) { paths.add(prefix+field); }
             } else if (field.equals("style")) {
-                try { var style=NoiseStyleFields.object(noise);for (String member : style.fields()) if (NoiseStyleFields.readOnly(style,member)) paths.add(prefix+"style."+member); }
+                try { var style=NoiseStyleFields.object(noise);for (String member : StyleFractures.readOnlyPaths(style)) paths.add(prefix+"style."+member); }
                 catch (IllegalArgumentException unsupported) { paths.add(prefix+field); }
             } else if (!NoiseFields.EDITABLE.contains(field)) paths.add(prefix+field);
         }

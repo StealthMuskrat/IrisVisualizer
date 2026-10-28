@@ -175,6 +175,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['noise'].update(editable(java_dir, 'NoiseStyleFields', 'OBJECT_FIELDS'))
     implemented['noiseStyle'] = set(editable(java_dir, 'NoiseStyleFields'))
     implemented['noiseStyle'].update(editable(java_dir, 'NoiseStyleSources'))
+    implemented['noiseStyle'].update(editable(java_dir, 'StyleFractures'))
     implemented['noiseStyle'].update(editable(java_dir, 'FloatingPlacementConstraints', 'WARP_FIELDS'))
     implemented['terrain3D'] = set(editable(java_dir, 'Terrain3DFields'))
     implemented['terrain3D'].update(editable(java_dir, 'NoiseStyleFields', 'TERRAIN_FIELDS'))

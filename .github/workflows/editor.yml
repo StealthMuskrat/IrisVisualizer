@@ -631,6 +631,14 @@ jobs:
           python editor/tools/extract_noise_fracture_fields.py IrisNoiseGenerator.java generated-noise-fracture-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-noise-fracture-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/noise-fracture-fields.properties).Hash) { throw 'Pinned noise-fracture definitions differ' }
+      - name: Verify pinned recursive style-fracture definitions
+        shell: pwsh
+        run: |
+          python editor/tools/test_style_fracture_fields.py IrisGeneratorStyle.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_style_fracture_fields.py IrisGeneratorStyle.java generated-style-fracture-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-style-fracture-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/style-fracture-fields.properties).Hash) { throw 'Pinned style-fracture definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

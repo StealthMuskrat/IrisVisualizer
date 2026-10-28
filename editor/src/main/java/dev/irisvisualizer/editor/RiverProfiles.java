@@ -119,7 +119,7 @@ public final class RiverProfiles {
                     for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) paths.add(prefix+".fluidPalette."+field);
                     try {
                         var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.profilePalette(index));
-                        if (style!=null) for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add(prefix+".fluidPalette.style."+field);
+                        if (style!=null) for (String field : StyleFractures.readOnlyPaths(style)) paths.add(prefix+".fluidPalette.style."+field);
                     } catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.style"); }
                     try {
                         var fluids=fluids(palette);

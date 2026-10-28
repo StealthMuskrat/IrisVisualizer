@@ -142,7 +142,8 @@ public final class CaveModules {
                     if (field.equals("style") || field.equals("verticalRange")) {
                         try {
                             var object = new LosslessJson(module.token(field).getBytes(StandardCharsets.UTF_8));
-                            for (String member : object.fields()) if (field.equals("style") ? NoiseStyleFields.readOnly(object,member) : !CavePlacementFields.RANGE_MEMBERS.contains(member)) paths.add(prefix + field + "." + member);
+                            if (field.equals("style")) { for (String member : StyleFractures.readOnlyPaths(object)) paths.add(prefix + field + "." + member); }
+                            else for (String member : object.fields()) if (!CavePlacementFields.RANGE_MEMBERS.contains(member)) paths.add(prefix + field + "." + member);
                         } catch (IllegalArgumentException mismatch) { paths.add(prefix + field); }
                     } else paths.add(prefix + field);
                 }

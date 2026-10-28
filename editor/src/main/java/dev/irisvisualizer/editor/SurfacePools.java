@@ -138,7 +138,7 @@ public final class SurfacePools {
                 try {
                     var palette=RiverProfiles.palette(pool);if (palette==null) continue;
                     for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) paths.add(prefix+".fluidPalette."+field);
-                    try { var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.poolPalette(index));if (style!=null) for (String field : style.fields()) if (NoiseStyleFields.readOnly(style,field)) paths.add(prefix+".fluidPalette.style."+field); }
+                    try { var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.poolPalette(index));if (style!=null) for (String field : StyleFractures.readOnlyPaths(style)) paths.add(prefix+".fluidPalette.style."+field); }
                     catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.style"); }
                     try { var fluids=RiverProfiles.fluids(palette);if (fluids!=null) for (int i=0;i<fluids.size();i++) for (String field : fluids.get(i).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) paths.add(prefix+".fluidPalette.palette["+i+"]."+field); }
                     catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.palette"); }

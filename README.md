@@ -37,4 +37,6 @@ The editor also authors optional dimension world borders: paired center coordina
 
 Dimension-type editing includes environment/fullbright and all 13 pinned options, explicit base inheritance and nullable time/cloud behavior, and exact 64-bit fixed times. Runtime registry and existing-world compatibility remain unvalidated; unsupported previews remain disabled.
 
-Noise-fracture trees now support bounded recursive child editing across composite, cliff and placement-heightmap contexts, including lossless list operations and shared noise/style controls. Editor limits are explicit. Unsupported previews remain disabled, and style-fracture objects remain read-only.
+Noise-fracture trees now support bounded recursive child editing across composite, cliff and placement-heightmap contexts, including lossless list operations and shared noise/style controls. Editor limits are explicit. Unsupported previews remain disabled.
+
+Style-fracture objects now have bounded recursive controls across existing style contexts, with FLAT child defaults, source/cache settings and independent child multipliers. Deeper or unsupported data is preserved, and unsupported previews remain disabled.

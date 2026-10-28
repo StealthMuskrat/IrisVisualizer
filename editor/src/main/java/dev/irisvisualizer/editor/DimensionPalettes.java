@@ -48,7 +48,7 @@ public final class DimensionPalettes {
         try {
             var palette=object(document,field);if (palette==null) return List.of();
             for (String item : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(item)) paths.add(field+"."+item);
-            try { var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.dimensionPalette(field));if (style!=null) for (String item : style.fields()) if (NoiseStyleFields.readOnly(style,item)) paths.add(field+".style."+item); }
+            try { var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.dimensionPalette(field));if (style!=null) for (String item : StyleFractures.readOnlyPaths(style)) paths.add(field+".style."+item); }
             catch (IllegalArgumentException unsupported) { paths.add(field+".style"); }
             try { var entries=entries(palette);if (entries!=null) for (int index=0;index<entries.size();index++) for (String item : entries.get(index).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(item)) paths.add(field+".palette["+index+"]."+item); }
             catch (IllegalArgumentException unsupported) { paths.add(field+".palette"); }

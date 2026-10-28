@@ -422,7 +422,7 @@ public final class EditorApp extends Application {
     private void drawNoiseFractures(LosslessJson noise,NoiseFields.Target target) {
         String prefix=NoiseFractures.listPrefix(target);
         if (!ImGui.treeNode("Coordinate fracture children##"+prefix)) return;
-        ImGui.textWrapped(NoiseFractures.help());ImGui.textWrapped("Enabled children offset X/Z using child noise and half-opacity centering. List order changes seed salts. No noise is sampled by this editor. Style fracture objects are a separate setting and remain read-only.");
+        ImGui.textWrapped(NoiseFractures.help());ImGui.textWrapped("Enabled children offset X/Z using child noise and half-opacity centering. List order changes seed salts. No noise is sampled by this editor. Style fracture objects have their own bounded recursive controls.");
         ImGui.textWrapped("Editor limits: "+NoiseFractures.MAXIMUM_DEPTH+" nested child levels and "+NoiseFractures.MAXIMUM_CHILDREN+" children per list. These are editor limits, not native schema limits. Snippets, mixed/null lists and deeper or oversized lists remain read-only.");
         if (target.fracturePath().size()>=NoiseFractures.MAXIMUM_DEPTH) { ImGui.textWrapped("This node's child list is beyond the editor depth limit. Existing data is preserved.");ImGui.treePop();return; }
         List<LosslessJson> children;
@@ -462,11 +462,11 @@ public final class EditorApp extends Application {
         try { style = NoiseStyleFields.object(container, target); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored style is a snippet or unsupported value (read-only)."); return; }
         ImGui.textWrapped(NoiseStyleFields.contextDescription(target));
-        ImGui.textWrapped("Expression and image-map references can override the base style. Fracture settings remain read-only; no style source is loaded or sampled here.");
+        ImGui.textWrapped("Expression and image-map references can override the base style. Recursive fracture children distort its coordinate field; no style source is loaded or sampled here.");
         ImGui.textWrapped(target.strictBounds() ? "This density style requires positive cellular zoom even when cellular frequency is zero."
                 : "Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
-            ImGui.textWrapped(target.optionalFloating() ? "Absent or null disables this style. Explicit enablement uses the generator-style class defaults ("+NoiseStyleFields.contextDefaultLabel(target)+")." : "Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
+            ImGui.textWrapped(target.optionalFloating() || target.optionalFracture() ? "Absent or null disables this style. Explicit enablement uses the generator-style class defaults ("+NoiseStyleFields.contextDefaultLabel(target)+")." : "Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
             if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefaultLabel(target) + ")")) enableStyle(target, "style");
             return;
         }
@@ -507,6 +507,38 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         drawStyleSources(style,target);
+        if (target.optionalFracture()) drawFractureMultiplier(style,target);
+        drawStyleFracture(style,target);
+        if (ImGui.treeNode("Other style data (read-only)##"+target.draftPrefix())) { for (String path : StyleFractures.readOnlyPaths(style,target.fractureDepth(),target.optionalFracture() || target.placementWarp())) ImGui.textWrapped(path);ImGui.treePop(); }
+    }
+    private void drawFractureMultiplier(LosslessJson style,NoiseStyleFields.Target child) {
+        ImGui.pushID(child.draftPrefix()+"multiplier");ImGui.textWrapped(StyleFractures.multiplierConstraints());String token=style.token("multiplier"),key=child.draftPrefix()+"multiplier";
+        if (token==null) {
+            if (ImGui.button("Enable child multiplier ("+StyleFractures.multiplierDefault()+")")) applyRoutingExtra(() -> workspace.replace(selected,StyleFractures.enableMultiplier(selected,workspace.read(selected),child)));
+        } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored multiplier has an unsupported type (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText("Child multiplier",input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply child multiplier")) commitRiverOverride(key,() -> workspace.replace(selected,StyleFractures.setMultiplier(selected,workspace.read(selected),child,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void drawStyleFracture(LosslessJson parent,NoiseStyleFields.Target target) {
+        if (!ImGui.treeNode("Style fracture child##"+target.draftPrefix())) return;
+        ImGui.textWrapped(StyleFractures.help());ImGui.textWrapped("The child uses its own generic style defaults and a separate positive multiplier. Native distortion runs before cellularization, parent zoom and caching. No native factories or noise sampling run here.");
+        ImGui.textWrapped("Editor limit: "+StyleFractures.MAXIMUM_DEPTH+" nested style-fracture levels, separate from noise-fracture lists. Deeper and unsupported stored data is preserved.");
+        if (target.fractureDepth()>=StyleFractures.MAXIMUM_DEPTH) { ImGui.textWrapped("This child is beyond the editor depth limit (read-only).");ImGui.treePop();return; }
+        var child=target.child();drawStyleFields(parent,child);
+        try {
+            if (NoiseStyleFields.object(parent,child)!=null) {
+                ImGui.textWrapped("Disable replaces this entire child object, including its nested and advanced data, with null.");
+                if (ImGui.button("Disable style fracture (write null)##"+child.draftPrefix())) {
+                    try {
+                        if (drafts.transitionUnder(child.draftPrefix(),() -> !drafts.anyUnder(child.draftPrefix()) || JOptionPane.showConfirmDialog(null,"Discard unapplied text within this style-fracture child and disable it?","Unapplied style-fracture text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION,() -> workspace.replace(selected,StyleFractures.disable(selected,workspace.read(selected),child)))) { values.keySet().removeIf(key -> key.startsWith(child.draftPrefix()));error=null; }
+                    } catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+        } catch (IllegalArgumentException unsupported) { /* The shared inspector explains unsupported types. */ }
+        ImGui.treePop();
     }
     private void drawStyleSources(LosslessJson style,NoiseStyleFields.Target target) {
         if (!ImGui.treeNode("Sources and cache##"+target.draftPrefix())) return;
@@ -531,7 +563,7 @@ public final class EditorApp extends Application {
         ImGui.treePop();
     }
     private void enableStyle(NoiseStyleFields.Target target, String field) {
-        try { workspace.replace(selected, NoiseStyleFields.enable(selected, workspace.read(selected), target, field)); error = null; }
+        try { workspace.replace(selected,target.optionalFracture() && field.equals("style") ? StyleFractures.enable(selected,workspace.read(selected),target) : NoiseStyleFields.enable(selected,workspace.read(selected),target,field)); error = null; }
         catch (Exception failure) { error = failure.getMessage(); }
     }
     private void changeNoise(CompositeNoise.Action action, int index) {
@@ -669,7 +701,7 @@ public final class EditorApp extends Application {
             for (String field : BiomeDecorators.BLOCK_LISTS) if (ImGui.treeNode(field)) { drawDecoratorBlocks(decorator,context,field);ImGui.treePop(); }
             for (String field : BiomeDecorators.STYLES) if (ImGui.treeNode(field)) {
                 var target=context.styleTarget(field);drawStyleFields(decorator,target);
-                try { var style=NoiseStyleFields.object(decorator,target);if (style!=null) for (String child : style.fields()) if (NoiseStyleFields.readOnly(style,child)) ImGui.textWrapped(child+" (read-only)"); } catch (IllegalArgumentException unsupported) { }
+                try { var style=NoiseStyleFields.object(decorator,target);if (style!=null) for (String child : StyleFractures.readOnlyPaths(style)) ImGui.textWrapped(child+" (read-only)"); } catch (IllegalArgumentException unsupported) { }
                 ImGui.treePop();
             }
             for (String field : decorator.fields()) if (!BiomeDecorators.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");ImGui.treePop();
