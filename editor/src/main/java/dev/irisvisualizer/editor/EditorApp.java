@@ -109,6 +109,12 @@ public final class EditorApp extends Application {
     private WorkspaceChanges.Filter changesFilter=WorkspaceChanges.Filter.ALL;
     private String changesSelected,changesPendingPath;
     private PackWorkspace changesPendingWorkspace;
+    private boolean showReferenceReview,reviewIncomingOnly;
+    private final PackReferenceAudit.Cache packReferenceReview=new PackReferenceAudit.Cache();
+    private final ImString referenceReviewQuery=new ImString(1024);
+    private PackReferenceAudit.View referenceReviewView=PackReferenceAudit.View.ALL;
+    private String referenceReviewPendingPath;
+    private PackWorkspace referenceReviewPendingWorkspace;
     @Override protected void preRun() {
         long handle = ((WindowGlfw) getWindow()).getHandle();
         glfwSetWindowCloseCallback(handle, window -> {
@@ -141,6 +147,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
+                if (ImGui.menuItem("Review pack resource links")) showReferenceReview=true;
                 ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
                 ImGui.textWrapped("Save As switches the active folder. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
                 ImGui.endMenu();
@@ -318,6 +325,7 @@ public final class EditorApp extends Application {
         if (showQuickOpen) drawQuickOpen();
         if (showTextSearch) drawTextSearch();
         if (showPendingChanges) drawPendingChanges();
+        if (showReferenceReview) drawPackReferenceReview();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
         if (navigationRequest!=null) {
@@ -330,14 +338,16 @@ public final class EditorApp extends Application {
                     boolean picker=quickPendingWorkspace==workspace && navigationRequest.target().equals(quickPendingPath);
                     boolean textResult=textPendingWorkspace==workspace && navigationRequest.target().equals(textPendingPath);
                     boolean pendingChange=changesPendingWorkspace==workspace && navigationRequest.target().equals(changesPendingPath);
+                    boolean referenceReview=referenceReviewPendingWorkspace==workspace && navigationRequest.target().equals(referenceReviewPendingPath);
                     boolean opened=navigationRequest.target().equals(selected) || transition(false,() -> { selected=navigationRequest.target();filter.set("");error=null; });
-                    if ((picker || textResult || pendingChange) && opened) { if (picker) showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
+                    if ((picker || textResult || pendingChange || referenceReview) && opened) { if (picker) showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
                 }
             } catch (Exception failure) { error=failure.getMessage(); }
         }
         quickPendingWorkspace=null;quickPendingPath=null;
         textPendingWorkspace=null;textPendingPath=null;
         changesPendingWorkspace=null;changesPendingPath=null;
+        referenceReviewPendingWorkspace=null;referenceReviewPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
     }
     private void drawReferences() {
@@ -5568,13 +5578,52 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
         if (selected==null) return;
         if (!browserFamily.matches(selected)) browserFamily=ResourceFinder.Family.ALL;
         if (browserChangedOnly && !workspace.changed(selected)) browserChangedOnly=false;
+    }
+    private void drawPackReferenceReview() {
+        if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }
+        if (ImGui.button("Close resource-link review")) { showReferenceReview=false;ImGui.end();return; }
+        ImGui.textWrapped("Known typed fields in dimension, region, biome and image-map JSON only. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
+        if (ImGui.button("Scan / refresh known resource links")) packReferenceReview.refresh(workspace);
+        ImGui.sameLine();if (ImGui.button("Clear link scan")) packReferenceReview.clear();
+        ImGui.inputText("Source, field, key or target contains",referenceReviewQuery);
+        if (ImGui.beginCombo("Link state",referenceReviewView.label())) { for (var view : PackReferenceAudit.View.values()) if (ImGui.selectable(view.label(),view==referenceReviewView)) referenceReviewView=view;ImGui.endCombo(); }
+        if (ImGui.checkbox("Known incoming links to current selection",reviewIncomingOnly)) reviewIncomingOnly=!reviewIncomingOnly;
+        if (ImGui.button("Clear link filters")) { referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false; }
+        var audit=packReferenceReview.current(workspace);
+        if (audit==null) ImGui.textWrapped("No scan for the current applied workspace state. Scan explicitly after New/Open/Import or an applied edit/resource change; changing filters does not rescan.");
+        else {
+            ImGui.textWrapped(audit.inspectedFiles()+" / "+audit.eligibleFiles()+" eligible resources inspected; "+audit.bytes()+" bytes; "+audit.skippedFiles()+" skipped files; "+audit.findings().size()+" recorded diagnostics.");
+            ImGui.textWrapped(audit.count(ReferenceDiagnostics.State.EXACT_FILE)+" exact-file links; "+audit.count(ReferenceDiagnostics.State.NO_EXACT_FILE)+" no-exact-file links; "+(audit.count(ReferenceDiagnostics.State.ABSENT_REQUIRED)+audit.count(ReferenceDiagnostics.State.EMPTY_REQUIRED))+" required-field diagnostics; "+audit.count(ReferenceDiagnostics.State.INVALID_KEY)+" invalid keys; "+audit.count(ReferenceDiagnostics.State.UNSUPPORTED)+" unsupported diagnostics.");
+            ImGui.textWrapped(audit.incomplete() ? "Inspection is incomplete: unsupported inputs or scan limits were encountered. Counts cover recorded diagnostics only." : "No skips/unsupported diagnostics within this scan. Reference coverage remains partial.");
+            if (!audit.notices().isEmpty() && ImGui.treeNode("Skipped/truncated inspection notices")) { for (var notice : audit.notices()) { ImGui.textWrapped(PackReferenceAudit.display(notice.path()));ImGui.textWrapped(notice.message()); }ImGui.treePop(); }
+            if (audit.omittedNotices()>0) ImGui.textWrapped(audit.omittedNotices()+" additional inspection notices omitted.");
+            if (reviewIncomingOnly && selected==null) ImGui.textWrapped("Select a resource to filter its known incoming references.");
+            else try {
+                var result=packReferenceReview.query(workspace,new PackReferenceAudit.Query(referenceReviewQuery.get(),referenceReviewView,reviewIncomingOnly ? selected : null));
+                if (reviewIncomingOnly) ImGui.textWrapped("Exact incoming target: "+PackReferenceAudit.display(selected));
+                ImGui.textWrapped(result.matches()+" matching diagnostics; "+result.findings().size()+" shown.");
+                if (result.truncated()) ImGui.textWrapped("Only the first 200 matches in source/field traversal order are shown. Narrow the filters to reach later findings.");
+                int index=0;for (var finding : result.findings()) {
+                    ImGui.pushID(index++);ImGui.textUnformatted(finding.state()+": "+PackReferenceAudit.display(finding.field()));ImGui.textWrapped(PackReferenceAudit.display(finding.source()));ImGui.textWrapped("Stored key / diagnostic: "+PackReferenceAudit.display(finding.key()));
+                    if (finding.target()!=null) ImGui.textWrapped("Exact target: "+PackReferenceAudit.display(finding.target()));
+                    if (ImGui.button("Open source resource")) queueReferenceReviewOpen(finding.source());
+                    if (finding.state()==ReferenceDiagnostics.State.EXACT_FILE && finding.target()!=null) { ImGui.sameLine();if (ImGui.button("Open target resource")) queueReferenceReviewOpen(finding.target()); }
+                    ImGui.popID();
+                }
+            } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+        }
+        ImGui.textWrapped("Explicit scan limits: 512 eligible files, 8 MB total, 1 MB/file, 4,096 recorded diagnostics and 256 notices. Per-resource checks also cap links. Filtering shows up to 200 matches with 256 search characters. Long labels are shortened to 256 UTF-16 characters plus ellipsis; control characters are escaped for display. Scans read applied memory only; drafts, disk state and formulas are not inspected. Save/Export remain available; no data is rewritten and no native resource is loaded.");
+        ImGui.end();
+    }
+    private void queueReferenceReviewOpen(String path) {
+        resourceNavigation.request(workspace,path);referenceReviewPendingPath=path;referenceReviewPendingWorkspace=workspace;
     }
     private void drawPendingChanges() {
         if (!ImGui.begin("Pending workspace changes")) { ImGui.end();return; }
