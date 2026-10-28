@@ -922,6 +922,21 @@ jobs:
           python editor/tools/extract_procedural_canopy_fields.py . generated-procedural-canopy-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-procedural-canopy-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-canopy-fields.properties).Hash) { throw 'Pinned procedural canopy definitions differ' }
+      - name: Verify pinned procedural accent contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeDecorator.java' -OutFile IrisTreeDecorator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeSecondaryLeaf.java' -OutFile IrisTreeSecondaryLeaf.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeDecoratorTarget.java' -OutFile IrisTreeDecoratorTarget.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/TreeDecoratorApplier.java' -OutFile TreeDecoratorApplier.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/ruin/IrisRuinDecorator.java' -OutFile IrisRuinDecorator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/ruin/IrisRuinDecoratorTarget.java' -OutFile IrisRuinDecoratorTarget.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/ruin/RuinDecoratorApplier.java' -OutFile RuinDecoratorApplier.java
+          python editor/tools/test_procedural_accent_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_procedural_accent_fields.py . generated-procedural-accent-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-procedural-accent-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-accent-fields.properties).Hash) { throw 'Pinned procedural accent definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
