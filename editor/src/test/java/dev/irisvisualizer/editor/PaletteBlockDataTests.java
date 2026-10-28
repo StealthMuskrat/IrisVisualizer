@@ -25,7 +25,7 @@ final class PaletteBlockDataTests {
         var cases=NoiseStyleSourceTests.cases().stream().filter(c -> PaletteBlockData.supports(c.target())).toList();check(cases.size()==92);var prefixes=new HashSet<String>();int serial=0;
         check(cases.stream().filter(c -> c.target().proceduralPalette()).count()==52 && cases.stream().filter(c -> c.target().nativeStructurePalette()).count()==8 && cases.stream().filter(c -> c.target().ore()).count()==3);
         for (var c : cases) {
-            var context=new PaletteBlockData.Context(c.target(),0);var scope=context.scope();String path=c.path();byte[] original=fixture(c,node(0,8));check(prefixes.add(scope.prefix()) && scope.prefix().startsWith(context.listPrefix()) && !scope.standalone() && scope.depth()==0 && scope.context().equals(context));
+            var context=new PaletteBlockData.Context(c.target(),0);var scope=context.scope();String path=c.path();byte[] original=fixture(c,node(0,8));check(prefixes.add(path+"|"+scope.prefix()) && scope.prefix().startsWith(context.listPrefix()) && !scope.standalone() && scope.depth()==0 && scope.context().equals(context));
             if (!context.fluid() && !c.target().palette()) check(PaletteBlockData.generalTarget(c.target()).styleTarget().equals(c.target()));
             var readonly=PaletteBlockData.readOnlyPaths(entry(original,c,0));check(readonly.containsAll(List.of("data.opaque","data.entitySpawn","tileData","debug","stamp","backup.weight","backup.tileData")) && !readonly.contains("data") && !readonly.contains("backup") && !readonly.contains("weight"));
             for (int depth=0;depth<=8;depth++) {
