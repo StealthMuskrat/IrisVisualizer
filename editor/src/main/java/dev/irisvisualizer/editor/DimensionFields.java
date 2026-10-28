@@ -21,7 +21,9 @@ public final class DimensionFields {
     /** Report unknown root fields and unknown children of the supported object groups. */
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
+        paths.addAll(DimensionTypeFields.readOnlyPaths(document));
         for (String field : document.fields()) {
+            if (DimensionTypeFields.ROOT_FIELDS.contains(field) || DimensionTypeFields.OBJECT_FIELDS.contains(field)) continue;
             if (WorldBoundaryFields.OBJECT_FIELDS.contains(field)) { paths.addAll(WorldBoundaryFields.readOnlyPaths(document));continue; }
             if (BlockFallbacks.OBJECT_FIELDS.contains(field)) continue;
             if (StaticObjects.LIST_FIELDS.contains(field) || StaticObjects.ROOT_FIELDS.contains(field)) continue;

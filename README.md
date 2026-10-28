@@ -4,7 +4,7 @@ Standalone Windows x64 visualizer and generation-focused pack editor for Iris, t
 
 **Status: editor implementation in progress; native world previews disabled.** The Windows x64 ImGui editor opens folders/ZIPs, preserves original/unknown data, edits supported dimension, region, biome and generator settings, and inspects image assets. Full schema coverage and interactive GUI/GPU verification remain pending. No custom replacement terrain generator is included. Native parity has not been established.
 
-See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40604938993](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40604938993). Download its IrisVisualizer-windows-x64 artifact to try the editor.
+See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40606376414](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40606376414). Download its IrisVisualizer-windows-x64 artifact to try the editor.
 
 ## Verify the first batch
 
@@ -34,3 +34,5 @@ Read [the feasibility findings](docs/FEASIBILITY.md) and [the development batche
 GPL-3.0-or-later; see [LICENSE.md](LICENSE.md). Iris is developed by Volmit Software under GPL-3.0-or-later. The integration compiles against upstream sources rather than duplicating Iris generation algorithms or schemas.
 
 The editor also authors optional dimension world borders: paired center coordinates, full diameter, warning distance and damage settings, using pinned native bounds and preserving advanced data. Null/absence leaves the live native border unchanged; the editor does not apply borders to running worlds. Unsupported previews remain disabled.
+
+Dimension-type editing includes environment/fullbright and all 13 pinned options, explicit base inheritance and nullable time/cloud behavior, and exact 64-bit fixed times. Runtime registry and existing-world compatibility remain unvalidated; unsupported previews remain disabled.

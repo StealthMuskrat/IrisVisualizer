@@ -1,10 +1,10 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in seventy pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in seventy-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 53 | 47 | 29 |
+| dimension | 82 | 56 | 50 | 26 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 38 | 32 | 4 |
@@ -72,12 +72,13 @@ Direct nonstatic/nontransient private fields in seventy pinned source classes on
 | staticObjectRotation | 3 | 3 | 3 | 0 |
 | position | 3 | 3 | 3 | 0 |
 | decorator | 17 | 17 | 17 | 0 |
+| dimensionTypeOptions | 13 | 13 | 13 | 0 |
 | worldBoundary | 5 | 5 | 5 | 0 |
 | worldBoundaryCenter | 2 | 2 | 2 | 0 |
 
 ## dimension
 
-Unclassified: `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `dimensionOptions`, `dimensionStack`, `disabledComponents`, `environment`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `fullbright`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`.
+Unclassified: `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `dimensionStack`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `upperDimension`, `useMantle`.
 
 ## importedStructures
 
@@ -344,6 +345,10 @@ Unclassified: none.
 Unclassified: none.
 
 ## decorator
+
+Unclassified: none.
+
+## dimensionTypeOptions
 
 Unclassified: none.
 

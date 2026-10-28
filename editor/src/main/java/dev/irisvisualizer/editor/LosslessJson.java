@@ -86,6 +86,15 @@ public final class LosslessJson {
         String next = value == null ? "null" : java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
         return nullableScalar(field, next);
     }
+    /** Exact nullable integer assignment without conversion through double. */
+    byte[] nullableInteger(String field, Long value) {
+        String old=token(field);
+        if (old!=null && !old.equals("null")) {
+            try { new java.math.BigDecimal(old).longValueExact(); }
+            catch (NumberFormatException | ArithmeticException invalid) { throw new IllegalArgumentException("Stored field is not a nullable 64-bit integer",invalid); }
+        }
+        return nullableScalar(field,value==null ? "null" : Long.toString(value));
+    }
     byte[] nullableBoolean(String field, Boolean value) {
         String old = token(field);
         if (old != null && !old.equals("null") && !old.equals("true") && !old.equals("false")) throw new IllegalArgumentException("Stored override is not boolean or null");
