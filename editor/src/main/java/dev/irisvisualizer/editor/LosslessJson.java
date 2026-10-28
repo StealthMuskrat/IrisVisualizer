@@ -39,6 +39,23 @@ public final class LosslessJson {
         return splice(span.start(), span.end(), quote(value));
     }
     record StringProperty(String key,String value) {}
+    /** Literal primitive-map mutation; caller owns domain syntax, widths and authorization. */
+    byte[] primitiveMapSet(String previous,String key,String json) {
+        if (key==null || json==null) throw new IllegalArgumentException("Primitive map key/value required");
+        var checked=new LosslessJson(("{\"value\":"+json+"}").getBytes(StandardCharsets.UTF_8));
+        if (!checked.fields().equals(Set.of("value")) || !primitive(checked.token("value"))) throw new IllegalArgumentException("A non-null JSON primitive is required");
+        if (previous==null) {
+            if (root.containsKey(key)) throw new IllegalArgumentException("Map key already exists");
+            int position=root.isEmpty() ? text.indexOf('{')+1 : root.values().stream().mapToInt(Span::end).max().orElseThrow();
+            String spacing=text.contains("\r\n") ? "\r\n  " : text.contains("\n") ? "\n  " : " ";
+            return splice(position,position,(root.isEmpty() ? "" : ",")+spacing+quote(key)+": "+checked.token("value"));
+        }
+        if (!root.containsKey(previous) || !primitive(token(previous)) || !previous.equals(key) && root.containsKey(key)) throw new IllegalArgumentException("Map entry is absent, nonprimitive or collides with another key");
+        byte[] updated=token(previous).equals(checked.token("value")) ? sourceBytes() : splice(root.get(previous).start(),root.get(previous).end(),checked.token("value"));
+        if (previous.equals(key)) return updated;
+        var next=new LosslessJson(updated);var span=next.rootKeys.get(previous);return next.splice(span.start(),span.end(),quote(key));
+    }
+    private static boolean primitive(String token) { return token!=null && (token.startsWith("\"") || token.equals("true") || token.equals("false") || numericToken(token)); }
     /** Literal dictionary keys never pass through dotted-path addressing. */
     List<StringProperty> stringProperties() {
         List<StringProperty> properties=new ArrayList<>();

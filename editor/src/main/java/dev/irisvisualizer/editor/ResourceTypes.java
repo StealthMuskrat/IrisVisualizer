@@ -8,7 +8,7 @@ public final class ResourceTypes {
     }
     /** Syntax and exact file presence only; no target-content validation or loader alias resolution. */
     public static java.util.List<String> referenceKeys(PackWorkspace workspace, String family) {
-        if (!java.util.Set.of("dimensions","regions","biomes","generators","image-maps").contains(family))
+        if (!java.util.Set.of("dimensions","regions","biomes","generators","image-maps","blocks").contains(family))
             throw new IllegalArgumentException("Unsupported resource reference family");
         return workspace.paths().stream().filter(path -> family.equals(base(path)))
                 .map(path -> path.substring(family.length()+1,path.length()-5)).filter(ResourceTypes::referenceKey).sorted().toList();
@@ -18,7 +18,7 @@ public final class ResourceTypes {
         String[] parts = path.split("/", -1);
         if (parts.length < 2) return null;
         for (String part : parts) if (part.isEmpty() || part.equals(".") || part.equals("..")) return null;
-        if (!java.util.Set.of("dimensions", "regions", "biomes", "generators", "image-maps").contains(parts[0])) return null;
+        if (!java.util.Set.of("dimensions", "regions", "biomes", "generators", "image-maps", "blocks").contains(parts[0])) return null;
         if (parts[0].equals("dimensions") && parts.length != 2) return null;
         return parts[0];
     }
@@ -38,7 +38,7 @@ public final class ResourceTypes {
         if (folder == null || folder.contains("\\") || folder.contains(":")) return false;
         String[] parts = folder.split("/", -1);
         for (String part : parts) if (part.isEmpty() || part.equals(".") || part.equals("..")) return false;
-        return java.util.Set.of("regions", "biomes", "generators", "image-maps", "objects", "images").contains(parts[0]);
+        return java.util.Set.of("regions", "biomes", "generators", "image-maps", "blocks", "objects", "images").contains(parts[0]);
     }
     public static String target(String source, String key) throws java.io.IOException {
         String base = fileFamily(source);

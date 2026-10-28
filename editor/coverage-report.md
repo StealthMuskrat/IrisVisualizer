@@ -73,7 +73,7 @@ Direct nonstatic/nontransient private fields in one hundred and eight pinned sou
 | seaCaves | 6 | 6 | 6 | 0 |
 | riverMaterial | 3 | 3 | 3 | 0 |
 | materialPalette | 3 | 3 | 3 | 0 |
-| blockData | 6 | 2 | 2 | 4 |
+| blockData | 6 | 6 | 4 | 0 |
 | riverProfile | 2 | 2 | 2 | 0 |
 | standingSurfacePool | 8 | 8 | 8 | 0 |
 | deepFluid | 12 | 12 | 12 | 0 |
@@ -391,7 +391,7 @@ Unclassified: none.
 
 ## blockData
 
-Unclassified: `backup`, `data`, `debug`, `tileData`.
+Unclassified: none.
 
 ## riverProfile
 

@@ -937,6 +937,14 @@ jobs:
           python editor/tools/extract_procedural_accent_fields.py . generated-procedural-accent-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-procedural-accent-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-accent-fields.properties).Hash) { throw 'Pinned procedural accent definitions differ' }
+      - name: Verify pinned block alias definition contracts
+        shell: pwsh
+        run: |
+          python editor/tools/test_block_definition_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_block_definition_fields.py . generated-block-definition-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-block-definition-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/block-definition-fields.properties).Hash) { throw 'Pinned block alias definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
