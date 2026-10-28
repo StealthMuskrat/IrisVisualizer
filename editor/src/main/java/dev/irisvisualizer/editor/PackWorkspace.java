@@ -57,6 +57,29 @@ public final class PackWorkspace {
     }
     public long resourceRevision() { return resourceRevision; }
     public long revision() { return resourceRevision + editRevision; }
+    private record AssetPlan(AssetImports.Source source,String target,long budget) {}
+    private AssetPlan planAssetImport(Path source,String key,long maximumBytes) throws IOException {
+        if (maximumBytes<0 || maximumBytes>MAX_BYTES) throw new IllegalArgumentException("Invalid workspace asset-import budget");
+        var asset=AssetImports.describe(source);String target=safe(asset.family()+"/"+key+asset.extension());
+        for (String component : target.split("/")) if (component.length()>255) throw new IOException("Imported asset path components must be at most 255 characters, including the file extension");
+        // Bound path depth/components before the resource-key regex processes untrusted pasted input.
+        asset.target(key);
+        if (files.size()>=MAX_FILES) throw new IOException("Too many pack files");
+        if (foldedFiles.contains(target.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource path: "+target);
+        validatePaths(target);
+        long available=maximumBytes-files.values().stream().mapToLong(bytes -> bytes.length).sum();
+        if (available<0 || asset.bytes()>available) throw new IOException("Asset exceeds the remaining workspace byte budget");
+        return new AssetPlan(asset,target,Math.min(AssetImports.MAX_BYTES,available));
+    }
+    /** Metadata/path/capacity checks only. The source is checked again when the user commits the import. */
+    public String checkAssetImport(Path source,String key) throws IOException { return planAssetImport(source,key,MAX_BYTES).target(); }
+    public String importAsset(Path source,String key) throws IOException { return importAsset(source,key,MAX_BYTES); }
+    String importAsset(Path source,String key,long maximumBytes) throws IOException {
+        var plan=planAssetImport(source,key,maximumBytes);byte[] data=AssetImports.read(plan.source(),plan.budget());
+        // All fallible I/O/preflight precedes installation; failed imports leave workspace/history state intact.
+        add(plan.target(),data);changed.add(plan.target());created.add(plan.target());resourceRevision++;
+        history.clear("Asset imported; earlier applied-edit history was cleared.");return plan.target();
+    }
     /** Duplicate bytes under the same supported type. No references or file contents are rewritten. */
     public String duplicate(String source, String key) throws IOException {
         if (!files.containsKey(source)) throw new IOException("Unknown resource");
@@ -335,9 +358,11 @@ public final class PackWorkspace {
         if (!foldedFiles.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource paths: " + key);
         files.put(key, bytes); savedHashes.put(key, hash(bytes));
     }
-    private void validatePaths() throws IOException {
+    private void validatePaths() throws IOException { validatePaths(null); }
+    private void validatePaths(String additionalFile) throws IOException {
         Map<String, String> spellings = new HashMap<>(); Set<String> folders = new HashSet<>();
-        List<String> all = new ArrayList<>(files.keySet()); all.addAll(directories);
+        List<String> plannedFiles=new ArrayList<>(files.keySet());if (additionalFile!=null) plannedFiles.add(additionalFile);
+        List<String> all = new ArrayList<>(plannedFiles); all.addAll(directories);
         for (String key : all) {
             String[] parts = key.split("/"); String current = "";
             for (int i=0;i<parts.length;i++) {
@@ -348,7 +373,7 @@ public final class PackWorkspace {
                 if (i < parts.length-1 || directories.contains(key)) folders.add(folded);
             }
         }
-        for (String file : files.keySet()) if (folders.contains(file.toLowerCase(Locale.ROOT)))
+        for (String file : plannedFiles) if (folders.contains(file.toLowerCase(Locale.ROOT)))
             throw new IOException("File/directory path collision: " + file);
     }
     private static byte[] hash(byte[] bytes) {

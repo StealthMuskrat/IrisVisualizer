@@ -175,6 +175,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New image-map definition")) createResource("image-maps");
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
+                if (ImGui.menuItem("Import image/object asset")) importAsset();
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
                 if (ImGui.menuItem("Review pack resource links")) showReferenceReview=true;
                 ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
@@ -187,7 +188,7 @@ public final class EditorApp extends Application {
                 ImGui.beginDisabled(workspace.redoCount()==0);if (ImGui.menuItem("Redo applied edit")) restoreAppliedEdit(true);ImGui.endDisabled();
                 if (workspace.redoPath()!=null) ImGui.textWrapped("Redo: "+workspace.redoPath());
                 ImGui.textWrapped(workspace.undoCount()+" undo / "+workspace.redoCount()+" redo; "+workspace.historyBytes()+" snapshot bytes.");
-                ImGui.textWrapped("Applied byte edits only, up to 128 edits / 32 MiB. Resource/folder creation or duplication clears history. Save retains it. History is memory-only and ends when the pack is replaced or the editor closes.");
+                ImGui.textWrapped("Applied byte edits only, up to 128 edits / 32 MiB. Resource/folder creation, duplication or asset import clears history. Save retains it. History is memory-only and ends when the pack is replaced or the editor closes.");
                 ImGui.textWrapped(workspace.historyNote());
                 if (ImGui.menuItem("Review applied edits")) showAppliedHistory=true;
                 ImGui.beginDisabled(workspace.undoCount()+workspace.redoCount()==0);if (ImGui.menuItem("Clear applied-edit history")) workspace.clearHistory();ImGui.endDisabled();
@@ -5566,6 +5567,18 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
+    }
+    private void importAsset() {
+        try {
+            var chooser=new JFileChooser();chooser.setDialogTitle("Import PNG/JPEG image or Iris object asset");chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);chooser.setAcceptAllFileFilterUsed(false);
+            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Images and Iris objects (*.png, *.jpg, *.jpeg, *.iob)","png","jpg","jpeg","iob"));
+            if (chooser.showOpenDialog(null)!=JFileChooser.APPROVE_OPTION) return;
+            Path source=chooser.getSelectedFile().toPath();var asset=AssetImports.describe(source);
+            String key=JOptionPane.showInputDialog(null,"Copy into "+asset.family()+"/ as a new resource key (omit "+asset.extension()+"):\n"+asset.bytes()+" bytes. The source is copied unchanged; contents are not validated.\nLimit: 64 MiB/file and available workspace capacity. Existing resources are never replaced.\nImport clears applied-edit history.",asset.suggestedKey());
+            if (key==null) return;
+            workspace.checkAssetImport(source,key);
+            transition(false,() -> { selected=workspace.importAsset(source,key);filter.set("");error=null; });
+        } catch (Exception failure) { error=failure.getMessage(); }
     }
     private void duplicateResource(String source) {
         try {
