@@ -79,16 +79,7 @@ public final class PackReferenceAudit {
     private static boolean contains(String value,String query) { return value!=null && value.toLowerCase(Locale.ROOT).contains(query); }
     /** Bounded GUI labels; control/unpaired surrogate characters are shown as literal escapes. */
     public static String display(String value) {
-        if (value==null) return "(none)";
-        var out=new StringBuilder();int offset=0;
-        while (offset<value.length()) {
-            int code=value.codePointAt(offset);String token;
-            if (Character.isISOControl(code) || code<=0xffff && Character.isSurrogate((char)code)) { String hex=Integer.toHexString(code);token="\\u"+"0".repeat(4-hex.length())+hex; }
-            else token=new String(Character.toChars(code));
-            if (out.length()+token.length()>MAX_DISPLAY_CHARACTERS) break;
-            out.append(token);offset+=Character.charCount(code);
-        }
-        if (offset<value.length()) out.append("...");return out.toString();
+        return InspectorText.label(value,MAX_DISPLAY_CHARACTERS);
     }
     public static Result filter(Audit audit,Query query) {
         Objects.requireNonNull(audit);Objects.requireNonNull(query);int matches=0;var findings=new ArrayList<Finding>();

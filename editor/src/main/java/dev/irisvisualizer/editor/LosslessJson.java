@@ -17,6 +17,39 @@ public final class LosslessJson {
         space(); if (peek() != '{') throw error(); object(true, 0); space(); if (at != text.length()) throw error();
     }
     public Set<String> fields() { return Collections.unmodifiableSet(root.keySet()); }
+    /** Source spans for the read-only browser. Constructor validation remains authoritative; no writer state changes. */
+    JsonStructure.Index structure(int maximumNodes,int maximumDepth) {
+        new JsonStructure.Limits(maximumNodes,maximumDepth);
+        class Walk {
+            final List<JsonStructure.Node> nodes=new ArrayList<>();boolean limited;
+            void skip() { space();if (peek()=='{') object(false,0);else value(0); }
+            int node(int parent,String segment,int depth) {
+                space();int start=at,id=nodes.size();char c=peek();
+                JsonStructure.Kind kind=switch (c) { case '{' -> JsonStructure.Kind.OBJECT;case '[' -> JsonStructure.Kind.ARRAY;case '"' -> JsonStructure.Kind.STRING;case 't','f' -> JsonStructure.Kind.BOOLEAN;case 'n' -> JsonStructure.Kind.NULL;default -> JsonStructure.Kind.NUMBER; };
+                nodes.add(null);var children=new ArrayList<Integer>();boolean omitted=false;
+                if (c=='{' || c=='[') {
+                    char end=c=='{' ? '}' : ']';at++;space();boolean empty=peek()==end;at=start;
+                    if (!empty && (depth>=maximumDepth || nodes.size()>=maximumNodes)) { skip();omitted=true;limited=true; }
+                    else {
+                        at++;space();int index=0;
+                        if (peek()!=end) while (true) {
+                            String child;
+                            if (c=='{') { space();child=string();space();require(':');space(); }
+                            else child=Integer.toString(index++);
+                            if (nodes.size()<maximumNodes) children.add(node(id,child,depth+1));
+                            else { skip();omitted=true;limited=true; }
+                            space();if (peek()==end) break;require(',');space();
+                        }
+                        require(end);
+                    }
+                } else value(0);
+                nodes.set(id,new JsonStructure.Node(id,parent,segment,kind,depth,start,at,children,omitted));return id;
+            }
+        }
+        int previous=at;
+        try { at=0;var walk=new Walk();walk.node(-1,"",0);return new JsonStructure.Index(walk.nodes,walk.limited); }
+        finally { at=previous; }
+    }
     byte[] sourceBytes() { return text.getBytes(StandardCharsets.UTF_8); }
     public String token(String field) { var span = root.get(field); return span == null ? null : text.substring(span.start(), span.end()); }
     public byte[] number(String field, double value) {

@@ -144,6 +144,16 @@ public final class EditorApp extends Application {
     private PackReferenceAudit.View referenceReviewView=PackReferenceAudit.View.ALL;
     private String referenceReviewPendingPath;
     private PackWorkspace referenceReviewPendingWorkspace;
+    private boolean showJsonStructure;
+    private final JsonStructure.Cache jsonSourceCache=new JsonStructure.Cache();
+    private JsonStructure.Snapshot jsonActiveSnapshot,jsonWholeSnapshot,jsonTokenSnapshot;
+    private final JsonStructure.PageCache jsonPages=new JsonStructure.PageCache();
+    private JsonStructure.Preview jsonWholePreview,jsonTokenPreview;
+    private JsonStructure.Pointer jsonCurrentPointer;
+    private int jsonNode,jsonPage,jsonBufferedNode=-1;
+    private final ImString jsonFind=new ImString(1024),jsonPointer=new ImString(65_536);
+    private ImString jsonWholeText,jsonTokenText;
+    private String jsonFindError,jsonPreviousFind="";
     @Override protected void preRun() {
         long handle = ((WindowGlfw) getWindow()).getHandle();
         glfwSetWindowCloseCallback(handle, window -> {
@@ -196,6 +206,7 @@ public final class EditorApp extends Application {
             }
             if (ImGui.beginMenu("Navigate")) {
                 if (ImGui.menuItem("Quick Open resource")) showQuickOpen=true;
+                ImGui.beginDisabled(!JsonStructure.supports(selected));if (ImGui.menuItem("Inspect selected JSON structure")) showJsonStructure=true;ImGui.endDisabled();
                 if (ImGui.menuItem("Search JSON text")) showTextSearch=true;
                 var back=navigationHistory.back();var forward=navigationHistory.forward();
                 ImGui.beginDisabled(back.isEmpty());if (ImGui.menuItem("Back")) queueHistoryNavigation(false,1);ImGui.endDisabled();
@@ -341,12 +352,11 @@ public final class EditorApp extends Application {
             if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
             if (ExpressionDefinitions.supports(selected) || "image-maps".equals(ResourceTypes.base(selected))) drawExpressionReferenceAudit();
             drawCoverage();
-            if (bytes != null) {
-                if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
-                    ImGui.textWrapped(new String(workspace.read(selected), StandardCharsets.UTF_8));
+            if (JsonStructure.supports(selected)) {
+                if (ImGui.button("Browse JSON structure (read-only)")) showJsonStructure=true;
+                if (ImGui.collapsingHeader("Original/current JSON (read-only)")) drawJsonSource(currentJsonSnapshot());
             } else {
                 ImGui.text(byteCount + " bytes");
-                if (selected.endsWith(".json")) ImGui.textWrapped("JSON inspection is limited to 1 MB; original bytes remain saveable/exportable.");
             }
         }
         if (selected != null) drawReferences();
@@ -356,6 +366,7 @@ public final class EditorApp extends Application {
         if (showTextSearch) drawTextSearch();
         if (showPendingChanges) drawPendingChanges();
         if (showReferenceReview) drawPackReferenceReview();
+        if (showJsonStructure) drawJsonStructure();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
         if (navigationRequest!=null) {
@@ -5620,13 +5631,62 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
         if (selected==null) return;
         if (!browserFamily.matches(selected)) browserFamily=ResourceFinder.Family.ALL;
         if (browserChangedOnly && !workspace.changed(selected)) browserChangedOnly=false;
+    }
+    private static ImString jsonReadOnlyBuffer(String text) { return new ImString(text,Math.max(128,text.getBytes(StandardCharsets.UTF_8).length+1)); }
+    private JsonStructure.Snapshot currentJsonSnapshot() {
+        var snapshot=jsonSourceCache.inspect(workspace,selected);
+        if (jsonActiveSnapshot!=snapshot) { jsonActiveSnapshot=snapshot;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholeText=null;jsonTokenText=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonBufferedNode=-1;openJsonNode(0);jsonPointer.set(""); }
+        return snapshot;
+    }
+    private void refreshJsonToken(JsonStructure.Snapshot snapshot) {
+        if (jsonTokenSnapshot!=snapshot || jsonBufferedNode!=jsonNode) { jsonTokenSnapshot=snapshot;jsonBufferedNode=jsonNode;jsonTokenPreview=snapshot.token(jsonNode);jsonCurrentPointer=snapshot.pointer(jsonNode);jsonTokenText=jsonReadOnlyBuffer(jsonTokenPreview.text()); }
+    }
+    private void drawJsonSource(JsonStructure.Snapshot snapshot) {
+        ImGui.textWrapped(snapshot.detail());
+        if (snapshot.status()==JsonStructure.Status.INVALID_UTF8 || snapshot.status()==JsonStructure.Status.CONTROL_TEXT || snapshot.status()==JsonStructure.Status.TOO_LARGE || snapshot.status()==JsonStructure.Status.NOT_JSON) { ImGui.textUnformatted(snapshot.bytes()+" applied bytes; source text unavailable.");return; }
+        if (jsonWholeSnapshot!=snapshot) { jsonWholeSnapshot=snapshot;jsonWholePreview=snapshot.sourcePreview();jsonWholeText=jsonReadOnlyBuffer(jsonWholePreview.text()); }
+        ImGui.textWrapped("Applied source: "+snapshot.bytes()+" bytes, "+jsonWholePreview.totalCharacters()+" UTF-16 characters"+(jsonWholePreview.truncated() ? "; first 16,384 shown" : ""));
+        ImGui.inputTextMultiline("Applied source text",jsonWholeText,-1,180,ImGuiInputTextFlags.ReadOnly);
+    }
+    private void openJsonNode(int id) { jsonNode=id;jsonPage=0;jsonFind.set("");jsonPreviousFind="";jsonFindError=null; }
+    private void drawJsonStructure() {
+        if (!ImGui.begin("JSON structure (read-only)")) { ImGui.end();return; }
+        if (ImGui.button("Close JSON browser")) { showJsonStructure=false;ImGui.end();return; }
+        var snapshot=currentJsonSnapshot();
+        ImGui.textWrapped("Resource: "+InspectorText.label(selected,256));
+        if (!snapshot.indexed()) { drawJsonSource(snapshot);ImGui.end();return; }
+        ImGui.textWrapped(snapshot.detail());
+        ImGui.textWrapped(snapshot.nodes().size()+" indexed nodes. Browsing shows applied source only; unknown fields stay read-only. This is not schema or native validation, and viewing does not insert defaults.");
+        if (ImGui.button("Root")) openJsonNode(0);ImGui.sameLine();ImGui.beginDisabled(jsonNode==0);if (ImGui.button("Parent")) openJsonNode(snapshot.node(jsonNode).parent());ImGui.endDisabled();
+        ImGui.inputText("Exact JSON pointer (empty = root)",jsonPointer);
+        if (ImGui.button("Go to indexed pointer")) {
+            try { int found=snapshot.find(jsonPointer.get());if (found<0) jsonFindError="Pointer not indexed: it may be absent or beyond index limits.";else openJsonNode(found); }
+            catch (IllegalArgumentException invalid) { jsonFindError=invalid.getMessage(); }
+        }
+        refreshJsonToken(snapshot);ImGui.textWrapped("Current pointer: "+(jsonNode==0 ? "(root)" : InspectorText.label(jsonCurrentPointer.text(),512)));if (!jsonCurrentPointer.complete()) ImGui.textWrapped("Pointer exceeds the 16,384-character representation limit; this display is incomplete.");
+        ImGui.inputText("Find indexed names / scalar prefixes",jsonFind);
+        if (!jsonFind.get().equals(jsonPreviousFind)) { jsonPage=0;jsonPreviousFind=jsonFind.get();jsonFindError=null; }
+        if (ImGui.button("Clear JSON search")) { jsonFind.set("");jsonPreviousFind="";jsonPage=0;jsonFindError=null; }
+        try {
+            var page=jsonPages.page(snapshot,jsonNode,jsonFind.get(),jsonPage);jsonPage=page.page();
+            ImGui.textWrapped(page.matches()+" matching indexed nodes; page "+(page.page()+1)+"; "+page.nodes().size()+" shown. Empty search lists direct children; search matches names or the first 256 source characters of scalar tokens.");
+            ImGui.beginDisabled(!page.previous());if (ImGui.button("Previous nodes")) jsonPage--;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(!page.next());if (ImGui.button("Next nodes")) jsonPage++;ImGui.endDisabled();
+            for (int id : page.nodes()) { var node=snapshot.node(id);ImGui.pushID(id);if (ImGui.button("Open node")) openJsonNode(id);ImGui.sameLine();ImGui.textUnformatted(node.kind()+" : "+(node.segment().isEmpty() ? "(empty member name)" : InspectorText.label(node.segment(),256)));ImGui.textWrapped(snapshot.summary(id));ImGui.popID(); }
+        } catch (IllegalArgumentException invalid) { jsonFindError=invalid.getMessage(); }
+        if (jsonFindError!=null) ImGui.textWrapped(jsonFindError);
+        refreshJsonToken(snapshot);var node=snapshot.node(jsonNode);
+        ImGui.separator();ImGui.textWrapped(node.kind()+" token; source UTF-16 offsets "+node.start()+".."+node.end()+"; "+jsonTokenPreview.totalCharacters()+" characters"+(jsonTokenPreview.truncated() ? "; first 16,384 shown" : ""));
+        if (node.limited()) ImGui.textWrapped("Some direct children or descendants are not indexed. The original token remains preserved.");
+        ImGui.inputTextMultiline("Selected original token",jsonTokenText,-1,180,ImGuiInputTextFlags.ReadOnly);
+        ImGui.textWrapped("Limits: 1 MB source, 4,096 nodes, 32 indexed child levels, 200 nodes/page, 256 search characters and 16,384-character token/pointer previews. Labels escape controls and shorten long text; token panes preserve source spelling. Pointers use / segments and ~0 / ~1 escapes, not dotted field paths. Save/Export remain independent; unsupported previews stay disabled.");
+        ImGui.end();
     }
     private void drawPackReferenceReview() {
         if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }
