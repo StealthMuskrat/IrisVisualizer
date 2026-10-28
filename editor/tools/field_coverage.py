@@ -343,6 +343,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['riverMaterial'] = set(editable(java_dir, 'RiverMaterialFields'))
     implemented['materialPalette'] = set(editable(java_dir, 'RiverMaterialFields', 'PALETTE_FIELDS'))
     implemented['blockData'] = set(editable(java_dir, 'RiverMaterialFields', 'ENTRY_FIELDS'))
+    implemented['blockData'].update(editable(java_dir, 'BlockDefinitions'))
     implemented['seaCaves'] = set(editable(java_dir, 'SeaCaveFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))

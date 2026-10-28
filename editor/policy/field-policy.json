@@ -2065,6 +2065,22 @@
     "weight": {
       "classification": "generation",
       "reason": "Source-audited river material/palette authoring; runtime registry, solidity and generation checks remain pending."
+    },
+    "data": {
+      "classification": "generation",
+      "reason": "Native block alias resolution uses structured state properties and recursive backups. Controls are available in blocks/ definitions; other nested contexts remain bounded separately."
+    },
+    "backup": {
+      "classification": "generation",
+      "reason": "Native block alias resolution uses structured state properties and recursive backups. Controls are available in blocks/ definitions; other nested contexts remain bounded separately."
+    },
+    "debug": {
+      "classification": "read-only",
+      "reason": "Console logging only; does not change generated block states."
+    },
+    "tileData": {
+      "classification": "read-only",
+      "reason": "Block-entity payloads and gameplay data are outside voxel-state editing scope; preserved verbatim."
     }
   },
   "riverProfile": {
