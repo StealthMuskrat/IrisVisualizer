@@ -6,8 +6,8 @@ Direct nonstatic/nontransient private fields in ninety-one pinned source classes
 | --- | ---: | ---: | ---: | ---: |
 | dimension | 82 | 80 | 74 | 2 |
 | nativeStructureAdjustment | 6 | 6 | 6 | 0 |
-| structureStilt | 4 | 4 | 3 | 0 |
-| structureTerrain | 11 | 11 | 10 | 0 |
+| structureStilt | 4 | 4 | 4 | 0 |
+| structureTerrain | 11 | 11 | 11 | 0 |
 | structureYBand | 2 | 2 | 2 | 0 |
 | dimensionMode | 1 | 1 | 1 | 0 |
 | importedStructures | 6 | 6 | 6 | 0 |

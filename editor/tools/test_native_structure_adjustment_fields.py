@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from extract_native_structure_adjustment_fields import extract
 sources=[Path(path).read_bytes() for path in sys.argv[1:]];result=extract(*sources).decode()
-for token in ['yShift.default=0\n','stilt.maxDepth.default=64\n','terrain.mode.default=SOURCE\n','terrain.erosionFrequency.default=0.07\n','terrain.lobeFrequency.default=0\n','resolution.policy=stackShiftsLastNonNullOverrides\n','band.policy=sortedEndpoints\n','palettes.policy=readOnly\n']:assert token in result,token
+for token in ['yShift.default=0\n','stilt.maxDepth.default=64\n','terrain.mode.default=SOURCE\n','terrain.erosionFrequency.default=0.07\n','terrain.lobeFrequency.default=0\n','resolution.policy=stackShiftsLastNonNullOverrides\n','band.policy=sortedEndpoints\n','palettes.policy=separatePaletteControls\n']:assert token in result,token
 for index,old,new in [(0,b'private IrisImportedStructureControl importedStructures = new IrisImportedStructureControl();',b'private IrisImportedStructureControl importedStructures;'),
                       (1,b'y += adjustment.getYShift();',b'y = adjustment.getYShift();'),(1,b'preserveSourceY |= adjustment.isPreserveSourceY();',b'preserveSourceY = adjustment.isPreserveSourceY();'),
                       (1,b'if (adjustment.getTerrain() != null)',b'if (terrain == null)'),(2,b'private int yShift = 0;',b'private int yShift = 1;'),
@@ -18,4 +18,4 @@ for index,old,new in [(0,b'private IrisImportedStructureControl importedStructur
     try:extract(*changed)
     except ValueError:continue
     raise AssertionError('Accepted native adjustment drift: '+str(old))
-print('PASS: native structure adjustment defaults/bounds, matching, stacked shifts/OR/last override resolution, sorted Y bands, terrain enums/erosion defaults and read-only palette contracts reject drift')
+print('PASS: native structure adjustment defaults/bounds, matching, stacked shifts/OR/last override resolution, sorted Y bands, terrain enums/erosion defaults and palette ownership contracts reject drift')
