@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in one hundred and eight pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in one hundred and eleven pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -8,6 +8,9 @@ import sys
 from pathlib import Path
 
 SOURCES = {
+ 'expression': 'generation/noise/IrisExpression.java',
+ 'expressionVariable': 'generation/noise/IrisExpressionLoad.java',
+ 'expressionFunction': 'generation/noise/IrisExpressionFunction.java',
  'proceduralObjects': 'generation/decoration/IrisProceduralObjects.java',
  'proceduralTree': 'generation/decoration/tree/IrisProceduralTree.java',
  'treeDecorator': 'generation/decoration/tree/IrisTreeDecorator.java',
@@ -350,8 +353,11 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['importedFeatures'].update(editable(java_dir, 'NativeGenerationFilters', 'FEATURE_FIELDS'))
     implemented['importedStructures'].update(editable(java_dir, 'NativeGenerationFilters', 'STRUCTURE_FIELDS'))
     implemented['importedStructures'].update(editable(java_dir, 'NativeStructureAdjustments', 'LIST_FIELDS'))
+    implemented['expression'] = set(editable(java_dir, 'ExpressionDefinitions', 'ROOT_FIELDS'))
+    implemented['expressionVariable'] = set(editable(java_dir, 'ExpressionDefinitions', 'VARIABLE_FIELDS'))
+    implemented['expressionFunction'] = set(editable(java_dir, 'ExpressionDefinitions', 'FUNCTION_FIELDS'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and eight pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and eleven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

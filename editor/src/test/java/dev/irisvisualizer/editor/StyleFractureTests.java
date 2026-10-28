@@ -14,7 +14,7 @@ final class StyleFractureTests {
     private static void check(boolean value) { if (!value) throw new AssertionError("Style-fracture contract failed"); }
     private static void rejects(Runnable action) { try { action.run(); } catch (IllegalArgumentException expected) { return; }throw new AssertionError("Expected rejected style-fracture operation"); }
     private static LosslessJson child(NoiseStyleSourceTests.Case c,byte[] source,int depth) { var style=c.style(source);for (int level=0;level<depth;level++) style=new LosslessJson(bytes(style.token("fracture")));return style; }
-    private static List<NoiseStyleSourceTests.Case> cases() {
+    static List<NoiseStyleSourceTests.Case> cases() {
         var result=new ArrayList<>(NoiseStyleSourceTests.cases());
         for (var root : NoiseStyleSourceTests.cases()) if (root.target().noise()!=null) {
             var noise=root.target().noise().child(0);String path=root.stylePath();result.add(new NoiseStyleSourceTests.Case(NoiseStyleFields.Target.noise(noise),path.substring(0,path.length()-"style".length())+"fracture.0.style"));
@@ -22,7 +22,7 @@ final class StyleFractureTests {
         return result;
     }
     static void run(Path temp) throws Exception {
-        check(cases().size()==173 && StyleFractures.MAXIMUM_DEPTH==8 && StyleFractures.multiplierDefault().equals("1"));
+        check(cases().size()==175 && StyleFractures.MAXIMUM_DEPTH==8 && StyleFractures.multiplierDefault().equals("1"));
         var sources=PackWorkspace.newPack(Map.of("expressions/formula.json",bytes("opaque expression"),"image-maps/map.json",bytes("opaque map")));
         int ordinal=0;
         for (var c : cases()) {

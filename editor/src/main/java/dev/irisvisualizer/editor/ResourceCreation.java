@@ -9,7 +9,7 @@ public final class ResourceCreation {
         if (folder == null || folder.contains("\\") || folder.contains(":")) throw new IOException("Unsupported resource folder");
         String[] parts = folder.split("/", -1);
         for (String part : parts) if (part.isEmpty() || part.equals(".") || part.equals("..")) throw new IOException("Unsafe resource folder");
-        if (!Set.of("dimensions", "regions", "biomes", "generators", "image-maps", "blocks").contains(parts[0])) throw new IOException("Creation supports dimension, region, biome, generator image-map and block JSON only");
+        if (!Set.of("dimensions", "regions", "biomes", "generators", "image-maps", "blocks", "expressions").contains(parts[0])) throw new IOException("Creation supports dimension, region, biome, generator, image-map, block and expression JSON only");
         if (parts[0].equals("dimensions") && parts.length != 1) throw new IOException("Dimensions must stay flat");
         return parts[0];
     }
@@ -34,6 +34,7 @@ public final class ResourceCreation {
             throw new IOException("Choose an exact existing " + dependencyType(folder) + " key for the new resource");
         if (base.equals("image-maps")) return ImageMapDefinitions.template(workspace,dependency);
         if (base.equals("blocks")) return BlockDefinitions.template();
+        if (base.equals("expressions")) return ExpressionDefinitions.template();
         byte[] bytes = StarterPack.resourceTemplate(base, name);
         LosslessJson document = new LosslessJson(bytes);
         switch (base) {

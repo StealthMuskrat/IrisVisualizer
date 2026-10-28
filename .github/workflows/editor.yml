@@ -945,6 +945,20 @@ jobs:
           python editor/tools/extract_block_definition_fields.py . generated-block-definition-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-block-definition-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/block-definition-fields.properties).Hash) { throw 'Pinned block alias definitions differ' }
+      - name: Verify pinned expression definition contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/IrisExpression.java' -OutFile IrisExpression.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/IrisExpressionLoad.java' -OutFile IrisExpressionLoad.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/IrisExpressionFunction.java' -OutFile IrisExpressionFunction.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/IrisEngineStreamType.java' -OutFile IrisEngineStreamType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/IrisEngineValueType.java' -OutFile IrisEngineValueType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/ExpressionNoise.java' -OutFile ExpressionNoise.java
+          python editor/tools/test_expression_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_expression_fields.py . generated-expression-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-expression-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/expression-fields.properties).Hash) { throw 'Pinned expression definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

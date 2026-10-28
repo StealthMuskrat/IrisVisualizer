@@ -26,7 +26,7 @@ public final class EditorApp extends Application {
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
     private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
     private final BlockAliasAudit.Cache blockAliasAudits = new BlockAliasAudit.Cache();
-    private final ResourceNavigation aliasNavigation = new ResourceNavigation();
+    private final ResourceNavigation resourceNavigation = new ResourceNavigation();
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
     private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
@@ -108,6 +108,7 @@ public final class EditorApp extends Application {
                     if (ImGui.menuItem(action)) perform(action);
                 if (ImGui.menuItem("New image-map definition")) createResource("image-maps");
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
+                if (ImGui.menuItem("New expression definition")) createResource("expressions");
                 ImGui.endMenu();
             }
             ImGui.text(workspace.dirty() ? "Unsaved changes" : "Saved / no applied changes");
@@ -234,6 +235,10 @@ public final class EditorApp extends Application {
                 try { drawBlockDefinition(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && ExpressionDefinitions.supports(selected)) {
+                try { drawExpressionDefinition(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
             drawCoverage();
             if (bytes != null) {
@@ -247,8 +252,8 @@ public final class EditorApp extends Application {
         if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
-        String aliasTarget=aliasNavigation.take(workspace);
-        if (aliasTarget!=null) { try { transition(false,() -> { selected=aliasTarget;filter.set(""); }); } catch (Exception failure) { error=failure.getMessage(); } }
+        String navigationTarget=resourceNavigation.take(workspace);
+        if (navigationTarget!=null) { try { transition(false,() -> { selected=navigationTarget;filter.set(""); }); } catch (Exception failure) { error=failure.getMessage(); } }
     }
     private void drawReferences() {
         String base = ResourceTypes.base(selected);
@@ -497,7 +502,7 @@ public final class EditorApp extends Application {
         ImGui.textWrapped(target.strictBounds() ? "This density style requires positive cellular zoom even when cellular frequency is zero."
                 : "Cellular frequency 0 disables cellularization. Set a positive cellular zoom before enabling it.");
         if (style == null) {
-            ImGui.textWrapped(target.optionalFloating() || target.optionalFracture() ? "Absent or null disables this style. Explicit enablement uses the generator-style class defaults ("+NoiseStyleFields.contextDefaultLabel(target)+")." : "Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
+            ImGui.textWrapped(target.optionalFloating() || target.optionalFracture() || target.expressionSource() ? "Absent or null disables this style. Explicit enablement uses the generator-style class defaults ("+NoiseStyleFields.contextDefaultLabel(target)+")." : "Absent style uses " + NoiseStyleFields.contextDefaultLabel(target) + ". Enable it explicitly before changing style settings.");
             if (ImGui.button("Enable style (" + NoiseStyleFields.contextDefaultLabel(target) + ")")) enableStyle(target, "style");
             return;
         }
@@ -582,6 +587,7 @@ public final class EditorApp extends Application {
                 if (current!=null && !choices.contains(current)) ImGui.textWrapped("Stored reference is outside the exact in-pack catalog and is preserved until replaced or cleared.");
                 if (ImGui.beginCombo(field,current==null ? "Absent/null" : current.length()>128 ? "Stored reference" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.setReference(selected,workspace.read(selected),target,field,choice,workspace)));ImGui.endCombo(); }
                 if (current!=null && ImGui.button("Clear reference (null)")) applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.setReference(selected,workspace.read(selected),target,field,null,workspace)));
+                if (current!=null && choices.contains(current) && ImGui.button("Open exact source file")) { try { resourceNavigation.request(workspace,NoiseStyleSources.family(field)+"/"+current+".json"); } catch (Exception failure) { error=failure.getMessage(); } }
                 if (choices.isEmpty()) ImGui.textWrapped("No exact "+NoiseStyleSources.family(field)+" JSON resources in this pack.");
             }
             ImGui.popID();
@@ -1635,7 +1641,7 @@ public final class EditorApp extends Application {
     private void drawExactBlockAlias(String block,String key) {
         String target=BlockDefinitions.exactAlias(workspace,block);if (target==null) return;ImGui.pushID(key+".exactAlias");
         ImGui.textWrapped("Exact alias file present; contents, loader aliases and cycles unchecked: "+target);
-        if (ImGui.smallButton("Open exact block alias")) { try { aliasNavigation.request(workspace,target); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();
+        if (ImGui.smallButton("Open exact block alias")) { try { resourceNavigation.request(workspace,target); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();
     }
     private void drawBlockAliasAudit() {
         if (!ImGui.collapsingHeader("Exact block-alias references")) return;
@@ -1646,10 +1652,52 @@ public final class EditorApp extends Application {
         if (audit.incomplete()) ImGui.textWrapped("Reference coverage is incomplete; see notices below.");
         if (!audit.inspected().contains(selected)) ImGui.textWrapped("The selected definition was not inspected within these limits. Missing links or cycles may remain unknown.");
         var outgoing=audit.outgoing(selected);var incoming=audit.incoming(selected);if (outgoing.isEmpty()) ImGui.textWrapped("No recorded outgoing exact alias reference. Material keys without an exact local alias file remain unchecked.");
-        int index=0;for (var edge : outgoing) { ImGui.pushID(index++);ImGui.textWrapped(edge.field()+" -> "+edge.target()+(edge.implicit() ? " (implicit native air default)" : "")+(edge.conditional() ? " (conditional backup)" : ""));if (ImGui.smallButton("Open referenced alias")) { try { aliasNavigation.request(workspace,edge.target());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
-        ImGui.textWrapped(incoming.size()+" recorded incoming exact references.");for (var edge : incoming) { ImGui.pushID(index++);ImGui.textWrapped(edge.source()+": "+edge.field()+(edge.conditional() ? " (conditional backup)" : ""));if (ImGui.smallButton("Open referring definition")) { try { aliasNavigation.request(workspace,edge.source());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
+        int index=0;for (var edge : outgoing) { ImGui.pushID(index++);ImGui.textWrapped(edge.field()+" -> "+edge.target()+(edge.implicit() ? " (implicit native air default)" : "")+(edge.conditional() ? " (conditional backup)" : ""));if (ImGui.smallButton("Open referenced alias")) { try { resourceNavigation.request(workspace,edge.target());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
+        ImGui.textWrapped(incoming.size()+" recorded incoming exact references.");for (var edge : incoming) { ImGui.pushID(index++);ImGui.textWrapped(edge.source()+": "+edge.field()+(edge.conditional() ? " (conditional backup)" : ""));if (ImGui.smallButton("Open referring definition")) { try { resourceNavigation.request(workspace,edge.source());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
         for (var cycle : audit.cycles(selected)) { ImGui.textWrapped("Potential cycle group (members, not traversal order): "+String.join(", ",cycle.members()));if (cycle.backupLinks()) ImGui.textWrapped("This group includes conditional backup links; the audit does not evaluate whether they execute."); }
         if (ImGui.treeNode("Alias audit notices")) { for (var notice : audit.notices()) ImGui.textWrapped(notice.path()+(notice.field().isEmpty() ? "" : ": "+notice.field())+" — "+notice.message());ImGui.treePop(); }
+    }
+    private void drawExpressionDefinition(LosslessJson root) {
+        ImGui.textWrapped("Expression text and source data only. No parser, function, engine source or evaluation is run. Grammar, built-in identifiers, provider compatibility and recursion remain unchecked; previews remain disabled.");
+        ImGui.textWrapped("Inherited x/y/z bindings: 1D = x/-1/-1; 2D = x/z/-1; 3D = x/y/z. Variables use engine value, then engine stream, then style, then static value. Functions use engine stream before style; stream functions use two arguments. A function without a provider is ignored natively.");
+        ImGui.textWrapped("New names use ASCII identifiers, exclude x/y/z, and are unique across both source lists. Renaming or duplicating a source does not rewrite expression text. List edits preserve other resources and unknown fields. Removing a row/list/provider discards that selected subtree, including advanced data.");
+        try { String current=ExpressionDefinitions.body(root),key=ExpressionDefinitions.bodyPrefix();ImGui.textWrapped(ExpressionDefinitions.help("root","expression"));if (current.isEmpty()) ImGui.textWrapped("Required expression text is absent/null or empty; enter text to repair it.");ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(ExpressionDefinitions.MAX_TEXT*4+1,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputTextMultiline("Expression text",input,-1,150);drafts.update(key,current,input.get());if (ImGui.button("Apply expression text")) commitRiverOverride(key,() -> workspace.replace(selected,ExpressionDefinitions.setBody(selected,workspace.read(selected),input.get()))); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored expression text has an unsupported type or NUL (read-only, preserved)."); }
+        for (String list : ExpressionDefinitions.LISTS) if (ImGui.treeNode(list)) { drawExpressionList(root,list);ImGui.treePop(); }
+        var readOnly=ExpressionDefinitions.readOnlyPaths(root);if (ImGui.collapsingHeader("Read-only expression fields ("+readOnly.size()+")")) for (String field : readOnly) ImGui.textWrapped(field+" (preserved)");
+    }
+    private void drawExpressionList(LosslessJson root,String list) {
+        String prefix=ExpressionDefinitions.listPrefix(list);ImGui.pushID(prefix);ImGui.textWrapped(ExpressionDefinitions.help("root",list));
+        try { var rows=ExpressionDefinitions.entries(root,list);if (rows!=null && rows.size()>ExpressionDefinitions.MAX_ENTRIES) throw new IllegalArgumentException("List limit");String key=prefix+"new.name";ImString input=values.computeIfAbsent(key,ignored -> new ImString("",4096));ImGui.inputText("Name for new source",input);drafts.update(key,"",input.get());ImGui.beginDisabled(input.get().isBlank() || rows!=null && rows.size()>=ExpressionDefinitions.MAX_ENTRIES);boolean add=ImGui.button("Add source with native defaults");ImGui.endDisabled();
+            if (add) { try { commitProfileChange(prefix,ExpressionDefinitions.change(selected,workspace.read(selected),list,RiverProfiles.Action.ADD,-1,input.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+            if (root.token(list)!=null && ImGui.button("Remove entire source list")) { try { commitProfileChange(prefix,ExpressionDefinitions.resetList(selected,workspace.read(selected),list),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+            if (rows!=null) for (int index=0;index<rows.size();index++) { ImGui.pushID(index);if (ImGui.treeNode("Source "+index)) {
+                var context=new ExpressionDefinitions.Context(list,index);String duplicateKey=context.prefix()+"duplicate.name";ImString duplicate=values.computeIfAbsent(duplicateKey,ignored -> new ImString("",4096));ImGui.inputText("Unique name for duplicate",duplicate);drafts.update(duplicateKey,"",duplicate.get());RiverProfiles.Action action=null;ImGui.beginDisabled(duplicate.get().isBlank() || rows.size()>=ExpressionDefinitions.MAX_ENTRIES);if (ImGui.button("Duplicate with new name")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove source")) action=RiverProfiles.Action.REMOVE;ImGui.beginDisabled(index==0);if (ImGui.button("Move up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==rows.size());if (ImGui.button("Move down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+                if (action!=null) { try { commitProfileChange(prefix,ExpressionDefinitions.change(selected,workspace.read(selected),list,action,index,action==RiverProfiles.Action.DUPLICATE ? duplicate.get() : null),action==RiverProfiles.Action.DUPLICATE ? duplicateKey : null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
+                drawExpressionSource(rows.get(index),context);ImGui.treePop();
+            }ImGui.popID(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored source list is null, mixed, a snippet or exceeds 64 entries (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawExpressionSource(LosslessJson row,ExpressionDefinitions.Context context) {
+        try { String current=ExpressionDefinitions.name(row,context),stored=current==null ? "" : current,key=context.prefix()+"name";ImGui.textWrapped(ExpressionDefinitions.help(context.list(),"name"));ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(stored.isEmpty() ? "Missing required name" : "Name",input);drafts.update(key,stored,input.get());if (ImGui.button("Apply source name")) commitRiverOverride(key,() -> workspace.replace(selected,ExpressionDefinitions.setName(selected,workspace.read(selected),context,input.get()))); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored name has an unsupported type or NUL (read-only, preserved)."); }
+        drawExpressionNumber(row,context,context.variable() ? "staticValue" : "args");
+        if (ImGui.treeNode("Style provider")) { drawStyleFields(row,context.styleTarget());try { ExpressionDefinitions.style(row);if (row.token("styleValue")!=null && ImGui.button("Restore no style provider")) { try { commitProfileChange(context.prefix()+"styleValue.",ExpressionDefinitions.resetStyle(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } } } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Unsupported provider type is preserved."); }ImGui.treePop(); }
+        drawExpressionEngineSource(row,context,"engineStreamValue");if (context.variable()) drawExpressionEngineSource(row,context,"engineValue");
+        if (!context.variable() && (row.token("styleValue")==null || row.token("styleValue").equals("null")) && (row.token("engineStreamValue")==null || row.token("engineStreamValue").equals("null"))) ImGui.textWrapped("This function has no provider and is ignored natively until a style or engine stream is selected.");
+        for (String field : row.fields()) if (!context.fields().contains(field)) ImGui.textWrapped(field+" (read-only, preserved)");
+    }
+    private void drawExpressionNumber(LosslessJson row,ExpressionDefinitions.Context context,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(ExpressionDefinitions.help(context.list(),field));
+        ImGui.textWrapped(field.equals("args") ? "Exact signed 32-bit integer, minimum 2. An engine stream forces native arity 2 regardless of this stored value. Provider/large-arity compatibility is unchecked." : "Finite native double. This value is used only when all higher-priority sources are absent/null.");
+        try { String current=ExpressionDefinitions.number(row,context,field),key=context.prefix()+field;ImGui.textWrapped(row.token(field)==null ? "Implicit native default: "+current : "Explicit stored value");ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(128,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply number")) commitRiverOverride(key,() -> workspace.replace(selected,ExpressionDefinitions.setNumber(selected,workspace.read(selected),context,field,input.get())));if (row.token(field)!=null && ImGui.button("Reset number to native default")) { try { commitProfileChange(key,ExpressionDefinitions.resetLeaf(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored number has unsupported type/width (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawExpressionEngineSource(LosslessJson row,ExpressionDefinitions.Context context,String field) {
+        ImGui.pushID(field);ImGui.textWrapped(ExpressionDefinitions.help(context.list(),field));ImGui.textWrapped("Requires a native engine context when evaluated. The editor does not initialize or query this source.");
+        try { String current=ExpressionDefinitions.source(row,context,field);if (ImGui.beginCombo(field,current==null ? "Absent/null" : current.length()>128 ? "Stored source" : current)) { for (String choice : ExpressionDefinitions.choices(context,field)) { if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,ExpressionDefinitions.setSource(selected,workspace.read(selected),context,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(ExpressionDefinitions.choiceHelp(context,field,choice)); }ImGui.endCombo(); }
+            if (current!=null && ImGui.button("Clear source (null)")) applyRoutingExtra(() -> workspace.replace(selected,ExpressionDefinitions.setSource(selected,workspace.read(selected),context,field,null)));if (row.token(field)!=null && ImGui.button("Reset source to absence")) { try { commitProfileChange(context.prefix()+field,ExpressionDefinitions.resetLeaf(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored source has an unsupported type or NUL (read-only, preserved)."); }ImGui.popID();
     }
     private void drawBlockDefinition(LosslessJson document) {
         ImGui.textWrapped("Block aliases supply native block states. Caller properties override an alias's state; an invalid merged override keeps that alias state. Otherwise an unresolved block tries its backup, then air. Registry compatibility, alias cycles and the resulting block are unchecked. No blocks are resolved or generated.");
@@ -1663,7 +1711,7 @@ public final class EditorApp extends Application {
         try { String current=BlockDefinitions.block(node);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL block");if (!BlockDefinitions.blockSyntax(current)) ImGui.textWrapped("External or unsupported block text is preserved; replace it with a vanilla base block or alias key.");String key=prefix+"block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.textWrapped(node.token("block")==null ? "Implicit block: "+current : "Stored block");ImGui.inputText("Block or alias",input);drafts.update(key,current,input.get());
             if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,BlockDefinitions.setBlock(selected,workspace.read(selected),scope,input.get())));
             if ((scope.standalone() || !scope.context().fluid()) && node.token("block")!=null && ImGui.button("Reset block to implicit air")) { try { commitProfileChange(key,BlockDefinitions.resetBlock(selected,workspace.read(selected),scope),null); } catch (Exception failure) { error=failure.getMessage(); } }
-            String exact=BlockDefinitions.exactAlias(workspace,current);if (exact!=null) { ImGui.textWrapped("Exact alias file present; contents and cycles unchecked: "+exact);if (ImGui.button("Open exact alias file")) { try { aliasNavigation.request(workspace,exact); } catch (Exception failure) { error=failure.getMessage(); } } }
+            String exact=BlockDefinitions.exactAlias(workspace,current);if (exact!=null) { ImGui.textWrapped("Exact alias file present; contents and cycles unchecked: "+exact);if (ImGui.button("Open exact alias file")) { try { resourceNavigation.request(workspace,exact); } catch (Exception failure) { error=failure.getMessage(); } } }
             if ((scope.standalone() || !scope.context().fluid()) && ImGui.beginCombo("Existing alias keys", "Choose an exact local alias")) { for (String alias : BlockDefinitions.aliases(workspace)) if (ImGui.selectable(alias,alias.equals(input.get()))) { input.set(alias);drafts.update(key,current,alias); }ImGui.endCombo(); }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block has an unsupported type or NUL text (read-only)."); } }
         if (ImGui.treeNode("State properties")) { drawBlockDefinitionStates(node,scope);ImGui.treePop(); }

@@ -5010,5 +5010,59 @@
       "classification": "generation",
       "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
     }
+  },
+  "expression": {
+    "expression": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "variables": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "functions": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    }
+  },
+  "expressionVariable": {
+    "name": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "staticValue": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "styleValue": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "engineStreamValue": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "engineValue": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    }
+  },
+  "expressionFunction": {
+    "name": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "styleValue": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "engineStreamValue": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    },
+    "args": {
+      "classification": "generation",
+      "reason": "Native expression data controls generated noise values and source/provider binding. Authoring never parses, evaluates or initializes an engine."
+    }
   }
 }
