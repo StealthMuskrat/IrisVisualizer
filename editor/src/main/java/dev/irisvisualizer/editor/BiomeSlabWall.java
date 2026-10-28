@@ -50,7 +50,7 @@ public final class BiomeSlabWall {
             for (String item : palette.fields()) if (!PALETTE_FIELDS.contains(item) && !(field.equals("slab") && item.equals("slopeCondition"))) paths.add(field+"."+item);
             try { var style=NoiseStyleFields.object(palette);if (style!=null) for (String item : StyleFractures.readOnlyPaths(style)) paths.add(field+".style."+item); }
             catch (IllegalArgumentException unsupported) { paths.add(field+".style"); }
-            try { var entries=DimensionPalettes.entries(palette);if (entries!=null) for (int index=0;index<entries.size();index++) for (String item : entries.get(index).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(item)) paths.add(field+".palette["+index+"]."+item); }
+            try { PaletteBlockData.report(paths,DimensionPalettes.entries(palette),field+".palette"); }
             catch (IllegalArgumentException unsupported) { paths.add(field+".palette"); }
             if (field.equals("slab") && palette.token("slopeCondition")!=null) {
                 try { var slope=BiomeLayers.slope(palette);for (String item : slope.fields()) if (!BiomeLayers.SLOPE_FIELDS.contains(item)) paths.add(field+".slopeCondition."+item); }

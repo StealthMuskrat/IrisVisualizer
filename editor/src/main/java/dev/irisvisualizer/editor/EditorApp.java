@@ -1622,47 +1622,52 @@ public final class EditorApp extends Application {
     }
     private void changeDecoratorBlock(BiomeDecorators.Context context,String field,RiverProfiles.Action action,int index,String value,String appliedKey) { try { commitProfileChange(context.blocksPrefix(field),BiomeDecorators.changeBlock(selected,workspace.read(selected),context,field,action,index,value),appliedKey); } catch (Exception failure) { error=failure.getMessage(); } }
     private static String mappingDraft(String source,String target) { return source.length()+":"+source+target; }
+    private void drawPaletteBlockData(LosslessJson entry,PaletteBlockData.Context context,int count) {
+        if (count>PaletteBlockData.MAX_ENTRIES) { ImGui.textWrapped("Block-state/backup editing is limited to palettes of 64 entries; advanced data is preserved.");return; }
+        if (ImGui.treeNode("Block states and backups")) { ImGui.textWrapped("Structured states and bounded backups use native block-data definitions. These edits preserve the root block and weight. Registry, alias cycles and material-role compatibility remain unverified. Backup weights, debug and block-entity payloads stay read-only. No blocks are resolved or generated.");drawBlockDefinitionNode(entry,context.scope());ImGui.treePop(); }
+        for (String field : PaletteBlockData.readOnlyPaths(entry)) ImGui.textWrapped(field+" (read-only, preserved)");
+    }
     private void drawBlockDefinition(LosslessJson document) {
         ImGui.textWrapped("Block aliases supply native block states. Caller properties override an alias's state; an invalid merged override keeps that alias state. Otherwise an unresolved block tries its backup, then air. Registry compatibility, alias cycles and the resulting block are unchecked. No blocks are resolved or generated.");
         ImGui.textWrapped("Edit at most eight backup levels and 64 properties per state map. Weights in alias files are ignored by native alias resolution and remain read-only, along with debug and block-entity data.");
-        drawBlockDefinitionNode(document,0);
+        drawBlockDefinitionNode(document,new BlockDefinitions.Scope(null,0));
         var readOnly=BlockDefinitions.readOnlyPaths(document);if (ImGui.collapsingHeader("Read-only block fields ("+readOnly.size()+")")) for (String field : readOnly) ImGui.textWrapped(field+" (preserved)");
     }
-    private void drawBlockDefinitionNode(LosslessJson node,int depth) {
-        String prefix=BlockDefinitions.scope(depth);ImGui.pushID(prefix);
-        ImGui.textWrapped(BlockDefinitions.help("block"));
+    private void drawBlockDefinitionNode(LosslessJson node,BlockDefinitions.Scope scope) {
+        int depth=scope.depth();String prefix=scope.prefix();ImGui.pushID(prefix);
+        if (scope.standalone() || scope.depth()>0) { ImGui.textWrapped(BlockDefinitions.help("block"));
         try { String current=BlockDefinitions.block(node);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL block");if (!BlockDefinitions.blockSyntax(current)) ImGui.textWrapped("External or unsupported block text is preserved; replace it with a vanilla base block or alias key.");String key=prefix+"block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.textWrapped(node.token("block")==null ? "Implicit block: "+current : "Stored block");ImGui.inputText("Block or alias",input);drafts.update(key,current,input.get());
-            if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,BlockDefinitions.setBlock(selected,workspace.read(selected),depth,input.get())));
-            if (node.token("block")!=null && ImGui.button("Reset block to implicit air")) { try { commitProfileChange(key,BlockDefinitions.resetBlock(selected,workspace.read(selected),depth),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,BlockDefinitions.setBlock(selected,workspace.read(selected),scope,input.get())));
+            if ((scope.standalone() || !scope.context().fluid()) && node.token("block")!=null && ImGui.button("Reset block to implicit air")) { try { commitProfileChange(key,BlockDefinitions.resetBlock(selected,workspace.read(selected),scope),null); } catch (Exception failure) { error=failure.getMessage(); } }
             String exact=BlockDefinitions.exactAlias(workspace,current);if (exact!=null) { ImGui.textWrapped("Exact alias file present; contents and cycles unchecked: "+exact);if (ImGui.button("Open exact alias file")) { try { transition(false,() -> { selected=exact;filter.set(""); }); } catch (Exception failure) { error=failure.getMessage(); } } }
-            if (ImGui.beginCombo("Existing alias keys", "Choose an exact local alias")) { for (String alias : BlockDefinitions.aliases(workspace)) if (ImGui.selectable(alias,alias.equals(input.get()))) { input.set(alias);drafts.update(key,current,alias); }ImGui.endCombo(); }
-        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block has an unsupported type or NUL text (read-only)."); }
-        if (ImGui.treeNode("State properties")) { drawBlockDefinitionStates(node,depth);ImGui.treePop(); }
+            if ((scope.standalone() || !scope.context().fluid()) && ImGui.beginCombo("Existing alias keys", "Choose an exact local alias")) { for (String alias : BlockDefinitions.aliases(workspace)) if (ImGui.selectable(alias,alias.equals(input.get()))) { input.set(alias);drafts.update(key,current,alias); }ImGui.endCombo(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block has an unsupported type or NUL text (read-only)."); } }
+        if (ImGui.treeNode("State properties")) { drawBlockDefinitionStates(node,scope);ImGui.treePop(); }
         if (ImGui.treeNode("Backup block")) {
-            ImGui.textWrapped(BlockDefinitions.help("backup"));ImGui.textWrapped("Removing a backup discards that entire subtree, including advanced data.");
+            ImGui.textWrapped(BlockDefinitions.help("backup"));if (!scope.standalone() && scope.context().fluid()) ImGui.textWrapped("New fluid backups use Minecraft water, lava or bubble_column. Fluid-role and registry behavior remain unverified.");ImGui.textWrapped("Removing a backup discards that entire subtree, including advanced data.");
             try { var child=BlockDefinitions.backup(node);if (child==null) {
-                if (depth<BlockDefinitions.MAX_DEPTH) { String key=prefix+"backup.new.block";ImString input=values.computeIfAbsent(key,ignored -> new ImString("minecraft:stone",16384));ImGui.inputText("New backup block",input);drafts.update(key,"minecraft:stone",input.get());ImGui.beginDisabled(!BlockDefinitions.blockSyntax(input.get()));boolean create=ImGui.button("Create explicit backup");ImGui.endDisabled();if (create) { try { commitProfileChange(prefix+"backup.",BlockDefinitions.createBackup(selected,workspace.read(selected),depth,input.get()),key); } catch (Exception failure) { error=failure.getMessage(); } } }else ImGui.textWrapped("Backup editor depth limit reached.");
-            }else if (depth>=BlockDefinitions.MAX_DEPTH) ImGui.textWrapped("Deeper backup data is read-only and preserved.");else drawBlockDefinitionNode(child,depth+1);
-            if (node.token("backup")!=null && ImGui.button("Remove entire backup")) { try { commitProfileChange(prefix+"backup.",BlockDefinitions.resetBackup(selected,workspace.read(selected),depth),null); } catch (Exception failure) { error=failure.getMessage(); } }
+                if (depth<BlockDefinitions.MAX_DEPTH) { String key=prefix+"backup.new.block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(scope.seedBlock(),16384));ImGui.inputText("New backup block",input);drafts.update(key,scope.seedBlock(),input.get());ImGui.beginDisabled(!BlockDefinitions.blockSyntax(input.get()));boolean create=ImGui.button("Create explicit backup");ImGui.endDisabled();if (create) { try { commitProfileChange(prefix+"backup.",BlockDefinitions.createBackup(selected,workspace.read(selected),scope,input.get()),key); } catch (Exception failure) { error=failure.getMessage(); } } }else ImGui.textWrapped("Backup editor depth limit reached.");
+            }else if (depth>=BlockDefinitions.MAX_DEPTH) ImGui.textWrapped("Deeper backup data is read-only and preserved.");else drawBlockDefinitionNode(child,scope.child());
+            if (node.token("backup")!=null && ImGui.button("Remove entire backup")) { try { commitProfileChange(prefix+"backup.",BlockDefinitions.resetBackup(selected,workspace.read(selected),scope),null); } catch (Exception failure) { error=failure.getMessage(); } }
             } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored backup is a snippet or non-object value (read-only, preserved)."); }
             ImGui.treePop();
         }ImGui.popID();
     }
-    private void drawBlockDefinitionStates(LosslessJson node,int depth) {
-        String prefix=BlockDefinitions.scope(depth)+"data.";ImGui.pushID("state-map");ImGui.textWrapped(BlockDefinitions.help("data"));ImGui.textWrapped("Use lowercase property names with string, boolean or numeric values. Values and properties are not checked against the Minecraft registry. Nested, null and gameplay properties remain read-only. Removing the entire map discards its advanced data.");
-        try { var map=BlockDefinitions.data(node);if (map==null) { if (ImGui.button("Create empty state map")) { try { commitProfileChange(prefix,BlockDefinitions.createData(selected,workspace.read(selected),depth),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();return; }
+    private void drawBlockDefinitionStates(LosslessJson node,BlockDefinitions.Scope scope) {
+        String prefix=scope.prefix()+"data.";ImGui.pushID("state-map");ImGui.textWrapped(BlockDefinitions.help("data"));ImGui.textWrapped("Use lowercase property names with string, boolean or numeric values. Values and properties are not checked against the Minecraft registry. Nested, null and gameplay properties remain read-only. Removing the entire map discards its advanced data.");
+        try { var map=BlockDefinitions.data(node);if (map==null) { if (ImGui.button("Create empty state map")) { try { commitProfileChange(prefix,BlockDefinitions.createData(selected,workspace.read(selected),scope),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();return; }
             if (map.fields().size()>BlockDefinitions.MAX_STATES) throw new IllegalArgumentException("State map limit");
-            if (ImGui.button("Remove entire state map")) { try { commitProfileChange(prefix,BlockDefinitions.resetData(selected,workspace.read(selected),depth),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
-            ImGui.beginDisabled(map.fields().size()>=BlockDefinitions.MAX_STATES);drawBlockDefinitionStateInput(depth,null,new BlockDefinitions.State("",BlockDefinitions.Kind.STRING,""),prefix+"new");ImGui.endDisabled();int index=0;
-            for (String property : map.fields()) { String key=prefix+(index++);ImGui.pushID(key);try { drawBlockDefinitionStateInput(depth,property,BlockDefinitions.state(map,property),key); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(property+" (unsupported state property/type, read-only, preserved)"); }ImGui.popID(); }
+            if (ImGui.button("Remove entire state map")) { try { commitProfileChange(prefix,BlockDefinitions.resetData(selected,workspace.read(selected),scope),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+            ImGui.beginDisabled(map.fields().size()>=BlockDefinitions.MAX_STATES);drawBlockDefinitionStateInput(scope,null,new BlockDefinitions.State("",BlockDefinitions.Kind.STRING,""),prefix+"new");ImGui.endDisabled();int index=0;
+            for (String property : map.fields()) { String key=prefix+(index++);ImGui.pushID(key);try { drawBlockDefinitionStateInput(scope,property,BlockDefinitions.state(map,property),key); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(property+" (unsupported state property/type, read-only, preserved)"); }ImGui.popID(); }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored state map is null, non-object or above the 64-property limit (read-only, preserved)."); }ImGui.popID();
     }
-    private void drawBlockDefinitionStateInput(int depth,String previous,BlockDefinitions.State state,String key) {
+    private void drawBlockDefinitionStateInput(BlockDefinitions.Scope scope,String previous,BlockDefinitions.State state,String key) {
         ImGui.pushID(key);ImString name=values.computeIfAbsent(key+".key",ignored -> new ImString(state.key(),4096)),kind=values.computeIfAbsent(key+".kind",ignored -> new ImString(state.kind().name(),32)),value=values.computeIfAbsent(key+".value",ignored -> new ImString(state.value(),Math.max(16384,state.value().getBytes(StandardCharsets.UTF_8).length+1)));
         ImGui.inputText("Property",name);if (ImGui.beginCombo("Value type",kind.get())) { for (var option : BlockDefinitions.Kind.values()) if (ImGui.selectable(option.name(),option.name().equals(kind.get()))) kind.set(option.name());ImGui.endCombo(); }ImGui.inputText("Value",value);
         drafts.update(key,state.key()+"\0"+state.kind()+"\0"+state.value(),name.get()+"\0"+kind.get()+"\0"+value.get());
-        if (ImGui.button(previous==null ? "Add property" : "Apply property")) { try { commitProfileChange(BlockDefinitions.scope(depth)+"data.",BlockDefinitions.setState(selected,workspace.read(selected),depth,previous,name.get(),BlockDefinitions.Kind.valueOf(kind.get()),value.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
-        if (previous!=null && ImGui.button("Remove property")) { try { commitProfileChange(BlockDefinitions.scope(depth)+"data.",BlockDefinitions.removeState(selected,workspace.read(selected),depth,previous),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();
+        if (ImGui.button(previous==null ? "Add property" : "Apply property")) { try { commitProfileChange(scope.prefix()+"data.",BlockDefinitions.setState(selected,workspace.read(selected),scope,previous,name.get(),BlockDefinitions.Kind.valueOf(kind.get()),value.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+        if (previous!=null && ImGui.button("Remove property")) { try { commitProfileChange(scope.prefix()+"data.",BlockDefinitions.removeState(selected,workspace.read(selected),scope,previous),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();
     }
     private void drawBlockFallbacks(LosslessJson document) {
         if (!ImGui.collapsingHeader("Missing-block fallbacks")) return;ImGui.pushID("blockFallbacks");
@@ -3270,7 +3275,7 @@ public final class EditorApp extends Application {
         drawGeneralBlockPalette(palette,GeneralBlockPalettes.Target.dimension(field));
     }
     private void drawGeneralBlockPalette(LosslessJson palette,GeneralBlockPalettes.Target target) {
-        ImGui.textWrapped(target.procedural() ? "Procedural palettes use Minecraft or unnamespaced block/alias syntax. Registry, state and block-role validation remain pending; advanced block data is preserved." : "General palettes use weights 1-"+DimensionPalettes.maximumWeight()+". Block names are checked for nonblank text only; registry/state/block-role validation remains pending. Advanced block data stays read-only.");
+        ImGui.textWrapped(target.procedural() ? "Procedural palettes use Minecraft or unnamespaced block/alias syntax. Registry, state and block-role validation remain pending; advanced block data is preserved." : "General palettes use weights 1-"+DimensionPalettes.maximumWeight()+". Block names are checked for nonblank text only; registry/state/block-role validation remains pending. Structured states and backups are editable below; debug and block-entity payloads remain read-only.");
         if (ImGui.treeNode("Palette noise")) {
             String token=palette.token("zoom"),key=target.noisePrefix()+"zoom";
             ImGui.textWrapped(target.zoomConstraints());
@@ -3331,7 +3336,7 @@ public final class EditorApp extends Application {
                 ImGui.inputText("Weight (1-"+DimensionPalettes.maximumWeight()+")",input);drafts.update(key,token,input.get());
                 if (ImGui.button("Apply weight")) commitRiverOverride(key,() -> workspace.replace(selected,target.setWeight(selected,workspace.read(selected),entryIndex,input.get())));
             }
-            for (String item : entry.fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(item)) ImGui.textWrapped(item+" (read-only)");
+            drawPaletteBlockData(entry,new PaletteBlockData.Context(target.styleTarget(),entryIndex),entries.size());
             ImGui.treePop();
         }
     }
@@ -3901,7 +3906,7 @@ public final class EditorApp extends Application {
         }
         if (ImGui.treeNode("Fluid palette noise")) { drawFluidPaletteNoise(palette,target);ImGui.treePop(); }
         for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
-        ImGui.textWrapped("1-64 weighted fluid entries; weights 1-64. Minecraft entries permit water, lava and bubble_column. Custom names pass the native name filter but still require runtime fluid/registry validation. Advanced block data stays read-only.");
+        ImGui.textWrapped("1-64 weighted fluid entries; weights 1-64. Minecraft entries permit water, lava and bubble_column. Custom names pass the native name filter but still require runtime fluid/registry validation. Structured states and backups are editable below; debug and block-entity payloads remain read-only.");
         List<LosslessJson> fluids;
         try { fluids=RiverProfiles.fluids(palette); }
         catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored fluid list contains snippets or unsupported entries (read-only).");return; }
@@ -3948,7 +3953,7 @@ public final class EditorApp extends Application {
                 ImGui.inputText("Weight (1-64)",input);drafts.update(weightKey,weight,input.get());
                 if (ImGui.button("Apply weight")) commitRiverOverride(weightKey,() -> workspace.replace(selected,target.setWeight(selected,workspace.read(selected),fluidIndex,input.get())));
             }
-            for (String field : entry.fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+            drawPaletteBlockData(entry,new PaletteBlockData.Context(target.styleTarget(),fluidIndex),fluids.size());
             ImGui.treePop();
         }
     }
@@ -4259,7 +4264,7 @@ public final class EditorApp extends Application {
             LosslessJson palette;
             try { palette=RiverMaterialFields.palette(object,target); }
             catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored palette is a snippet or unsupported value (read-only)."); return; }
-            ImGui.textWrapped("Weighted blocks: at least one entry; weights 1-64. Advanced block data is read-only. Runtime block registry, state and solidity validation is pending.");
+            ImGui.textWrapped("Weighted blocks: at least one entry; weights 1-64. Structured state/backup controls are available below. Runtime block registry, state and solidity validation is pending.");
             if (palette==null) {
                 ImGui.textWrapped("The absent palette uses STONE. Creation writes an explicit block list.");
                 if (ImGui.button("Create material palette (STONE)")) {
@@ -4310,7 +4315,7 @@ public final class EditorApp extends Application {
                     if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,RiverMaterialFields.setBlock(selected,workspace.read(selected),target,selectedIndex,input.get())));
                 } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored block name is not a string (read-only)."); }
                 drawRiverMaterialNumber(entry,target,index,"weight");
-                for (String field : entry.fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                drawPaletteBlockData(entry,new PaletteBlockData.Context(NoiseStyleFields.Target.palette(target),selectedIndex),entries.size());
                 ImGui.treePop();
             }
         } finally { ImGui.popID(); }

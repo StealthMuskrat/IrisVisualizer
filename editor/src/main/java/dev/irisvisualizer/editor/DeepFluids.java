@@ -175,7 +175,7 @@ public final class DeepFluids {
                     for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) paths.add(prefix+".fluidPalette."+field);
                     try { var style=NoiseStyleFields.object(palette,NoiseStyleFields.Target.deepPalette(index));if (style!=null) for (String field : StyleFractures.readOnlyPaths(style)) paths.add(prefix+".fluidPalette.style."+field); }
                     catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.style"); }
-                    try { var fluids=RiverProfiles.fluids(palette);if (fluids!=null) for (int i=0;i<fluids.size();i++) for (String field : fluids.get(i).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) paths.add(prefix+".fluidPalette.palette["+i+"]."+field); }
+                    try { PaletteBlockData.report(paths,RiverProfiles.fluids(palette),prefix+".fluidPalette.palette"); }
                     catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette.palette"); }
                 } catch (IllegalArgumentException unsupported) { paths.add(prefix+".fluidPalette"); }
             }

@@ -15,7 +15,9 @@ for name,old,new in [
  ('IrisBlockData','entry.getValue().toString()','entry.getValue()'),
  ('IrisBlockData','return "blocks";','return "block";'),
  ('IrisBlockData','this.data.containsKey("entitySpawn")','this.data.containsKey("entity")'),
- ('IrisMaterialPalette','i < ix.getWeight()','i < 1')]:
+ ('IrisMaterialPalette','i < ix.getWeight()','i < 1'),
+ ('IrisMaterialPalette','NativeBlockState bx = ix.getBlockData(rdata);','NativeBlockState bx = null;'),
+ ('IrisBiomePaletteLayer','NativeBlockState bx = ix.getBlockData(data);','NativeBlockState bx = null;')]:
  raw=sources[name];assert old.encode() in raw;changed=dict(sources);changed[name]=raw.replace(old.encode(),new.encode(),1)
  try:extract(changed)
  except ValueError:pass

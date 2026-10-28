@@ -83,7 +83,7 @@ final class RiverPaletteTests {
                 rejects(() -> NoiseStyleFields.editText(PATH,original,styleTarget,field,"1"));
                 rejects(() -> NoiseStyleFields.enable(PATH,original,styleTarget,field));
             }
-            check(readOnly.contains(readOnlyPrefix+".futurePalette") && readOnly.contains(readOnlyPrefix+".palette[0].data") && !readOnly.contains(readOnlyPrefix+".style") && !readOnly.contains(readOnlyPrefix+".zoom"));
+            check(readOnly.contains(readOnlyPrefix+".futurePalette") && !readOnly.contains(readOnlyPrefix+".palette[0].data") && !readOnly.contains(readOnlyPrefix+".style") && !readOnly.contains(readOnlyPrefix+".zoom"));
             rejects(() -> NoiseStyleFields.editStyle(PATH,original,styleTarget,"FUTURE_STYLE"));
             for (String wrong : List.of("null","[]","true","1","\"snippet\"")) {
                 byte[] wrongPalette=document(target,wrong);

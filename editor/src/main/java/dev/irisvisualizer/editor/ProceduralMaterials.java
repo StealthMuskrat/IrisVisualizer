@@ -100,9 +100,7 @@ public final class ProceduralMaterials {
             for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) paths.add(prefix+"."+field);
             try { zoom(palette); } catch (IllegalArgumentException invalid) { paths.add(prefix+".zoom"); }
             try { var style=NoiseStyleFields.object(palette,context.styleTarget());if (style!=null) for (String field : StyleFractures.readOnlyPaths(style)) paths.add(prefix+".style."+field); } catch (IllegalArgumentException invalid) { paths.add(prefix+".style"); }
-            var entries=entries(palette);if (entries!=null) for (int i=0;i<entries.size();i++) for (String field : entries.get(i).fields()) { var block=entries.get(i);String at=prefix+".palette["+i+"]."+field;
-                if (!RiverMaterialFields.ENTRY_FIELDS.contains(field)) paths.add(at);else try { if (field.equals("weight")) weight(block);else block.stringToken("block"); } catch (IllegalArgumentException invalid) { paths.add(at); }
-            }
+            PaletteBlockData.report(paths,entries(palette),prefix+".palette");
         } catch (IllegalArgumentException invalid) { paths.add(prefix); }return List.copyOf(paths);
     }
 }
