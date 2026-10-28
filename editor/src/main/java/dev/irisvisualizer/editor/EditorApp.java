@@ -190,6 +190,7 @@ public final class EditorApp extends Application {
                     drawDimensionType(document);
                     drawDimensionStack(document);
                     drawDimensionCarvings(document);
+                    drawSubterrainFeatures(document);
                     drawTerrainOverlays(document);
                     drawTerrainTransform(document);
                     drawImageMapBindings(document);
@@ -242,7 +243,7 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks exact image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks exact image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -888,6 +889,77 @@ public final class EditorApp extends Application {
             ImGui.sameLine();if (ImGui.button("Remove setting")) { try { commitProfileChange(prefix,TerrainTransforms.removeSetting(selected,workspace.read(selected),row.key()),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }ImGui.popID();
         }
         ImGui.treePop();
+    }
+    private void drawSubterrainFeatures(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Underground feature definitions")) return;
+        ImGui.pushID("subterrain-features");
+        ImGui.textWrapped("Authored faults, cenotes, lava tubes and terraces. Native planning requires useMantle, carvingEnabled, OVERWORLD mode and CARVED availability. Registry/material compatibility, full footprint/Y-band fitting, region selection and generated geometry are unvalidated. No planning, rasterization or preview runs here.");
+        ImGui.textWrapped("IDs use native letters/digits/_/- and slash syntax with trimmed case-sensitive identity. New IDs must be unique across this list, including disabled entries (editor guard). Priority is a signed integer; higher priority wins and native stable IDs break ties.");
+        List<LosslessJson> entries;
+        try { entries=SubterrainFeatures.entries(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored feature list is null, a snippet or mixed/non-object data (read-only).");ImGui.popID();return; }
+        if (entries!=null && entries.size()>SubterrainFeatures.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the native 64-definition limit (read-only).");ImGui.popID();return; }
+        for (String finding : SubterrainFeatures.findings(document)) ImGui.textWrapped("Applied feature check: "+finding+" (does not block Save/Export)");
+        List<String> biomes=SubterrainFeatures.choices(workspace,"biomes"),regions=SubterrainFeatures.choices(workspace,"regions");String newKey=SubterrainFeatures.prefix()+"new.id",biomeKey=SubterrainFeatures.prefix()+"new.biome";
+        ImString id=values.computeIfAbsent(newKey,ignored -> new ImString("",4096)),biome=values.computeIfAbsent(biomeKey,ignored -> new ImString("",4096));ImGui.inputText("New stable feature ID",id);drafts.update(newKey,"",id.get());
+        if (ImGui.beginCombo("New occupied-cell biome",biome.get().isEmpty() ? "Choose an exact biome" : biome.get())) { for (String choice : biomes) if (ImGui.selectable(choice,choice.equals(biome.get()))) biome.set(choice);ImGui.endCombo(); }
+        ImGui.textWrapped("Add seeds ID/biome only; CENOTE, enabled=true and all numeric/range/material defaults remain implicit. Final removal restores field absence.");
+        ImGui.beginDisabled(id.get().isBlank() || biome.get().isEmpty() || entries!=null && entries.size()>=SubterrainFeatures.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add feature definition");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(SubterrainFeatures.prefix(),SubterrainFeatures.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,id.get(),biome.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        if (entries!=null) for (int index=0;index<entries.size();index++) {
+            int feature=index;var entry=entries.get(index);String prefix=SubterrainFeatures.prefix(index);ImGui.pushID(prefix);
+            if (ImGui.treeNode("Feature "+index)) {
+                String copyKey=prefix+"copy.id";ImString copyId=values.computeIfAbsent(copyKey,ignored -> new ImString("",4096));ImGui.inputText("Duplicate with new ID",copyId);drafts.update(copyKey,"",copyId.get());
+                RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==entries.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove feature")) action=RiverProfiles.Action.REMOVE;
+                if (action!=null) { try { commitProfileChange(SubterrainFeatures.prefix(),SubterrainFeatures.change(selected,workspace.read(selected),action,index,copyId.get(),null,workspace),action==RiverProfiles.Action.DUPLICATE ? copyKey : null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
+                for (String field : List.of("id","solid")) {
+                    ImGui.pushID(field);ImGui.textWrapped(SubterrainFeatures.help(field));String key=prefix+field;
+                    try { String stored=SubterrainFeatures.text(entry,field);if (stored.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(16384,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,stored,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,field.equals("id") ? SubterrainFeatures.setId(selected,workspace.read(selected),feature,input.get()) : SubterrainFeatures.setSolid(selected,workspace.read(selected),feature,input.get()))); }
+                    catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored text has an unsupported type/value (read-only)."); }ImGui.popID();
+                }
+                try { String current=SubterrainFeatures.text(entry,"biome");if (!current.isBlank() && !biomes.contains(current)) ImGui.textWrapped("Stored biome has no exact authorable file match; native trimming/aliases/content are unchecked.");if (ImGui.beginCombo("Occupied-cell biome",current.isEmpty() ? "No explicit biome" : current.length()>128 || current.indexOf(0)>=0 ? "Stored biome" : current)) { if (ImGui.selectable("No explicit biome (empty)",current.isEmpty())) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setBiome(selected,workspace.read(selected),feature,null,workspace)));for (String choice : biomes) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setBiome(selected,workspace.read(selected),feature,choice,workspace)));ImGui.endCombo(); } }
+                catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored biome reference is unsupported (read-only)."); }
+                String enabled=entry.token("enabled");if (enabled==null || enabled.equals("true") || enabled.equals("false")) { boolean value=enabled==null || enabled.equals("true");if (ImGui.checkbox("Enabled (native default true)",value)) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setEnabled(selected,workspace.read(selected),feature,!value))); } else ImGui.textWrapped("Stored enabled is not boolean (read-only).");
+                try { String current=SubterrainFeatures.family(entry);if (ImGui.beginCombo("Geometry family",current.length()>128 || current.indexOf(0)>=0 ? "Stored family" : current)) { for (String choice : SubterrainFeatures.families()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setFamily(selected,workspace.read(selected),feature,choice)));ImGui.endCombo(); } }
+                catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored family is not a string (read-only)."); }
+                try { String current=SubterrainFeatures.fluid(entry);ImGui.textWrapped("Native fluid rule: "+SubterrainFeatures.effectiveFluid(entry)+"; no material is resolved here.");if (ImGui.beginCombo("Retained fluid override",current==null ? "Family default" : current.length()>128 || current.indexOf(0)>=0 ? "Stored fluid" : current)) { if (ImGui.selectable("Family default (remove override)",current==null)) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setFluid(selected,workspace.read(selected),feature,null)));for (String choice : SubterrainFeatures.fluids()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setFluid(selected,workspace.read(selected),feature,choice)));ImGui.endCombo(); } }
+                catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored fluid/family is unsupported (read-only)."); }
+                for (String field : SubterrainFeatures.NUMBERS) {
+                    ImGui.pushID(field);ImGui.textWrapped(SubterrainFeatures.help(field));ImGui.textWrapped(SubterrainFeatures.constraints(field));String token=entry.token(field),key=prefix+field;
+                    if (token==null) { if (ImGui.button("Enable default "+SubterrainFeatures.defaultToken(field))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.enableScalar(selected,workspace.read(selected),feature,field))); }
+                    else if (!SubterrainFeatures.numericSupported(entry,field)) ImGui.textWrapped("Stored scalar has an unsupported type, width or finite value (read-only).");
+                    else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,SubterrainFeatures.setScalar(selected,workspace.read(selected),feature,field,input.get()))); }ImGui.popID();
+                }
+                drawSubterrainRange(entry,index);drawSubterrainRegions(entry,index,regions);
+                for (String field : entry.fields()) if (!SubterrainFeatures.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                ImGui.treePop();
+            }
+            ImGui.popID();
+        }
+        ImGui.popID();
+    }
+    private void drawSubterrainRange(LosslessJson entry,int feature) {
+        if (!ImGui.treeNode("Inclusive absolute world-Y band")) return;
+        ImGui.textWrapped("Absent range defaults to -48..48; inline empty range uses IrisRange defaults 16..32. Finite ordered bounds must fit signed 32-bit Y. Native planning uses ceil(min)/floor(max) and requires the complete feature/seals to fit; band/geometry fitting and resulting placement are unvalidated.");
+        String prefix=SubterrainFeatures.prefix(feature)+"worldYRange.",key=prefix+"pair";
+        try { String low=SubterrainFeatures.bound(entry,"min"),high=SubterrainFeatures.bound(entry,"max");ImString min=values.computeIfAbsent(prefix+"min",ignored -> new ImString(low,Math.max(128,low.length()+1))),max=values.computeIfAbsent(prefix+"max",ignored -> new ImString(high,Math.max(128,high.length()+1)));
+            ImGui.inputText("Inclusive minimum world Y",min);ImGui.inputText("Inclusive maximum world Y",max);drafts.update(key,TerrainTransforms.draftPair(low,high),TerrainTransforms.draftPair(min.get(),max.get()));
+            if (ImGui.button("Apply world-Y pair")) { try { commitProfileChange(prefix,SubterrainFeatures.setRange(selected,workspace.read(selected),feature,min.get(),max.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+            var range=SubterrainFeatures.range(entry);if (range!=null) { for (String field : range.fields()) if (!List.of("min","max").contains(field)) ImGui.textWrapped("worldYRange."+field+" (read-only)");ImGui.textWrapped("Remove discards the entire range object, including advanced data, and restores the absent -48..48 default.");if (ImGui.button("Remove range override")) { try { commitProfileChange(prefix,SubterrainFeatures.removeRange(selected,workspace.read(selected),feature),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored range is null, a snippet or contains unsupported bounds (read-only)."); }ImGui.treePop();
+    }
+    private void drawSubterrainRegions(LosslessJson entry,int feature,List<String> choices) {
+        if (!ImGui.treeNode("Allowed placement-center regions")) return;
+        ImGui.textWrapped("Absent/empty permits all regions. Exact in-pack native key syntax only; contents and center-region selection are unchecked. Raw order/duplicates are preserved here; native membership is a set. Final removal restores absence.");
+        List<String> regions;try { regions=SubterrainFeatures.regions(entry); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored allowedRegions is null/mixed/unsupported (read-only).");ImGui.treePop();return; }
+        if (regions!=null && regions.size()>SubterrainFeatures.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-region editor limit (read-only).");ImGui.treePop();return; }
+        String prefix=SubterrainFeatures.prefix(feature)+"allowedRegions#",key=prefix+"new";ImString next=values.computeIfAbsent(key,ignored -> new ImString("",4096));if (ImGui.beginCombo("New allowed region",next.get().isEmpty() ? "Choose a region" : next.get())) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(next.get()))) next.set(choice);ImGui.endCombo(); }
+        ImGui.beginDisabled(next.get().isEmpty() || regions!=null && regions.size()>=SubterrainFeatures.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add region reference");ImGui.endDisabled();if (add) { try { commitProfileChange(prefix,SubterrainFeatures.changeRegion(selected,workspace.read(selected),feature,RiverProfiles.Action.ADD,-1,next.get(),workspace),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        if (regions!=null) for (int index=0;index<regions.size();index++) { int region=index;String current=regions.get(index);ImGui.pushID(index);
+            if (ImGui.beginCombo("Region",current.length()>128 || current.indexOf(0)>=0 ? "Stored region" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setRegion(selected,workspace.read(selected),feature,region,choice,workspace)));ImGui.endCombo(); }
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate reference")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==regions.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove reference")) action=RiverProfiles.Action.REMOVE;
+            if (action!=null) { try { commitProfileChange(prefix,SubterrainFeatures.changeRegion(selected,workspace.read(selected),feature,action,index,null,workspace),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }ImGui.popID();
+        }ImGui.treePop();
     }
     private void drawDimensionCarvings(LosslessJson document) {
         if (!ImGui.collapsingHeader("Dimension carving entries")) return;
