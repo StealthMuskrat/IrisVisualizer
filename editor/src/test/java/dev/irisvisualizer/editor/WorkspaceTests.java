@@ -250,7 +250,7 @@ public final class WorkspaceTests {
    noiseWorkspace.replace("generators/flat.json",NoiseFields.editText("generators/flat.json",noiseWorkspace.read("generators/flat.json"),0,"seed","-9223372036854775808"));
    noiseWorkspace.save(temp.resolve("edited-noise-pack"));
    check(new LosslessJson(PackWorkspace.open(temp.resolve("edited-noise-pack")).read("generators/flat.json")).objectArray("composite").get(0).token("seed").equals("-9223372036854775808"));
-   check(FieldCoverage.groups("biomes/nested/test.json").equals(List.of("biome","biomeGeneratorLink","terrain3D","caveProfile","styledRange","caveModule","range","riverPolicy","biomePaletteLayer","slopeClip","blockData","noiseStyle","floatingBiome","objectPlacement","objectTranslate","objectScale","objectRotation","axisRotation","objectLimit","stiltSettings","vacuumSettings","objectReplace","materialPalette","oreGenerator","depositGenerator","depositVariant","decorator")));
+   check(FieldCoverage.groups("biomes/nested/test.json").equals(List.of("biome","structurePlacement","nativeStructureSource","biomeGeneratorLink","terrain3D","caveProfile","styledRange","caveModule","range","riverPolicy","biomePaletteLayer","slopeClip","blockData","noiseStyle","floatingBiome","objectPlacement","objectTranslate","objectScale","objectRotation","axisRotation","objectLimit","stiltSettings","vacuumSettings","objectReplace","materialPalette","oreGenerator","depositGenerator","depositVariant","decorator")));
    check(FieldCoverage.groups("asset.iob").isEmpty());
    var dimensionCoverage=FieldCoverage.fields("dimension");
    check(dimensionCoverage.stream().anyMatch(field->field.name().equals("name") && field.classification().equals("read-only") && !field.implemented()));
