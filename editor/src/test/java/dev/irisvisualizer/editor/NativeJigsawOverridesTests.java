@@ -18,7 +18,7 @@ final class NativeJigsawOverridesTests {
     static void run(Path temp) throws Exception {
         check(NativeJigsawOverrides.EDITABLE.size()==10 && NativeJigsawOverrides.NUMBERS.size()==5 && NativeJigsawOverrides.choices("projectStartToHeightmap").size()==8 && NativeJigsawOverrides.choices("liquidSettings").size()==3);
         for (String base : StructurePlacements.CONTEXTS) {
-            String path=base+"/nested/world.json";var c=new NativeJigsawOverrides.Context(base,0,0);byte[] original=single(null),empty=NativeJigsawOverrides.enable(path,original,c);
+            String path=base.equals("dimensions") ? "dimensions/world.json" : base+"/nested/world.json";var c=new NativeJigsawOverrides.Context(base,0,0);byte[] original=single(null),empty=NativeJigsawOverrides.enable(path,original,c);
             check(object(empty).fields().isEmpty() && Arrays.equals(original,NativeJigsawOverrides.reset(path,empty,c)));rejects(() -> NativeJigsawOverrides.enable(path,empty,c));
             check(Arrays.equals(original,NativeJigsawOverrides.reset(path,original,c)));
             byte[] nullable=single("null");check(object(nullable)==null && object(NativeJigsawOverrides.enable(path,nullable,c)).fields().isEmpty() && source(NativeJigsawOverrides.reset(path,nullable,c),0).token("jigsaw")==null);
@@ -43,7 +43,7 @@ final class NativeJigsawOverridesTests {
             for (String invalid : List.of("\"snippet\"","[]","3","false")) { byte[] malformed=single(invalid);rejects(() -> NativeJigsawOverrides.enable(path,malformed,c));rejects(() -> NativeJigsawOverrides.reset(path,malformed,c));check(StructurePlacements.readOnlyPaths(new LosslessJson(malformed),base).contains("structures[0].nativeStructures[0].jigsaw")); }
             for (String invalid : List.of("1.5","2147483648","\"1\"","false")) { byte[] malformed=single("{\"maxDepth\":"+invalid+"}");rejects(() -> NativeJigsawOverrides.set(path,malformed,c,"maxDepth","1")); }
             check(StructurePlacements.readOnlyPaths(new LosslessJson(precise),base).contains("structures[0].nativeStructures[0].jigsaw.future"));
-            rejects(() -> NativeJigsawOverrides.enable("generators/test.json",original,c));String other=base.equals("biomes") ? "regions" : "biomes";rejects(() -> NativeJigsawOverrides.set(other+"/test.json",empty,c,"maxDepth","1"));
+            rejects(() -> NativeJigsawOverrides.enable("generators/test.json",original,c));rejects(() -> NativeJigsawOverrides.enable("dimensions/nested/world.json",original,c));String other=base.equals("biomes") ? "regions" : "biomes";rejects(() -> NativeJigsawOverrides.set(other+"/test.json",empty,c,"maxDepth","1"));
             rejects(() -> NativeJigsawOverrides.enable(path,original,new NativeJigsawOverrides.Context(base,1,0)));rejects(() -> NativeJigsawOverrides.enable(path,original,new NativeJigsawOverrides.Context(base,0,2)));
             for (String backend : List.of("\"structures\":[\"assembly\"]","\"structures\":[\"assembly\"],\"nativeStructures\":[{}]","\"nativeStructures\":[]","\"nativeStructures\":[\"snippet\"]")) { byte[] malformed=bytes("{\"structures\":[{"+backend+"}]}");rejects(() -> NativeJigsawOverrides.enable(path,malformed,c)); }
             byte[] manyPlacements=bytes("{\"structures\":["+String.join(",",Collections.nCopies(65,"{}"))+"]}"),manySources=bytes("{\"structures\":[{\"nativeStructures\":["+String.join(",",Collections.nCopies(65,"{}"))+"]}]}");rejects(() -> NativeJigsawOverrides.enable(path,manyPlacements,c));rejects(() -> NativeJigsawOverrides.enable(path,manySources,c));
