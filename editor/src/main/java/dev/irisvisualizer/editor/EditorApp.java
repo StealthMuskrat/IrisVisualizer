@@ -2025,7 +2025,7 @@ public final class EditorApp extends Application {
     }
     private void drawProceduralObjects(LosslessJson document) {
         if (!ImGui.collapsingHeader("Procedural object collections")) return;ImGui.pushID(ProceduralObjects.prefix());
-        ImGui.textWrapped("Trees, ruins, formations, coral, fungi and crystals use native class defaults. Chance is checked per chunk before density attempts. Variants are pre-baked by Iris; this editor never generates or caches them. Shape controls use pinned native defaults and field bounds. Material roles and palettes are available below. Canopy/decorator objects remain read-only. Source compatibility, name collisions, memory cost and actual placement are unverified. Unsupported previews remain disabled.");
+        ImGui.textWrapped("Trees, ruins, formations, coral, fungi and crystals use native class defaults. Chance is checked per chunk before density attempts. Variants are pre-baked by Iris; this editor never generates or caches them. Shape controls use pinned native defaults and field bounds. Material roles and palettes are available below. Tree canopy controls are available below; decorator and secondary-leaf collections remain read-only. Source compatibility, name collisions, memory cost and actual placement are unverified. Unsupported previews remain disabled.");
         ImGui.textWrapped("Removing an entire collection or owner discards all data inside that selected subtree, including advanced fields.");
         try {
             var owner=ProceduralObjects.object(document);
@@ -2050,9 +2050,50 @@ public final class EditorApp extends Application {
                 ImGui.beginDisabled(rows.size()>=ProceduralObjects.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
                 ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==rows.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
                 if (action!=null) { try { commitProfileChange(prefix,ProceduralObjects.change(selected,workspace.read(selected),kind,action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
-                for (String field : ProceduralObjects.fields(kind)) drawProceduralValue(rows.get(index),context,field);drawProceduralShapes(rows.get(index),context);drawProceduralMaterials(rows.get(index),context);drawProceduralTransforms(rows.get(index),context);ImGui.treePop();
+                for (String field : ProceduralObjects.fields(kind)) drawProceduralValue(rows.get(index),context,field);drawProceduralShapes(rows.get(index),context);drawProceduralMaterials(rows.get(index),context);drawProceduralTransforms(rows.get(index),context);if (kind.equals("trees")) drawProceduralCanopies(rows.get(index),context);ImGui.treePop();
             }ImGui.popID(); }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list is mixed, a snippet or non-object data (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawProceduralCanopies(LosslessJson entry,ProceduralObjects.Context owner) {
+        if (!ImGui.treeNode("Tree canopy")) return;
+        ImGui.textWrapped("Pinned canopy and branch data only. Omitted canopy settings use native class defaults. Explicit nonempty layers replace profile-driven layers in their stored order. A branch object enables the native branch-driven crown; sub-branches also depend on branchDepth. Numeric controls enforce source annotations and widths; native function clamping, geometry and runtime cost are unverified. No foliage or branches are generated.");
+        ImGui.textWrapped("Removing an owner or the entire layer list discards its selected subtree, including advanced data. Parent and sibling configuration is preserved.");
+        drawCanopyOwner(entry,ProceduralCanopies.Context.object(owner,"canopy"));ImGui.treePop();
+    }
+    private void drawCanopyOwner(LosslessJson entry,ProceduralCanopies.Context context) {
+        if (!ImGui.treeNode(context.scope())) return;ImGui.pushID(context.prefix());
+        try { var object=ProceduralCanopies.object(entry,context);
+            if (object==null) { ImGui.textWrapped("No inline owner is stored. Create writes an empty object with pinned native class defaults; existing null/default interactions are not evaluated.");if (ImGui.button("Create inline canopy settings")) { try { commitProfileChange(context.prefix(),ProceduralCanopies.enable(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } }if (ProceduralCanopies.stored(entry,context) && ImGui.button("Reset stored null owner (remove field)")) { try { commitProfileChange(context.prefix(),ProceduralCanopies.reset(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+            else {
+                if (ImGui.button("Remove entire selected canopy owner")) { try { commitProfileChange(context.prefix(),ProceduralCanopies.reset(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+                for (String field : ProceduralCanopies.scalars(context)) drawCanopyValue(object,context,field);
+                if (context.scope().equals("canopy")) { drawCanopyLayers(entry,context.owner());drawCanopyOwner(entry,ProceduralCanopies.Context.object(context.owner(),"canopy.branches")); }
+                if (context.scope().equals("canopy.branches")) drawCanopyOwner(entry,ProceduralCanopies.Context.object(context.owner(),"canopy.branches.subBranches"));
+                for (String path : ProceduralCanopies.readOnlyPaths(entry,context)) ImGui.textWrapped(path+" (read-only, preserved)");
+            }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored canopy owner is a snippet/non-object or lacks an inline ancestor (read-only, preserved)."); }ImGui.popID();ImGui.treePop();
+    }
+    private void drawCanopyValue(LosslessJson object,ProceduralCanopies.Context context,String field) {
+        String key=context.prefix()+field;ImGui.pushID(field);ImGui.textWrapped(ProceduralCanopies.help(context,field));
+        try { String current=ProceduralCanopies.value(object,context,field),type=ProceduralCanopies.type(context,field);ImGui.textWrapped(object.token(field)==null ? "Implicit class default: "+current : "Explicit stored value");
+            if (!ProceduralCanopies.choices(context,field).isEmpty()) { if (ImGui.beginCombo(field,current.length()>128 || current.indexOf(0)>=0 ? "Stored option" : current)) { for (String choice : ProceduralCanopies.choices(context,field)) { if (ImGui.selectable(choice,choice.equals(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralCanopies.set(selected,workspace.read(selected),context,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(ProceduralCanopies.choiceHelp(context,field,choice)); }ImGui.endCombo(); } }
+            else if (type.equals("boolean")) { if (ImGui.checkbox(field,Boolean.parseBoolean(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralCanopies.set(selected,workspace.read(selected),context,field,Boolean.toString(!Boolean.parseBoolean(current)))));if (object.token(field)==null && ImGui.button("Store class default")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralCanopies.set(selected,workspace.read(selected),context,field,current))); }
+            else { ImGui.textWrapped(ProceduralCanopies.constraints(context,field));ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(256,current.length()+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply canopy value")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralCanopies.set(selected,workspace.read(selected),context,field,input.get()))); }
+            if (object.token(field)!=null && ImGui.button("Reset leaf (remove field)")) { try { commitProfileChange(key,ProceduralCanopies.resetLeaf(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored canopy value has unsupported type/width (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawCanopyLayers(LosslessJson entry,ProceduralObjects.Context owner) {
+        if (!ImGui.treeNode("Explicit crown layers")) return;String prefix=owner.prefix()+"canopy.layers.";ImGui.pushID(prefix);
+        ImGui.textWrapped("Omitted, null or empty layers use native profile-driven layers. Add writes an empty native layer (offset 0, radius 2). Removing the final layer restores omission. Order is preserved and can affect the branch-driven crown.");
+        try { var rows=ProceduralCanopies.layers(entry);if (rows!=null && rows.size()>64) throw new IllegalArgumentException("Layer limit");ImGui.beginDisabled(rows!=null && rows.size()>=64);boolean add=ImGui.button("Add crown layer with native defaults");ImGui.endDisabled();
+            if (add) { try { commitProfileChange(prefix,ProceduralCanopies.changeLayers(selected,workspace.read(selected),owner,RiverProfiles.Action.ADD,-1),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+            if (ProceduralCanopies.object(entry,ProceduralCanopies.Context.object(owner,"canopy")).token("layers")!=null && ImGui.button("Remove entire explicit layer list")) { try { commitProfileChange(prefix,ProceduralCanopies.resetLayers(selected,workspace.read(selected),owner),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+            if (rows!=null) for (int index=0;index<rows.size();index++) { ImGui.pushID(index);if (ImGui.treeNode("Layer "+index)) {
+                RiverProfiles.Action action=null;ImGui.beginDisabled(rows.size()>=64);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==rows.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+                if (action!=null) { try { commitProfileChange(prefix,ProceduralCanopies.changeLayers(selected,workspace.read(selected),owner,action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();ImGui.treePop();return; }
+                var context=ProceduralCanopies.Context.layer(owner,index);for (String field : ProceduralCanopies.scalars(context)) drawCanopyValue(rows.get(index),context,field);for (String path : ProceduralCanopies.readOnlyPaths(entry,context)) ImGui.textWrapped(path+" (read-only, preserved)");ImGui.treePop();
+            }ImGui.popID(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored layers are mixed/non-inline or above the 64-entry limit (read-only, preserved)."); }ImGui.popID();ImGui.treePop();
     }
     private void drawProceduralMaterials(LosslessJson entry,ProceduralObjects.Context context) {
         if (!ImGui.treeNode("Materials and palettes")) return;String kind=context.kind();
