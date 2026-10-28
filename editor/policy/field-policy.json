@@ -239,6 +239,10 @@
     "focusRegion": {
       "classification": "generation",
       "reason": "Exact in-pack selector authoring; native focus priority, compatibility and generation are not evaluated."
+    },
+    "carving": {
+      "classification": "generation",
+      "reason": "Ordered dimension cave-biome overrides with inclusive absolute world-Y roots and local child IDs; native selection is not emulated."
     }
   },
   "biome": {
@@ -3009,6 +3013,40 @@
     "rarity": {
       "classification": "generation",
       "reason": "Nullable custom-biome ambient particle data: fully namespaced syntax-only particle keys and exact native rarity 1..10000. The editor never resolves live particle registries or renders particles."
+    }
+  },
+  "dimensionCarving": {
+    "id": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    },
+    "enabled": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    },
+    "biome": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    },
+    "worldYRange": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    },
+    "childShrinkFactor": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    },
+    "childStyle": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    },
+    "children": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
+    },
+    "childRecursionDepth": {
+      "classification": "generation",
+      "reason": "Controls native dimension carving root/child selection or its biome reference; authored data only, without native resolution."
     }
   }
 }

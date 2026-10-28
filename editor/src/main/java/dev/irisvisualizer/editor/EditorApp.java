@@ -187,6 +187,7 @@ public final class EditorApp extends Application {
                     drawWorldBoundary(document);
                     drawDimensionType(document);
                     drawDimensionStack(document);
+                    drawDimensionCarvings(document);
                     drawResourceSelectors(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
@@ -232,7 +233,7 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks a bounded subset of dimension selectors/stacks, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks a bounded subset of dimension selectors/stacks/carving biomes, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -633,6 +634,92 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
             for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !ResourceSelectors.BIOME_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawDimensionCarvings(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Dimension carving entries")) return;
+        ImGui.pushID("dimension-carving");
+        ImGui.textWrapped("Dimension-level cave-biome overrides use absolute world Y with inclusive bounds. Native root lookup picks the last usable matching entry; cave generation can combine multiple entry profiles. Enabled flags, target content gates, native carving and noise are not evaluated here; unsupported previews remain disabled.");
+        ImGui.textWrapped("Child selection includes the parent and usable linked entries, uses biome rarity, and does not apply the child's Y range. Cycles and self-links are allowed; native depth is capped at 32. ID changes and removals leave existing links unchanged.");
+        List<LosslessJson> entries;
+        try { entries=DimensionCarvings.entries(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored carving list is a snippet, mixed list or unsupported type (read-only).");ImGui.popID();return; }
+        if (entries!=null && entries.size()>DimensionCarvings.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-entry editor limit (read-only).");ImGui.popID();return; }
+        for (String finding : DimensionCarvings.findings(document)) ImGui.textWrapped("Applied local ID check: "+finding+" (Save/Export remain available)");
+        String newKey=DimensionCarvings.prefix()+"new.id",biomeKey=DimensionCarvings.prefix()+"new.biome";
+        ImString newId=values.computeIfAbsent(newKey,ignored -> new ImString("",4096)),biome=values.computeIfAbsent(biomeKey,ignored -> new ImString("",4096));
+        ImGui.inputText("New local ID (lowercase letters/digits/_/-)",newId);drafts.update(newKey,"",newId.get());
+        var choices=selectorCatalogs.choices(workspace,"carvingBiome");
+        if (ImGui.beginCombo("New cave biome (exact file)",biome.get().isEmpty() ? "Choose a biome" : biome.get())) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(biome.get()))) biome.set(choice);ImGui.endCombo(); }
+        ImGui.beginDisabled(newId.get().isEmpty() || biome.get().isEmpty() || entries!=null && entries.size()>=DimensionCarvings.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add carving entry");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(DimensionCarvings.prefix(),DimensionCarvings.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,newId.get(),biome.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        if (entries==null) { ImGui.textWrapped("Absent/null list: no authored dimension carving entries. Add seeds only ID and biome; native defaults supply all other fields.");ImGui.popID();return; }
+        for (int index=0;index<entries.size();index++) {
+            int entryIndex=index;var entry=entries.get(index);String prefix=DimensionCarvings.prefix(index);ImGui.pushID(prefix);
+            if (ImGui.treeNode("Carving entry "+index)) {
+                String copyKey=prefix+"copy.id";ImString copyId=values.computeIfAbsent(copyKey,ignored -> new ImString("",4096));ImGui.inputText("Duplicate with new ID",copyId);drafts.update(copyKey,"",copyId.get());
+                RiverProfiles.Action action=null;
+                if (ImGui.button("Duplicate entry")) action=RiverProfiles.Action.DUPLICATE;
+                ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();
+                ImGui.sameLine();ImGui.beginDisabled(index+1==entries.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove entry")) action=RiverProfiles.Action.REMOVE;
+                if (action!=null) { try { commitProfileChange(DimensionCarvings.prefix(),DimensionCarvings.change(selected,workspace.read(selected),action,index,copyId.get(),null,workspace),action==RiverProfiles.Action.DUPLICATE ? copyKey : null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
+                try {
+                    String stored=entry.token("id")==null ? "" : entry.stringToken("id"),key=prefix+"id";ImString id=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));
+                    ImGui.inputText("Local ID",id);drafts.update(key,stored,id.get());if (ImGui.button("Apply ID (links unchanged)")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionCarvings.setId(selected,workspace.read(selected),entryIndex,id.get())));
+                } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored ID is not a string (read-only)."); }
+                try {
+                    String current=entry.token("biome")==null ? "" : entry.stringToken("biome");
+                    if (!current.isEmpty() && !choices.contains(current)) ImGui.textWrapped("Stored biome has no exact file match; native trimmed aliases and contents are unchecked.");
+                    if (ImGui.beginCombo("Cave biome",current.isEmpty() ? "Choose an exact biome" : current.length()>128 ? "Stored biome key" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionCarvings.setBiome(selected,workspace.read(selected),entryIndex,choice,workspace)));ImGui.endCombo(); }
+                } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored biome is not a string (read-only)."); }
+                String enabled=entry.token("enabled");if (enabled==null || enabled.equals("true") || enabled.equals("false")) { boolean value=enabled==null || enabled.equals("true");if (ImGui.checkbox("Enabled (native default true)",value)) applyRoutingExtra(() -> workspace.replace(selected,DimensionCarvings.setEnabled(selected,workspace.read(selected),entryIndex,!value))); } else ImGui.textWrapped("Stored enabled is not a boolean (read-only).");
+                drawCarvingRange(entry,index);
+                for (String field : DimensionCarvings.SCALARS) {
+                    ImGui.pushID(field);ImGui.textWrapped(DimensionCarvings.help(field));ImGui.textWrapped(field.equals("childRecursionDepth") ? "Exact depth 0..32; editor uses the native clamp range." : "Finite shrink factor >= 0.0001; editor uses the native minimum clamp.");String token=entry.token(field),key=prefix+field;
+                    if (token==null) { if (ImGui.button("Enable default "+DimensionCarvings.defaultToken(field))) applyRoutingExtra(() -> workspace.replace(selected,DimensionCarvings.enableScalar(selected,workspace.read(selected),entryIndex,field))); }
+                    else if (!DimensionCarvings.numericSupported(entry,field)) ImGui.textWrapped("Stored scalar has an unsupported type or integer width (read-only).");
+                    else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionCarvings.setScalar(selected,workspace.read(selected),entryIndex,field,input.get()))); }
+                    ImGui.popID();
+                }
+                drawCarvingChildren(document,entry,index);
+                if (ImGui.treeNode("Child selection style")) { drawStyleFields(entry,DimensionCarvings.styleTarget(index));ImGui.treePop(); }
+                for (String field : entry.fields()) if (!DimensionCarvings.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                ImGui.treePop();
+            }
+            ImGui.popID();
+        }
+        ImGui.popID();
+    }
+    private void drawCarvingRange(LosslessJson entry,int index) {
+        if (!ImGui.treeNode("Inclusive absolute world-Y range")) return;
+        String prefix=DimensionCarvings.prefix(index)+"worldYRange.",key=prefix+"pair";
+        ImGui.textWrapped("Absent range defaults to -64..320; an inline empty range uses class defaults 16..32. Explicit null is unbounded. Bounds may be fractional and are not clamped to dimension height. Applying a pair requires finite ordered values (editor guard).");
+        try {
+            String low=DimensionCarvings.rangeBound(entry,"min"),high=DimensionCarvings.rangeBound(entry,"max");
+            ImString min=values.computeIfAbsent(prefix+"min",ignored -> new ImString(low,Math.max(128,low.length()+1))),max=values.computeIfAbsent(prefix+"max",ignored -> new ImString(high,Math.max(128,high.length()+1)));
+            if ("null".equals(entry.token("worldYRange"))) ImGui.textWrapped("Currently unbounded; inputs are defaults for an explicit range.");
+            ImGui.inputText("Inclusive minimum world Y",min);ImGui.inputText("Inclusive maximum world Y",max);drafts.update(key,low+"|"+high,min.get()+"|"+max.get());
+            if (ImGui.button("Apply explicit world-Y pair")) { try { commitProfileChange(prefix,DimensionCarvings.setRange(selected,workspace.read(selected),index,min.get(),max.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+            if (!"null".equals(entry.token("worldYRange")) && ImGui.button("Remove Y restriction (write null)")) { try { commitProfileChange(prefix,DimensionCarvings.unbounded(selected,workspace.read(selected),index),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            var range=DimensionCarvings.range(entry);if (range!=null) for (String field : range.fields()) if (!List.of("min","max").contains(field)) ImGui.textWrapped("worldYRange."+field+" (read-only)");
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored range/bounds are unsupported (read-only)."); }
+        ImGui.treePop();
+    }
+    private void drawCarvingChildren(LosslessJson document,LosslessJson entry,int index) {
+        if (!ImGui.treeNode("Child carving-entry links")) return;
+        String prefix=DimensionCarvings.prefix(index)+"children#",key=prefix+"new";List<String> children;
+        try { children=DimensionCarvings.children(entry); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored children are not a string list (read-only).");ImGui.treePop();return; }
+        if (children!=null && children.size()>DimensionCarvings.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-child editor limit (read-only).");ImGui.treePop();return; }
+        ImString choice=values.computeIfAbsent(key,ignored -> new ImString("",4096));var ids=DimensionCarvings.ids(document);
+        if (ImGui.beginCombo("Local child ID",choice.get().isEmpty() ? "Choose an ID" : choice.get())) { for (String id : ids) if (ImGui.selectable(id,id.equals(choice.get()))) choice.set(id);ImGui.endCombo(); }
+        ImGui.beginDisabled(choice.get().isEmpty() || children!=null && children.size()>=DimensionCarvings.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add child link");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,DimensionCarvings.changeChild(selected,workspace.read(selected),index,RiverProfiles.Action.ADD,-1,choice.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        if (children!=null) for (int child=0;child<children.size();child++) {
+            ImGui.pushID(child);ImGui.textWrapped(children.get(child));RiverProfiles.Action action=null;
+            if (ImGui.button("Duplicate link")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(child==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(child+1==children.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove link")) action=RiverProfiles.Action.REMOVE;
+            if (action!=null) { try { commitProfileChange(prefix,DimensionCarvings.changeChild(selected,workspace.read(selected),index,action,child,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }ImGui.popID();
+        }
+        ImGui.treePop();
     }
     private void drawResourceSelectors(LosslessJson document) {
         if (!ImGui.collapsingHeader(ResourceTypes.base(selected).equals("dimensions") ? "Focused biome and region" : "Reachable carving-biome reference")) return;

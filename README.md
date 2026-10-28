@@ -2,9 +2,9 @@
 
 Standalone Windows x64 visualizer and generation-focused pack editor for Iris, targeting Java 25, LWJGL and ImGui.
 
-**Status: editor implementation in progress; native world previews disabled.** The Windows x64 ImGui editor opens folders/ZIPs, preserves original/unknown data, edits supported dimension, region, biome and generator settings, inspects image assets, and offers exact biome/region focus selectors with bounded file-reference navigation. Full schema coverage and interactive GUI/GPU verification remain pending. No custom replacement terrain generator is included. Native parity has not been established.
+**Status: editor implementation in progress; native world previews disabled.** The Windows x64 ImGui editor opens folders/ZIPs, preserves original/unknown data, edits supported dimension, region, biome and generator settings, inspects image assets, and offers exact biome/region focus selectors with bounded file-reference navigation and dimension carving entry controls. Full schema coverage and interactive GUI/GPU verification remain pending. No custom replacement terrain generator is included. Native parity has not been established.
 
-See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40615361821](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40615361821). Download its IrisVisualizer-windows-x64 artifact to try the editor.
+See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40671786147](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40671786147). Download its IrisVisualizer-windows-x64 artifact to try the editor.
 
 ## Verify the first batch
 

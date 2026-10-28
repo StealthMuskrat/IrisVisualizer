@@ -677,6 +677,17 @@ jobs:
           python editor/tools/extract_resource_selector_fields.py IrisDimension.java IrisBiome.java IrisEngine.java IrisComplex.java RegionSelection.java DimensionTerrainContext.java generated-resource-selector-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-resource-selector-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/resource-selector-fields.properties).Hash) { throw 'Pinned resource selector definitions differ' }
+      - name: Verify pinned dimension carving declarations and resolver
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionCarvingEntry.java' -OutFile IrisDimensionCarvingEntry.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionCarvingResolver.java' -OutFile IrisDimensionCarvingResolver.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/mantle/MantleCarvingComponent.java' -OutFile MantleCarvingComponent.java
+          python editor/tools/test_dimension_carving_fields.py IrisDimension.java IrisDimensionCarvingEntry.java IrisDimensionCarvingResolver.java IrisRange.java MantleCarvingComponent.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_carving_fields.py IrisDimension.java IrisDimensionCarvingEntry.java IrisDimensionCarvingResolver.java IrisRange.java MantleCarvingComponent.java generated-dimension-carving-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-carving-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-carving-fields.properties).Hash) { throw 'Pinned dimension carving definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
