@@ -100,6 +100,7 @@ public final class WorkspaceTests {
    InlineBlockDataTests.run(temp);
    BlockAliasAuditTests.run(temp);
    ExpressionDefinitionTests.run(temp);
+   ExpressionReferenceAuditTests.run(temp);
    var tree=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json","asset.iob"),List.of("empty"),"");
    check(tree.size()==4 && tree.get(0).folder() && tree.get(3).path().equals("asset.iob"));
    var filtered=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json"),List.of(),"A.JSON");

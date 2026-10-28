@@ -26,6 +26,7 @@ public final class EditorApp extends Application {
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
     private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
     private final BlockAliasAudit.Cache blockAliasAudits = new BlockAliasAudit.Cache();
+    private final ExpressionReferenceAudit.Cache expressionAudits = new ExpressionReferenceAudit.Cache();
     private final ResourceNavigation resourceNavigation = new ResourceNavigation();
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
@@ -240,6 +241,7 @@ public final class EditorApp extends Application {
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
             if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
+            if (ExpressionDefinitions.supports(selected) || "image-maps".equals(ResourceTypes.base(selected))) drawExpressionReferenceAudit();
             drawCoverage();
             if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
@@ -1656,6 +1658,21 @@ public final class EditorApp extends Application {
         ImGui.textWrapped(incoming.size()+" recorded incoming exact references.");for (var edge : incoming) { ImGui.pushID(index++);ImGui.textWrapped(edge.source()+": "+edge.field()+(edge.conditional() ? " (conditional backup)" : ""));if (ImGui.smallButton("Open referring definition")) { try { resourceNavigation.request(workspace,edge.source());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
         for (var cycle : audit.cycles(selected)) { ImGui.textWrapped("Potential cycle group (members, not traversal order): "+String.join(", ",cycle.members()));if (cycle.backupLinks()) ImGui.textWrapped("This group includes conditional backup links; the audit does not evaluate whether they execute."); }
         if (ImGui.treeNode("Alias audit notices")) { for (var notice : audit.notices()) ImGui.textWrapped(notice.path()+(notice.field().isEmpty() ? "" : ": "+notice.field())+" — "+notice.message());ImGui.treePop(); }
+    }
+    private void drawExpressionReferenceAudit() {
+        if (!ImGui.collapsingHeader("Expression source references and declarations")) return;
+        var audit=expressionAudits.inspect(workspace);
+        ImGui.textWrapped("Read-only literal links in expression variable/function styles and their fracture children. No formula is parsed; formula identifiers, other resource consumers, loader aliases, provider compatibility and runtime applicability are unchecked. Potential cycle groups include unused and overridden sources and do not prove execution. Save/Export remain available.");
+        ImGui.textWrapped("Limits: 512 sorted expression definitions, 1 MB per JSON, 8 MB total, 64 entries per source list, eight style-fracture levels, 4096 references and 256 notices. Exact file presence does not validate target contents.");
+        ImGui.textWrapped(audit.definitions()+" definitions; "+audit.inspected().size()+" inspected; "+audit.parsed()+" JSON objects parsed; "+audit.edges().size()+" literal links; "+audit.cycles().size()+" potential cycle groups.");
+        if (audit.incomplete()) ImGui.textWrapped("Reference/declaration coverage is incomplete; see notices below.");
+        if (ExpressionDefinitions.supports(selected) && !audit.inspected().contains(selected)) ImGui.textWrapped("The selected definition was not inspected within these limits; missing links and cycles may remain unknown.");
+        var outgoing=audit.outgoing(selected);if (outgoing.isEmpty()) ImGui.textWrapped("No recorded outgoing literal source links in this file.");int index=0;
+        for (var edge : outgoing) { ImGui.pushID(index++);ImGui.textWrapped(edge.field()+" -> "+edge.target()+(edge.present() ? " (exact file present)" : " (exact file absent)")+(edge.higherPriorityConfigured() ? " (higher-priority source field configured; runtime unchecked)" : ""));if (edge.present() && ImGui.smallButton("Open referenced source")) { try { resourceNavigation.request(workspace,edge.target());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
+        var incoming=audit.incoming(selected);ImGui.textWrapped(incoming.size()+" recorded incoming links from expression definitions.");
+        for (var edge : incoming) { ImGui.pushID(index++);ImGui.textWrapped(edge.source()+": "+edge.field()+(edge.higherPriorityConfigured() ? " (higher-priority source field configured)" : ""));if (ImGui.smallButton("Open referring expression")) { try { resourceNavigation.request(workspace,edge.source());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
+        for (var cycle : audit.cycles(selected)) ImGui.textWrapped("Potential cycle group (members, not traversal order): "+String.join(", ",cycle));
+        if (ImGui.treeNode("Expression reference/declaration notices")) { for (var notice : audit.notices()) ImGui.textWrapped(notice.path()+(notice.field().isEmpty() ? "" : ": "+notice.field())+" — "+notice.message());ImGui.treePop(); }
     }
     private void drawExpressionDefinition(LosslessJson root) {
         ImGui.textWrapped("Expression text and source data only. No parser, function, engine source or evaluation is run. Grammar, built-in identifiers, provider compatibility and recursion remain unchecked; previews remain disabled.");
