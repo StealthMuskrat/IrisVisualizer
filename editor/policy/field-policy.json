@@ -323,6 +323,10 @@
     "structures": {
       "classification": "generation",
       "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "treeSettings": {
+      "classification": "read-only",
+      "reason": "Handles sapling growth events through TreeSVC, rather than initial voxel generation. Preserved read-only."
     }
   },
   "biome": {
@@ -2523,6 +2527,30 @@
     "caveAnchorMode": {
       "classification": "generation",
       "reason": "Biome/region root placements only: pinned cave-anchor enum and profile fallback in MantleObjectComponent. CEILING_HANG forces ceiling anchors; floating entry lists do not consume this setting."
+    },
+    "isDolphinTarget": {
+      "classification": "read-only",
+      "reason": "Writes buried-treasure point-of-interest metadata for underwater storage chests, without changing their generated block states. Preserved read-only."
+    },
+    "loot": {
+      "classification": "read-only",
+      "reason": "Selects custom inventory loot tables for placed containers; does not select or shape generated voxels. Preserved read-only."
+    },
+    "vanillaLoot": {
+      "classification": "read-only",
+      "reason": "Selects vanilla inventory loot tables for placed containers; does not select or shape generated voxels. Preserved read-only."
+    },
+    "overrideGlobalLoot": {
+      "classification": "read-only",
+      "reason": "Controls object-versus-environment inventory loot precedence, outside voxel-generation editing. Preserved read-only."
+    },
+    "markers": {
+      "classification": "read-only",
+      "reason": "Attaches MatterMarker metadata to already placed object blocks for entity spawning and runtime marker lifecycle; marker selection uses a separate RNG stream. Preserved read-only."
+    },
+    "trees": {
+      "classification": "read-only",
+      "reason": "Matches sapling growth replacements and tags placements with TreeBlockMaterial metadata; this is separate from procedural tree geometry. Preserved read-only."
     }
   },
   "objectTranslate": {

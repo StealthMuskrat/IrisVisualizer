@@ -959,6 +959,26 @@ jobs:
           python editor/tools/extract_expression_fields.py . generated-expression-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-expression-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/expression-fields.properties).Hash) { throw 'Pinned expression definitions differ' }
+      - name: Audit pinned read-only field consumers
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimension.java' -OutFile IrisDimension.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectPlacement.java' -OutFile IrisObjectPlacement.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeSettings.java' -OutFile IrisTreeSettings.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTree.java' -OutFile IrisTree.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/TreeBlockMaterial.java' -OutFile TreeBlockMaterial.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/mantle/MantleObjectComponent.java' -OutFile MantleObjectComponent.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/IrisObjectPlacementRunner.java' -OutFile IrisObjectPlacementRunner.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/platform/generation/EngineBukkitOps.java' -OutFile EngineBukkitOps.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/world/tree/TreeSVC.java' -OutFile TreeSVC.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/world/tree/TreeDefinitionIndex.java' -OutFile TreeDefinitionIndex.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/MarkerSpawnScanner.java' -OutFile MarkerSpawnScanner.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/WorldBlockDropRouter.java' -OutFile WorldBlockDropRouter.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/world/entity/IrisMarker.java' -OutFile IrisMarker.java
+          python editor/tools/test_read_only_consumers.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/audit_read_only_consumers.py . editor/policy/field-policy.json editor/policy/read-only-consumers.json iris.lock.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

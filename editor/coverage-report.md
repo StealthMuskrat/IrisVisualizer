@@ -21,7 +21,7 @@ Direct nonstatic/nontransient private fields in one hundred and eleven pinned so
 | proceduralCoral | 37 | 37 | 37 | 0 |
 | proceduralFungus | 39 | 39 | 39 | 0 |
 | proceduralCrystal | 34 | 34 | 34 | 0 |
-| dimension | 82 | 81 | 75 | 1 |
+| dimension | 82 | 82 | 75 | 0 |
 | structurePlacement | 23 | 23 | 23 | 0 |
 | jigsawConfiguration | 10 | 10 | 10 | 0 |
 | nativeStructureSource | 3 | 3 | 3 | 0 |
@@ -83,7 +83,7 @@ Direct nonstatic/nontransient private fields in one hundred and eleven pinned so
 | biomePaletteLayer | 6 | 6 | 6 | 0 |
 | slopeClip | 2 | 2 | 2 | 0 |
 | floatingBiome | 42 | 42 | 41 | 0 |
-| objectPlacement | 41 | 35 | 35 | 6 |
+| objectPlacement | 41 | 41 | 35 | 0 |
 | objectTranslate | 4 | 4 | 4 | 0 |
 | objectScale | 5 | 5 | 5 | 0 |
 | objectRotation | 4 | 4 | 4 | 0 |
@@ -186,7 +186,7 @@ Unclassified: none.
 
 ## dimension
 
-Unclassified: `treeSettings`.
+Unclassified: none.
 
 ## structurePlacement
 
@@ -434,7 +434,7 @@ Unclassified: none.
 
 ## objectPlacement
 
-Unclassified: `isDolphinTarget`, `loot`, `markers`, `overrideGlobalLoot`, `trees`, `vanillaLoot`.
+Unclassified: none.
 
 ## objectTranslate
 

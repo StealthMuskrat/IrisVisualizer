@@ -13,6 +13,12 @@ public final class FieldCoverage {
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public record Field(String name, String classification, String reason, boolean implemented) {}
+    /** Exact direct field names only; never treats dotted text as an inherited policy. */
+    public static String readOnlyReason(String group,String name) {
+        var field=fields(group).stream().filter(value -> value.name().equals(name)).findFirst();
+        if (field.isEmpty() || field.get().classification().equals("unclassified")) return "Unknown or unclassified field; original value is preserved.";
+        return field.get().classification().equals("read-only") ? field.get().reason() : "Unsupported value or context; original value is preserved.";
+    }
     public static List<Field> fields(String group) {
         String names = DATA.getProperty(group + ".fields", "");
         if (names.isEmpty()) return List.of();
