@@ -906,6 +906,22 @@ jobs:
           python editor/tools/extract_procedural_material_fields.py . generated-procedural-material-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-procedural-material-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-material-fields.properties).Hash) { throw 'Pinned procedural material definitions differ' }
+      - name: Verify pinned procedural tree canopy contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeCanopy.java' -OutFile IrisTreeCanopy.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeLayer.java' -OutFile IrisTreeLayer.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeBranches.java' -OutFile IrisTreeBranches.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeSubBranches.java' -OutFile IrisTreeSubBranches.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeLeafMode.java' -OutFile IrisTreeLeafMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeBranchProbability.java' -OutFile IrisTreeBranchProbability.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/TreeCanopyBuilder.java' -OutFile TreeCanopyBuilder.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/TreeFunctions.java' -OutFile TreeFunctions.java
+          python editor/tools/test_procedural_canopy_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_procedural_canopy_fields.py . generated-procedural-canopy-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-procedural-canopy-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-canopy-fields.properties).Hash) { throw 'Pinned procedural canopy definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

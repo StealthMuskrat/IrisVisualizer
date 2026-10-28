@@ -4748,5 +4748,193 @@
       "classification": "generation",
       "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
     }
+  },
+  "treeCanopy": {
+    "startAngle": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "squish": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "leafDensity": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "crownStretchX": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "crownStretchZ": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "layers": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "branches": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    }
+  },
+  "treeLayer": {
+    "yOffset": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "radius": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    }
+  },
+  "treeBranches": {
+    "probabilityFunction": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityConstant": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityBase": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityCrown": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilitySteepness": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityMidpoint": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityExponent": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityMean": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityStd": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityScale": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "probabilityPeriods": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "lengthFunction": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "lengthBase": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "lengthCrown": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "lengthConstant": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "lengthMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "lengthSteepness": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "azimuthMode": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "azimuth": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "elevation": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "sag": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "branchDepth": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "leafStartUp": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "clusterRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "clusterMode": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "clusterDensity": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "subBranches": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    }
+  },
+  "treeSubBranches": {
+    "count": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "pitchDelta": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "yawDelta": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "lengthScale": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "sag": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "clusterRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "clusterMode": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    },
+    "clusterDensity": {
+      "classification": "generation",
+      "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
+    }
   }
 }

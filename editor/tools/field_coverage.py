@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in one hundred and one pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in one hundred and five pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -10,6 +10,10 @@ from pathlib import Path
 SOURCES = {
  'proceduralObjects': 'generation/decoration/IrisProceduralObjects.java',
  'proceduralTree': 'generation/decoration/tree/IrisProceduralTree.java',
+ 'treeCanopy': 'generation/decoration/tree/IrisTreeCanopy.java',
+ 'treeLayer': 'generation/decoration/tree/IrisTreeLayer.java',
+ 'treeBranches': 'generation/decoration/tree/IrisTreeBranches.java',
+ 'treeSubBranches': 'generation/decoration/tree/IrisTreeSubBranches.java',
  'proceduralRuin': 'generation/decoration/ruin/IrisRuin.java',
  'proceduralFormation': 'generation/decoration/formation/IrisFormation.java',
  'proceduralCoral': 'generation/decoration/coral/IrisCoral.java',
@@ -155,6 +159,11 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['proceduralCrystal'].update(editable(java_dir, 'ProceduralShapes', 'CRYSTAL_FIELDS'))
     for group in ['proceduralTree','proceduralRuin','proceduralFormation','proceduralCoral','proceduralFungus','proceduralCrystal']: implemented[group].update(editable(java_dir, 'ProceduralTransforms', 'OBJECT_FIELDS'))
     implemented['proceduralTree'].update(editable(java_dir, 'ProceduralMaterials', 'TREE_FIELDS'))
+    implemented['proceduralTree'].update(editable(java_dir, 'ProceduralCanopies', 'OBJECT_FIELDS'))
+    implemented['treeCanopy'] = set(editable(java_dir, 'ProceduralCanopies', 'CANOPY_FIELDS'))
+    implemented['treeLayer'] = set(editable(java_dir, 'ProceduralCanopies', 'LAYER_FIELDS'))
+    implemented['treeBranches'] = set(editable(java_dir, 'ProceduralCanopies', 'BRANCH_FIELDS'))
+    implemented['treeSubBranches'] = set(editable(java_dir, 'ProceduralCanopies', 'SUB_BRANCH_FIELDS'))
     implemented['proceduralRuin'].update(editable(java_dir, 'ProceduralMaterials', 'RUIN_FIELDS'))
     implemented['proceduralFormation'].update(editable(java_dir, 'ProceduralMaterials', 'FORMATION_FIELDS'))
     implemented['proceduralCoral'].update(editable(java_dir, 'ProceduralMaterials', 'CORAL_FIELDS'))
@@ -333,7 +342,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['importedStructures'].update(editable(java_dir, 'NativeGenerationFilters', 'STRUCTURE_FIELDS'))
     implemented['importedStructures'].update(editable(java_dir, 'NativeStructureAdjustments', 'LIST_FIELDS'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and five pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name
