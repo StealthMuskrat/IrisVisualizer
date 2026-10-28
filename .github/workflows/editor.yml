@@ -754,6 +754,18 @@ jobs:
           python editor/tools/extract_dimension_generation_fields.py IrisDimension.java IrisDimensionMode.java IrisDimensionModeType.java StudioMode.java EngineMantle.java IrisEngine.java IrisBiomeLayerGenerator.java IrisTerrainNormalActuator.java generated-dimension-generation-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-dimension-generation-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-generation-fields.properties).Hash) { throw 'Pinned dimension generation definitions differ' }
+      - name: Verify pinned native feature filters and structure-set frequency controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/IrisImportedFeatureBiomeRule.java' -OutFile IrisImportedFeatureBiomeRule.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisDecorationStep.java' -OutFile IrisDecorationStep.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructureSetFrequencyOverride.java' -OutFile IrisStructureSetFrequencyOverride.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/PackValidator.java' -OutFile PackValidator.java
+          python editor/tools/test_native_generation_filter_fields.py IrisDimension.java IrisImportedFeatureControl.java IrisImportedFeatureBiomeRule.java IrisDecorationStep.java IrisImportedStructureControl.java IrisStructureSetFrequencyOverride.java PackDimensionValidator.java PackValidator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_native_generation_filter_fields.py IrisDimension.java IrisImportedFeatureControl.java IrisImportedFeatureBiomeRule.java IrisDecorationStep.java IrisImportedStructureControl.java IrisStructureSetFrequencyOverride.java PackDimensionValidator.java PackValidator.java generated-native-generation-filter-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-native-generation-filter-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/native-generation-filter-fields.properties).Hash) { throw 'Pinned native generation filter definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

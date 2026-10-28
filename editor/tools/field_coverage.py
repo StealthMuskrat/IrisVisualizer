@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in eighty-five pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in eighty-seven pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -12,6 +12,8 @@ SOURCES = {
  'dimensionMode': 'generation/terrain/IrisDimensionMode.java',
  'importedStructures': 'structure/nativegen/IrisImportedStructureControl.java',
  'importedFeatures': 'structure/nativegen/IrisImportedFeatureControl.java',
+ 'importedFeatureBiomeRule': 'structure/nativegen/IrisImportedFeatureBiomeRule.java',
+ 'structureSetFrequency': 'structure/placement/IrisStructureSetFrequencyOverride.java',
  'biome': 'generation/biome/IrisBiome.java',
  'biomeGeneratorLink': 'generation/biome/IrisBiomeGeneratorLink.java',
  'generator': 'generation/noise/IrisGenerator.java',
@@ -170,6 +172,9 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['dimension'].update(editable(java_dir, 'SubterrainFeatures', 'LIST_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'DimensionGenerationControls', 'ROOT_FIELDS'))
     implemented['dimensionMode'] = set(editable(java_dir, 'DimensionGenerationControls'))
+    implemented['dimension'].update(editable(java_dir, 'NativeGenerationFilters', 'OBJECT_FIELDS'))
+    implemented['importedFeatureBiomeRule'] = set(editable(java_dir, 'NativeGenerationFilters'))
+    implemented['structureSetFrequency'] = set(editable(java_dir, 'NativeGenerationFilters', 'FREQUENCY_FIELDS'))
     implemented['subterrainFeature'] = set(editable(java_dir, 'SubterrainFeatures'))
     implemented['imageMap'] = set(editable(java_dir, 'ImageMapDefinitions'))
     implemented['imageMapOrigin'] = set(editable(java_dir, 'ImageMapDefinitions', 'AXES'))
@@ -278,8 +283,10 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['seaCaves'] = set(editable(java_dir, 'SeaCaveFields'))
     implemented['biomeGeneratorLink'] = {'min', 'max'}  # paired range controls in BiomeFields
     implemented['biomeGeneratorLink'].update(editable(java_dir, 'BiomeGeneratorLinks'))
+    implemented['importedFeatures'].update(editable(java_dir, 'NativeGenerationFilters', 'FEATURE_FIELDS'))
+    implemented['importedStructures'].update(editable(java_dir, 'NativeGenerationFilters', 'STRUCTURE_FIELDS'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in eighty-five pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in eighty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name
