@@ -183,6 +183,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     for group in ['dimension','biome','region']:
         implemented[group].update(editable(java_dir, 'StructurePlacements', 'LIST_FIELDS'))
     implemented['structurePlacement'] = set(editable(java_dir, 'StructurePlacements'))
+    implemented['structurePlacement'].update(editable(java_dir, 'StructurePlacementIntegration', 'OBJECT_FIELDS'))
     implemented['nativeStructureSource'] = set(editable(java_dir, 'StructurePlacements', 'NATIVE_FIELDS'))
     implemented['nativeStructureAdjustment'] = set(editable(java_dir, 'NativeStructureAdjustments'))
     implemented['structureStilt'] = set(editable(java_dir, 'NativeStructureAdjustments', 'STILT_FIELDS'))
