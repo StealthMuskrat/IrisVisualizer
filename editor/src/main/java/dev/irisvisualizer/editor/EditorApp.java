@@ -187,6 +187,7 @@ public final class EditorApp extends Application {
                     drawSurfaceLayerFallback(document);
                     drawDimensionHeights(document);
                     drawWorldBoundary(document);
+                    drawNativeStructureAdjustments(document);
                     drawNativeGenerationFilters(document);
                     drawDimensionGenerationControls(document);
                     drawDimensionType(document);
@@ -814,6 +815,71 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         ImGui.treePop();
+    }
+    private void drawNativeStructureAdjustments(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Native structure adjustments")) return;ImGui.pushID("native-adjustments");
+        ImGui.textWrapped("These adjustments apply to native structures that still generate, including mod/datapack structures. Match keys are syntax-only registry families, not Iris file references. New empty adjustments match nothing. No placement, terrain operation, world-height compatibility or preview is evaluated here.");
+        ImGui.textWrapped("Matching yShift values stack with undergroundYShift; preserveSourceY accumulates. The last matching non-null yBand, stilt and terrain objects win independently. preserveSourceY takes precedence over yBand; fixed vanilla alignments may ignore yBand. Native build-height clamping is not simulated.");
+        List<LosslessJson> entries;
+        try { entries=NativeStructureAdjustments.entries(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored importedStructures/adjustments is null, a snippet or has non-object entries (read-only).");ImGui.popID();return; }
+        if (entries!=null && entries.size()>NativeStructureAdjustments.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-adjustment editor limit (read-only).");ImGui.popID();return; }
+        ImGui.beginDisabled(entries!=null && entries.size()>=NativeStructureAdjustments.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add inactive adjustment");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(NativeStructureAdjustments.prefix(),NativeStructureAdjustments.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        if (entries!=null) for (int index=0;index<entries.size();index++) {
+            var entry=entries.get(index);ImGui.pushID(index);
+            if (ImGui.treeNode("Adjustment "+index)) {
+                RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==entries.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+                if (action!=null) { try { commitProfileChange(NativeStructureAdjustments.prefix(),NativeStructureAdjustments.change(selected,workspace.read(selected),action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
+                drawNativeAdjustmentMatches(entry,index);drawNativeAdjustmentValue(entry,index,"","yShift");drawNativeAdjustmentValue(entry,index,"","preserveSourceY");
+                for (String context : NativeStructureAdjustments.OPTIONAL) drawNativeAdjustmentObject(entry,index,context);
+                for (String field : entry.fields()) if (!NativeStructureAdjustments.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only, preserved)");ImGui.treePop();
+            }ImGui.popID();
+        }ImGui.popID();
+    }
+    private void drawNativeAdjustmentMatches(LosslessJson entry,int index) {
+        if (!ImGui.treeNode("Structure match families")) return;String prefix=NativeStructureAdjustments.prefix(index)+"match.";ImGui.pushID(prefix);ImGui.textWrapped(NativeStructureAdjustments.help("","match"));List<String> list;
+        try { list=NativeStructureAdjustments.matches(entry); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored match is null/non-string/mixed (read-only).");ImGui.popID();ImGui.treePop();return; }
+        if (list!=null && list.size()>NativeStructureAdjustments.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-match editor limit (read-only).");ImGui.popID();ImGui.treePop();return; }
+        String newKey=prefix+"new";ImString next=values.computeIfAbsent(newKey,ignored -> new ImString("",16384));ImGui.inputText("New namespace:key or namespace:",next);drafts.update(newKey,"",next.get());ImGui.beginDisabled(next.get().isEmpty() || list!=null && list.size()>=NativeStructureAdjustments.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add match");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,NativeStructureAdjustments.changeMatch(selected,workspace.read(selected),index,RiverProfiles.Action.ADD,-1,next.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+        if (list!=null) for (int row=0;row<list.size();row++) {
+            int item=row;String current=list.get(row),key=prefix+row;ImGui.pushID(row);
+            if (current.indexOf(0)>=0) ImGui.textWrapped("Stored match contains NUL (text read-only; structural removal is available).");
+            else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Match family",input);drafts.update(key,current,input.get());if (ImGui.button("Apply match")) commitRiverOverride(key,() -> workspace.replace(selected,NativeStructureAdjustments.setMatch(selected,workspace.read(selected),index,item,input.get()))); }
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(row==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(row+1==list.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+            if (action!=null) { try { commitProfileChange(prefix,NativeStructureAdjustments.changeMatch(selected,workspace.read(selected),index,action,row,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.popID();ImGui.treePop();return; }ImGui.popID();
+        }ImGui.popID();ImGui.treePop();
+    }
+    private void drawNativeAdjustmentObject(LosslessJson entry,int index,String context) {
+        if (!ImGui.treeNode(context+" override")) return;ImGui.pushID(context);String prefix=NativeStructureAdjustments.prefix(index)+context+".";ImGui.textWrapped(NativeStructureAdjustments.help("",context));
+        try {
+            var object=NativeStructureAdjustments.object(entry,context);
+            if (object==null) { ImGui.textWrapped("Absent/null means no override in this entry. Enable writes an empty inline object with native class defaults.");if (ImGui.button("Enable inline "+context)) applyRoutingExtra(() -> workspace.replace(selected,NativeStructureAdjustments.enableOptional(selected,workspace.read(selected),index,context))); }
+            else {
+                if (context.equals("yBand")) {
+                    ImGui.textWrapped("Absolute world Y, -4064..4064. Equal and reversed endpoints are supported; native resolution sorts the endpoints.");String key=prefix+"pair";
+                    try { String low=NativeStructureAdjustments.value(object,context,"min"),high=NativeStructureAdjustments.value(object,context,"max");ImString min=values.computeIfAbsent(prefix+"min",ignored -> new ImString(low,Math.max(128,low.length()+1))),max=values.computeIfAbsent(prefix+"max",ignored -> new ImString(high,Math.max(128,high.length()+1)));ImGui.inputText("Minimum world Y",min);ImGui.inputText("Maximum world Y",max);drafts.update(key,low+"|"+high,min.get()+"|"+max.get());if (ImGui.button("Apply both Y-band endpoints")) { try { commitProfileChange(prefix,NativeStructureAdjustments.setBand(selected,workspace.read(selected),index,min.get(),max.get()),key); } catch (Exception failure) { error=failure.getMessage(); } } }
+                    catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored Y band has a non-integer or unsupported-width endpoint (read-only)."); }
+                } else {
+                    ImGui.textWrapped(context.equals("stilt") ? "Native class defaults: maxDepth 64, spacing 1, cobblestone palette. Advanced palette data stays read-only. supportNonOccluding is documented for Iris-authored structures." : "Absent leaves use SOURCE/BOX, padding 0, flattenRange 64, erosion strength 0.8/frequency 0.07, lobe frequency 0 and strength 0.85. Lobe frequency 0 derives 0.3 times erosion frequency. Advanced encasePalette stays read-only; native default material depends on the world environment.");
+                    for (String field : context.equals("stilt") ? NativeStructureAdjustments.STILT_FIELDS : NativeStructureAdjustments.TERRAIN_FIELDS) drawNativeAdjustmentValue(object,index,context,field);
+                }
+                for (String field : object.fields()) if (!(context.equals("yBand") ? NativeStructureAdjustments.BAND_FIELDS : context.equals("stilt") ? NativeStructureAdjustments.STILT_FIELDS : NativeStructureAdjustments.TERRAIN_FIELDS).contains(field)) ImGui.textWrapped(context+"."+field+" (read-only, preserved)");
+            }
+            if (entry.token(context)!=null) { ImGui.textWrapped("Remove discards this entire override, including advanced palette/unknown data, and restores absence.");if (ImGui.button("Remove "+context+" override")) { try { commitProfileChange(prefix,NativeStructureAdjustments.removeOptional(selected,workspace.read(selected),index,context),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored override is a snippet/non-object (read-only)."); }ImGui.popID();ImGui.treePop();
+    }
+    private void drawNativeAdjustmentValue(LosslessJson object,int index,String context,String field) {
+        ImGui.pushID(field);String key=NativeStructureAdjustments.prefix(index)+(context.isEmpty() ? "" : context+".")+field;ImGui.textWrapped(NativeStructureAdjustments.help(context,field));
+        try {
+            String current=NativeStructureAdjustments.value(object,context,field);
+            if (NativeStructureAdjustments.booleanField(context,field)) { boolean flag=current.equals("true");if (ImGui.checkbox(field+" (default "+NativeStructureAdjustments.defaultToken(context,field)+")",flag)) applyRoutingExtra(() -> workspace.replace(selected,NativeStructureAdjustments.setBoolean(selected,workspace.read(selected),index,context,field,!flag))); }
+            else if (NativeStructureAdjustments.enumField(context,field)) { ImGui.textWrapped(NativeStructureAdjustments.choiceHelp(field,current));if (ImGui.beginCombo(field,current.length()>128 || current.indexOf(0)>=0 ? "Stored option" : current)) { for (String choice : NativeStructureAdjustments.choices(field)) { if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,NativeStructureAdjustments.setChoice(selected,workspace.read(selected),index,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(NativeStructureAdjustments.choiceHelp(field,choice)); }ImGui.endCombo(); } }
+            else { ImGui.textWrapped(NativeStructureAdjustments.constraints(context,field));ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(128,current.length()+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,NativeStructureAdjustments.setNumber(selected,workspace.read(selected),index,context,field,input.get()))); }
+            if (object.token(field)!=null && ImGui.button("Restore absent default")) { try { commitProfileChange(key,NativeStructureAdjustments.resetLeaf(selected,workspace.read(selected),index,context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored value has an unsupported type, integer width or finite value (read-only)."); }ImGui.popID();
     }
     private void drawNativeGenerationFilters(LosslessJson document) {
         if (!ImGui.collapsingHeader("Native feature filters and structure-set frequency")) return;
@@ -3524,8 +3590,8 @@ public final class EditorApp extends Application {
     }
     private void commitProfileChange(String prefix,byte[] next,String appliedKey) throws java.io.IOException {
         if (drafts.transitionUnder(prefix,() -> {
-            boolean other=values.keySet().stream().anyMatch(key -> key.startsWith(prefix) && !key.equals(appliedKey) && drafts.contains(key));
-            return !other || JOptionPane.showConfirmDialog(null,"This changes list positions and discards other unapplied text in this list. Continue?","Unapplied text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION;
+            boolean other=drafts.anyOtherUnder(prefix,appliedKey);
+            return !other || JOptionPane.showConfirmDialog(null,"This discards other unapplied text in the affected settings. Continue?","Unapplied text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION;
         },() -> workspace.replace(selected,next))) { values.keySet().removeIf(key -> key.startsWith(prefix));error=null; }
     }
     private void drawGrottoSettings(LosslessJson rivers) {
@@ -3899,7 +3965,7 @@ public final class EditorApp extends Application {
     private void commitMaterialList(String target,byte[] next,String appliedKey) throws java.io.IOException {
         String prefix=RiverMaterialFields.listDraftPrefix(target);
         if (drafts.transitionUnder(prefix,() -> {
-            boolean other=values.keySet().stream().anyMatch(key -> key.startsWith(prefix) && !key.equals(appliedKey) && drafts.contains(key));
+            boolean other=drafts.anyOtherUnder(prefix,appliedKey);
             return !other || JOptionPane.showConfirmDialog(null,"This changes palette list positions and discards other unapplied text in this palette. Continue?","Unapplied text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION;
         },() -> workspace.replace(selected,next))) {
             values.keySet().removeIf(key -> key.startsWith(prefix)); error=null;
@@ -4947,7 +5013,7 @@ public final class EditorApp extends Application {
     private boolean discardListDrafts(String field, java.util.function.Predicate<String> included) {
         boolean other = values.entrySet().stream().anyMatch(entry -> entry.getKey().startsWith(field + "#")
                 && !included.test(entry.getKey()) && drafts.contains(entry.getKey()));
-        return !other || JOptionPane.showConfirmDialog(null, "This changes list positions and discards other unapplied text in this list. Continue?",
+        return !other || JOptionPane.showConfirmDialog(null, "This discards other unapplied text in the affected settings. Continue?",
                 "Unapplied text", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
     }
     private boolean discardDraftsAllowed() {

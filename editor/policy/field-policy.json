@@ -303,6 +303,10 @@
     "importedFeatures": {
       "classification": "generation",
       "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    },
+    "importedStructures": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
     }
   },
   "biome": {
@@ -655,6 +659,10 @@
     "frequencyOverrides": {
       "classification": "generation",
       "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    },
+    "adjustments": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
     }
   },
   "importedFeatures": {
@@ -3415,6 +3423,106 @@
     "multiplier": {
       "classification": "generation",
       "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    }
+  },
+  "nativeStructureAdjustment": {
+    "match": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "yShift": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "yBand": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "preserveSourceY": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "stilt": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "terrain": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    }
+  },
+  "structureStilt": {
+    "maxDepth": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "spacing": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "supportNonOccluding": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "palette": {
+      "classification": "read-only",
+      "reason": "Advanced native structure palette data is preserved. This context does not yet support palette entries, noise or registry material resolution."
+    }
+  },
+  "structureTerrain": {
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "horizontalPadding": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "flattenRange": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "ceilingPadding": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "floorPadding": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "shape": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "erosionStrength": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "erosionFrequency": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "lobeFrequency": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "lobeStrength": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "encasePalette": {
+      "classification": "read-only",
+      "reason": "Advanced native structure palette data is preserved. This context does not yet support palette entries, noise or registry material resolution."
+    }
+  },
+  "structureYBand": {
+    "min": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "max": {
+      "classification": "generation",
+      "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
     }
   }
 }

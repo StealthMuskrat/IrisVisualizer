@@ -13,6 +13,7 @@ public final class InspectorDrafts {
     public boolean any() { return !changed.isEmpty(); }
     public boolean contains(String key) { return changed.contains(key); }
     public boolean anyUnder(String prefix) { return changed.stream().anyMatch(key -> key.startsWith(prefix)); }
+    public boolean anyOtherUnder(String prefix,String appliedKey) { return changed.stream().anyMatch(key -> key.startsWith(prefix) && !key.equals(appliedKey)); }
     public void applied(String key) { changed.remove(key); }
     public void clearUnder(String prefix) { changed.removeIf(key -> key.startsWith(prefix)); }
     @FunctionalInterface public interface Change { void run() throws java.io.IOException; }

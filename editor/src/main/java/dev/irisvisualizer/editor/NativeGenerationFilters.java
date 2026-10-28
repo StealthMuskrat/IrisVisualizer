@@ -110,7 +110,8 @@ public final class NativeGenerationFilters {
             var object=object(root,parent);if (object==null) return List.of();
             for (String field : object.fields()) {
                 String path=parent+"."+field;
-                if (parent.equals("importedFeatures") && List.of("steps","disabledSteps").contains(field)) { try { var values=strings(object,field,true);limit(values.size(),false); } catch (IllegalArgumentException invalid) { paths.add(path); } }
+                if (parent.equals("importedStructures") && field.equals("adjustments")) { paths.addAll(NativeStructureAdjustments.readOnlyPaths(root)); }
+                else if (parent.equals("importedFeatures") && List.of("steps","disabledSteps").contains(field)) { try { var values=strings(object,field,true);limit(values.size(),false); } catch (IllegalArgumentException invalid) { paths.add(path); } }
                 else if (parent.equals("importedFeatures") && field.equals("biomeRules") || parent.equals("importedStructures") && field.equals("frequencyOverrides")) {
                     try { var entries=entries(root,field);limit(entries.size(),false);for (int i=0;i<entries.size();i++) for (String child : entries.get(i).fields()) { var entry=entries.get(i);String childPath=path+"["+i+"]."+child;
                         if (field.equals("biomeRules")) { if (!EDITABLE.contains(child)) paths.add(childPath);else try { var values=strings(entry,child,false);limit(values.size(),false); } catch (IllegalArgumentException invalid) { paths.add(childPath); } }
