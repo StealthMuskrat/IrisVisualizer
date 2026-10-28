@@ -668,15 +668,15 @@
   "noiseStyle": {
     "style": {
       "classification": "generation",
-      "reason": "Selects or scales/shapes source-defined base noise; source references and cache size have separate typed controls, while fracture remains read-only."
+      "reason": "Source-defined base noise selection/shaping with separate source/cache and bounded recursive fracture controls; native noise is not evaluated."
     },
     "zoom": {
       "classification": "generation",
-      "reason": "Selects or scales/shapes source-defined base noise; source references and cache size have separate typed controls, while fracture remains read-only."
+      "reason": "Source-defined base noise selection/shaping with separate source/cache and bounded recursive fracture controls; native noise is not evaluated."
     },
     "exponent": {
       "classification": "generation",
-      "reason": "Selects or scales/shapes source-defined base noise; source references and cache size have separate typed controls, while fracture remains read-only."
+      "reason": "Source-defined base noise selection/shaping with separate source/cache and bounded recursive fracture controls; native noise is not evaluated."
     },
     "cellularFrequency": {
       "classification": "generation",
@@ -701,6 +701,10 @@
     "cacheSize": {
       "classification": "generation",
       "reason": "Enabled inline styles expose exact in-pack source references or bounded cache-size configuration; native loading, source precedence and caching remain unevaluated."
+    },
+    "fracture": {
+      "classification": "generation",
+      "reason": "Nullable recursive style distortion with all shared style/source/cache controls and a finite positive child multiplier. Typed existing-parent routing and an explicit eight-level editor bound preserve unsupported/deeper data; no native noise is evaluated."
     }
   },
   "terrain3D": {

@@ -13,7 +13,7 @@ final class NoiseStyleSourceTests {
     private static String text(byte[] value) { return new String(value,StandardCharsets.UTF_8); }
     private static void check(boolean condition) { if (!condition) throw new AssertionError("Style source contract failed"); }
     private static void rejects(Runnable action) { try { action.run(); } catch (IllegalArgumentException expected) { return; }throw new AssertionError("Expected rejected style source operation"); }
-    private record Case(NoiseStyleFields.Target target,String stylePath) {
+    record Case(NoiseStyleFields.Target target,String stylePath) {
         String path() { return target.resourceBase().equals("dimensions") ? "dimensions/source.json" : target.resourceBase()+"/nested/source.json"; }
         byte[] document(String style) { return bytes(wrap(stylePath.split("\\."),0,style)); }
         LosslessJson style(byte[] raw) { return at(new LosslessJson(raw),stylePath.split("\\."),0); }
@@ -28,7 +28,7 @@ final class NoiseStyleSourceTests {
         var child=new LosslessJson(object.token(field).getBytes(StandardCharsets.UTF_8));return index+1==parts.length ? child : at(child,parts,index+1);
     }
     private static void add(List<Case> cases,NoiseStyleFields.Target target) { cases.add(new Case(target,target.objectField())); }
-    private static List<Case> cases() {
+    static List<Case> cases() {
         var result=new ArrayList<Case>();
         for (String field : NoiseStyleFields.DIMENSION_FIELDS) add(result,NoiseStyleFields.Target.dimension(field));
         for (String field : NoiseStyleFields.BIOME_FIELDS) add(result,NoiseStyleFields.Target.biome(field));
@@ -93,7 +93,7 @@ final class NoiseStyleSourceTests {
         var saved=PackWorkspace.newPack(Map.of("dimensions/source.json",savedSource,"expressions/noise/formula.json",resources.read("expressions/noise/formula.json"),"image-maps/map/height.json",resources.read("image-maps/map/height.json"),"objects/opaque.iob",new byte[]{0,127,-1,42}));
         saved.replace("dimensions/source.json",NoiseStyleSources.setReference("dimensions/source.json",saved.read("dimensions/source.json"),dimension,"expression","noise/formula",saved));saved.replace("dimensions/source.json",NoiseStyleSources.setCache("dimensions/source.json",saved.read("dimensions/source.json"),dimension,"8192"));
         saved.save(temp.resolve("style-sources"));saved.exportZip(temp.resolve("style-sources.zip"));var reopened=PackWorkspace.open(temp.resolve("style-sources"));var imported=PackWorkspace.importZip(temp.resolve("style-sources.zip"));for (String path : saved.paths()) check(Arrays.equals(saved.read(path),reopened.read(path)) && Arrays.equals(saved.read(path),imported.read(path)));
-        check(FieldCoverage.fields("noiseStyle").stream().filter(FieldCoverage.Field::implemented).count()==9);
+        check(FieldCoverage.fields("noiseStyle").stream().filter(FieldCoverage.Field::implemented).count()==10);
         System.out.println("PASS: style references/cache across "+cases().size()+" owner contexts, exact resource catalogs, nullable precedence settings, exact cache bounds/types, strict parent/owner guards, read-only malformed data, independent drafts and lossless Save/ZIP");
     }
 }

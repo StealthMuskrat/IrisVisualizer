@@ -85,7 +85,7 @@ public final class FloatingPlacementSettings {
             var object=object(placement,field);if (object==null) continue;
             for (String member : object.fields()) if (!(field.equals("scale") ? SCALE_FIELDS : RANGE_FIELDS).contains(member)) paths.add(field+"."+member);
             if (field.equals("densityStyle")) {
-                try { var style=NoiseStyleFields.object(object);if (style!=null) for (String member : style.fields()) if (NoiseStyleFields.readOnly(style,member)) paths.add("densityStyle.style."+member); }
+                try { var style=NoiseStyleFields.object(object);if (style!=null) for (String member : StyleFractures.readOnlyPaths(style)) paths.add("densityStyle.style."+member); }
                 catch (IllegalArgumentException unsupported) { paths.add("densityStyle.style"); }
             }
         } catch (IllegalArgumentException unsupported) { paths.add(field); }

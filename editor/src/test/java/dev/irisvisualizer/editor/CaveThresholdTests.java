@@ -119,7 +119,7 @@ final class CaveThresholdTests {
         rejects(() -> CaveThresholdFields.defaultBound("style", false));
         check(FieldCoverage.fields("styledRange").size() == 3 && FieldCoverage.fields("styledRange").stream().allMatch(FieldCoverage.Field::implemented));
         var readOnly = DimensionFields.readOnlyPaths(new LosslessJson(source));
-        check(readOnly.equals(List.of( "caveProfile.densityThreshold.style.fracture", "caveProfile.densityThreshold.style.future", "caveProfile.densityThreshold.future", "caveProfile.modules", "unknown")));
+        check(readOnly.equals(List.of( "caveProfile.densityThreshold.style.future", "caveProfile.densityThreshold.future", "caveProfile.modules", "unknown")));
         var drafts = new InspectorDrafts();
         for (String context : CaveProfileFields.CONTEXTS) {
             drafts.update(CaveThresholdFields.draftPrefix(context) + "min", "0", "1");

@@ -95,7 +95,7 @@ final class RiverBankTests {
         for (String field : List.of("fracture","multiplier","cacheSize","expression","imageMap")) {
             rejects(() -> NoiseStyleFields.enable(PATH,original,target,field));
             rejects(() -> NoiseStyleFields.editText(PATH,original,target,field,"1"));
-            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).contains("hydrology.rivers.geometry.banks3D.densityStyle."+field) == (!field.equals("cacheSize") && !field.equals("expression")));
+            check(DimensionFields.readOnlyPaths(new LosslessJson(original)).contains("hydrology.rivers.geometry.banks3D.densityStyle."+field) == List.of("multiplier","imageMap").contains(field));
         }
         for (String bad : List.of("null","[]","true","1","\"snippet\"")) {
             byte[] wrongBank=bytes(prefix+bad+suffix), wrongStyle=bytes(prefix+"{\"amplitude\":8,\"densityStyle\":"+bad+"}"+suffix);

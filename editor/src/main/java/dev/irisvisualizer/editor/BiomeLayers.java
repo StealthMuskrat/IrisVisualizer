@@ -109,7 +109,7 @@ public final class BiomeLayers {
             for (int index=0;index<layers.size();index++) {
                 var layer=layers.get(index);String prefix=list+"["+index+"]";
                 for (String item : layer.fields()) if (!EDITABLE.contains(item)) paths.add(prefix+"."+item);
-                try { var style=NoiseStyleFields.object(layer,NoiseStyleFields.Target.biomeLayer(list,index));if (style!=null) for (String item : style.fields()) if (NoiseStyleFields.readOnly(style,item)) paths.add(prefix+".style."+item); }
+                try { var style=NoiseStyleFields.object(layer,NoiseStyleFields.Target.biomeLayer(list,index));if (style!=null) for (String item : StyleFractures.readOnlyPaths(style)) paths.add(prefix+".style."+item); }
                 catch (IllegalArgumentException unsupported) { paths.add(prefix+".style"); }
                 try { var blocks=DimensionPalettes.entries(layer);if (blocks!=null) for (int i=0;i<blocks.size();i++) for (String item : blocks.get(i).fields()) if (!RiverMaterialFields.ENTRY_FIELDS.contains(item)) paths.add(prefix+".palette["+i+"]."+item); }
                 catch (IllegalArgumentException unsupported) { paths.add(prefix+".palette"); }

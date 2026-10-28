@@ -80,7 +80,7 @@ public final class FloatingPlacementConstraints {
             var object=object(placement,field);if (object!=null) for (String member : object.fields()) if (!(field.equals("clamp") ? CLAMP_FIELDS : SLOPE_FIELDS).contains(member)) paths.add(field+"."+member);
         } catch (IllegalArgumentException unsupported) { paths.add(field); }
         String token=placement.token("warp");if (token!=null) try {
-            var warp=new LosslessJson(token.getBytes(StandardCharsets.UTF_8));for (String member : warp.fields()) if (NoiseStyleFields.readOnly(warp,member) && !WARP_FIELDS.contains(member)) paths.add("warp."+member);
+            var warp=new LosslessJson(token.getBytes(StandardCharsets.UTF_8));for (String member : StyleFractures.readOnlyPaths(warp,0,true)) paths.add("warp."+member);
         } catch (IllegalArgumentException unsupported) { paths.add("warp"); }
         return List.copyOf(paths);
     }
