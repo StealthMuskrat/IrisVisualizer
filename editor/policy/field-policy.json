@@ -259,6 +259,46 @@
     "subterrainFeatures": {
       "classification": "generation",
       "reason": "Dimension-owned deterministic underground feature definitions; typed authoring without native placement planning or geometry validation."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "studioMode": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "useMantle": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "preventLeafDecay": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "hideOresForHiddenOre": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "debugChunkCrossSections": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "explodeBiomePalettes": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "debugSmartBore": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "explodeBiomePaletteSize": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "debugCrossSectionsMod": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
     }
   },
   "biome": {
@@ -3325,6 +3365,12 @@
     "priority": {
       "classification": "generation",
       "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    }
+  },
+  "dimensionMode": {
+    "type": {
+      "classification": "generation",
+      "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
     }
   }
 }

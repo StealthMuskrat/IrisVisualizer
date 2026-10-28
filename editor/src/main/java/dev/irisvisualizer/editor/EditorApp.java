@@ -187,6 +187,7 @@ public final class EditorApp extends Application {
                     drawSurfaceLayerFallback(document);
                     drawDimensionHeights(document);
                     drawWorldBoundary(document);
+                    drawDimensionGenerationControls(document);
                     drawDimensionType(document);
                     drawDimensionStack(document);
                     drawDimensionCarvings(document);
@@ -812,6 +813,46 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         ImGui.treePop();
+    }
+    private void drawDimensionGenerationControls(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Dimension generation and server Studio controls")) return;
+        ImGui.pushID("dimension-generation");
+        ImGui.textWrapped("These settings change generated pack data. Studio layouts run in supported server Studio worlds; they do not enable an editor preview. Existing worlds and native compatibility are not evaluated here.");
+        ImGui.textWrapped("Underground features require useMantle, carvingEnabled, an OVERWORLD mode and the CARVED component. Disabled components remain advanced data. SUPERFLAT has limited generation features. No settings are changed automatically when choosing a mode.");
+        if (ImGui.treeNode("Generation mode")) {
+            ImGui.textWrapped(DimensionGenerationControls.help("mode"));
+            try {
+                var object=DimensionGenerationControls.mode(document);
+                if (object==null) { ImGui.textWrapped("Absent mode uses OVERWORLD. Enabling writes an empty inline object and keeps that default.");if (ImGui.button("Enable inline mode")) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.enableMode(selected,workspace.read(selected)))); }
+                else {
+                    String current=DimensionGenerationControls.modeType(document);ImGui.textWrapped(DimensionGenerationControls.choiceHelp(false,current));
+                    if (ImGui.beginCombo("Mode type",current.length()>128 || current.indexOf(0)>=0 ? "Stored type" : current)) { for (String choice : DimensionGenerationControls.modes()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.setMode(selected,workspace.read(selected),choice)));ImGui.endCombo(); }
+                    if (object.token("type")!=null && ImGui.button("Restore OVERWORLD default (remove type)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.resetModeType(selected,workspace.read(selected))));
+                    for (String field : object.fields()) if (!DimensionGenerationControls.EDITABLE.contains(field)) ImGui.textWrapped("mode."+field+" (read-only, preserved)");
+                }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored mode is null, a snippet/non-object, or has a non-string type (read-only)."); }
+            ImGui.treePop();
+        }
+        ImGui.textWrapped(DimensionGenerationControls.help("studioMode"));
+        try {
+            String current=DimensionGenerationControls.studioMode(document);ImGui.textWrapped(DimensionGenerationControls.choiceHelp(true,current));
+            if (ImGui.beginCombo("Server Studio mode",current.length()>128 || current.indexOf(0)>=0 ? "Stored Studio mode" : current)) { for (String choice : DimensionGenerationControls.studioModes()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.setStudioMode(selected,workspace.read(selected),choice)));ImGui.endCombo(); }
+            if (document.token("studioMode")!=null && ImGui.button("Restore NORMAL default (remove studioMode)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.resetRoot(selected,workspace.read(selected),"studioMode")));
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored studioMode is not a string (read-only)."); }
+        for (String field : DimensionGenerationControls.BOOLEANS) {
+            ImGui.pushID(field);ImGui.textWrapped(DimensionGenerationControls.help(field));
+            try { boolean current=DimensionGenerationControls.booleanValue(document,field);if (ImGui.checkbox(field+" (native default "+DimensionGenerationControls.defaultToken(field)+")",current)) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.setBoolean(selected,workspace.read(selected),field,!current)));if (document.token(field)!=null && ImGui.button("Restore absent default")) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.resetRoot(selected,workspace.read(selected),field))); }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored toggle is not boolean (read-only)."); }ImGui.popID();
+        }
+        for (String field : DimensionGenerationControls.NUMBERS) {
+            ImGui.pushID(field);ImGui.textWrapped(DimensionGenerationControls.help(field));ImGui.textWrapped(DimensionGenerationControls.constraints(field));String key=DimensionGenerationControls.prefix()+field;
+            try {
+                String current=DimensionGenerationControls.numberValue(document,field);
+                if (document.token(field)==null) { if (ImGui.button("Enable native default "+current)) applyRoutingExtra(() -> workspace.replace(selected,DimensionGenerationControls.enableNumber(selected,workspace.read(selected),field))); }
+                else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(128,current.length()+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionGenerationControls.setNumber(selected,workspace.read(selected),field,input.get())));if (ImGui.button("Restore absent default")) { try { commitProfileChange(key,DimensionGenerationControls.resetRoot(selected,workspace.read(selected),field),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored value is not an exact signed 32-bit integer (read-only)."); }ImGui.popID();
+        }
+        ImGui.popID();
     }
     private void drawTerrainOverlays(LosslessJson document) {
         if (!ImGui.collapsingHeader("Terrain overlay noise")) return;

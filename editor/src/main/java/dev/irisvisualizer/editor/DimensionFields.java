@@ -21,9 +21,11 @@ public final class DimensionFields {
     /** Report unknown root fields and unknown children of the supported object groups. */
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
+        paths.addAll(DimensionGenerationControls.readOnlyPaths(document));
         paths.addAll(DimensionTypeFields.readOnlyPaths(document));
         paths.addAll(DimensionStacks.readOnlyPaths(document));
         for (String field : document.fields()) {
+            if (DimensionGenerationControls.ROOT_FIELDS.contains(field)) continue;
             if (SubterrainFeatures.LIST_FIELDS.contains(field)) continue;
             if (ImageMapBindings.LIST_FIELDS.contains(field)) continue;
             if (TerrainOverlays.LIST_FIELDS.contains(field) || TerrainTransforms.OBJECT_FIELDS.contains(field)) continue;

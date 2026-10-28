@@ -1,10 +1,11 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in eighty-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in eighty-five pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 65 | 59 | 17 |
+| dimension | 82 | 75 | 69 | 7 |
+| dimensionMode | 1 | 1 | 1 | 0 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 40 | 34 | 2 |
@@ -91,7 +92,11 @@ Direct nonstatic/nontransient private fields in eighty-four pinned source classe
 
 ## dimension
 
-Unclassified: `borrowedDimensionType`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `hideOresForHiddenOre`, `importedFeatures`, `importedStructures`, `mode`, `preventLeafDecay`, `structures`, `studioMode`, `treeSettings`, `useMantle`.
+Unclassified: `borrowedDimensionType`, `datapackImports`, `disabledComponents`, `importedFeatures`, `importedStructures`, `structures`, `treeSettings`.
+
+## dimensionMode
+
+Unclassified: none.
 
 ## importedStructures
 

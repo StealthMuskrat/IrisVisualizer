@@ -742,6 +742,18 @@ jobs:
           python editor/tools/extract_subterrain_feature_fields.py IrisDimension.java IrisSubterrainFeature.java IrisSubterrainFamily.java IrisSubterrainFluid.java IrisRange.java SubterrainPlanner.java IrisComplex.java generated-subterrain-feature-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-subterrain-feature-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/subterrain-feature-fields.properties).Hash) { throw 'Pinned underground feature definitions differ' }
+      - name: Verify pinned dimension generation modes and Studio controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionMode.java' -OutFile IrisDimensionMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionModeType.java' -OutFile IrisDimensionModeType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/studio/StudioMode.java' -OutFile StudioMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/mantle/EngineMantle.java' -OutFile EngineMantle.java
+          python editor/tools/test_dimension_generation_fields.py IrisDimension.java IrisDimensionMode.java IrisDimensionModeType.java StudioMode.java EngineMantle.java IrisEngine.java IrisBiomeLayerGenerator.java IrisTerrainNormalActuator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_generation_fields.py IrisDimension.java IrisDimensionMode.java IrisDimensionModeType.java StudioMode.java EngineMantle.java IrisEngine.java IrisBiomeLayerGenerator.java IrisTerrainNormalActuator.java generated-dimension-generation-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-generation-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-generation-fields.properties).Hash) { throw 'Pinned dimension generation definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
