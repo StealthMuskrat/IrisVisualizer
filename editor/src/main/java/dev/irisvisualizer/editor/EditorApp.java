@@ -25,6 +25,7 @@ public final class EditorApp extends Application {
     private String riverCatalogDimension;
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
     private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
+    private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
     private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
     private PackWorkspace referenceWorkspace;
@@ -103,6 +104,7 @@ public final class EditorApp extends Application {
             if (ImGui.beginMenu("File")) {
                 for (String action : new String[]{"New", "Open", "Save", "Import", "Export"})
                     if (ImGui.menuItem(action)) perform(action);
+                if (ImGui.menuItem("New image-map definition")) createResource("image-maps");
                 ImGui.endMenu();
             }
             ImGui.text(workspace.dirty() ? "Unsaved changes" : "Saved / no applied changes");
@@ -215,6 +217,10 @@ public final class EditorApp extends Application {
                 try { drawRegion(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && ImageMapDefinitions.supports(selected)) {
+                try { drawImageMapDefinition(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             drawCoverage();
             if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
@@ -230,13 +236,13 @@ public final class EditorApp extends Application {
     }
     private void drawReferences() {
         String base = ResourceTypes.base(selected);
-        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes").contains(base)
+        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps").contains(base)
                 || !ImGui.collapsingHeader("Resource links (partial)")) return;
         if (referenceWorkspace != workspace || referenceRevision != workspace.revision() || !java.util.Objects.equals(referencePath, selected)) {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks a bounded subset of dimension selectors/stacks/carving biomes/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks exact image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -637,6 +643,87 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
             for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !ResourceSelectors.BIOME_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawImageMapDefinition(LosslessJson document) {
+        ImGui.textWrapped("Image-map definition authoring. File choices check exact in-pack lowercase .png paths only. PNG format, color mode/bit depth, dimensions, coordinate transforms, legend targets, binding compatibility and native compilation/output are unvalidated. Map sampling and generation previews remain disabled.");
+        for (String finding : ImageMapDefinitions.findings(document)) ImGui.textWrapped("Applied authored-data check: "+finding+" (does not block Save/Export)");
+        try {
+            String source=ImageMapDefinitions.text(document,"source");var choices=imageMapSources.choices(workspace);
+            if (!source.isEmpty() && !choices.contains(source)) ImGui.textWrapped("Stored source has no exact lowercase .png file match; native loader aliases are unchecked.");
+            if (ImGui.beginCombo("PNG source",source.isEmpty() ? "Choose an existing PNG file" : source.length()>128 || source.indexOf(0)>=0 ? "Stored source" : source)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(source))) applyRoutingExtra(() -> workspace.replace(selected,ImageMapDefinitions.setSource(selected,workspace.read(selected),choice,workspace)));ImGui.endCombo(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored source is not a string (read-only)."); }
+        for (String field : ImageMapDefinitions.ENUMS) {
+            ImGui.pushID("imageMap.choice."+field);ImGui.textWrapped(ImageMapDefinitions.help(field));
+            try { String current=ImageMapDefinitions.choice(document,field);if (ImGui.beginCombo(field,current.length()>128 || current.indexOf(0)>=0 ? "Stored enum value" : current)) { for (String choice : ImageMapDefinitions.choices(field)) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,ImageMapDefinitions.setChoice(selected,workspace.read(selected),field,choice)));ImGui.endCombo(); } }
+            catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored enum has an unsupported type (read-only)."); }ImGui.popID();
+        }
+        ImGui.textWrapped("Settings apply independently. Applied-data notices describe known cross-field constraints; changing type does not clear legends, smoothing, alpha or fallback settings.");
+        for (String field : ImageMapDefinitions.TOGGLES) {
+            String token=document.token(field);if (token==null || token.equals("true") || token.equals("false")) { boolean current=Boolean.parseBoolean(token==null ? ImageMapDefinitions.defaultToken(field) : token);if (ImGui.checkbox(field+" (default "+ImageMapDefinitions.defaultToken(field)+")",current)) applyRoutingExtra(() -> workspace.replace(selected,ImageMapDefinitions.setToggle(selected,workspace.read(selected),field,!current))); }
+            else ImGui.textWrapped(field+": stored type is not boolean (read-only).");
+        }
+        for (String field : ImageMapDefinitions.NUMBERS) if (!List.of("minimumHeight","maximumHeight").contains(field)) {
+            ImGui.pushID("imageMap.number."+field);ImGui.textWrapped(ImageMapDefinitions.help(field));ImGui.textWrapped(ImageMapDefinitions.constraints(field));String token=document.token(field),key=ImageMapDefinitions.prefix()+field;
+            if (token==null) { if (ImGui.button("Enable "+field+" ("+ImageMapDefinitions.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,ImageMapDefinitions.enableScalar(selected,workspace.read(selected),field))); }
+            else if (!ImageMapDefinitions.numericSupported(document,field)) ImGui.textWrapped("Stored number has an unsupported type, width or finite range (read-only).");
+            else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,ImageMapDefinitions.setScalar(selected,workspace.read(selected),field,input.get()))); }ImGui.popID();
+        }
+        if (ImGui.treeNode("Height decoding range")) {
+            ImGui.textWrapped("Finite absolute-world-Y minimum/maximum; equal values are supported. Apply the ordered pair together. Offset/clamp remain independent; decoded output is not evaluated.");
+            try {
+                String low=ImageMapDefinitions.height(document,"minimumHeight"),high=ImageMapDefinitions.height(document,"maximumHeight"),prefix=ImageMapDefinitions.prefix()+"height.",key=prefix+"pair";
+                ImString min=values.computeIfAbsent(prefix+"min",ignored -> new ImString(low,Math.max(128,low.length()+1))),max=values.computeIfAbsent(prefix+"max",ignored -> new ImString(high,Math.max(128,high.length()+1)));
+                ImGui.inputText("Minimum absolute height",min);ImGui.inputText("Maximum absolute height",max);drafts.update(key,TerrainTransforms.draftPair(low,high),TerrainTransforms.draftPair(min.get(),max.get()));
+                if (ImGui.button("Apply height pair")) { try { commitProfileChange(prefix,ImageMapDefinitions.setHeights(selected,workspace.read(selected),min.get(),max.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored height pair has unsupported values (read-only)."); }ImGui.treePop();
+        }
+        for (String field : ImageMapDefinitions.ORIGINS) drawImageMapOrigin(document,field);
+        try {
+            String current=ImageMapDefinitions.text(document,"fallbackTarget"),key=ImageMapDefinitions.prefix()+"fallbackTarget";if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Fallback target (literal string)",input);drafts.update(key,current,input.get());
+            if (ImGui.button("Apply fallback target")) commitRiverOverride(key,() -> workspace.replace(selected,ImageMapDefinitions.setFallbackTarget(selected,workspace.read(selected),input.get())));
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored fallback target is not editable text (read-only)."); }
+        drawImageMapColors(document);
+        if (ImGui.collapsingHeader("Other image-map fields (read-only)")) for (String field : document.fields()) if (!ImageMapDefinitions.EDITABLE.contains(field)) ImGui.textWrapped(field);
+    }
+    private void drawImageMapOrigin(LosslessJson document,String field) {
+        if (!ImGui.treeNode(field+" coordinates")) return;
+        ImGui.textWrapped(ImageMapDefinitions.help(field));ImGui.textWrapped("Finite X/Z pair, with class defaults 0/0. sourceOrigin Z means source-image Y pixels. The editor does not compute transformed coordinates.");
+        String prefix=ImageMapDefinitions.prefix()+field+".",key=prefix+"pair";
+        try {
+            String first=ImageMapDefinitions.coordinate(document,field,"x"),second=ImageMapDefinitions.coordinate(document,field,"z");
+            ImString x=values.computeIfAbsent(prefix+"x",ignored -> new ImString(first,Math.max(128,first.length()+1))),z=values.computeIfAbsent(prefix+"z",ignored -> new ImString(second,Math.max(128,second.length()+1)));
+            ImGui.inputText("X",x);ImGui.inputText("Z / image Y",z);drafts.update(key,TerrainTransforms.draftPair(first,second),TerrainTransforms.draftPair(x.get(),z.get()));
+            if (ImGui.button("Apply coordinate pair")) { try { commitProfileChange(prefix,ImageMapDefinitions.setOrigin(selected,workspace.read(selected),field,x.get(),z.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+            var origin=ImageMapDefinitions.origin(document,field);if (origin!=null) {
+                for (String member : origin.fields()) if (!ImageMapDefinitions.AXES.contains(member)) ImGui.textWrapped(field+"."+member+" (read-only)");
+                ImGui.textWrapped("Remove discards this entire origin object, including advanced data, and restores its absent 0/0 default.");
+                if (ImGui.button("Remove origin override")) { try { commitProfileChange(prefix,ImageMapDefinitions.removeOrigin(selected,workspace.read(selected),field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored origin is null, a snippet or contains unsupported coordinates (read-only)."); }ImGui.treePop();
+    }
+    private void drawImageMapColors(LosslessJson document) {
+        if (!ImGui.treeNode("Color legend")) return;
+        ImGui.textWrapped("Use #RRGGBB keys and nonblank literal targets. Hex letter case is preserved, but duplicate raw RGB colors are rejected ignoring case. Target resources/blocks depend on the binding role and remain unchecked. Native COLOR_MAP requires a legend; a final removal restores absence and is reported until repaired or type changes.");
+        List<LosslessJson.StringProperty> rows;
+        try { rows=ImageMapDefinitions.colors(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored colors is null/mixed/unsupported (read-only).");ImGui.treePop();return; }
+        if (rows==null) { if (ImGui.button("Enable explicit empty legend")) applyRoutingExtra(() -> workspace.replace(selected,ImageMapDefinitions.enableColors(selected,workspace.read(selected))));ImGui.treePop();return; }
+        if (rows.size()>ImageMapDefinitions.MAXIMUM_COLORS) { ImGui.textWrapped("Above the 64-color editor limit (read-only).");ImGui.treePop();return; }
+        String prefix=ImageMapDefinitions.prefix()+"colors#",key=prefix+"new.pair";ImString color=values.computeIfAbsent(prefix+"new.color",ignored -> new ImString("",4096)),target=values.computeIfAbsent(prefix+"new.target",ignored -> new ImString("",16384));
+        ImGui.inputText("New #RRGGBB",color);ImGui.inputText("New target",target);drafts.update(key,TerrainTransforms.draftPair("",""),TerrainTransforms.draftPair(color.get(),target.get()));ImGui.beginDisabled(rows.size()>=ImageMapDefinitions.MAXIMUM_COLORS);boolean add=ImGui.button("Add legend entry");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,ImageMapDefinitions.addColor(selected,workspace.read(selected),color.get(),target.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        for (int index=0;index<rows.size();index++) {
+            var row=rows.get(index);String pair=prefix+index+".pair";ImGui.pushID(index);
+            if (row.key().indexOf(0)>=0 || row.value().indexOf(0)>=0) ImGui.textWrapped("Stored legend entry contains NUL text (text editing read-only).");
+            else {
+                ImString nextColor=values.computeIfAbsent(prefix+index+".color",ignored -> new ImString(row.key(),Math.max(4096,row.key().getBytes(StandardCharsets.UTF_8).length+1))),nextTarget=values.computeIfAbsent(prefix+index+".target",ignored -> new ImString(row.value(),Math.max(16384,row.value().getBytes(StandardCharsets.UTF_8).length+1)));
+                ImGui.inputText("#RRGGBB",nextColor);ImGui.inputText("Literal target",nextTarget);drafts.update(pair,TerrainTransforms.draftPair(row.key(),row.value()),TerrainTransforms.draftPair(nextColor.get(),nextTarget.get()));
+                if (ImGui.button("Apply legend pair")) { try { commitProfileChange(prefix,ImageMapDefinitions.setColor(selected,workspace.read(selected),row.key(),nextColor.get(),nextTarget.get()),pair); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+            }
+            if (ImGui.button("Remove legend entry")) { try { commitProfileChange(prefix,ImageMapDefinitions.removeColor(selected,workspace.read(selected),row.key()),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }ImGui.popID();
+        }
+        ImGui.treePop();
     }
     private void drawImageMapBindings(LosslessJson document) {
         if (!ImGui.collapsingHeader("Dimension image-map bindings")) return;

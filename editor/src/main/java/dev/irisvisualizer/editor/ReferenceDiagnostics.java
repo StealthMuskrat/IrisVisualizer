@@ -15,12 +15,13 @@ public final class ReferenceDiagnostics {
     public record Link(String field, String key, String target, State state) {}
     public static List<Link> inspect(PackWorkspace workspace, String path) {
         String base = ResourceTypes.base(path);
-        if (base == null || !Set.of("dimensions", "regions", "biomes").contains(base)) return List.of();
+        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps").contains(base)) return List.of();
         if (workspace.size(path) > MAX_JSON_BYTES) return List.of(new Link("JSON", "Above 1 MB inspection limit", null, State.UNSUPPORTED));
         Links links = new Links();
         try {
             LosslessJson document = new LosslessJson(workspace.read(path));
             switch (base) {
+                case "image-maps" -> pngSource(workspace,document,links);
                 case "dimensions" -> {
                     list(workspace,document,"regions","regions",true,links);
                     scalar(workspace,document,"focus","biomes","",false,false,links);
@@ -48,11 +49,15 @@ public final class ReferenceDiagnostics {
                 }
                 default -> { }
             }
-            riverBiomes(workspace,path,document,links);
+            if (!base.equals("image-maps")) riverBiomes(workspace,path,document,links);
         } catch (IllegalArgumentException invalid) { links.add(new Link("JSON", "Invalid/ambiguous JSON", null, State.UNSUPPORTED)); }
         List<Link> result=new ArrayList<>(links);
         if (links.truncated) result.add(new Link("References","Inspection truncated at "+MAX_LINKS+" links",null,State.UNSUPPORTED));
         return List.copyOf(result);
+    }
+    private static void pngSource(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+        try { String key=document.stringToken("source");links.add(key==null ? new Link("source","Absent PNG source",null,State.ABSENT_REQUIRED) : link(workspace,"source",key,"images")); }
+        catch (IllegalArgumentException unsupported) { links.add(new Link("source","Non-string PNG source",null,State.UNSUPPORTED)); }
     }
     private static void imageMaps(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("imageMaps")==null) return;
@@ -153,7 +158,7 @@ public final class ReferenceDiagnostics {
     private static Link link(PackWorkspace workspace, String field, String key, String type) {
         if (!ResourceTypes.referenceKey(key))
             return new Link(field, key, null, State.INVALID_KEY);
-        String target = type + "/" + key + (type.equals("objects") ? ".iob" : ".json");
+        String target = type + "/" + key + (type.equals("objects") ? ".iob" : type.equals("images") ? ".png" : ".json");
         if (type.equals("dimensions") && !type.equals(ResourceTypes.base(target))) return new Link(field,key,null,State.INVALID_KEY);
         return new Link(field, key, target, workspace.paths().contains(target) ? State.EXACT_FILE : State.NO_EXACT_FILE);
     }

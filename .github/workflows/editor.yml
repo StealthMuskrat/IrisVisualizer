@@ -713,6 +713,23 @@ jobs:
           python editor/tools/extract_image_map_binding_fields.py IrisDimension.java IrisImageMapBinding.java IrisImageMapMask.java IrisImageMapApplication.java IrisImageMapMaskOperation.java IrisImageMapRuntime.java IrisImageMapMaskSampler.java generated-image-map-binding-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-image-map-binding-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/image-map-binding-fields.properties).Hash) { throw 'Pinned image-map binding definitions differ' }
+      - name: Verify pinned image-map definitions and authored-data compiler rules
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMap.java' -OutFile IrisImageMap.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapOrigin.java' -OutFile IrisImageMapOrigin.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapType.java' -OutFile IrisImageMapType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapRotation.java' -OutFile IrisImageMapRotation.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapSampling.java' -OutFile IrisImageMapSampling.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapOutOfBounds.java' -OutFile IrisImageMapOutOfBounds.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapAlpha.java' -OutFile IrisImageMapAlpha.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapUnknownColor.java' -OutFile IrisImageMapUnknownColor.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/image/IrisImageMapCompiler.java' -OutFile IrisImageMapCompiler.java
+          python editor/tools/test_image_map_definition_fields.py IrisImageMap.java IrisImageMapOrigin.java IrisImageMapType.java IrisImageMapRotation.java IrisImageMapSampling.java IrisImageMapOutOfBounds.java IrisImageMapAlpha.java IrisImageMapUnknownColor.java IrisImageMapCompiler.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_image_map_definition_fields.py IrisImageMap.java IrisImageMapOrigin.java IrisImageMapType.java IrisImageMapRotation.java IrisImageMapSampling.java IrisImageMapOutOfBounds.java IrisImageMapAlpha.java IrisImageMapUnknownColor.java IrisImageMapCompiler.java generated-image-map-definition-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-image-map-definition-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/image-map-definition-fields.properties).Hash) { throw 'Pinned image-map definition fields differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

@@ -1,0 +1,87 @@
+package dev.irisvisualizer.editor;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.*;
+
+final class ImageMapDefinitionTests {
+    private static final String PATH="image-maps/nested/map.json";
+    private static byte[] bytes(String value) { return value.getBytes(StandardCharsets.UTF_8); }
+    private static String text(byte[] value) { return new String(value,StandardCharsets.UTF_8); }
+    private static void check(boolean value) { if (!value) throw new AssertionError("Image-map definition contract failed"); }
+    private static void rejects(Runnable action) { try { action.run(); } catch (IllegalArgumentException expected) { return; }throw new AssertionError("Expected rejected image-map definition operation"); }
+    private interface IoAction { void run() throws Exception; }
+    private static void rejectsIo(IoAction action) throws Exception { try { action.run(); } catch (IOException expected) { return; }throw new AssertionError("Expected rejected image-map resource operation"); }
+    static void run(Path temp) throws Exception {
+        check(ImageMapDefinitions.EDITABLE.size()==25 && ImageMapDefinitions.AXES.equals(List.of("x","z")) && ImageMapDefinitions.NUMBERS.size()==10);
+        var pack=PackWorkspace.newPack(Map.of("dimensions/main.json",bytes("{\"regions\":[]}"),"images/nested/source.png",new byte[]{1,2,3},"images/other.png",new byte[]{4,5},"images/uppercase.PNG",new byte[]{6},"images/photo.jpg",new byte[]{7},"objects/opaque.iob",new byte[]{8},"effects/opaque.json",bytes("not parsed")));
+        check(ImageMapDefinitions.sources(pack).equals(List.of("nested/source","other")));check(ResourceTypes.base(PATH).equals("image-maps") && ResourceTypes.fileFamily(PATH).equals("image-maps") && ResourceTypes.folderFamily("image-maps/nested") && ResourceCreation.base("image-maps/nested").equals("image-maps") && ResourceCreation.dependencyType("image-maps").equals("images"));
+        check(ResourceCreation.choices(pack,"image-maps").equals(ImageMapDefinitions.sources(pack)));rejectsIo(() -> pack.createResource("image-maps","missing","missing"));rejectsIo(() -> pack.createResource("image-maps/nested","missing-parent","other"));
+        String created=pack.createResource("image-maps","first","nested/source");check(created.equals("image-maps/first.json") && new LosslessJson(pack.read(created)).fields().equals(Set.of("source")) && new LosslessJson(pack.read(created)).stringToken("source").equals("nested/source"));
+        check(ResourceTypes.referenceKeys(pack,"image-maps").equals(List.of("first")));pack.createSubfolder("image-maps","nested");String nested=pack.createResource("image-maps/nested","map","other");check(nested.equals(PATH));String duplicate=pack.duplicate(nested,"nested/copied");check(duplicate.equals("image-maps/nested/copied.json") && Arrays.equals(pack.read(nested),pack.read(duplicate)));
+        rejectsIo(() -> pack.createResource("image-maps/nested","map","other"));rejectsIo(() -> pack.duplicate(nested,"../bad"));rejectsIo(() -> pack.createResource("image-maps/../bad","x","other"));
+        check(ImageMapDefinitions.supports(PATH) && !ImageMapDefinitions.supports("image-maps/map.JSON") && !ImageMapDefinitions.supports("image-maps/../map.json"));
+        byte[] absent=bytes("{\r\n \"future\":\"雪\\u0061\",\"large\":9223372036854775807\r\n}\r\n");
+        byte[] source=ImageMapDefinitions.setSource(PATH,absent,"nested/source",pack);check(new LosslessJson(source).stringToken("source").equals("nested/source"));
+        for (String invalid : List.of("missing","nested/source.png","uppercase","photo","alias:source","../source")) rejects(() -> ImageMapDefinitions.setSource(PATH,source,invalid,pack));
+        for (String field : ImageMapDefinitions.ENUMS) {
+            check(!ImageMapDefinitions.choices(field).isEmpty() && ImageMapDefinitions.choices(field).contains(ImageMapDefinitions.defaultToken(field)));
+            for (String choice : ImageMapDefinitions.choices(field)) check(new LosslessJson(ImageMapDefinitions.setChoice(PATH,absent,field,choice)).stringToken(field).equals(choice));
+            rejects(() -> ImageMapDefinitions.setChoice(PATH,absent,field,"UNKNOWN"));
+            byte[] unknown=bytes("{\""+field+"\":\"UNKNOWN\"}");ImageMapDefinitions.setChoice(PATH,unknown,field,ImageMapDefinitions.defaultToken(field));
+            for (String invalid : List.of("null","[]","{}","true","1")) rejects(() -> ImageMapDefinitions.setChoice(PATH,bytes("{\""+field+"\":"+invalid+"}"),field,ImageMapDefinitions.defaultToken(field)));
+        }
+        check(ImageMapDefinitions.choices("type").size()==6 && ImageMapDefinitions.choices("rotation").size()==4 && ImageMapDefinitions.choices("sampling").size()==3 && ImageMapDefinitions.choices("outOfBounds").size()==5 && ImageMapDefinitions.choices("alpha").size()==4 && ImageMapDefinitions.choices("unknownColor").size()==3);
+        for (String field : ImageMapDefinitions.TOGGLES) {
+            check(List.of("true","false").contains(ImageMapDefinitions.defaultToken(field)));
+            for (boolean value : List.of(true,false)) check(new LosslessJson(ImageMapDefinitions.setToggle(PATH,absent,field,value)).token(field).equals(Boolean.toString(value)));
+            for (String invalid : List.of("null","[]","{}","1","\"true\"")) rejects(() -> ImageMapDefinitions.setToggle(PATH,bytes("{\""+field+"\":"+invalid+"}"),field,true));
+        }
+        for (String field : ImageMapDefinitions.NUMBERS) if (!List.of("minimumHeight","maximumHeight").contains(field)) {
+            byte[] enabled=ImageMapDefinitions.enableScalar(PATH,absent,field);check(new LosslessJson(enabled).token(field).equals(ImageMapDefinitions.defaultToken(field)));rejects(() -> ImageMapDefinitions.enableScalar(PATH,enabled,field));rejects(() -> ImageMapDefinitions.setScalar(PATH,absent,field,"1"));
+            List<String> valid=switch(field) { case "blocksPerPixel","curveExponent" -> List.of("0.000001","1","1000000");case "smoothingRadius" -> List.of("0","32","3.2e1");case "colorTolerance" -> List.of("0","441.672956");case "verticalOffset" -> List.of("-1000.5","0","1000.5");default -> List.of("0","0.5","1"); };
+            for (String value : valid) ImageMapDefinitions.setScalar(PATH,enabled,field,value);
+            List<String> invalid=switch(field) { case "blocksPerPixel","curveExponent" -> List.of("0","-1","0.0000001");case "smoothingRadius" -> List.of("-1","33","1.000000000000000001","2147483648");case "colorTolerance" -> List.of("-0.1","441.672957");case "verticalOffset" -> List.of("NaN");default -> List.of("-0.1","1.1"); };
+            for (String value : invalid) rejects(() -> ImageMapDefinitions.setScalar(PATH,enabled,field,value));
+            for (String value : List.of("NaN","Infinity","1e999","1e9999999999","")) rejects(() -> ImageMapDefinitions.setScalar(PATH,enabled,field,value));
+            for (String token : List.of("null","[]","{}","true","\"1\"","1e999","1e9999999999")) rejects(() -> ImageMapDefinitions.setScalar(PATH,bytes("{\""+field+"\":"+token+"}"),field,"1"));
+        }
+        rejects(() -> ImageMapDefinitions.setScalar(PATH,bytes("{\"smoothingRadius\":1.000000000000000001}"),"smoothingRadius","1"));
+        ImageMapDefinitions.setScalar(PATH,bytes("{\"smoothingRadius\":40}"),"smoothingRadius","32");ImageMapDefinitions.setScalar(PATH,bytes("{\"fallbackValue\":2}"),"fallbackValue","1");
+        check(ImageMapDefinitions.height(new LosslessJson(absent),"minimumHeight").equals("-64") && ImageMapDefinitions.height(new LosslessJson(absent),"maximumHeight").equals("320"));
+        byte[] heights=ImageMapDefinitions.setHeights(PATH,absent,"-1000.5","1000.5");check(new LosslessJson(heights).token("minimumHeight").equals("-1000.5"));ImageMapDefinitions.setHeights(PATH,absent,"0","0");ImageMapDefinitions.setHeights(PATH,bytes("{\"minimumHeight\":5,\"maximumHeight\":1}"),"-1","1");
+        rejects(() -> ImageMapDefinitions.setHeights(PATH,absent,"1","0"));rejects(() -> ImageMapDefinitions.setHeights(PATH,absent,"NaN","1"));rejects(() -> ImageMapDefinitions.setHeights(PATH,bytes("{\"maximumHeight\":null}"),"0","1"));rejects(() -> ImageMapDefinitions.enableScalar(PATH,absent,"minimumHeight"));
+        for (String field : ImageMapDefinitions.ORIGINS) {
+            check(ImageMapDefinitions.coordinate(new LosslessJson(absent),field,"x").equals("0"));byte[] pair=ImageMapDefinitions.setOrigin(PATH,absent,field,"-0.5","1000.25");check(ImageMapDefinitions.coordinate(new LosslessJson(pair),field,"z").equals("1000.25"));check(Arrays.equals(absent,ImageMapDefinitions.removeOrigin(PATH,pair,field)) && Arrays.equals(absent,ImageMapDefinitions.removeOrigin(PATH,absent,field)));
+            for (String invalid : List.of("null","[]","true","1","\"snippet\"","{\"x\":null}","{\"z\":\"1\"}","{\"x\":1e999}")) rejects(() -> ImageMapDefinitions.setOrigin(PATH,bytes("{\""+field+"\":"+invalid+"}"),field,"0","1"));
+            rejects(() -> ImageMapDefinitions.setOrigin(PATH,absent,field,"Infinity","0"));
+        }
+        String raw="{\r\n \"source\":\"nested/so\\u0075rce\",\"type\":\"GRAYSCALE_HEIGHT\",\"minimumHeight\":-6.4e1,\"maximumHeight\":320,\"origin\":{\"x\":1e2,\"z\":2e2,\"futureCoordinate\":\"雪\\u0061\"},\"colors\":{\"#ff0000\":\"iris:biome\\u0061\"},\"futureRoot\":9223372036854775807\r\n}\r\n";
+        byte[] precise=bytes(raw),copy=precise.clone();check(Arrays.equals(precise,ImageMapDefinitions.setSource(PATH,precise,"nested/source",pack)));check(Arrays.equals(precise,ImageMapDefinitions.setHeights(PATH,precise,"-64","320")));check(Arrays.equals(precise,ImageMapDefinitions.setOrigin(PATH,precise,"origin","100","200")));
+        check(text(ImageMapDefinitions.setOrigin(PATH,precise,"origin","100","300")).equals(raw.replace("\"z\":2e2","\"z\":300")));check(text(ImageMapDefinitions.setHeights(PATH,precise,"-64","400")).equals(raw.replace("\"maximumHeight\":320","\"maximumHeight\":400")));
+        byte[] legend=ImageMapDefinitions.enableColors(PATH,absent);check(ImageMapDefinitions.colors(new LosslessJson(legend)).isEmpty());legend=ImageMapDefinitions.addColor(PATH,legend,"#Ff0000"," iris:biome ");check(ImageMapDefinitions.colors(new LosslessJson(legend)).getFirst().value().equals(" iris:biome "));check(Arrays.equals(absent,ImageMapDefinitions.removeColor(PATH,legend,"#Ff0000")));
+        check(Arrays.equals(precise,ImageMapDefinitions.setColor(PATH,precise,"#ff0000","#ff0000","iris:biomea")));check(text(ImageMapDefinitions.setColor(PATH,precise,"#ff0000","#00FF00","iris:biomea")).equals(raw.replace("\"#ff0000\"","\"#00FF00\"")));
+        byte[] oneColor=ImageMapDefinitions.addColor(PATH,ImageMapDefinitions.enableColors(PATH,absent),"#ffffff","target");rejects(() -> ImageMapDefinitions.addColor(PATH,oneColor,"#FFFFFF","other"));rejects(() -> ImageMapDefinitions.setColor(PATH,oneColor,"missing","#ffffff","other"));
+        byte[] twoColors=ImageMapDefinitions.addColor(PATH,oneColor,"#000000","other");rejects(() -> ImageMapDefinitions.setColor(PATH,twoColors,"#000000","#FFFFFF","other"));
+        for (String invalid : List.of("","ffffff","#fff","#ff000000","#gg0000")) rejects(() -> ImageMapDefinitions.addColor(PATH,oneColor,invalid,"target"));rejects(() -> ImageMapDefinitions.setColor(PATH,oneColor,"#ffffff","#ffffff"," "));
+        for (String invalid : List.of("null","[]","true","1","\"snippet\"","{\"#ffffff\":null}","{\"#ffffff\":1}")) { byte[] wrong=bytes("{\"colors\":"+invalid+"}");rejects(() -> ImageMapDefinitions.enableColors(PATH,wrong));rejects(() -> ImageMapDefinitions.addColor(PATH,wrong,"#000000","target"));rejects(() -> ImageMapDefinitions.setColor(PATH,wrong,"#ffffff","#000000","target"));rejects(() -> ImageMapDefinitions.removeColor(PATH,wrong,"#ffffff")); }
+        var colors=new ArrayList<String>();for (int index=0;index<64;index++) colors.add(String.format("\"#%06x\":\"target\"",index));byte[] maximum=bytes("{\"colors\":{"+String.join(",",colors)+"}}");rejects(() -> ImageMapDefinitions.addColor(PATH,maximum,"#ffffff","target"));check(ImageMapDefinitions.colors(new LosslessJson(ImageMapDefinitions.removeColor(PATH,maximum,"#000000"))).size()==63);
+        colors.add("\"#ffffff\":\"target\"");byte[] oversized=bytes("{\"colors\":{"+String.join(",",colors)+"}}");rejects(() -> ImageMapDefinitions.setColor(PATH,oversized,"#000000","#000000","changed"));rejects(() -> ImageMapDefinitions.removeColor(PATH,oversized,"#000000"));ImageMapDefinitions.setChoice(PATH,oversized,"type","COLOR_MAP");
+        for (String field : List.of("source","fallbackTarget")) for (String invalid : List.of("null","[]","{}","true","1")) { byte[] wrong=bytes("{\""+field+"\":"+invalid+"}");if (field.equals("source")) rejects(() -> ImageMapDefinitions.setSource(PATH,wrong,"other",pack));else rejects(() -> ImageMapDefinitions.setFallbackTarget(PATH,wrong,"target")); }
+        ImageMapDefinitions.setFallbackTarget(PATH,absent,"");ImageMapDefinitions.setFallbackTarget(PATH,absent,"minecraft:stone[prop=value]");
+        byte[] conflicts=bytes("{\"type\":\"COLOR_MAP\",\"sampling\":\"BILINEAR\",\"smoothingRadius\":1,\"colors\":{\"#ffffff\":\"target\",\"#FFFFFF\":\"other\"}}");var findings=ImageMapDefinitions.findings(new LosslessJson(conflicts));check(findings.stream().anyMatch(f -> f.contains("NEAREST")) && findings.stream().anyMatch(f -> f.contains("smoothing")) && findings.stream().anyMatch(f -> f.contains("duplicate")) && findings.stream().anyMatch(f -> f.contains("fallbackTarget")));
+        check(ImageMapDefinitions.findings(new LosslessJson(bytes("{\"type\":\"ALPHA_MASK\",\"alpha\":\"MASK\"}"))).stream().anyMatch(f -> f.contains("IGNORE")));check(ImageMapDefinitions.findings(new LosslessJson(oneColor)).stream().anyMatch(f -> f.contains("require COLOR_MAP")));
+        check(ImageMapDefinitions.findings(new LosslessJson(bytes("{\"type\":\"COLOR_MAP\",\"outOfBounds\":\"ERROR\",\"colors\":{\"#ffffff\":\"target\"}}"))).isEmpty());
+        for (String path : List.of("dimensions/x.json","biomes/x.json","regions/x.json","generators/x.json","image-maps/x.JSON","image-maps/../x.json","x.json")) { rejects(() -> ImageMapDefinitions.setSource(path,absent,"other",pack));rejects(() -> ImageMapDefinitions.setToggle(path,absent,"clamp",true));rejects(() -> ImageMapDefinitions.setOrigin(path,absent,"origin","0","1"));rejects(() -> ImageMapDefinitions.addColor(path,oneColor,"#000000","target")); }
+        var cache=new ImageMapDefinitions.SourceCache();var sourceKeys=cache.choices(pack);pack.replace("images/other.png",new byte[]{9});check(sourceKeys==cache.choices(pack));pack.duplicate("images/other.png","copied");check(sourceKeys!=cache.choices(pack) && cache.choices(pack).contains("copied"));var other=PackWorkspace.newPack(Map.of("images/new.png",new byte[]{1}));check(cache.choices(other).equals(List.of("new")));
+        pack.replace(PATH,source);long revision=pack.revision();var links=ReferenceDiagnostics.inspect(pack,PATH);check(links.size()==1 && links.getFirst().target().equals("images/nested/source.png") && links.getFirst().state()==ReferenceDiagnostics.State.EXACT_FILE && pack.revision()==revision);
+        pack.replace(PATH,bytes("{}"));check(ReferenceDiagnostics.inspect(pack,PATH).getFirst().state()==ReferenceDiagnostics.State.ABSENT_REQUIRED);pack.replace(PATH,bytes("{\"source\":\"../bad\"}"));check(ReferenceDiagnostics.inspect(pack,PATH).getFirst().state()==ReferenceDiagnostics.State.INVALID_KEY);pack.replace(PATH,bytes("{\"source\":null}"));check(ReferenceDiagnostics.inspect(pack,PATH).getFirst().state()==ReferenceDiagnostics.State.UNSUPPORTED);
+        var drafts=new InspectorDrafts();String origin=ImageMapDefinitions.prefix()+"origin.pair",color=ImageMapDefinitions.prefix()+"colors#0.pair",outside="other#zoom";for (String key : List.of(origin,color,outside)) drafts.update(key,"1","2");check(!drafts.transitionUnder(ImageMapDefinitions.prefix(),() -> false,() -> {}) && drafts.count()==3);
+        try { drafts.transitionUnder(ImageMapDefinitions.prefix(),() -> true,() -> { throw new IOException("write failed"); });throw new AssertionError(); } catch (IOException expected) { check(drafts.count()==3); }
+        check(drafts.transitionUnder(ImageMapDefinitions.prefix()+"colors#",() -> true,() -> {}) && drafts.count()==2 && drafts.contains(origin));
+        check(Arrays.equals(precise,copy));pack.replace(PATH,precise);pack.save(temp.resolve("image-map-definitions"));pack.exportZip(temp.resolve("image-map-definitions.zip"));var reopened=PackWorkspace.open(temp.resolve("image-map-definitions"));var imported=PackWorkspace.importZip(temp.resolve("image-map-definitions.zip"));for (String path : pack.paths()) check(Arrays.equals(pack.read(path),reopened.read(path)) && Arrays.equals(pack.read(path),imported.read(path)));
+        check(FieldCoverage.fields("imageMap").size()==25 && FieldCoverage.fields("imageMap").stream().allMatch(FieldCoverage.Field::implemented) && FieldCoverage.fields("imageMapOrigin").size()==2 && FieldCoverage.fields("imageMapOrigin").stream().allMatch(FieldCoverage.Field::implemented) && FieldCoverage.groups(PATH).equals(List.of("imageMap","imageMapOrigin")));
+        System.out.println("PASS: all image-map definition/origin fields and enums, PNG source/catalog/creation/duplication, finite/exact bounds and paired heights/coordinates, literal RGB legends/collisions, advisory native cross-field constraints, raw no-ops, scoped drafts and lossless Save/ZIP without decoding PNGs");
+    }
+}

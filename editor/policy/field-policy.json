@@ -3128,5 +3128,117 @@
       "classification": "generation",
       "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
     }
+  },
+  "imageMap": {
+    "source": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "type": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "blocksPerPixel": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "origin": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "sourceOrigin": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "mirrorX": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "mirrorZ": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "sampling": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "outOfBounds": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "fallbackValue": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "fallbackTarget": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "alpha": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "minimumHeight": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "maximumHeight": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "verticalOffset": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "inverted": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "curveExponent": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "smoothingRadius": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "threshold": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "falloff": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "colorTolerance": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "unknownColor": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    },
+    "colors": {
+      "classification": "generation",
+      "reason": "Typed reusable image-map definition data; native PNG decoding, compilation, sampling, targets and generation are unvalidated."
+    }
+  },
+  "imageMapOrigin": {
+    "x": {
+      "classification": "generation",
+      "reason": "Finite image-map world/source coordinate data; native coordinate transformation is not evaluated."
+    },
+    "z": {
+      "classification": "generation",
+      "reason": "Finite image-map world/source coordinate data; native coordinate transformation is not evaluated."
+    }
   }
 }

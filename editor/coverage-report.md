@@ -1,6 +1,6 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in eighty-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in eighty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
@@ -75,6 +75,8 @@ Direct nonstatic/nontransient private fields in eighty-one pinned source classes
 | customBiome | 15 | 15 | 15 | 0 |
 | customBiomeSpawn | 5 | 5 | 5 | 0 |
 | customBiomeParticle | 2 | 2 | 2 | 0 |
+| imageMap | 25 | 25 | 25 | 0 |
+| imageMapOrigin | 2 | 2 | 2 | 0 |
 | imageMapBinding | 4 | 4 | 4 | 0 |
 | imageMapMask | 5 | 5 | 5 | 0 |
 | shapedStyle | 3 | 3 | 3 | 0 |
@@ -367,6 +369,14 @@ Unclassified: none.
 Unclassified: none.
 
 ## customBiomeParticle
+
+Unclassified: none.
+
+## imageMap
+
+Unclassified: none.
+
+## imageMapOrigin
 
 Unclassified: none.
 
