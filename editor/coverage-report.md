@@ -1,12 +1,16 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in eighty-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in ninety-one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 76 | 70 | 6 |
+| dimension | 82 | 77 | 71 | 5 |
+| nativeStructureAdjustment | 6 | 6 | 6 | 0 |
+| structureStilt | 4 | 4 | 3 | 0 |
+| structureTerrain | 11 | 11 | 10 | 0 |
+| structureYBand | 2 | 2 | 2 | 0 |
 | dimensionMode | 1 | 1 | 1 | 0 |
-| importedStructures | 6 | 5 | 5 | 1 |
+| importedStructures | 6 | 6 | 6 | 0 |
 | importedFeatures | 6 | 6 | 6 | 0 |
 | importedFeatureBiomeRule | 3 | 3 | 3 | 0 |
 | structureSetFrequency | 2 | 2 | 2 | 0 |
@@ -94,7 +98,23 @@ Direct nonstatic/nontransient private fields in eighty-seven pinned source class
 
 ## dimension
 
-Unclassified: `borrowedDimensionType`, `datapackImports`, `disabledComponents`, `importedStructures`, `structures`, `treeSettings`.
+Unclassified: `borrowedDimensionType`, `datapackImports`, `disabledComponents`, `structures`, `treeSettings`.
+
+## nativeStructureAdjustment
+
+Unclassified: none.
+
+## structureStilt
+
+Unclassified: none.
+
+## structureTerrain
+
+Unclassified: none.
+
+## structureYBand
+
+Unclassified: none.
 
 ## dimensionMode
 
@@ -102,7 +122,7 @@ Unclassified: none.
 
 ## importedStructures
 
-Unclassified: `adjustments`.
+Unclassified: none.
 
 ## importedFeatures
 

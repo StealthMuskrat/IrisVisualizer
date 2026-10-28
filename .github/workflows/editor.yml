@@ -766,6 +766,22 @@ jobs:
           python editor/tools/extract_native_generation_filter_fields.py IrisDimension.java IrisImportedFeatureControl.java IrisImportedFeatureBiomeRule.java IrisDecorationStep.java IrisImportedStructureControl.java IrisStructureSetFrequencyOverride.java PackDimensionValidator.java PackValidator.java generated-native-generation-filter-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-native-generation-filter-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/native-generation-filter-fields.properties).Hash) { throw 'Pinned native generation filter definitions differ' }
+      - name: Verify pinned native structure adjustments and terrain controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/IrisVanillaStructureAdjustment.java' -OutFile IrisVanillaStructureAdjustment.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructureStiltSettings.java' -OutFile IrisStructureStiltSettings.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructureTerrain.java' -OutFile IrisStructureTerrain.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructureYBand.java' -OutFile IrisStructureYBand.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/PackStructurePlacementValidator.java' -OutFile PackStructurePlacementValidator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/PackJsonFieldChecks.java' -OutFile PackJsonFieldChecks.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/VolmLib/210705c5ab1321dc74b86b48457fd6d5e0452944/shared/src/main/java/art/arcane/volmlib/util/structure/StructureTerrainMode.java' -OutFile StructureTerrainMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/VolmLib/210705c5ab1321dc74b86b48457fd6d5e0452944/shared/src/main/java/art/arcane/volmlib/util/structure/StructureCarveShape.java' -OutFile StructureCarveShape.java
+          python editor/tools/test_native_structure_adjustment_fields.py IrisDimension.java IrisImportedStructureControl.java IrisVanillaStructureAdjustment.java IrisStructureStiltSettings.java IrisStructureTerrain.java IrisStructureYBand.java PackStructurePlacementValidator.java PackDimensionValidator.java StructureTerrainMode.java StructureCarveShape.java PackJsonFieldChecks.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_native_structure_adjustment_fields.py IrisDimension.java IrisImportedStructureControl.java IrisVanillaStructureAdjustment.java IrisStructureStiltSettings.java IrisStructureTerrain.java IrisStructureYBand.java PackStructurePlacementValidator.java PackDimensionValidator.java StructureTerrainMode.java StructureCarveShape.java PackJsonFieldChecks.java generated-native-structure-adjustment-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-native-structure-adjustment-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/native-structure-adjustment-fields.properties).Hash) { throw 'Pinned native structure adjustment definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
