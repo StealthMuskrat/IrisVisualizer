@@ -979,6 +979,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python editor/tools/audit_read_only_consumers.py . editor/policy/field-policy.json editor/policy/read-only-consumers.json iris.lock.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify pinned structure definition controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructure.java' -OutFile IrisStructure.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawPool.java' -OutFile IrisJigsawPool.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawMode.java' -OutFile IrisJigsawMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawCompatibility.java' -OutFile IrisJigsawCompatibility.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawBranchFailurePolicy.java' -OutFile IrisJigsawBranchFailurePolicy.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/object/ObjectPlaceMode.java' -OutFile ObjectPlaceMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/graph/StructureGraphCompiler.java' -OutFile StructureGraphCompiler.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/StructureAssembler.java' -OutFile StructureAssembler.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/mantle/IrisStructureComponent.java' -OutFile IrisStructureComponent.java
+          python editor/tools/test_structure_definition_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_structure_definition_fields.py . generated-structure-definition-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-structure-definition-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/structure-definition-fields.properties).Hash) { throw 'Pinned structure definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

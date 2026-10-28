@@ -15,13 +15,14 @@ public final class ReferenceDiagnostics {
     public record Link(String field, String key, String target, State state) {}
     public static List<Link> inspect(PackWorkspace workspace, String path) {
         String base = ResourceTypes.base(path);
-        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps").contains(base)) return List.of();
+        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps", "structures").contains(base)) return List.of();
         if (workspace.size(path) > MAX_JSON_BYTES) return List.of(new Link("JSON", "Above 1 MB inspection limit", null, State.UNSUPPORTED));
         Links links = new Links();
         try {
             LosslessJson document = new LosslessJson(workspace.read(path));
             switch (base) {
                 case "image-maps" -> pngSource(workspace,document,links);
+                case "structures" -> structurePool(workspace,document,links);
                 case "dimensions" -> {
                     list(workspace,document,"regions","regions",true,links);
                     scalar(workspace,document,"focus","biomes","",false,false,links);
@@ -50,7 +51,7 @@ public final class ReferenceDiagnostics {
                 }
                 default -> { }
             }
-            if (!base.equals("image-maps")) riverBiomes(workspace,path,document,links);
+            if (Set.of("dimensions","regions","biomes").contains(base)) riverBiomes(workspace,path,document,links);
         } catch (IllegalArgumentException invalid) { links.add(new Link("JSON", "Invalid/ambiguous JSON", null, State.UNSUPPORTED)); }
         List<Link> result=new ArrayList<>(links);
         if (links.truncated) result.add(new Link("References","Inspection truncated at "+MAX_LINKS+" links",null,State.UNSUPPORTED));
@@ -66,6 +67,10 @@ public final class ReferenceDiagnostics {
                 list(workspace,entry,"allowedRegions","regions",false,prefix,links);
             }
         } catch (IllegalArgumentException unsupported) { links.add(new Link("subterrainFeatures","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
+    }
+    private static void structurePool(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+        try { String key=document.stringToken("startPool");links.add(key==null ? new Link("startPool","Absent start pool",null,State.ABSENT_REQUIRED) : link(workspace,"startPool",key,"jigsaw-pools")); }
+        catch (IllegalArgumentException unsupported) { links.add(new Link("startPool","Non-string start pool",null,State.UNSUPPORTED)); }
     }
     private static void pngSource(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         try { String key=document.stringToken("source");links.add(key==null ? new Link("source","Absent PNG source",null,State.ABSENT_REQUIRED) : link(workspace,"source",key,"images")); }
