@@ -861,6 +861,33 @@ jobs:
           python editor/tools/extract_procedural_object_fields.py IrisBiome.java IrisRegion.java IrisProceduralObjects.java IrisProceduralTree.java IrisRuin.java IrisFormation.java IrisCoral.java IrisFungus.java IrisCrystal.java ObjectPlaceMode.java CarvingMode.java MantleObjectComponent.java IrisProceduralPlacement.java generated-procedural-object-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-procedural-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-object-fields.properties).Hash) { throw 'Pinned procedural object definitions differ' }
+      - name: Verify pinned procedural shape contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/ProceduralTreeGenerator.java' -OutFile ProceduralTreeGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/ruin/RuinGenerator.java' -OutFile RuinGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/formation/FormationGenerator.java' -OutFile FormationGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/coral/CoralGenerator.java' -OutFile CoralGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/fungus/FungusGenerator.java' -OutFile FungusGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/crystal/CrystalGenerator.java' -OutFile CrystalGenerator.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeProfile.java' -OutFile IrisTreeProfile.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeFunction.java' -OutFile IrisTreeFunction.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeAzimuthMode.java' -OutFile IrisTreeAzimuthMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisTreeRootStyle.java' -OutFile IrisTreeRootStyle.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/ruin/IrisRuinForm.java' -OutFile IrisRuinForm.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/formation/IrisFormationForm.java' -OutFile IrisFormationForm.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/formation/IrisFormationProfile.java' -OutFile IrisFormationProfile.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/coral/IrisCoralForm.java' -OutFile IrisCoralForm.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/coral/IrisCoralBranchAzimuth.java' -OutFile IrisCoralBranchAzimuth.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/fungus/IrisFungusCapShape.java' -OutFile IrisFungusCapShape.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/crystal/IrisCrystalSurface.java' -OutFile IrisCrystalSurface.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/crystal/IrisCrystalDistribution.java' -OutFile IrisCrystalDistribution.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/crystal/CrystalShardBuilder.java' -OutFile CrystalShardBuilder.java
+          python editor/tools/test_procedural_shape_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_procedural_shape_fields.py . generated-procedural-shape-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-procedural-shape-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-shape-fields.properties).Hash) { throw 'Pinned procedural shape definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

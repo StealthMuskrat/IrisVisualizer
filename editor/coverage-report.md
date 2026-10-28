@@ -5,12 +5,12 @@ Direct nonstatic/nontransient private fields in one hundred and one pinned sourc
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
 | proceduralObjects | 6 | 6 | 6 | 0 |
-| proceduralTree | 61 | 61 | 9 | 0 |
-| proceduralRuin | 30 | 30 | 8 | 0 |
-| proceduralFormation | 50 | 50 | 9 | 0 |
-| proceduralCoral | 37 | 37 | 8 | 0 |
-| proceduralFungus | 39 | 39 | 8 | 0 |
-| proceduralCrystal | 34 | 34 | 8 | 0 |
+| proceduralTree | 61 | 61 | 45 | 0 |
+| proceduralRuin | 30 | 30 | 20 | 0 |
+| proceduralFormation | 50 | 50 | 40 | 0 |
+| proceduralCoral | 37 | 37 | 28 | 0 |
+| proceduralFungus | 39 | 39 | 26 | 0 |
+| proceduralCrystal | 34 | 34 | 22 | 0 |
 | dimension | 82 | 81 | 75 | 1 |
 | structurePlacement | 23 | 23 | 23 | 0 |
 | jigsawConfiguration | 10 | 10 | 10 | 0 |
