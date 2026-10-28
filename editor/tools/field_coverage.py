@@ -153,6 +153,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['proceduralCoral'].update(editable(java_dir, 'ProceduralShapes', 'CORAL_FIELDS'))
     implemented['proceduralFungus'].update(editable(java_dir, 'ProceduralShapes', 'FUNGUS_FIELDS'))
     implemented['proceduralCrystal'].update(editable(java_dir, 'ProceduralShapes', 'CRYSTAL_FIELDS'))
+    for group in ['proceduralTree','proceduralRuin','proceduralFormation','proceduralCoral','proceduralFungus','proceduralCrystal']: implemented[group].update(editable(java_dir, 'ProceduralTransforms', 'OBJECT_FIELDS'))
     implemented['floatingBiome'] = set(editable(java_dir, 'FloatingBiomes'))
     implemented['floatingBiome'].update(editable(java_dir, 'FloatingNoiseStyles'))
     implemented['floatingBiome'].update(editable(java_dir, 'FloatingBottomPalettes'))

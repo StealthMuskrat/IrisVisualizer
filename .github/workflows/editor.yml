@@ -888,6 +888,14 @@ jobs:
           python editor/tools/extract_procedural_shape_fields.py . generated-procedural-shape-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-procedural-shape-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-shape-fields.properties).Hash) { throw 'Pinned procedural shape definitions differ' }
+      - name: Verify pinned procedural transform contracts
+        shell: pwsh
+        run: |
+          python editor/tools/test_procedural_transform_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_procedural_transform_fields.py . generated-procedural-transform-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-procedural-transform-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-transform-fields.properties).Hash) { throw 'Pinned procedural transform definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
