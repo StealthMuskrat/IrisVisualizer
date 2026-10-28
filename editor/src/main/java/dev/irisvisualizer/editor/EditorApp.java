@@ -2025,7 +2025,7 @@ public final class EditorApp extends Application {
     }
     private void drawProceduralObjects(LosslessJson document) {
         if (!ImGui.collapsingHeader("Procedural object collections")) return;ImGui.pushID(ProceduralObjects.prefix());
-        ImGui.textWrapped("Trees, ruins, formations, coral, fungi and crystals use native class defaults. Chance is checked per chunk before density attempts. Variants are pre-baked by Iris; this editor never generates or caches them. Shape, material, palette and nested transform settings stay read-only. Source compatibility, name collisions, memory cost and actual placement are unverified. Unsupported previews remain disabled.");
+        ImGui.textWrapped("Trees, ruins, formations, coral, fungi and crystals use native class defaults. Chance is checked per chunk before density attempts. Variants are pre-baked by Iris; this editor never generates or caches them. Shape controls use pinned native defaults and field bounds. Materials, palettes, canopy/decorator objects and nested transforms stay read-only. Source compatibility, name collisions, memory cost and actual placement are unverified. Unsupported previews remain disabled.");
         ImGui.textWrapped("Removing an entire collection or owner discards all data inside that selected subtree, including advanced fields.");
         try {
             var owner=ProceduralObjects.object(document);
@@ -2050,9 +2050,26 @@ public final class EditorApp extends Application {
                 ImGui.beginDisabled(rows.size()>=ProceduralObjects.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
                 ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==rows.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
                 if (action!=null) { try { commitProfileChange(prefix,ProceduralObjects.change(selected,workspace.read(selected),kind,action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
-                for (String field : ProceduralObjects.fields(kind)) drawProceduralValue(rows.get(index),context,field);ImGui.treePop();
+                for (String field : ProceduralObjects.fields(kind)) drawProceduralValue(rows.get(index),context,field);drawProceduralShapes(rows.get(index),context);ImGui.treePop();
             }ImGui.popID(); }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list is mixed, a snippet or non-object data (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawProceduralShapes(LosslessJson entry,ProceduralObjects.Context context) {
+        if (!ImGui.treeNode("Shape controls")) return;String kind=context.kind();
+        ImGui.textWrapped("Native field bounds only. Iris normalizes the displayed range endpoints when generating; reversed authored ranges retain their order here. Shape interactions, native clamping, material roles, geometry size and baking cost are unverified. No geometry is generated.");
+        for (var pair : ProceduralShapes.pairs(kind)) drawProceduralShapePair(entry,context,pair);
+        for (String field : ProceduralShapes.fields(kind)) if (!ProceduralShapes.paired(kind,field)) drawProceduralValue(entry,context,field);ImGui.treePop();
+    }
+    private void drawProceduralShapePair(LosslessJson entry,ProceduralObjects.Context context,List<String> pair) {
+        String kind=context.kind(),first=pair.get(0),second=pair.get(1),prefix=context.prefix()+"shapeRange#"+first+".",key=prefix+"tuple";ImGui.pushID(prefix);
+        try {
+            String left=ProceduralObjects.value(entry,kind,first),right=ProceduralObjects.value(entry,kind,second);ImGui.textWrapped(ProceduralObjects.help(kind,first));ImGui.textWrapped(ProceduralObjects.help(kind,second));
+            ImGui.textWrapped(first+": "+ProceduralObjects.constraints(kind,first)+(entry.token(first)==null ? " (implicit "+left+")" : " (stored)"));
+            ImGui.textWrapped(second+": "+ProceduralObjects.constraints(kind,second)+(entry.token(second)==null ? " (implicit "+right+")" : " (stored)"));
+            ImString a=values.computeIfAbsent(prefix+first,ignored -> new ImString(left,Math.max(256,left.length()+1))),b=values.computeIfAbsent(prefix+second,ignored -> new ImString(right,Math.max(256,right.length()+1)));ImGui.inputText(first,a);ImGui.inputText(second,b);drafts.update(key,left+"|"+right,a.get()+"|"+b.get());
+            if (ImGui.button("Apply both range endpoints")) { try { commitProfileChange(prefix,ProceduralShapes.setPair(selected,workspace.read(selected),context,first,a.get(),b.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+            if ((entry.token(first)!=null || entry.token(second)!=null) && ImGui.button("Reset both endpoints (remove fields)")) { try { commitProfileChange(prefix,ProceduralShapes.resetPair(selected,workspace.read(selected),context,first),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored shape range has an unsupported type/width (read-only, preserved)."); }ImGui.popID();
     }
     private void drawProceduralValue(LosslessJson entry,ProceduralObjects.Context context,String field) {
         String kind=context.kind(),key=context.prefix()+field;ImGui.pushID(field);ImGui.textWrapped(ProceduralObjects.help(kind,field));
@@ -2060,7 +2077,7 @@ public final class EditorApp extends Application {
             String current=ProceduralObjects.value(entry,kind,field),type=ProceduralObjects.type(kind,field);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");
             ImGui.textWrapped(entry.token(field)==null ? "Implicit native default: "+current : "Explicit stored value");
             if (type.equals("boolean")) { if (ImGui.checkbox(field,Boolean.parseBoolean(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,Boolean.toString(!Boolean.parseBoolean(current)))));if (entry.token(field)==null && ImGui.button("Store native default")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,current))); }
-            else if (!ProceduralObjects.choices(kind,field).isEmpty()) { if (ImGui.beginCombo(field,current.length()>128 ? "Stored option" : current)) { for (String choice : ProceduralObjects.choices(kind,field)) { if (ImGui.selectable(choice,choice.equals(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(ProceduralObjects.choiceHelp(field,choice)); }ImGui.endCombo(); } }
+            else if (!ProceduralObjects.choices(kind,field).isEmpty()) { if (ImGui.beginCombo(field,current.length()>128 ? "Stored option" : current)) { for (String choice : ProceduralObjects.choices(kind,field)) { if (ImGui.selectable(choice,choice.equals(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(ProceduralObjects.choiceHelp(kind,field,choice)); }ImGui.endCombo(); } }
             else { if (!type.equals("String")) ImGui.textWrapped(ProceduralObjects.constraints(kind,field));ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply value")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,input.get()))); }
             if (entry.token(field)!=null && ImGui.button("Reset to native default (remove field)")) { try { commitProfileChange(key,ProceduralObjects.resetLeaf(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored value has an unsupported type/width (read-only, preserved)."); }ImGui.popID();
