@@ -307,6 +307,18 @@
     "importedStructures": {
       "classification": "generation",
       "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    },
+    "borrowedDimensionType": {
+      "classification": "generation",
+      "reason": "Controls platform dimension-type borrowing, dimension-owned datapack sources or serialized disabled generation components. Editing performs no fetching, file access, registry lookup or component discovery."
+    },
+    "datapackImports": {
+      "classification": "generation",
+      "reason": "Controls platform dimension-type borrowing, dimension-owned datapack sources or serialized disabled generation components. Editing performs no fetching, file access, registry lookup or component discovery."
+    },
+    "disabledComponents": {
+      "classification": "generation",
+      "reason": "Controls platform dimension-type borrowing, dimension-owned datapack sources or serialized disabled generation components. Editing performs no fetching, file access, registry lookup or component discovery."
     }
   },
   "biome": {

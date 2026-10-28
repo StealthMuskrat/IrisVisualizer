@@ -177,6 +177,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['dimension'].update(editable(java_dir, 'DimensionGenerationControls', 'ROOT_FIELDS'))
     implemented['dimensionMode'] = set(editable(java_dir, 'DimensionGenerationControls'))
     implemented['dimension'].update(editable(java_dir, 'NativeStructureAdjustments', 'ROOT_FIELDS'))
+    implemented['dimension'].update(editable(java_dir, 'DimensionIntegrations'))
     implemented['nativeStructureAdjustment'] = set(editable(java_dir, 'NativeStructureAdjustments'))
     implemented['structureStilt'] = set(editable(java_dir, 'NativeStructureAdjustments', 'STILT_FIELDS'))
     implemented['structureTerrain'] = set(editable(java_dir, 'NativeStructureAdjustments', 'TERRAIN_FIELDS'))

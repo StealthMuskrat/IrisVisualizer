@@ -4,7 +4,7 @@ Direct nonstatic/nontransient private fields in ninety-one pinned source classes
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 77 | 71 | 5 |
+| dimension | 82 | 80 | 74 | 2 |
 | nativeStructureAdjustment | 6 | 6 | 6 | 0 |
 | structureStilt | 4 | 4 | 3 | 0 |
 | structureTerrain | 11 | 11 | 10 | 0 |
@@ -98,7 +98,7 @@ Direct nonstatic/nontransient private fields in ninety-one pinned source classes
 
 ## dimension
 
-Unclassified: `borrowedDimensionType`, `datapackImports`, `disabledComponents`, `structures`, `treeSettings`.
+Unclassified: `structures`, `treeSettings`.
 
 ## nativeStructureAdjustment
 

@@ -187,6 +187,7 @@ public final class EditorApp extends Application {
                     drawSurfaceLayerFallback(document);
                     drawDimensionHeights(document);
                     drawWorldBoundary(document);
+                    drawDimensionIntegrations(document);
                     drawNativeStructureAdjustments(document);
                     drawNativeGenerationFilters(document);
                     drawDimensionGenerationControls(document);
@@ -816,6 +817,37 @@ public final class EditorApp extends Application {
         }
         ImGui.treePop();
     }
+    private void drawDimensionIntegrations(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Dimension integrations and component controls")) return;ImGui.pushID("dimension-integrations");
+        ImGui.textWrapped("These controls author pack data only. No datapack is fetched, local file opened, registry queried or component discovered. Import ownership, source content, platform support and existing-world compatibility are unverified. Unsupported previews stay disabled.");
+        ImGui.textWrapped(DimensionIntegrations.help("borrowedDimensionType"));
+        ImGui.textWrapped("Borrowing is supported by Fabric/Forge/NeoForge, not Bukkit. The registered type must exist; dimensionHeight.min must equal its min_y and the pack maximum must fit inside its top. Native hotload rejects a changed borrowed key: close and reopen Studio after changing it. Options/fullbright are preserved even when borrowing makes them ineffective.");
+        String prefix=DimensionIntegrations.prefix("borrowedDimensionType"),key=prefix+"value";
+        try { String stored=DimensionIntegrations.borrowed(document),current=stored==null ? "" : stored;if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Borrowed type (empty means generated)",input);drafts.update(key,current,input.get());if (ImGui.button("Apply borrowed type key")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionIntegrations.setBorrowed(selected,workspace.read(selected),input.get())));if (document.token("borrowedDimensionType")!=null && ImGui.button("Restore generated type (remove borrowed key)")) { try { commitProfileChange(prefix,DimensionIntegrations.resetBorrowed(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored borrowedDimensionType is non-string or contains NUL (text read-only)."); }
+        for (String field : DimensionIntegrations.LIST_FIELDS) drawDimensionIntegrationList(document,field);ImGui.popID();
+    }
+    private void drawDimensionIntegrationList(LosslessJson document,String field) {
+        if (!ImGui.treeNode(field)) return;ImGui.pushID(field);String prefix=DimensionIntegrations.prefix(field);ImGui.textWrapped(DimensionIntegrations.help(field));boolean components=field.equals("disabledComponents");
+        ImGui.textWrapped(components ? "The choices are serializable reserved flags, not a list of active components. Custom flags use canonical CUSTOM:64..255. Availability/effect are unverified. CARVED also suppresses native river hydrology and gates underground features; Iris may disable flags for other reasons. No other settings are changed automatically." : "Enter an absolute HTTP(S) URL with a URI host, or an absolute local file URI without authority/query/fragment. Only syntax is checked, with no path normalization, download, archive inspection or file access. The server trims/deduplicates sources and normalizes local paths. Removing configured sources does not disable local ZIPs discovered under Iris/datapacks/imports.");
+        List<String> entries;
+        try { entries=DimensionIntegrations.entries(document,field); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list is null/mixed/non-string (read-only).");ImGui.popID();ImGui.treePop();return; }
+        if (entries!=null && entries.size()>DimensionIntegrations.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-entry editor limit (read-only).");ImGui.popID();ImGui.treePop();return; }
+        if (document.token(field)!=null && document.token(field).equals("null")) ImGui.textWrapped("Explicit null has no configured sources; Add converts it into a string list.");
+        String newKey=prefix+"new";ImString next=values.computeIfAbsent(newKey,ignored -> new ImString("",16384));ImGui.inputText(components ? "New reserved flag or CUSTOM:ordinal" : "New source URI",next);
+        if (components && ImGui.beginCombo("Choose reserved flag",next.get().length()>128 || next.get().indexOf(0)>=0 ? "Entered flag" : next.get().isEmpty() ? "Choose flag" : next.get())) { for (String flag : DimensionIntegrations.flags()) if (ImGui.selectable(flag,flag.equals(next.get()))) next.set(flag);ImGui.endCombo(); }drafts.update(newKey,"",next.get());
+        ImGui.beginDisabled(next.get().isEmpty() || entries!=null && entries.size()>=DimensionIntegrations.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add integration entry");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,DimensionIntegrations.change(selected,workspace.read(selected),field,RiverProfiles.Action.ADD,-1,next.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+        if (document.token(field)!=null && ImGui.button("Remove entire configured list")) { try { commitProfileChange(prefix,DimensionIntegrations.resetList(selected,workspace.read(selected),field),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+        if (entries!=null) for (int index=0;index<entries.size();index++) {
+            int row=index;String current=entries.get(index),key=prefix+index;ImGui.pushID(index);
+            if (current.indexOf(0)>=0) ImGui.textWrapped("Stored entry contains NUL (text read-only; structural removal is available).");
+            else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(components ? "Serialized flag" : "Datapack source",input);drafts.update(key,current,input.get());if (ImGui.button("Apply entry")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionIntegrations.setEntry(selected,workspace.read(selected),field,row,input.get()))); }
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==entries.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+            if (action!=null) { try { commitProfileChange(prefix,DimensionIntegrations.change(selected,workspace.read(selected),field,action,index,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.popID();ImGui.treePop();return; }ImGui.popID();
+        }ImGui.popID();ImGui.treePop();
+    }
     private void drawNativeStructureAdjustments(LosslessJson document) {
         if (!ImGui.collapsingHeader("Native structure adjustments")) return;ImGui.pushID("native-adjustments");
         ImGui.textWrapped("These adjustments apply to native structures that still generate, including mod/datapack structures. Match keys are syntax-only registry families, not Iris file references. New empty adjustments match nothing. No placement, terrain operation, world-height compatibility or preview is evaluated here.");
@@ -941,7 +973,7 @@ public final class EditorApp extends Application {
         if (!ImGui.collapsingHeader("Dimension generation and server Studio controls")) return;
         ImGui.pushID("dimension-generation");
         ImGui.textWrapped("These settings change generated pack data. Studio layouts run in supported server Studio worlds; they do not enable an editor preview. Existing worlds and native compatibility are not evaluated here.");
-        ImGui.textWrapped("Underground features require useMantle, carvingEnabled, an OVERWORLD mode and the CARVED component. Disabled components remain advanced data. SUPERFLAT has limited generation features. No settings are changed automatically when choosing a mode.");
+        ImGui.textWrapped("Underground features require useMantle, carvingEnabled, an OVERWORLD mode and the CARVED component. Disabled components are authored in the dimension integration controls; active components are unverified. SUPERFLAT has limited generation features. No settings are changed automatically when choosing a mode.");
         if (ImGui.treeNode("Generation mode")) {
             ImGui.textWrapped(DimensionGenerationControls.help("mode"));
             try {
@@ -3056,7 +3088,7 @@ public final class EditorApp extends Application {
         if (!ImGui.collapsingHeader("Environment and dimension type")) return;
         ImGui.pushID("dimensionType");
         ImGui.textWrapped("These settings author the generated dimension type. Inherit follows the base environment; effective values depend on the target platform/version. Registry, generated datapack and existing-world compatibility are unvalidated. Iris can refuse hotloads that change environment or the generated type; close and reopen Studio after such changes.");
-        ImGui.textWrapped("A borrowed dimension type can override dimensionOptions and fullbright on supported modded platforms. borrowedDimensionType remains read-only here. No live world is modified.");
+        ImGui.textWrapped("The borrowed dimension type is authored in the dimension integration controls. On supported modded platforms it overrides dimensionOptions and fullbright; those values remain preserved here. No live world is modified.");
         ImGui.textWrapped(DimensionTypeFields.help("environment"));String environmentToken=document.token("environment");
         if (environmentToken==null) {
             if (ImGui.button("Enable environment (NORMAL)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.enableRoot(selected,workspace.read(selected),"environment")));
