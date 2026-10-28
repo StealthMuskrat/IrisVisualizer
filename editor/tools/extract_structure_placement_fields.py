@@ -50,7 +50,7 @@ def extract(*sources):
             '"spacing", 1, 4096, blockingErrors','"separation", 0, Integer.MAX_VALUE, blockingErrors','"minHeight", Integer.MIN_VALUE, Integer.MAX_VALUE, blockingErrors')
     require(x,'if (iris == nativeStructure)', 'placement.getAnchor() != IrisStructureAnchorMode.LEGACY', 'totalWeight = Math.addExact(totalWeight, source.getWeight());','if (totalWeight > Integer.MAX_VALUE)')
     require(k,'STRUCTURES_FOLDER = "structures";', 'STRUCTURE_HOST_FOLDERS = List.of(DIMENSIONS_FOLDER, "regions", "biomes");')
-    values.update({'backend.policy':'exactlyOneBackend','identity.policy':'explicitNewIdLocalUniqueness','advanced.policy':'jigsawReadOnly','registry.policy':'unverified'})
+    values.update({'backend.policy':'exactlyOneBackend','identity.policy':'explicitNewIdLocalUniqueness','advanced.policy':'separateJigsawControls','registry.policy':'unverified'})
     return ''.join(key+'='+json.dumps(value,ensure_ascii=True)[1:-1]+'\n' for key,value in values.items()).encode('ascii')
 
 if __name__=='__main__':Path(sys.argv[12]).write_bytes(extract(*(Path(path).read_bytes() for path in sys.argv[1:12])))

@@ -3653,8 +3653,50 @@
       "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
     },
     "jigsaw": {
-      "classification": "read-only",
-      "reason": "Advanced native jigsaw overrides are preserved without live registry/pool/processor or assembly validation."
+      "classification": "generation",
+      "reason": "Optional native jigsaw overrides preserve the registered source definition when omitted."
+    }
+  },
+  "jigsawConfiguration": {
+    "startPool": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "startJigsawName": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "maxDepth": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "maxDistanceHorizontal": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "maxDistanceVertical": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "useExpansionHack": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "projectStartToHeightmap": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "dimensionPaddingBottom": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "dimensionPaddingTop": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    },
+    "liquidSettings": {
+      "classification": "generation",
+      "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
     }
   }
 }
