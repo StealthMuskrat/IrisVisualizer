@@ -489,6 +489,10 @@
     "structures": {
       "classification": "generation",
       "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "proceduralObjects": {
+      "classification": "generation",
+      "reason": "Procedural collections supply in-memory objects to the native terrain object pass."
     }
   },
   "generator": {
@@ -661,6 +665,10 @@
     "structures": {
       "classification": "generation",
       "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "proceduralObjects": {
+      "classification": "generation",
+      "reason": "Procedural collections supply in-memory objects to the native terrain object pass."
     }
   },
   "importedStructures": {
@@ -3697,6 +3705,1048 @@
     "liquidSettings": {
       "classification": "generation",
       "reason": "Controls native jigsaw assembly override data; execution and registry compatibility are unverified."
+    }
+  },
+  "proceduralObjects": {
+    "trees": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "ruins": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "formations": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "coral": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "fungi": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "crystals": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    }
+  },
+  "proceduralTree": {
+    "name": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "variants": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "plausible": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "carvingSupport": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "translate": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stiltSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "vacuumSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "trunk": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "trunkPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "leaves": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "leavesPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "profile": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "trunkWidth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "trunkShape": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapeStart": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapeEnd": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapeSteepness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapeBase": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapePeriod": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapeAmplitude": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapePeakOffset": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shapeFloor": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "leanAzimuth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "leanAngle": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "trunkCurve": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "curveSteepness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "leanAzimuthMode": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthStart": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthEnd": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthTurns": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthAmplitude": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthPeriod": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthOffset": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthScale": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "azimuthWhorlCount": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "secondaryLeaves": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "secondaryLeafFraction": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "weightedSecondaryLeaves": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "secondaryLeavesPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "secondaryTrunk": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "secondaryTrunkPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "secondaryTrunkStart": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "secondaryTrunkEnd": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "roots": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rootStyle": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rootDepth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rootFlare": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "trunkForks": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "forkHeight": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "forkAngle": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "canopy": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "decorators": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    }
+  },
+  "proceduralRuin": {
+    "name": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "variants": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "carvingSupport": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "translate": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stiltSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "vacuumSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "block": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "blockPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "form": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "widthMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "widthMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "lengthMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "lengthMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "weatheringPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "weatheredBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "mossiness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "weatheringScale": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "erosion": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "erosionScale": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "buriedFraction": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "accents": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    }
+  },
+  "proceduralFormation": {
+    "name": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "variants": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "carvingSupport": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "surfaceSupportBuffer": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "translate": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stiltSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "vacuumSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "form": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "block": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "blockPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "strataPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "strataThickness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "baseWidthMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "baseWidthMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "topWidth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "profile": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "profileWaist": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "profileWaistFloor": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "lean": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "leanAzimuth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "roughness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "jitter": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "hoodooCapRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "hoodooCapHeight": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "archSpan": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "archThickness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "archAsymmetry": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "basaltColumns": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "basaltColumnRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "basaltHeightVariance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "icebergPeaks": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "fractureCount": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "fractureSeparation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spiralTurns": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spiralRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spiralThickness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "overhangReach": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "overhangDrop": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "roomHeightFraction": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    }
+  },
+  "proceduralCoral": {
+    "name": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "variants": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "carvingSupport": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "translate": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stiltSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "vacuumSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "waterlogged": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "form": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "block": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "blockPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tipBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tipPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tipChance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "heightMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spread": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "sway": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "branchCount": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "branchLength": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "branchElevation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "branchAzimuth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "subBranches": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "subBranchCount": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "subBranchScale": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tipClusterRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "brainRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "brainRoughness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "pillarRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "fanWidth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tendrilCount": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    }
+  },
+  "proceduralFungus": {
+    "name": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "variants": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "carvingSupport": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "translate": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stiltSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "vacuumSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stem": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "cap": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemHeightMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemHeightMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemWidth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemCurve": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemLeanAzimuth": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemWaveAmplitude": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stemWavePeriods": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capShape": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capRadiusMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capRadiusMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capThickness": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capSquish": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capDroop": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "capOverhang": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "gillBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "gillPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "gillChance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spotBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spotPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spotChance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shelf": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shelfRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    }
+  },
+  "proceduralCrystal": {
+    "name": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "variants": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "seed": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "mode": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "rotation": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "clamp": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "carvingSupport": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "translate": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "stiltSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "vacuumSettings": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "growthSurface": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "block": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "blockPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tipBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tipPalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "tipChance": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "glow": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "glowBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "baseBlock": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "basePalette": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "baseRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "baseNoise": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shardCountMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shardCountMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shardLengthMin": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shardLengthMax": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shardBaseRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "shardTaper": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "spreadAngle": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "distribution": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
+    },
+    "jitter": {
+      "classification": "generation",
+      "reason": "Controls native procedural geometry, materials, deterministic variants or placement. Unimplemented nested/shape controls remain read-only."
     }
   }
 }

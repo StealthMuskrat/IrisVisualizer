@@ -1,9 +1,16 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in ninety-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in one hundred and one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
+| proceduralObjects | 6 | 6 | 6 | 0 |
+| proceduralTree | 61 | 61 | 9 | 0 |
+| proceduralRuin | 30 | 30 | 8 | 0 |
+| proceduralFormation | 50 | 50 | 9 | 0 |
+| proceduralCoral | 37 | 37 | 8 | 0 |
+| proceduralFungus | 39 | 39 | 8 | 0 |
+| proceduralCrystal | 34 | 34 | 8 | 0 |
 | dimension | 82 | 81 | 75 | 1 |
 | structurePlacement | 23 | 23 | 23 | 0 |
 | jigsawConfiguration | 10 | 10 | 10 | 0 |
@@ -17,11 +24,11 @@ Direct nonstatic/nontransient private fields in ninety-four pinned source classe
 | importedFeatures | 6 | 6 | 6 | 0 |
 | importedFeatureBiomeRule | 3 | 3 | 3 | 0 |
 | structureSetFrequency | 2 | 2 | 2 | 0 |
-| biome | 42 | 41 | 35 | 1 |
+| biome | 42 | 42 | 36 | 0 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
-| region | 27 | 26 | 20 | 1 |
+| region | 27 | 27 | 21 | 0 |
 | noise | 15 | 15 | 15 | 0 |
 | noiseStyle | 10 | 10 | 10 | 0 |
 | terrain3D | 14 | 14 | 14 | 0 |
@@ -99,6 +106,34 @@ Direct nonstatic/nontransient private fields in ninety-four pinned source classe
 | worldBoundary | 5 | 5 | 5 | 0 |
 | worldBoundaryCenter | 2 | 2 | 2 | 0 |
 
+## proceduralObjects
+
+Unclassified: none.
+
+## proceduralTree
+
+Unclassified: none.
+
+## proceduralRuin
+
+Unclassified: none.
+
+## proceduralFormation
+
+Unclassified: none.
+
+## proceduralCoral
+
+Unclassified: none.
+
+## proceduralFungus
+
+Unclassified: none.
+
+## proceduralCrystal
+
+Unclassified: none.
+
 ## dimension
 
 Unclassified: `treeSettings`.
@@ -153,7 +188,7 @@ Unclassified: none.
 
 ## biome
 
-Unclassified: `proceduralObjects`.
+Unclassified: none.
 
 ## biomeGeneratorLink
 
@@ -169,7 +204,7 @@ Unclassified: none.
 
 ## region
 
-Unclassified: `proceduralObjects`.
+Unclassified: none.
 
 ## noise
 

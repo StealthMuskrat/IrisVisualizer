@@ -311,6 +311,7 @@ public final class EditorApp extends Application {
         drawCaveProfile(document);
         drawRiverPolicy(document);
         drawRootObjects(document,FloatingObjectPlacements.REGION_ROOT);
+        drawProceduralObjects(document);
         drawDepositVariants(document,"regions");
         drawDeposits(document,"regions");
         drawOres(document,"regions");
@@ -630,6 +631,7 @@ public final class EditorApp extends Application {
         drawBiomeDecorators(document);
         drawBiomeSlabWall(document);
         drawRootObjects(document,FloatingObjectPlacements.BIOME_ROOT);
+        drawProceduralObjects(document);
         drawDepositVariants(document,"biomes");
         drawBiomeOreHosts(document);
         drawDeposits(document,"biomes");
@@ -650,7 +652,7 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !ResourceSelectors.BIOME_FIELDS.contains(field) && !StructurePlacements.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !ProceduralObjects.OBJECT_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !ResourceSelectors.BIOME_FIELDS.contains(field) && !StructurePlacements.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
     }
     private void drawImageMapDefinition(LosslessJson document) {
         ImGui.textWrapped("Image-map definition authoring. File choices check exact in-pack lowercase .png paths only. PNG format, color mode/bit depth, dimensions, coordinate transforms, legend targets, binding compatibility and native compilation/output are unvalidated. Map sampling and generation previews remain disabled.");
@@ -2020,6 +2022,48 @@ public final class EditorApp extends Application {
         ImGui.inputText(min==null ? "Minimum (class default)" : "Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());ImGui.inputText(max==null ? "Maximum (class default)" : "Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
         if (ImGui.button("Apply height band")) { try { workspace.replace(selected,OreGenerators.setRange(selected,workspace.read(selected),context,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
         for (String field : range.fields()) if (!List.of("min","max").contains(field)) ImGui.textWrapped(field+" (read-only)");
+    }
+    private void drawProceduralObjects(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Procedural object collections")) return;ImGui.pushID(ProceduralObjects.prefix());
+        ImGui.textWrapped("Trees, ruins, formations, coral, fungi and crystals use native class defaults. Chance is checked per chunk before density attempts. Variants are pre-baked by Iris; this editor never generates or caches them. Shape, material, palette and nested transform settings stay read-only. Source compatibility, name collisions, memory cost and actual placement are unverified. Unsupported previews remain disabled.");
+        ImGui.textWrapped("Removing an entire collection or owner discards all data inside that selected subtree, including advanced fields.");
+        try {
+            var owner=ProceduralObjects.object(document);
+            if (owner==null) { ImGui.textWrapped("Absent or null proceduralObjects has no configured procedural placements.");if (ImGui.button("Enable inline procedural collections")) { try { commitProfileChange(ProceduralObjects.prefix(),ProceduralObjects.enable(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+            else {
+                if (ImGui.button("Remove entire procedural owner")) { try { commitProfileChange(ProceduralObjects.prefix(),ProceduralObjects.reset(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+                for (String kind : ProceduralObjects.LIST_FIELDS) if (ImGui.treeNode(kind)) { drawProceduralList(document,kind);ImGui.treePop(); }
+                for (String path : ProceduralObjects.readOnlyPaths(document)) ImGui.textWrapped(path+" (read-only, preserved)");
+            }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored proceduralObjects is not an inline object (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawProceduralList(LosslessJson document,String kind) {
+        String prefix=ProceduralObjects.listPrefix(kind);ImGui.pushID(prefix);ImGui.textWrapped(ProceduralObjects.help(kind,null));
+        try {
+            var rows=ProceduralObjects.entries(document,kind);if (rows!=null && rows.size()>ProceduralObjects.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-entry editor limit (read-only).");ImGui.popID();return; }
+            if (rows==null) ImGui.textWrapped("Absent/null list is empty. Add stores one empty object using native class defaults.");
+            ImGui.beginDisabled(rows!=null && rows.size()>=ProceduralObjects.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add placement with native defaults");ImGui.endDisabled();
+            if (add) { try { commitProfileChange(prefix,ProceduralObjects.change(selected,workspace.read(selected),kind,RiverProfiles.Action.ADD,-1),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+            if (ProceduralObjects.object(document).token(kind)!=null && ImGui.button("Remove entire configured collection")) { try { commitProfileChange(prefix,ProceduralObjects.resetList(selected,workspace.read(selected),kind),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+            if (rows!=null) for (int index=0;index<rows.size();index++) { ImGui.pushID(index);if (ImGui.treeNode("Placement "+index)) {
+                var context=new ProceduralObjects.Context(ResourceTypes.base(selected),kind,index);RiverProfiles.Action action=null;
+                ImGui.beginDisabled(rows.size()>=ProceduralObjects.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+                ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==rows.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+                if (action!=null) { try { commitProfileChange(prefix,ProceduralObjects.change(selected,workspace.read(selected),kind,action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
+                for (String field : ProceduralObjects.fields(kind)) drawProceduralValue(rows.get(index),context,field);ImGui.treePop();
+            }ImGui.popID(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list is mixed, a snippet or non-object data (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawProceduralValue(LosslessJson entry,ProceduralObjects.Context context,String field) {
+        String kind=context.kind(),key=context.prefix()+field;ImGui.pushID(field);ImGui.textWrapped(ProceduralObjects.help(kind,field));
+        try {
+            String current=ProceduralObjects.value(entry,kind,field),type=ProceduralObjects.type(kind,field);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");
+            ImGui.textWrapped(entry.token(field)==null ? "Implicit native default: "+current : "Explicit stored value");
+            if (type.equals("boolean")) { if (ImGui.checkbox(field,Boolean.parseBoolean(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,Boolean.toString(!Boolean.parseBoolean(current)))));if (entry.token(field)==null && ImGui.button("Store native default")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,current))); }
+            else if (!ProceduralObjects.choices(kind,field).isEmpty()) { if (ImGui.beginCombo(field,current.length()>128 ? "Stored option" : current)) { for (String choice : ProceduralObjects.choices(kind,field)) { if (ImGui.selectable(choice,choice.equals(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(ProceduralObjects.choiceHelp(field,choice)); }ImGui.endCombo(); } }
+            else { if (!type.equals("String")) ImGui.textWrapped(ProceduralObjects.constraints(kind,field));ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply value")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralObjects.set(selected,workspace.read(selected),context,field,input.get()))); }
+            if (entry.token(field)!=null && ImGui.button("Reset to native default (remove field)")) { try { commitProfileChange(key,ProceduralObjects.resetLeaf(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored value has an unsupported type/width (read-only, preserved)."); }ImGui.popID();
     }
     private void drawRootObjects(LosslessJson document,int owner) {
         if (!ImGui.collapsingHeader(owner==FloatingObjectPlacements.REGION_ROOT ? "Region object placements" : "Biome object placements")) return;
