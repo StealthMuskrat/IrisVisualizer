@@ -1,16 +1,19 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in one hundred and five pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in one hundred and eight pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
 | proceduralObjects | 6 | 6 | 6 | 0 |
-| proceduralTree | 61 | 61 | 59 | 0 |
+| proceduralTree | 61 | 61 | 61 | 0 |
+| treeDecorator | 6 | 6 | 6 | 0 |
+| treeSecondaryLeaf | 2 | 2 | 2 | 0 |
+| ruinDecorator | 5 | 5 | 5 | 0 |
 | treeCanopy | 8 | 8 | 8 | 0 |
 | treeLayer | 2 | 2 | 2 | 0 |
 | treeBranches | 27 | 27 | 27 | 0 |
 | treeSubBranches | 8 | 8 | 8 | 0 |
-| proceduralRuin | 30 | 30 | 29 | 0 |
+| proceduralRuin | 30 | 30 | 30 | 0 |
 | proceduralFormation | 50 | 50 | 50 | 0 |
 | proceduralCoral | 37 | 37 | 37 | 0 |
 | proceduralFungus | 39 | 39 | 39 | 0 |
@@ -115,6 +118,18 @@ Direct nonstatic/nontransient private fields in one hundred and five pinned sour
 Unclassified: none.
 
 ## proceduralTree
+
+Unclassified: none.
+
+## treeDecorator
+
+Unclassified: none.
+
+## treeSecondaryLeaf
+
+Unclassified: none.
+
+## ruinDecorator
 
 Unclassified: none.
 

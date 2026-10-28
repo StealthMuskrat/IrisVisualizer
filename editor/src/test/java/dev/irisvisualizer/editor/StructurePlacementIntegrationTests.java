@@ -19,7 +19,7 @@ final class StructurePlacementIntegrationTests {
     private static void check(boolean value) { if (!value) throw new AssertionError("Placement integration contract failed"); }
     private static void rejects(Runnable action) { try { action.run(); } catch (IllegalArgumentException expected) { return; }throw new AssertionError("Expected rejected placement integration operation"); }
     static void run(Path temp) throws Exception {
-        check(NoiseStyleSourceTests.cases().size()==161);
+        check(NoiseStyleSourceTests.cases().size()==165);
         for (String base : StructurePlacements.CONTEXTS) for (boolean nativeSource : List.of(false,true)) {
             String path=base.equals("dimensions") ? "dimensions/world.json" : base+"/nested/world.json";String source=backend(nativeSource);byte[] original=single("{"+source+",\"placementId\":\"stable\\u005fID\",\"futurePlacement\":9223372036854775807}");
             check(StructurePlacementIntegration.modes(entry(original)).size()==(nativeSource ? 7 : 4));

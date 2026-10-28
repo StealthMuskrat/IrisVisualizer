@@ -57,7 +57,7 @@ final class ProceduralCanopyTests {
             check(FieldCoverage.groups(path).containsAll(List.of("treeCanopy","treeLayer","treeBranches","treeSubBranches")));
         }
         var owner=new ProceduralObjects.Context("biomes","trees",0);rejects(() -> new ProceduralCanopies.Context(new ProceduralObjects.Context("biomes","ruins",0),"canopy",-1));rejects(() -> ProceduralCanopies.Context.object(owner,"canopy.unknown"));rejects(() -> new ProceduralCanopies.Context(owner,"canopy",0));rejects(() -> ProceduralCanopies.Context.layer(owner,-1));rejects(() -> new ProceduralCanopies.Context(null,"canopy",-1));
-        for (String group : List.of("treeCanopy","treeLayer","treeBranches","treeSubBranches")) check(FieldCoverage.fields(group).stream().allMatch(FieldCoverage.Field::implemented));check(FieldCoverage.fields("proceduralTree").stream().filter(FieldCoverage.Field::implemented).count()==59);
+        for (String group : List.of("treeCanopy","treeLayer","treeBranches","treeSubBranches")) check(FieldCoverage.fields(group).stream().allMatch(FieldCoverage.Field::implemented));check(FieldCoverage.fields("proceduralTree").stream().filter(FieldCoverage.Field::implemented).count()==61);
         System.out.println("PASS: tree canopy/layers/branches/sub-branches across two hosts, 42 native scalar controls and complete scoped enums, source bounds/default/null/reset and raw no-ops, ordered lossless layer lifecycle/profile restoration, strict owner/path/index/type/size guards, seed/material/palette/sibling/advanced-data preservation, scoped drafts and Save/ZIP without foliage or branch generation");
     }
 }

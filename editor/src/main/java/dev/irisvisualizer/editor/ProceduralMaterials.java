@@ -41,22 +41,34 @@ public final class ProceduralMaterials {
     public static byte[] setMaterial(String path,byte[] raw,ProceduralObjects.Context c,String field,String value) { ProceduralObjects.authorize(path,c);defaultBlock(c.kind(),field);if (!blockSyntax(value)) throw new IllegalArgumentException("Use Minecraft or unnamespaced block/alias syntax; external namespaces and state existence are unsupported/unverified");return ProceduralObjects.edit(raw,c,e -> { String old=material(e,c.kind(),field);return value.equals(old) && e.token(field)!=null ? e.sourceBytes() : e.nullableString(field,value); }); }
     public static byte[] clearMaterial(String path,byte[] raw,ProceduralObjects.Context c,String field) { ProceduralObjects.authorize(path,c);if (!optional(c.kind(),field)) throw new IllegalArgumentException("This material has a non-null native default; reset to restore it");return ProceduralObjects.edit(raw,c,e -> { material(e,c.kind(),field);return "null".equals(e.token(field)) ? e.sourceBytes() : e.nullableString(field,null); }); }
     public static byte[] resetMaterial(String path,byte[] raw,ProceduralObjects.Context c,String field) { ProceduralObjects.authorize(path,c);defaultBlock(c.kind(),field);return ProceduralObjects.edit(raw,c,e -> { material(e,c.kind(),field);return e.token(field)==null ? e.sourceBytes() : e.removeField(field); }); }
-    public record Context(String resourceBase,String kind,int index,String field) {
+    public record Context(String resourceBase,String kind,int index,String field,int element) {
+        public Context(String resourceBase,String kind,int index,String field) { this(resourceBase,kind,index,field,-1); }
         public Context(ProceduralObjects.Context owner,String field) { this(owner.base(),owner.kind(),owner.index(),field); }
-        public Context { new ProceduralObjects.Context(resourceBase,kind,index);if (field==null || !palettes(kind).contains(field) && !STILT_FIELDS.contains(field)) throw new IllegalArgumentException("Select a procedural material palette"); }
+        public Context { new ProceduralObjects.Context(resourceBase,kind,index);if (field==null || element < -1 || (element>=0 ? !(kind.equals("trees") && field.equals("decorators.palette") || kind.equals("ruins") && field.equals("accents.palette")) : !palettes(kind).contains(field) && !STILT_FIELDS.contains(field))) throw new IllegalArgumentException("Select a procedural material palette"); }
         public ProceduralObjects.Context owner() { return new ProceduralObjects.Context(resourceBase,kind,index); }
+        public static Context accent(ProceduralAccents.Context c) { if (c==null || !c.palette()) throw new IllegalArgumentException("Select a decorator palette");return new Context(c.owner().base(),c.owner().kind(),c.owner().index(),c.list()+".palette",c.index()); }
+        public boolean accent() { return element>=0; }
+        public ProceduralAccents.Context accentContext() { if (!accent()) throw new IllegalArgumentException("Not an accent palette");return new ProceduralAccents.Context(owner(),field.substring(0,field.indexOf('.')),element); }
+        public String palettePath() { return accent() ? accentContext().list()+"."+element+".palette" : field; }
+        public String diagnosticPath() { return accent() ? accentContext().list()+"["+element+"].palette" : field; }
         public boolean stilt() { return field.equals("stiltSettings.palette"); }
-        public String member() { return stilt() ? "palette" : field; }
-        public String prefix() { return owner().prefix()+field+"."; }
-        public String stylePath() { return "proceduralObjects."+kind+"."+index+"."+field+".style"; }
+        public String member() { return stilt() || accent() ? "palette" : field; }
+        public String prefix() { return owner().prefix()+palettePath()+"."; }
+        public String stylePath() { return "proceduralObjects."+kind+"."+index+"."+palettePath()+".style"; }
         public NoiseStyleFields.Target styleTarget() { return new NoiseStyleFields.Target(resourceBase,stylePath(),null); }
         GeneralBlockPalettes.Target target() { return GeneralBlockPalettes.Target.procedural(this); }
     }
     private static void authorize(String path,Context c) { if (c==null) throw new IllegalArgumentException("Select a palette context");ProceduralObjects.authorize(path,c.owner()); }
-    static Context styleContext(String base,String path) { if (!("biomes".equals(base) || "regions".equals(base)) || path==null) return null;var m=Pattern.compile("proceduralObjects\\.(trees|ruins|formations|coral|fungi|crystals)\\.(0|[1-9][0-9]*)\\.([A-Za-z]+|stiltSettings\\.palette)\\.style").matcher(path);if (!m.matches()) return null;try { return new Context(base,m.group(1),Integer.parseInt(m.group(2)),m.group(3)); } catch (IllegalArgumentException bad) { return null; } }
-    private static LosslessJson parent(LosslessJson entry,Context c) { if (!c.stilt()) return entry;var stilt=ProceduralTransforms.object(entry,"stiltSettings");if (stilt==null) throw new IllegalArgumentException("Enable inline stilt settings first");return stilt; }
+    static Context styleContext(String base,String path) {
+        if (!("biomes".equals(base) || "regions".equals(base)) || path==null) return null;
+        var accent=Pattern.compile("proceduralObjects\\.(trees|ruins)\\.(0|[1-9][0-9]*)\\.(decorators|accents)\\.(0|[1-9][0-9]*)\\.palette\\.style").matcher(path);
+        if (accent.matches()) try { return new Context(base,accent.group(1),Integer.parseInt(accent.group(2)),accent.group(3)+".palette",Integer.parseInt(accent.group(4))); } catch (IllegalArgumentException bad) { return null; }
+        var m=Pattern.compile("proceduralObjects\\.(trees|ruins|formations|coral|fungi|crystals)\\.(0|[1-9][0-9]*)\\.([A-Za-z]+|stiltSettings\\.palette)\\.style").matcher(path);if (!m.matches()) return null;try { return new Context(base,m.group(1),Integer.parseInt(m.group(2)),m.group(3)); } catch (IllegalArgumentException bad) { return null; }
+    }
+
+    static LosslessJson parent(LosslessJson entry,Context c) { if (c.accent()) return ProceduralAccents.entry(entry,c.accentContext());if (!c.stilt()) return entry;var stilt=ProceduralTransforms.object(entry,"stiltSettings");if (stilt==null) throw new IllegalArgumentException("Enable inline stilt settings first");return stilt; }
     static LosslessJson object(LosslessJson entry,Context c) { String token=parent(entry,c).token(c.member());return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
-    private static byte[] editOwner(byte[] raw,Context c,Function<LosslessJson,byte[]> op) { return ProceduralObjects.edit(raw,c.owner(),entry -> { if (!c.stilt()) return op.apply(entry);parent(entry,c);return entry.objectEdit("stiltSettings",op,false); }); }
+    private static byte[] editOwner(byte[] raw,Context c,Function<LosslessJson,byte[]> op) { if (c.accent()) return ProceduralAccents.edit(raw,c.accentContext(),op);return ProceduralObjects.edit(raw,c.owner(),entry -> { if (!c.stilt()) return op.apply(entry);parent(entry,c);return entry.objectEdit("stiltSettings",op,false); }); }
     public static String creationBlock(Context c) { return DATA.getProperty("palette.classBlock"); }
     static List<LosslessJson> entries(LosslessJson palette) { return palette.token("palette")==null ? null : palette.objectArray("palette"); }
     static void checkEntries(LosslessJson palette) { var entries=entries(palette);if (entries!=null && entries.size()>MAXIMUM_ENTRIES) throw new IllegalArgumentException("Above the 64-entry procedural palette editor limit"); }
@@ -83,7 +95,7 @@ public final class ProceduralMaterials {
         return editPalette(original,context,p -> { zoom(p);if (p.token("zoom")==null) throw new IllegalArgumentException("Enable zoom first");return new BigDecimal(p.token("zoom")).compareTo(value)==0 ? p.sourceBytes() : p.number("zoom",value.doubleValue()); });
     }
     static List<String> readOnlyPaths(LosslessJson entry,Context context) {
-        var paths=new ArrayList<String>();String prefix=context.field();
+        var paths=new ArrayList<String>();String prefix=context.diagnosticPath();
         try { var palette=object(entry,context);if (palette==null) return List.of();checkEntries(palette);
             for (String field : palette.fields()) if (!RiverMaterialFields.PALETTE_FIELDS.contains(field)) paths.add(prefix+"."+field);
             try { zoom(palette); } catch (IllegalArgumentException invalid) { paths.add(prefix+".zoom"); }

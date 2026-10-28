@@ -4936,5 +4936,63 @@
       "classification": "generation",
       "reason": "Controls native procedural tree crown layers, leaf geometry or branching. Authoring never generates foliage or branches."
     }
+  },
+  "treeDecorator": {
+    "target": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "block": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "palette": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "length": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "axisAware": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    }
+  },
+  "treeSecondaryLeaf": {
+    "block": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "weight": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    }
+  },
+  "ruinDecorator": {
+    "target": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "block": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "palette": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    },
+    "scatterRadius": {
+      "classification": "generation",
+      "reason": "Controls native procedural accent placement, foliage material selection or block-state orientation. Authoring never applies accents or samples weights."
+    }
   }
 }
