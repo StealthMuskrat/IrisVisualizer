@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in ninety-three pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in ninety-four pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -10,6 +10,7 @@ from pathlib import Path
 SOURCES = {
  'dimension': 'generation/terrain/IrisDimension.java',
  'structurePlacement': 'structure/placement/IrisStructurePlacement.java',
+ 'jigsawConfiguration': 'structure/jigsaw/IrisJigsawConfiguration.java',
  'nativeStructureSource': 'structure/nativegen/IrisNativeStructure.java',
  'nativeStructureAdjustment': 'structure/nativegen/IrisVanillaStructureAdjustment.java',
  'structureStilt': 'structure/placement/IrisStructureStiltSettings.java',
@@ -184,7 +185,8 @@ def run(source_dir, policy_file, java_dir, output_dir):
         implemented[group].update(editable(java_dir, 'StructurePlacements', 'LIST_FIELDS'))
     implemented['structurePlacement'] = set(editable(java_dir, 'StructurePlacements'))
     implemented['structurePlacement'].update(editable(java_dir, 'StructurePlacementIntegration', 'OBJECT_FIELDS'))
-    implemented['nativeStructureSource'] = set(editable(java_dir, 'StructurePlacements', 'NATIVE_FIELDS'))
+    implemented['nativeStructureSource'] = set(editable(java_dir, 'StructurePlacements', 'NATIVE_FIELDS')) | set(editable(java_dir, 'NativeJigsawOverrides', 'OBJECT_FIELDS'))
+    implemented['jigsawConfiguration'] = set(editable(java_dir, 'NativeJigsawOverrides', 'EDITABLE'))
     implemented['nativeStructureAdjustment'] = set(editable(java_dir, 'NativeStructureAdjustments'))
     implemented['structureStilt'] = set(editable(java_dir, 'NativeStructureAdjustments', 'STILT_FIELDS'))
     implemented['structureStilt'].update(editable(java_dir, 'NativeStructurePalettes', 'STILT_FIELDS'))
@@ -306,7 +308,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['importedStructures'].update(editable(java_dir, 'NativeGenerationFilters', 'STRUCTURE_FIELDS'))
     implemented['importedStructures'].update(editable(java_dir, 'NativeStructureAdjustments', 'LIST_FIELDS'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in ninety-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in ninety-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

@@ -833,6 +833,18 @@ jobs:
           python editor/tools/extract_structure_placement_integration_fields.py IrisStructurePlacement.java IrisStructureTerrain.java IrisStructureStiltSettings.java PackStructurePlacementValidator.java NativeStructurePlacementPlanner.java generated-structure-placement-integration-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-structure-placement-integration-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/structure-placement-integration-fields.properties).Hash) { throw 'Pinned placement integration definitions differ' }
+      - name: Verify pinned native jigsaw override contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawConfiguration.java' -OutFile IrisJigsawConfiguration.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawHeightmap.java' -OutFile IrisJigsawHeightmap.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawLiquidSettings.java' -OutFile IrisJigsawLiquidSettings.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/NativeStructureStartPlan.java' -OutFile NativeStructureStartPlan.java
+          python editor/tools/test_native_jigsaw_fields.py IrisJigsawConfiguration.java IrisJigsawHeightmap.java IrisJigsawLiquidSettings.java PackStructurePlacementValidator.java PackJsonFieldChecks.java NativeStructureStartPlan.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_native_jigsaw_fields.py IrisJigsawConfiguration.java IrisJigsawHeightmap.java IrisJigsawLiquidSettings.java PackStructurePlacementValidator.java PackJsonFieldChecks.java NativeStructureStartPlan.java generated-native-jigsaw-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-native-jigsaw-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/native-jigsaw-fields.properties).Hash) { throw 'Pinned native jigsaw definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

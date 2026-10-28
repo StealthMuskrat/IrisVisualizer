@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from extract_structure_placement_fields import extract
 sources=[Path(path).read_bytes() for path in sys.argv[1:]];result=extract(*sources).decode()
-for token in ['spacing.default=32\n','salt.default=165745296\n','density.default=0.02\n','anchor.default=LEGACY\n','backend.policy=exactlyOneBackend\n','advanced.policy=jigsawReadOnly\n']:assert token in result,token
+for token in ['spacing.default=32\n','salt.default=165745296\n','density.default=0.02\n','anchor.default=LEGACY\n','backend.policy=exactlyOneBackend\n','advanced.policy=separateJigsawControls\n']:assert token in result,token
 for index,old,new in [(0,b'private KList<IrisStructurePlacement> structures = new KList<>();',b'private KList<IrisStructurePlacement> structures;'),
                       (3,b'private int spacing = 32;',b'private int spacing = 16;'),(3,b'private int ringCount = 128;',b'private int ringCount = 64;'),
                       (3,b'@MaxNumber(4096)',b'@MaxNumber(8192)'),(3,b'private double density = 0.02;',b'private double density = 0.01;'),

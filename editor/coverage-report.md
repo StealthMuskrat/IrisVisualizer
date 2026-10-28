@@ -1,12 +1,13 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in ninety-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in ninety-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
 | dimension | 82 | 81 | 75 | 1 |
 | structurePlacement | 23 | 23 | 23 | 0 |
-| nativeStructureSource | 3 | 3 | 2 | 0 |
+| jigsawConfiguration | 10 | 10 | 10 | 0 |
+| nativeStructureSource | 3 | 3 | 3 | 0 |
 | nativeStructureAdjustment | 6 | 6 | 6 | 0 |
 | structureStilt | 4 | 4 | 4 | 0 |
 | structureTerrain | 11 | 11 | 11 | 0 |
@@ -103,6 +104,10 @@ Direct nonstatic/nontransient private fields in ninety-three pinned source class
 Unclassified: `treeSettings`.
 
 ## structurePlacement
+
+Unclassified: none.
+
+## jigsawConfiguration
 
 Unclassified: none.
 
