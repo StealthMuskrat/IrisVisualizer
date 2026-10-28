@@ -19,7 +19,7 @@ final class NativeStructurePaletteTests {
     private static void check(boolean value) { if (!value) throw new AssertionError("Native structure palette contract failed"); }
     private static void rejects(Runnable action) { try { action.run(); } catch (IllegalArgumentException expected) { return; }throw new AssertionError("Expected rejected structure palette operation"); }
     static void run(Path temp) throws Exception {
-        check(NoiseStyleSourceTests.cases().size()==113);
+        check(NoiseStyleSourceTests.cases().size()==161);
         for (String owner : List.of("stilt","terrain")) {
             var c=new NativeStructurePalettes.Context(0,owner);var target=c.target();var style=c.styleTarget();
             check(target.nativeStructure() && !target.layer() && target.minimumEntries()==1 && target.defaultBlock().equals("STONE") && target.styleTarget().equals(style) && style.nativeStructurePalette() && style.member().equals("style") && NoiseStyleFields.contextDefault(style).equals("STATIC"));

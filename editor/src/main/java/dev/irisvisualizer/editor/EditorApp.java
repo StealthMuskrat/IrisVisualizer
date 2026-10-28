@@ -2025,7 +2025,7 @@ public final class EditorApp extends Application {
     }
     private void drawProceduralObjects(LosslessJson document) {
         if (!ImGui.collapsingHeader("Procedural object collections")) return;ImGui.pushID(ProceduralObjects.prefix());
-        ImGui.textWrapped("Trees, ruins, formations, coral, fungi and crystals use native class defaults. Chance is checked per chunk before density attempts. Variants are pre-baked by Iris; this editor never generates or caches them. Shape controls use pinned native defaults and field bounds. Materials, palettes and canopy/decorator objects stay read-only. Nested transform/deformation controls are available below. Source compatibility, name collisions, memory cost and actual placement are unverified. Unsupported previews remain disabled.");
+        ImGui.textWrapped("Trees, ruins, formations, coral, fungi and crystals use native class defaults. Chance is checked per chunk before density attempts. Variants are pre-baked by Iris; this editor never generates or caches them. Shape controls use pinned native defaults and field bounds. Material roles and palettes are available below. Canopy/decorator objects remain read-only. Source compatibility, name collisions, memory cost and actual placement are unverified. Unsupported previews remain disabled.");
         ImGui.textWrapped("Removing an entire collection or owner discards all data inside that selected subtree, including advanced fields.");
         try {
             var owner=ProceduralObjects.object(document);
@@ -2033,7 +2033,7 @@ public final class EditorApp extends Application {
             else {
                 if (ImGui.button("Remove entire procedural owner")) { try { commitProfileChange(ProceduralObjects.prefix(),ProceduralObjects.reset(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
                 for (String kind : ProceduralObjects.LIST_FIELDS) if (ImGui.treeNode(kind)) { drawProceduralList(document,kind);ImGui.treePop(); }
-                for (String path : ProceduralObjects.readOnlyPaths(document)) ImGui.textWrapped(path+" (read-only, preserved)");
+                for (String path : ProceduralObjects.readOnlyPaths(document,ResourceTypes.base(selected))) ImGui.textWrapped(path+" (read-only, preserved)");
             }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored proceduralObjects is not an inline object (read-only, preserved)."); }ImGui.popID();
     }
@@ -2050,14 +2050,35 @@ public final class EditorApp extends Application {
                 ImGui.beginDisabled(rows.size()>=ProceduralObjects.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
                 ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==rows.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
                 if (action!=null) { try { commitProfileChange(prefix,ProceduralObjects.change(selected,workspace.read(selected),kind,action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
-                for (String field : ProceduralObjects.fields(kind)) drawProceduralValue(rows.get(index),context,field);drawProceduralShapes(rows.get(index),context);drawProceduralTransforms(rows.get(index),context);ImGui.treePop();
+                for (String field : ProceduralObjects.fields(kind)) drawProceduralValue(rows.get(index),context,field);drawProceduralShapes(rows.get(index),context);drawProceduralMaterials(rows.get(index),context);drawProceduralTransforms(rows.get(index),context);ImGui.treePop();
             }ImGui.popID(); }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list is mixed, a snippet or non-object data (read-only, preserved)."); }ImGui.popID();
+    }
+    private void drawProceduralMaterials(LosslessJson entry,ProceduralObjects.Context context) {
+        if (!ImGui.treeNode("Materials and palettes")) return;String kind=context.kind();
+        ImGui.textWrapped("Native material roles and fallback rules only. A nonempty palette takes precedence when its role is resolved; other role conditions may select different material data. Inline empty palette objects inherit STONE, STATIC style and zoom 5. Explicit empty entry lists retain the native single-material/role fallback. Registry, alias targets, block states, leaf/solid/waterlogging compatibility and sampling are unverified.");
+        for (String field : ProceduralMaterials.materials(kind)) { String key=context.prefix()+"material#"+field;ImGui.pushID(key);ImGui.textWrapped(ProceduralMaterials.help(kind,field));
+            try { String stored=ProceduralMaterials.material(entry,kind,field),current=stored==null ? "" : stored;if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");
+                ImGui.textWrapped(entry.token(field)==null ? "Implicit native default: "+ProceduralMaterials.defaultBlock(kind,field) : "null".equals(entry.token(field)) ? "Explicit null: native role fallback is not evaluated." : "Explicit stored material");
+                if (!current.isEmpty() && !ProceduralMaterials.blockSyntax(current)) ImGui.textWrapped("Unsupported external/invalid block text is preserved. Replace it with supported syntax or reset the field.");
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply block/alias text")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralMaterials.setMaterial(selected,workspace.read(selected),context,field,input.get())));
+                if (ProceduralMaterials.optional(kind,field) && ImGui.button("Clear optional material to none")) { try { commitProfileChange(key,ProceduralMaterials.clearMaterial(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+                if (entry.token(field)!=null && ImGui.button("Reset material to native default")) { try { commitProfileChange(key,ProceduralMaterials.resetMaterial(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored material is not nullable text or contains NUL (read-only, preserved)."); }ImGui.popID();
+        }
+        for (String field : ProceduralMaterials.palettes(kind)) drawProceduralPalette(entry,new ProceduralMaterials.Context(context,field));ImGui.treePop();
+    }
+    private void drawProceduralPalette(LosslessJson entry,ProceduralMaterials.Context context) {
+        if (!ImGui.treeNode(context.field()+" palette")) return;ImGui.pushID(context.prefix());ImGui.textWrapped(context.stilt() ? "Omitted/null stilt palette extends the object's original layer under native stilt rules. Creating a STONE palette replaces that fallback; the placement mode is not changed." : ProceduralMaterials.help(context.kind(),context.field()));
+        ImGui.textWrapped("Create explicitly writes a STONE entry, leaving native STATIC style/zoom 5 implicit. Reset removes the whole palette, including advanced data, and restores the native omitted fallback. No registry, role or sampling checks run.");
+        try { var palette=ProceduralMaterials.object(entry,context);if (palette==null) { if (ImGui.button("Create explicit STONE palette")) { try { commitProfileChange(context.prefix(),ProceduralMaterials.create(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } } }else { ProceduralMaterials.checkEntries(palette);drawGeneralBlockPalette(palette,context.target()); }
+            var parent=context.stilt() ? ProceduralTransforms.object(entry,"stiltSettings") : entry;if (parent.token(context.member())!=null && ImGui.button("Reset to omitted palette")) { try { commitProfileChange(context.prefix(),ProceduralMaterials.reset(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored palette or owner is non-inline, has mixed/null entries or exceeds the 64-entry limit (read-only, preserved)."); }ImGui.popID();ImGui.treePop();
     }
     private void drawProceduralTransforms(LosslessJson entry,ProceduralObjects.Context context) {
         if (!ImGui.treeNode("Placement transforms and deformation")) return;
         ImGui.textWrapped("Controls author native placement settings only. Translation, rotation and clamps are class defaults when omitted; explicit null requires replacement or reset. Stilt/vacuum omission or null uses native mode-specific fallback. Mode effects, rotation/state compatibility, terrain geometry, material existence and runtime cost are unverified. No transformation or deformation runs.");
-        ImGui.textWrapped("Removing a whole settings object discards its selected subtree, including advanced fields. Palettes remain read-only.");
+        ImGui.textWrapped("Removing a whole settings object discards its selected subtree, including advanced fields. Procedural stilt palettes are available below.");
         for (String scope : ProceduralTransforms.OBJECT_FIELDS) drawProceduralTransformOwner(entry,context,scope);ImGui.treePop();
     }
     private void drawProceduralTransformOwner(LosslessJson entry,ProceduralObjects.Context context,String scope) {
@@ -2071,8 +2092,8 @@ public final class EditorApp extends Application {
                 if (scope.equals("clamp") || scope.startsWith("rotation.")) drawProceduralTransformRange(object,context,scope);
                 for (String field : ProceduralTransforms.fields(scope)) if (!ProceduralTransforms.paired(scope,field)) drawProceduralTransformValue(object,context,scope,field);
                 if (scope.equals("rotation")) for (String axis : ProceduralTransforms.AXES) drawProceduralTransformOwner(entry,context,"rotation."+axis);
-                if (scope.equals("stiltSettings")) drawProceduralExclusions(object,context);
-                for (String path : ProceduralTransforms.readOnlyPaths(entry,scope)) ImGui.textWrapped(path+" (read-only, preserved)");
+                if (scope.equals("stiltSettings")) { drawProceduralExclusions(object,context);drawProceduralPalette(entry,new ProceduralMaterials.Context(context,"stiltSettings.palette")); }
+                for (String path : ProceduralTransforms.readOnlyPaths(entry,scope,context)) ImGui.textWrapped(path+" (read-only, preserved)");
             }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored settings contain non-inline or unsupported data (read-only, preserved)."); }ImGui.popID();ImGui.treePop();
     }
@@ -3133,13 +3154,13 @@ public final class EditorApp extends Application {
         drawGeneralBlockPalette(palette,GeneralBlockPalettes.Target.dimension(field));
     }
     private void drawGeneralBlockPalette(LosslessJson palette,GeneralBlockPalettes.Target target) {
-        ImGui.textWrapped("General palettes use weights 1-"+DimensionPalettes.maximumWeight()+". Block names are checked for nonblank text only; registry/state/block-role validation remains pending. Advanced block data stays read-only.");
+        ImGui.textWrapped(target.procedural() ? "Procedural palettes use Minecraft or unnamespaced block/alias syntax. Registry, state and block-role validation remain pending; advanced block data is preserved." : "General palettes use weights 1-"+DimensionPalettes.maximumWeight()+". Block names are checked for nonblank text only; registry/state/block-role validation remains pending. Advanced block data stays read-only.");
         if (ImGui.treeNode("Palette noise")) {
             String token=palette.token("zoom"),key=target.noisePrefix()+"zoom";
             ImGui.textWrapped(target.zoomConstraints());
             if (token==null) {
                 if (ImGui.button("Enable palette zoom ("+target.zoomDefault()+")")) applyRoutingExtra(() -> workspace.replace(selected,target.enableZoom(selected,workspace.read(selected))));
-            } else if (!LosslessJson.numericToken(token) || target.nativeStructure() && !NativeStructurePalettes.supportedZoom(palette)) ImGui.textWrapped("Stored palette zoom has an unsupported type (read-only).");
+            } else if (!LosslessJson.numericToken(token) || target.nativeStructure() && !NativeStructurePalettes.supportedZoom(palette) || target.procedural() && !ProceduralMaterials.supportedZoom(palette)) ImGui.textWrapped("Stored palette zoom has an unsupported type (read-only).");
             else {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText("Palette zoom",input);drafts.update(key,token,input.get());
@@ -3162,13 +3183,13 @@ public final class EditorApp extends Application {
         }
         String newKey=target.listPrefix()+"new.block";
         ImString newBlock=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New block",newBlock);drafts.update(newKey,"",newBlock.get());
-        ImGui.beginDisabled(target.nativeStructure() && entries.size()>=NativeStructurePalettes.MAXIMUM_ENTRIES);boolean addBlock=ImGui.button("Add block");ImGui.endDisabled();
+        ImGui.beginDisabled((target.nativeStructure() || target.procedural()) && entries.size()>=NativeStructurePalettes.MAXIMUM_ENTRIES);boolean addBlock=ImGui.button("Add block");ImGui.endDisabled();
         if (addBlock) { changeGeneralBlockPalette(target,RiverProfiles.Action.ADD,-1,newBlock.get(),newKey);return; }
-        if (entries.isEmpty()) ImGui.textWrapped(target.ore() ? "Empty palette: this ore generator produces no blocks." : target.slabWall() ? "Empty palette: no material is selected. Add a block to author a material palette." : "This list is empty. Add a block to repair the required list.");
+        if (entries.isEmpty()) ImGui.textWrapped(target.procedural() ? "Empty entries retain native single-material/role fallback; add a block to activate the palette." : target.ore() ? "Empty palette: this ore generator produces no blocks." : target.slabWall() ? "Empty palette: no material is selected. Add a block to author a material palette." : "This list is empty. Add a block to repair the required list.");
         for (int index=0;index<entries.size();index++) {
             if (!ImGui.treeNode("Block "+index)) continue;
             int entryIndex=index;var entry=entries.get(index);RiverProfiles.Action action=null;
-            ImGui.beginDisabled(target.nativeStructure() && entries.size()>=NativeStructurePalettes.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();
+            ImGui.beginDisabled((target.nativeStructure() || target.procedural()) && entries.size()>=NativeStructurePalettes.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();
             ImGui.sameLine();ImGui.beginDisabled(entries.size()<=target.minimumEntries());
             if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
             ImGui.endDisabled();ImGui.beginDisabled(index==0);
@@ -3180,6 +3201,7 @@ public final class EditorApp extends Application {
             try {
                 String stored=entry.token("block")==null ? "" : entry.stringToken("block"),key=target.listPrefix()+index+".block";
                 if (stored.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");
+                if (target.procedural() && !ProceduralMaterials.blockSyntax(stored)) ImGui.textWrapped("Unsupported external/invalid block text is preserved; replace with supported syntax to edit it.");
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText(entry.token("block")==null ? "Required block (missing)" : "Block",input);drafts.update(key,stored,input.get());
                 if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,target.setBlock(selected,workspace.read(selected),entryIndex,input.get())));
@@ -3187,7 +3209,7 @@ public final class EditorApp extends Application {
             String token=entry.token("weight"),key=target.listPrefix()+index+".weight";
             if (token==null) {
                 if (ImGui.button("Enable weight ("+DimensionPalettes.weightDefault()+")")) applyRoutingExtra(() -> workspace.replace(selected,target.enableWeight(selected,workspace.read(selected),entryIndex)));
-            } else if (!LosslessJson.numericToken(token) || target.nativeStructure() && !NativeStructurePalettes.supportedWeight(entry)) ImGui.textWrapped("Stored weight has an unsupported type (read-only).");
+            } else if (!LosslessJson.numericToken(token) || target.nativeStructure() && !NativeStructurePalettes.supportedWeight(entry) || target.procedural() && !ProceduralMaterials.supportedWeight(entry)) ImGui.textWrapped("Stored weight has an unsupported type (read-only).");
             else {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText("Weight (1-"+DimensionPalettes.maximumWeight()+")",input);drafts.update(key,token,input.get());
