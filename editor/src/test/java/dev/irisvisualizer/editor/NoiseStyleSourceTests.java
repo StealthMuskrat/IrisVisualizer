@@ -35,6 +35,7 @@ final class NoiseStyleSourceTests {
         add(result,DimensionCarvings.styleTarget(0));
         add(result,TerrainOverlays.styleTarget(0));
         for (String owner : List.of("stilt","terrain")) add(result,new NativeStructurePalettes.Context(0,owner).styleTarget());
+        for (String base : StructurePlacements.CONTEXTS) for (String owner : List.of("stilt","terrain")) add(result,NativeStructurePalettes.Context.placement(base,0,owner).styleTarget());
         for (String field : NoiseStyleFields.BIOME_FIELDS) add(result,NoiseStyleFields.Target.biome(field));
         for (String field : NoiseStyleFields.TERRAIN_FIELDS) add(result,NoiseStyleFields.Target.terrain(field));
         for (String base : CaveProfileFields.CONTEXTS) {

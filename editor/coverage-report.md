@@ -5,7 +5,7 @@ Direct nonstatic/nontransient private fields in ninety-three pinned source class
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
 | dimension | 82 | 81 | 75 | 1 |
-| structurePlacement | 23 | 23 | 21 | 0 |
+| structurePlacement | 23 | 23 | 23 | 0 |
 | nativeStructureSource | 3 | 3 | 2 | 0 |
 | nativeStructureAdjustment | 6 | 6 | 6 | 0 |
 | structureStilt | 4 | 4 | 4 | 0 |

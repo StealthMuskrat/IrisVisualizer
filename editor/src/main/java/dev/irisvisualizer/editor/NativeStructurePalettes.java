@@ -21,24 +21,29 @@ public final class NativeStructurePalettes {
             if (!"minecraft:cobblestone".equals(DATA.getProperty("stilt.absent")) || !"environmentFallback".equals(DATA.getProperty("terrain.absent")) || !"STONE".equals(DATA.getProperty("palette.classBlock"))) throw new IOException("Unsupported structure palette defaults");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
-    public record Context(int index,String owner) {
-        public Context { if (index<0 || owner==null || !List.of("stilt","terrain").contains(owner)) throw new IllegalArgumentException("Select a native structure palette"); }
+    public record Context(int index,String owner,String resourceBase,boolean placement) {
+        public Context(int index,String owner) { this(index,owner,"dimensions",false); }
+        public Context { if (index<0 || owner==null || !List.of("stilt","terrain").contains(owner) || resourceBase==null || (placement ? !StructurePlacements.CONTEXTS.contains(resourceBase) : !resourceBase.equals("dimensions"))) throw new IllegalArgumentException("Select a structure palette in a supported owner"); }
+        public static Context placement(String base,int index,String owner) { return new Context(index,owner,base,true); }
         public String member() { return owner.equals("stilt") ? "palette" : "encasePalette"; }
-        public String prefix() { return NativeStructureAdjustments.prefix(index)+owner+"."+member()+"."; }
-        public String stylePath() { return "importedStructures.adjustments."+index+"."+owner+"."+member()+".style"; }
-        public NoiseStyleFields.Target styleTarget() { return new NoiseStyleFields.Target("dimensions",stylePath(),null); }
+        public String prefix() { return (placement ? StructurePlacements.prefix(index) : NativeStructureAdjustments.prefix(index))+owner+"."+member()+"."; }
+        public String stylePath() { return (placement ? "structures." : "importedStructures.adjustments.")+index+"."+owner+"."+member()+".style"; }
+        public NoiseStyleFields.Target styleTarget() { return new NoiseStyleFields.Target(resourceBase,stylePath(),null); }
         GeneralBlockPalettes.Target target() { return GeneralBlockPalettes.Target.nativeStructure(this); }
     }
-    private static void authorize(String path,Context context) { if (context==null || !DimensionFields.dimension(path)) throw new IllegalArgumentException("Native structure palettes are dimension-only"); }
+    private static void authorize(String path,Context context) { if (context==null || !context.resourceBase().equals(ResourceTypes.base(path))) throw new IllegalArgumentException("Structure palette owner does not match the resource"); }
     static Context styleContext(String base,String path) {
-        if (!"dimensions".equals(base) || path==null || !path.startsWith("importedStructures.adjustments.")) return null;
-        var match=Pattern.compile("importedStructures\\.adjustments\\.(0|[1-9][0-9]*)\\.(stilt\\.palette|terrain\\.encasePalette)\\.style").matcher(path);
+        if (base==null || path==null) return null;
+        boolean placement=path.startsWith("structures.");
+        if (placement ? !StructurePlacements.CONTEXTS.contains(base) : !base.equals("dimensions") || !path.startsWith("importedStructures.adjustments.")) return null;
+        String prefix=placement ? "structures" : "importedStructures\\.adjustments";
+        var match=Pattern.compile(prefix+"\\.(0|[1-9][0-9]*)\\.(stilt\\.palette|terrain\\.encasePalette)\\.style").matcher(path);
         if (!match.matches()) return null;
-        try { return new Context(Integer.parseInt(match.group(1)),match.group(2).startsWith("stilt.") ? "stilt" : "terrain"); } catch (NumberFormatException invalid) { return null; }
+        try { return new Context(Integer.parseInt(match.group(1)),match.group(2).startsWith("stilt.") ? "stilt" : "terrain",base,placement); } catch (NumberFormatException invalid) { return null; }
     }
     public static String creationBlock(Context context) { return context.owner().equals("stilt") ? DATA.getProperty("stilt.absent") : DATA.getProperty("palette.classBlock"); }
     static LosslessJson object(LosslessJson entry,Context context) { var owner=NativeStructureAdjustments.object(entry,context.owner());if (owner==null) return null;String token=owner.token(context.member());return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
-    private static byte[] editOwner(byte[] original,Context context,Function<LosslessJson,byte[]> operation) { return NativeStructureAdjustments.edit(original,context.index(),e -> { if (NativeStructureAdjustments.object(e,context.owner())==null) throw new IllegalArgumentException("Enable the inline adjustment owner first");return e.objectEdit(context.owner(),operation,false); }); }
+    private static byte[] editOwner(byte[] original,Context context,Function<LosslessJson,byte[]> operation) { if (context.placement()) return StructurePlacementIntegration.editOwner(original,context.index(),context.owner(),operation);return NativeStructureAdjustments.edit(original,context.index(),e -> { if (NativeStructureAdjustments.object(e,context.owner())==null) throw new IllegalArgumentException("Enable the inline adjustment owner first");return e.objectEdit(context.owner(),operation,false); }); }
     static List<LosslessJson> entries(LosslessJson palette) { return palette.token("palette")==null ? null : palette.objectArray("palette"); }
     static void checkEntries(LosslessJson palette) { var entries=entries(palette);if (entries!=null && entries.size()>MAXIMUM_ENTRIES) throw new IllegalArgumentException("Above the 64-entry structure palette editor limit"); }
     static byte[] editPalette(byte[] original,Context context,Function<LosslessJson,byte[]> operation) { return editOwner(original,context,o -> { String token=o.token(context.member());if (token==null || token.equals("null")) throw new IllegalArgumentException("Enable an inline structure palette first");return o.objectEdit(context.member(),p -> { checkEntries(p);return operation.apply(p); },false); }); }

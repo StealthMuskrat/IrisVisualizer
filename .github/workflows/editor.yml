@@ -825,6 +825,14 @@ jobs:
           python editor/tools/extract_structure_placement_fields.py IrisDimension.java IrisBiome.java IrisRegion.java IrisStructurePlacement.java IrisNativeStructure.java StructureDistribution.java IrisStructureAnchorMode.java NativeStructureSuppression.java PackStructurePlacementValidator.java NativeStructurePlacementPlanner.java PackValidator.java generated-structure-placement-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-structure-placement-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/structure-placement-fields.properties).Hash) { throw 'Pinned structure placement definitions differ' }
+      - name: Verify pinned structure placement terrain and foundation contracts
+        shell: pwsh
+        run: |
+          python editor/tools/test_structure_placement_integration_fields.py IrisStructurePlacement.java IrisStructureTerrain.java IrisStructureStiltSettings.java PackStructurePlacementValidator.java NativeStructurePlacementPlanner.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_structure_placement_integration_fields.py IrisStructurePlacement.java IrisStructureTerrain.java IrisStructureStiltSettings.java PackStructurePlacementValidator.java NativeStructurePlacementPlanner.java generated-structure-placement-integration-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-structure-placement-integration-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/structure-placement-integration-fields.properties).Hash) { throw 'Pinned placement integration definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
