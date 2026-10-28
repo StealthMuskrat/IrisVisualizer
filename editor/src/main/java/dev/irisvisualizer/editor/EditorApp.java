@@ -638,7 +638,7 @@ public final class EditorApp extends Application {
     private void drawDimensionCarvings(LosslessJson document) {
         if (!ImGui.collapsingHeader("Dimension carving entries")) return;
         ImGui.pushID("dimension-carving");
-        ImGui.textWrapped("Dimension-level cave-biome overrides use absolute world Y with inclusive bounds. The last usable matching root wins. Enabled flags, target content gates, native carving and noise are not evaluated here; unsupported previews remain disabled.");
+        ImGui.textWrapped("Dimension-level cave-biome overrides use absolute world Y with inclusive bounds. Native root lookup picks the last usable matching entry; cave generation can combine multiple entry profiles. Enabled flags, target content gates, native carving and noise are not evaluated here; unsupported previews remain disabled.");
         ImGui.textWrapped("Child selection includes the parent and usable linked entries, uses biome rarity, and does not apply the child's Y range. Cycles and self-links are allowed; native depth is capped at 32. ID changes and removals leave existing links unchanged.");
         List<LosslessJson> entries;
         try { entries=DimensionCarvings.entries(document); }

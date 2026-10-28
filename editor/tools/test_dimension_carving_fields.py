@@ -16,7 +16,8 @@ for index,old,new in [(0,b'index.put(entryId.trim(), entry);',b'index.putIfAbsen
                       (2,b'options.add(new CarvingChoice(parent, rarity(parentBiome)));',b''),
                       (2,b'if (childDepthLimit < depth)',b'if (false)'),
                       (3,b'private double min = 16;',b'private double min = 0;'),
-                      (3,b'return v >= min && v <= max;',b'return v >= min && v < max;')]:
+                      (3,b'return v >= min && v <= max;',b'return v >= min && v < max;'),
+                      (4,b'IrisRange worldYRange = new IrisRange(previous, boundary - 1);',b'IrisRange worldYRange = new IrisRange(previous, boundary);')]:
     assert old in sources[index],old
     changed=sources.copy();changed[index]=changed[index].replace(old,new)
     try:extract(*changed)

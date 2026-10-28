@@ -6,10 +6,10 @@ import sys
 from pathlib import Path
 from extract_river_material_fields import compact
 
-def extract(dimension,entry,resolver,range_source):
-    d,e,r,g=[raw.decode('utf-8') for raw in [dimension,entry,resolver,range_source]]
+def extract(dimension,entry,resolver,range_source,consumer):
+    d,e,r,g,m=[raw.decode('utf-8') for raw in [dimension,entry,resolver,range_source,consumer]]
     values={'irisRevision':'c3359e0a16438b1bb8468901c6171dcefdf63f7f'}
-    for name,raw in zip(['dimension','entry','resolver','range'],[dimension,entry,resolver,range_source]):values[name+'SourceSha256']=hashlib.sha256(raw).hexdigest()
+    for name,raw in zip(['dimension','entry','resolver','range','consumer'],[dimension,entry,resolver,range_source,consumer]):values[name+'SourceSha256']=hashlib.sha256(raw).hexdigest()
     def require(text,*contracts):
         for contract in contracts:
             if compact(contract) not in compact(text):raise ValueError('Changed carving contract: '+contract)
@@ -38,9 +38,15 @@ def extract(dimension,entry,resolver,range_source):
             'if (childDepthLimit < depth) { depth = childDepthLimit; }')
     selection=re.search(r'private static IrisRaritySelection<CarvingChoice> buildSelectionPlan\(.*?\n    \}',r,re.DOTALL)
     if not selection or 'getWorldYRange' in selection.group(0):raise ValueError('Child selection range semantics changed')
+    require(m,'private List<WeightedProfile> resolveDimensionCarvingProfiles(',
+            'for (IrisDimensionCarvingEntry entry : entries)',
+            'if (entry == null || !entry.isEnabled()) { continue; }',
+            'IrisDimensionCarvingEntry resolvedEntry = IrisDimensionCarvingResolver.resolveFromRoot( engine, entry, baseX + (columnIndex >> 4), previous, baseZ + (columnIndex & 15), resolverState);',
+            'IrisRange worldYRange = new IrisRange(previous, boundary - 1);',
+            'weightedProfiles.add(new WeightedProfile(profile, rootProfileColumnWeights.get(profile), -1D, worldYRange, weightedProfiles.size()));')
     require(g,'private double min = 16;','private double max = 32;','return v >= min && v <= max;')
-    values.update({'root.policy':'lastUsableMatchingRoot','range.policy':'inclusiveAbsoluteWorldY','children.policy':'parentPlusChildrenIgnoreChildY',
+    values.update({'consumer.policy':'multipleWeightedProfiles','root.policy':'lastUsableMatchingRoot','range.policy':'inclusiveAbsoluteWorldY','children.policy':'parentPlusChildrenIgnoreChildY',
                    'range.context.min':'-64','range.context.max':'320','range.class.min':'16','range.class.max':'32','depth.maximum':'32','shrink.minimum':'0.0001'})
     return ''.join(key+'='+json.dumps(value,ensure_ascii=True)[1:-1]+'\n' for key,value in values.items()).encode('ascii')
 
-if __name__=='__main__':Path(sys.argv[5]).write_bytes(extract(*(Path(path).read_bytes() for path in sys.argv[1:5])))
+if __name__=='__main__':Path(sys.argv[6]).write_bytes(extract(*(Path(path).read_bytes() for path in sys.argv[1:6])))
