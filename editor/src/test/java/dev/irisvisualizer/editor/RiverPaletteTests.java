@@ -79,7 +79,7 @@ final class RiverPaletteTests {
             String readOnlyPrefix="hydrology.rivers."+target+(target.equals(RiverMaterialFields.PADDING) ? "" : ".palette");
             var readOnly=DimensionFields.readOnlyPaths(new LosslessJson(original));
             for (String field : List.of("expression","imageMap","fracture","cacheSize","multiplier","futureStyle")) {
-                check(readOnly.contains(readOnlyPrefix+".style."+field) != field.equals("expression"));
+                check(readOnly.contains(readOnlyPrefix+".style."+field) == List.of("imageMap","cacheSize","multiplier","futureStyle").contains(field));
                 rejects(() -> NoiseStyleFields.editText(PATH,original,styleTarget,field,"1"));
                 rejects(() -> NoiseStyleFields.enable(PATH,original,styleTarget,field));
             }
