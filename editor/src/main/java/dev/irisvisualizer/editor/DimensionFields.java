@@ -24,6 +24,7 @@ public final class DimensionFields {
         paths.addAll(DimensionTypeFields.readOnlyPaths(document));
         paths.addAll(DimensionStacks.readOnlyPaths(document));
         for (String field : document.fields()) {
+            if (TerrainOverlays.LIST_FIELDS.contains(field) || TerrainTransforms.OBJECT_FIELDS.contains(field)) continue;
             if (DimensionCarvings.LIST_FIELDS.contains(field)) continue;
             if (ResourceSelectors.DIMENSION_FIELDS.contains(field)) { if (!ResourceSelectors.supported(document,field)) paths.add(field);continue; }
             if (DimensionStacks.ROOT_FIELDS.contains(field) || DimensionStacks.OBJECT_FIELDS.contains(field)) continue;

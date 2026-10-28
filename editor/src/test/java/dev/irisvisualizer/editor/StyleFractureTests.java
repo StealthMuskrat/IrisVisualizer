@@ -22,7 +22,7 @@ final class StyleFractureTests {
         return result;
     }
     static void run(Path temp) throws Exception {
-        check(cases().size()==112 && StyleFractures.MAXIMUM_DEPTH==8 && StyleFractures.multiplierDefault().equals("1"));
+        check(cases().size()==113 && StyleFractures.MAXIMUM_DEPTH==8 && StyleFractures.multiplierDefault().equals("1"));
         var sources=PackWorkspace.newPack(Map.of("expressions/formula.json",bytes("opaque expression"),"image-maps/map.json",bytes("opaque map")));
         int ordinal=0;
         for (var c : cases()) {
@@ -81,6 +81,6 @@ final class StyleFractureTests {
         try { drafts.transitionUnder(target.draftPrefix(),() -> true,() -> { throw new IOException("failed write"); });throw new AssertionError(); } catch (IOException expected) { check(drafts.count()==4); }
         check(drafts.transitionUnder(target.draftPrefix(),() -> true,() -> {}) && drafts.count()==2 && drafts.contains(parent) && drafts.contains(other));
         check(FieldCoverage.fields("noiseStyle").size()==10 && FieldCoverage.fields("noiseStyle").stream().allMatch(FieldCoverage.Field::implemented));
-        System.out.println("PASS: recursive style fractures across 112 owner contexts, FLAT child defaults/generic bounds, multiplier and shared source/cache routing, strict parents/types/owners, depth preservation, scoped drafts and lossless Save/ZIP");
+        System.out.println("PASS: recursive style fractures across 113 owner contexts, FLAT child defaults/generic bounds, multiplier and shared source/cache routing, strict parents/types/owners, depth preservation, scoped drafts and lossless Save/ZIP");
     }
 }

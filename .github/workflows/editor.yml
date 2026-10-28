@@ -688,6 +688,17 @@ jobs:
           python editor/tools/extract_dimension_carving_fields.py IrisDimension.java IrisDimensionCarvingEntry.java IrisDimensionCarvingResolver.java IrisRange.java MantleCarvingComponent.java generated-dimension-carving-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-dimension-carving-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-carving-fields.properties).Hash) { throw 'Pinned dimension carving definitions differ' }
+      - name: Verify pinned terrain overlay and external transform controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/noise/IrisShapedGeneratorStyle.java' -OutFile IrisShapedGeneratorStyle.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/transform/IrisTerrainTransform.java' -OutFile IrisTerrainTransform.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/transform/TerrainTransformRegistry.java' -OutFile TerrainTransformRegistry.java
+          python editor/tools/test_dimension_terrain_fields.py IrisDimension.java IrisShapedGeneratorStyle.java IrisComplex.java DimensionTerrainContext.java IrisTerrainTransform.java TerrainTransformRegistry.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_terrain_fields.py IrisDimension.java IrisShapedGeneratorStyle.java IrisComplex.java DimensionTerrainContext.java IrisTerrainTransform.java TerrainTransformRegistry.java generated-dimension-terrain-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-terrain-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-terrain-fields.properties).Hash) { throw 'Pinned dimension terrain definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

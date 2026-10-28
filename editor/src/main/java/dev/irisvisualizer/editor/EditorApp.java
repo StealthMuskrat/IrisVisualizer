@@ -188,6 +188,8 @@ public final class EditorApp extends Application {
                     drawDimensionType(document);
                     drawDimensionStack(document);
                     drawDimensionCarvings(document);
+                    drawTerrainOverlays(document);
+                    drawTerrainTransform(document);
                     drawResourceSelectors(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
@@ -634,6 +636,83 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
             for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !ResourceSelectors.BIOME_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawTerrainOverlays(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Terrain overlay noise")) return;
+        ImGui.pushID("terrain-overlays");
+        ImGui.textWrapped("Iris adds each fitted overlay to terrain height. Bounds are signed integer offsets -2032..2032, not absolute world Y. Equal and reversed pairs are supported; native height bounds account for both ends. Native clamping, image-map overrides and generation are not evaluated here.");
+        List<LosslessJson> entries;
+        try { entries=TerrainOverlays.entries(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored overlays are null, a snippet or mixed/non-object list (read-only).");ImGui.popID();return; }
+        if (entries!=null && entries.size()>TerrainOverlays.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-overlay editor limit (read-only).");ImGui.popID();return; }
+        ImGui.textWrapped("Add writes explicit IRIS generator and min/max 0; it starts with a zero offset. Final removal restores field absence. Structural edits preserve raw entry data.");
+        ImGui.beginDisabled(entries!=null && entries.size()>=TerrainOverlays.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add zero-offset overlay (IRIS)");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(TerrainOverlays.prefix(),TerrainOverlays.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        if (entries!=null) for (int index=0;index<entries.size();index++) {
+            int entryIndex=index;var entry=entries.get(index);ImGui.pushID(TerrainOverlays.prefix(index));
+            if (ImGui.treeNode("Overlay "+index)) {
+                RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==entries.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+                if (action!=null) { try { commitProfileChange(TerrainOverlays.prefix(),TerrainOverlays.change(selected,workspace.read(selected),action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
+                try {
+                    String low=TerrainOverlays.bound(entry,"min"),high=TerrainOverlays.bound(entry,"max"),prefix=TerrainOverlays.prefix(index)+"bounds.",key=prefix+"pair";
+                    ImString min=values.computeIfAbsent(prefix+"min",ignored -> new ImString(low,Math.max(128,low.length()+1))),max=values.computeIfAbsent(prefix+"max",ignored -> new ImString(high,Math.max(128,high.length()+1)));
+                    ImGui.inputText("Minimum offset",min);ImGui.inputText("Maximum offset",max);drafts.update(key,low+"|"+high,min.get()+"|"+max.get());
+                    if (ImGui.button("Apply both offset bounds")) { try { commitProfileChange(prefix,TerrainOverlays.setBounds(selected,workspace.read(selected),index,min.get(),max.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+                } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored bounds are not exact signed 32-bit integers (read-only)."); }
+                if (ImGui.treeNode("Overlay generator style")) { drawStyleFields(entry,TerrainOverlays.styleTarget(entryIndex));ImGui.treePop(); }
+                for (String field : entry.fields()) if (!TerrainOverlays.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                ImGui.treePop();
+            }
+            ImGui.popID();
+        }
+        ImGui.popID();
+    }
+    private void drawTerrainTransform(LosslessJson document) {
+        if (!ImGui.collapsingHeader("External terrain-transform descriptor")) return;
+        ImGui.pushID("terrain-transform");
+        ImGui.textWrapped("Author the ID and exact implementation version of a provider installed in Iris. Matching is case-sensitive and preserves whitespace; versions are exact strings, not version ranges. This editor does not discover, install, invoke or validate providers, their settings, or transformed output.");
+        LosslessJson descriptor;
+        try { descriptor=TerrainTransforms.object(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored terrainTransform is not an inline object (read-only).");ImGui.popID();return; }
+        String prefix=TerrainTransforms.prefix()+"identity.",key=prefix+"pair";
+        try {
+            String id=descriptor==null ? "" : TerrainTransforms.identity(descriptor,"id"),version=descriptor==null ? "" : TerrainTransforms.identity(descriptor,"version");
+            if (id.indexOf(0)>=0 || version.indexOf(0)>=0) throw new IllegalArgumentException("NUL text is not editable");
+            ImString nextId=values.computeIfAbsent(prefix+"id",ignored -> new ImString(id,Math.max(4096,id.getBytes(StandardCharsets.UTF_8).length+1))),nextVersion=values.computeIfAbsent(prefix+"version",ignored -> new ImString(version,Math.max(4096,version.getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Exact provider ID",nextId);ImGui.inputText("Exact implementation version",nextVersion);drafts.update(key,TerrainTransforms.draftPair(id,version),TerrainTransforms.draftPair(nextId.get(),nextVersion.get()));
+            if (ImGui.button(descriptor==null ? "Create descriptor with this identity" : "Apply provider identity pair")) { try { byte[] updated=descriptor==null ? TerrainTransforms.create(selected,workspace.read(selected),nextId.get(),nextVersion.get()) : TerrainTransforms.setIdentity(selected,workspace.read(selected),nextId.get(),nextVersion.get());commitProfileChange(prefix,updated,key); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored ID/version has an unsupported type or NUL text (read-only)."); }
+        if (descriptor==null) { ImGui.textWrapped("Absent/null descriptor leaves terrain transformation disabled. Creation writes the chosen ID/version; settings retain their empty class default until enabled.");ImGui.popID();return; }
+        drawTerrainTransformSettings(descriptor);
+        for (String field : descriptor.fields()) if (!TerrainTransforms.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+        ImGui.textWrapped("Remove discards this entire descriptor, including settings and advanced data, and restores absence.");
+        if (ImGui.button("Remove terrain-transform descriptor")) { try { commitProfileChange(TerrainTransforms.prefix(),TerrainTransforms.remove(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        ImGui.popID();
+    }
+    private void drawTerrainTransformSettings(LosslessJson descriptor) {
+        if (!ImGui.treeNode("Provider string settings")) return;
+        ImGui.textWrapped("Literal string keys and values are passed to the provider. Empty strings and punctuation are allowed; provider-specific meaning is unchecked. Map iteration order has no runtime guarantee. Final removal restores the empty default by removing settings.");
+        List<LosslessJson.StringProperty> rows;
+        try { rows=TerrainTransforms.settings(descriptor); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored settings are null, mixed or unsupported (read-only).");ImGui.treePop();return; }
+        if (rows==null) { if (ImGui.button("Enable explicit empty settings map")) applyRoutingExtra(() -> workspace.replace(selected,TerrainTransforms.enableSettings(selected,workspace.read(selected))));ImGui.treePop();return; }
+        if (rows.size()>TerrainTransforms.MAXIMUM_SETTINGS) { ImGui.textWrapped("Above the 64-setting editor limit (read-only).");ImGui.treePop();return; }
+        String prefix=TerrainTransforms.prefix()+"settings#",newKey=prefix+"new.pair";ImString name=values.computeIfAbsent(prefix+"new.key",ignored -> new ImString("",4096)),value=values.computeIfAbsent(prefix+"new.value",ignored -> new ImString("",16384));
+        ImGui.inputText("New literal key",name);ImGui.inputText("New string value",value);drafts.update(newKey,TerrainTransforms.draftPair("",""),TerrainTransforms.draftPair(name.get(),value.get()));ImGui.beginDisabled(rows.size()>=TerrainTransforms.MAXIMUM_SETTINGS);boolean add=ImGui.button("Add setting");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,TerrainTransforms.add(selected,workspace.read(selected),name.get(),value.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        for (int index=0;index<rows.size();index++) {
+            var row=rows.get(index);String key=prefix+index+".pair";ImGui.pushID(index);
+            if (row.key().indexOf(0)>=0 || row.value().indexOf(0)>=0) {
+                ImGui.textWrapped("Stored setting contains NUL text (text editing read-only).");
+                if (ImGui.button("Remove this setting")) { try { commitProfileChange(prefix,TerrainTransforms.removeSetting(selected,workspace.read(selected),row.key()),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+                ImGui.popID();continue;
+            }
+            ImString nextKey=values.computeIfAbsent(prefix+index+".key",ignored -> new ImString(row.key(),Math.max(4096,row.key().getBytes(StandardCharsets.UTF_8).length+1))),nextValue=values.computeIfAbsent(prefix+index+".value",ignored -> new ImString(row.value(),Math.max(16384,row.value().getBytes(StandardCharsets.UTF_8).length+1)));
+            ImGui.inputText("Literal key",nextKey);ImGui.inputText("String value",nextValue);drafts.update(key,TerrainTransforms.draftPair(row.key(),row.value()),TerrainTransforms.draftPair(nextKey.get(),nextValue.get()));
+            if (ImGui.button("Apply setting pair")) { try { commitProfileChange(prefix,TerrainTransforms.set(selected,workspace.read(selected),row.key(),nextKey.get(),nextValue.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+            ImGui.sameLine();if (ImGui.button("Remove setting")) { try { commitProfileChange(prefix,TerrainTransforms.removeSetting(selected,workspace.read(selected),row.key()),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }ImGui.popID();
+        }
+        ImGui.treePop();
     }
     private void drawDimensionCarvings(LosslessJson document) {
         if (!ImGui.collapsingHeader("Dimension carving entries")) return;
