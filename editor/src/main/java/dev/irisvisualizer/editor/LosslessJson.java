@@ -59,7 +59,11 @@ public final class LosslessJson {
         Span span=rootKeys.get(key);return splice(span.start(),span.end(),quote(next));
     }
     byte[] stringMapRemove(String key) {
-        stringProperties();var keys=new ArrayList<>(root.keySet());int index=keys.indexOf(key);
+        stringProperties();return removeField(key);
+    }
+    /** Removes one explicitly selected member while preserving other raw keys/values. */
+    byte[] removeField(String key) {
+        var keys=new ArrayList<>(root.keySet());int index=keys.indexOf(key);
         if (index<0) throw new IllegalArgumentException("Map key is absent");
         if (index<keys.size()-1) return splice(rootKeys.get(key).start(),rootKeys.get(keys.get(index+1)).start(),"");
         int start=index==0 ? rootKeys.get(key).start() : root.get(keys.get(index-1)).end();

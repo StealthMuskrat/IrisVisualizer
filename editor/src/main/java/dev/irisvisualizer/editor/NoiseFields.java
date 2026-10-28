@@ -18,9 +18,12 @@ public final class NoiseFields {
     }
     public static final List<String> EDITABLE = List.of("zoom", "negative", "opacity", "offsetX", "offsetY", "offsetZ", "seed", "parametric", "bezier", "sinCentered", "exponent", "enabled", "octaves");
     public static final List<String> OBJECT_FIELDS = List.of("cliffHeightGenerator");
-    public record Target(String objectField, int index, FloatingPlacementOverrides.Context heightmapContext) {
+    public record Target(String objectField, int index, FloatingPlacementOverrides.Context heightmapContext, List<Integer> fracturePath) {
+        public Target(String objectField,int index,FloatingPlacementOverrides.Context heightmapContext) { this(objectField,index,heightmapContext,List.of()); }
         public Target(String objectField,int index) { this(objectField,index,null); }
         public Target {
+            if (fracturePath==null || fracturePath.size()>NoiseFractures.MAXIMUM_DEPTH || fracturePath.stream().anyMatch(i -> i==null || i<0)) throw new IllegalArgumentException("Unsupported fracture path");
+            fracturePath=List.copyOf(fracturePath);
             if (heightmapContext!=null) { if (!"heightmap".equals(objectField) || index!=-1) throw new IllegalArgumentException("Unsupported placement heightmap target"); }
             else if (!("composite".equals(objectField) && index >= 0) && !(OBJECT_FIELDS.contains(objectField) && index == -1))
                 throw new IllegalArgumentException("Unsupported noise object target");
@@ -30,7 +33,8 @@ public final class NoiseFields {
         public String resourceBase() { return heightmap() ? FloatingObjectPlacements.resourceBase(heightmapContext.entry()) : "generators"; }
         public static Target composite(int index) { return new Target("composite", index); }
         public static Target cliffHeight() { return new Target("cliffHeightGenerator", -1); }
-        public String draftPrefix() { return heightmap() ? heightmapContext.heightmapPrefix() : index < 0 ? objectField + "#" : objectField + "#" + index + "."; }
+        public Target child(int child) { var path=new ArrayList<>(fracturePath);path.add(child);return new Target(objectField,index,heightmapContext,path); }
+        public String draftPrefix() { String prefix=heightmap() ? heightmapContext.heightmapPrefix() : index < 0 ? objectField + "#" : objectField + "#" + index + ".";for (int child : fracturePath) prefix+="fracture#"+child+".";return prefix; }
     }
     public static boolean generator(String path) { return "generators".equals(ResourceTypes.base(path)); }
     private static void authorize(String path, Target target, String field) {
@@ -76,9 +80,15 @@ public final class NoiseFields {
         return editObject(original, target, object -> object.bool(field, value), false);
     }
     static byte[] editObject(byte[] original, Target target, java.util.function.Function<LosslessJson, byte[]> operation, boolean create) {
-        if (target.heightmap()) return FloatingPlacementOverrides.editHeightmap(original,target.heightmapContext(),operation);
+        java.util.function.Function<LosslessJson,byte[]> nested=object -> editFracture(object,target.fracturePath(),0,operation);
+        if (target.heightmap()) return FloatingPlacementOverrides.editHeightmap(original,target.heightmapContext(),nested);
         var document = new LosslessJson(original);
-        if (target.index() >= 0) return document.objectArrayEdit(target.objectField(), target.index(), operation);
-        return document.objectEdit(target.objectField(), operation, create);
+        if (target.index() >= 0) return document.objectArrayEdit(target.objectField(), target.index(), nested);
+        return document.objectEdit(target.objectField(), nested, create && target.fracturePath().isEmpty());
+    }
+    private static byte[] editFracture(LosslessJson object,List<Integer> path,int depth,java.util.function.Function<LosslessJson,byte[]> operation) {
+        if (depth==path.size()) return operation.apply(object);
+        if (object.objectArray("fracture").size()>NoiseFractures.MAXIMUM_CHILDREN) throw new IllegalArgumentException("Oversized fracture ancestors remain read-only");
+        return object.objectArrayEdit("fracture",path.get(depth),child -> editFracture(child,path,depth+1,operation));
     }
 }

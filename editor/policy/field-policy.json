@@ -438,7 +438,7 @@
     },
     "cliffHeightGenerator": {
       "classification": "generation",
-      "reason": "Cliff shaping noise object; audited noise scalar controls only, with styles and fracture trees still read-only."
+      "reason": "Cliff shaping noise with bounded scalar/style controls and recursive coordinate-fracture children; no noise sampling or native preview."
     },
     "interpolator": {
       "classification": "generation",
@@ -659,6 +659,10 @@
     "style": {
       "classification": "generation",
       "reason": "Noise style object; bounded enum, zoom and exponent controls only, with contextual defaults preserved."
+    },
+    "fracture": {
+      "classification": "generation",
+      "reason": "Recursive ordered child-noise lists with inherited scalar/style controls and lossless structural edits; source-bound coordinate offsets and salt ordering. Editor limits are eight child levels and 64 entries per list, distinct from native optimizer bounds. Unsupported/deeper data remains preserved."
     }
   },
   "noiseStyle": {

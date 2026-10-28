@@ -70,7 +70,7 @@ final class FloatingPlacementOverrideTests {
             String force=list.equals("floatingObjects") ? "force" : "forcePlace";byte[] original=document(list,"{\""+force+"\":false,\"heightmap\":{\"seed\":9007199254740993,\"offsetY\":1e2,\"enabled\":true,\"octaves\":1,\"style\":{\"style\":\"UNKNOWN\",\"zoom\":1e0,\"expression\":\"x+z\"},\"fracture\":[{\"future\":true}],\"cliffHeightGenerator\":{\"future\":9007199254740993},\"futureNoise\":\"雪\\u0061\"},\"futurePlacement\":9007199254740993}"),copy=original.clone();
             check(text(NoiseFields.editText(PATH,original,target,"seed","-9223372036854775808")).equals(text(original).replace("\"seed\":9007199254740993","\"seed\":-9223372036854775808")));
             check(text(NoiseFields.editText(PATH,original,target,"offsetY","160")).equals(text(original).replace("\"offsetY\":1e2","\"offsetY\":160")));
-            check(FloatingPlacementOverrides.readOnlyHeightmapPaths(placement(original,list)).containsAll(List.of("heightmap.fracture","heightmap.cliffHeightGenerator","heightmap.futureNoise")));
+            check(FloatingPlacementOverrides.readOnlyHeightmapPaths(placement(original,list)).containsAll(List.of("heightmap.fracture[0].future","heightmap.cliffHeightGenerator","heightmap.futureNoise")));
             var drafts=new InspectorDrafts();String seed=target.draftPrefix()+"seed",style=styleTarget.draftPrefix()+"zoom",warp=FloatingObjectPlacements.placementPrefix(0,list,0)+"warp.zoom",other=new FloatingPlacementOverrides.Context(1,list,0).heightmapPrefix()+"seed";
             for (String key : List.of(seed,style,warp,other)) drafts.update(key,"1","2");
             check(!drafts.transitionUnder(context.heightmapPrefix(),() -> false,() -> { throw new AssertionError(); }) && drafts.count()==4);

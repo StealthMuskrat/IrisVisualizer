@@ -36,3 +36,5 @@ GPL-3.0-or-later; see [LICENSE.md](LICENSE.md). Iris is developed by Volmit Soft
 The editor also authors optional dimension world borders: paired center coordinates, full diameter, warning distance and damage settings, using pinned native bounds and preserving advanced data. Null/absence leaves the live native border unchanged; the editor does not apply borders to running worlds. Unsupported previews remain disabled.
 
 Dimension-type editing includes environment/fullbright and all 13 pinned options, explicit base inheritance and nullable time/cloud behavior, and exact 64-bit fixed times. Runtime registry and existing-world compatibility remain unvalidated; unsupported previews remain disabled.
+
+Noise-fracture trees now support bounded recursive child editing across composite, cliff and placement-heightmap contexts, including lossless list operations and shared noise/style controls. Editor limits are explicit; unsupported previews and style-fracture objects remain disabled/read-only.

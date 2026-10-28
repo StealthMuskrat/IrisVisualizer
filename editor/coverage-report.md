@@ -12,7 +12,7 @@ Direct nonstatic/nontransient private fields in seventy-one pinned source classe
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
 | region | 27 | 25 | 19 | 2 |
-| noise | 15 | 14 | 14 | 1 |
+| noise | 15 | 15 | 15 | 0 |
 | noiseStyle | 10 | 9 | 9 | 1 |
 | terrain3D | 14 | 14 | 14 | 0 |
 | caveProfile | 32 | 32 | 32 | 0 |
@@ -110,7 +110,7 @@ Unclassified: `proceduralObjects`, `structures`.
 
 ## noise
 
-Unclassified: `fracture`.
+Unclassified: none.
 
 ## noiseStyle
 
