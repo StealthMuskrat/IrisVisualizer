@@ -87,6 +87,15 @@ public final class EditorApp extends Application {
     private long indexedRevision = -1;
     private PackWorkspace indexedWorkspace;
     private List<ResourceTree.Node> resources = List.of();
+    private ResourceFinder.Family browserFamily=ResourceFinder.Family.ALL,indexedFamily;
+    private boolean browserChangedOnly,indexedChangedOnly,indexedDirty;
+    private long indexedAppliedRevision=-1;
+    private boolean showQuickOpen,quickChangedOnly;
+    private final ImString quickQuery=new ImString(256);
+    private ResourceFinder.Family quickFamily=ResourceFinder.Family.ALL;
+    private final ResourceFinder.Cache quickFinder=new ResourceFinder.Cache();
+    private String quickSelected,quickPendingPath;
+    private PackWorkspace quickPendingWorkspace;
     @Override protected void preRun() {
         long handle = ((WindowGlfw) getWindow()).getHandle();
         glfwSetWindowCloseCallback(handle, window -> {
@@ -133,6 +142,7 @@ public final class EditorApp extends Application {
                 ImGui.endMenu();
             }
             if (ImGui.beginMenu("Navigate")) {
+                if (ImGui.menuItem("Quick Open resource")) showQuickOpen=true;
                 var back=navigationHistory.back();var forward=navigationHistory.forward();
                 ImGui.beginDisabled(back.isEmpty());if (ImGui.menuItem("Back")) queueHistoryNavigation(false,1);ImGui.endDisabled();
                 ImGui.beginDisabled(forward.isEmpty());if (ImGui.menuItem("Forward")) queueHistoryNavigation(true,1);ImGui.endDisabled();
@@ -150,10 +160,14 @@ public final class EditorApp extends Application {
         ImGui.setNextWindowPos(0, 24); ImGui.setNextWindowSize(width * .24f, height);
         ImGui.begin("Resources");
         ImGui.inputText("Search", filter);
-        if (indexedWorkspace != workspace || indexedRevision != workspace.resourceRevision() || !filter.get().equals(indexedFilter)) {
-            indexedWorkspace = workspace; indexedRevision = workspace.resourceRevision(); indexedFilter = filter.get();
-            resources = ResourceTree.build(workspace.paths(), workspace.directories(), indexedFilter);
+        if (ImGui.beginCombo("Resource family",browserFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==browserFamily)) browserFamily=family;ImGui.endCombo(); }
+        if (ImGui.checkbox("Applied changes only",browserChangedOnly)) browserChangedOnly=!browserChangedOnly;
+        if (ImGui.button("Clear browser filters")) { filter.set("");browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; }
+        if (indexedWorkspace != workspace || indexedRevision != workspace.resourceRevision() || !filter.get().equals(indexedFilter) || indexedFamily!=browserFamily || indexedChangedOnly!=browserChangedOnly || browserChangedOnly && (indexedAppliedRevision!=workspace.revision() || indexedDirty!=workspace.dirty())) {
+            indexedWorkspace = workspace; indexedRevision = workspace.resourceRevision(); indexedFilter = filter.get();indexedFamily=browserFamily;indexedChangedOnly=browserChangedOnly;indexedAppliedRevision=workspace.revision();indexedDirty=workspace.dirty();
+            resources = ResourceTree.build(workspace,indexedFilter,browserFamily,browserChangedOnly);
         }
+        if (browserFamily!=ResourceFinder.Family.ALL || browserChangedOnly) ImGui.textWrapped("File filters hide empty folders. Clear filters to see all folders.");
         if (resources.isEmpty()) ImGui.textWrapped(workspace.paths().isEmpty() ? "No resources. Open a pack folder or import a ZIP." : "No matching resources.");
         ImGui.textDisabled("Ctrl-click: duplicate; Ctrl-right-click folder: create; Ctrl-middle-click folder: subfolder");
         drawResources(resources);
@@ -284,6 +298,7 @@ public final class EditorApp extends Application {
         if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+        if (showQuickOpen) drawQuickOpen();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
         if (navigationRequest!=null) {
@@ -292,9 +307,14 @@ public final class EditorApp extends Application {
                 if (plan!=null) {
                     navigationHistory.validate(plan,workspace);
                     transition(false,() -> { navigationHistory.commit(plan,workspace);selected=plan.location().path();filter.set(plan.location().filter());error=null; });
-                } else if (!navigationRequest.target().equals(selected)) transition(false,() -> { selected=navigationRequest.target();filter.set("");error=null; });
+                } else {
+                    boolean picker=quickPendingWorkspace==workspace && navigationRequest.target().equals(quickPendingPath);
+                    boolean opened=navigationRequest.target().equals(selected) || transition(false,() -> { selected=navigationRequest.target();filter.set("");error=null; });
+                    if (picker && opened) { showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
+                }
             } catch (Exception failure) { error=failure.getMessage(); }
         }
+        quickPendingWorkspace=null;quickPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
     }
     private void drawReferences() {
@@ -5525,8 +5545,36 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get()); } else navigationHistory.observe(workspace,selected,filter.get()); }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
+    }
+    private void revealSelectedResource() {
+        if (selected==null) return;
+        if (!browserFamily.matches(selected)) browserFamily=ResourceFinder.Family.ALL;
+        if (browserChangedOnly && !workspace.changed(selected)) browserChangedOnly=false;
+    }
+    private void drawQuickOpen() {
+        if (!ImGui.begin("Quick Open resource")) { ImGui.end();return; }
+        if (ImGui.button("Close Quick Open")) { showQuickOpen=false;ImGui.end();return; }
+        ImGui.inputText("Path or filename",quickQuery);
+        if (ImGui.beginCombo("Find family",quickFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==quickFamily)) quickFamily=family;ImGui.endCombo(); }
+        if (ImGui.checkbox("Find applied changes only",quickChangedOnly)) quickChangedOnly=!quickChangedOnly;
+        if (ImGui.button("Clear finder filters")) { quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false; }
+        ImGui.textWrapped("Case-insensitive path search. All space-separated terms must match; exact paths and filenames rank first. This lists files only and does not read their contents. Opening uses the unapplied-text guard.");
+        try {
+            var result=quickFinder.query(workspace,new ResourceFinder.Query(quickQuery.get(),quickFamily,quickChangedOnly));
+            if (result.hits().stream().noneMatch(hit -> hit.path().equals(quickSelected))) quickSelected=result.hits().isEmpty() ? null : result.hits().getFirst().path();
+            ImGui.textWrapped(result.matches()+" matches; "+result.hits().size()+" shown; "+result.indexedFiles()+" / "+result.totalFiles()+" files indexed.");
+            if (result.truncated()) ImGui.textWrapped("Only the best 100 results are shown; narrow the search to find more.");
+            if (result.incompleteIndex()) ImGui.textWrapped("The path index budget was reached; remaining sorted paths are unsearched. Use the resource browser for those files.");
+            for (var hit : result.hits()) { ImGui.pushID(hit.path());String path=hit.path().length()>128 ? hit.path().substring(0,128)+"..." : hit.path();if (ImGui.selectable(path+(workspace.changed(hit.path()) ? " *" : ""),hit.path().equals(quickSelected))) quickSelected=hit.path();if (ImGui.isItemHovered()) ImGui.setTooltip(hit.path());ImGui.popID(); }
+            if (quickSelected!=null) {
+                ImGui.textWrapped(quickSelected+" — "+workspace.size(quickSelected)+" bytes");
+                if (ImGui.button("Open selected resource")) { resourceNavigation.request(workspace,quickSelected);quickPendingPath=quickSelected;quickPendingWorkspace=workspace; }
+            }
+            ImGui.textWrapped("Limits: 100 results, eight terms / 256 search characters, 100,000 files and 16 million normalized path characters. Other files includes unsupported families. Applied changes excludes unapplied text and folder-only changes.");
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+        ImGui.end();
     }
     private void drawAppliedHistory() {
         if (!ImGui.begin("Applied edit history")) { ImGui.end();return; }
