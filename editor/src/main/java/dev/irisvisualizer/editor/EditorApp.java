@@ -96,6 +96,13 @@ public final class EditorApp extends Application {
     private final ResourceFinder.Cache quickFinder=new ResourceFinder.Cache();
     private String quickSelected,quickPendingPath;
     private PackWorkspace quickPendingWorkspace;
+    private boolean showTextSearch,textChangedOnly;
+    private final ImString textQuery=new ImString(1024);
+    private ResourceFinder.Family textFamily=ResourceFinder.Family.ALL;
+    private final WorkspaceTextSearch.Cache textSearch=new WorkspaceTextSearch.Cache();
+    private WorkspaceTextSearch.Query activeTextQuery;
+    private String textSearchError,textPendingPath;
+    private PackWorkspace textPendingWorkspace;
     @Override protected void preRun() {
         long handle = ((WindowGlfw) getWindow()).getHandle();
         glfwSetWindowCloseCallback(handle, window -> {
@@ -145,6 +152,7 @@ public final class EditorApp extends Application {
             }
             if (ImGui.beginMenu("Navigate")) {
                 if (ImGui.menuItem("Quick Open resource")) showQuickOpen=true;
+                if (ImGui.menuItem("Search JSON text")) showTextSearch=true;
                 var back=navigationHistory.back();var forward=navigationHistory.forward();
                 ImGui.beginDisabled(back.isEmpty());if (ImGui.menuItem("Back")) queueHistoryNavigation(false,1);ImGui.endDisabled();
                 ImGui.beginDisabled(forward.isEmpty());if (ImGui.menuItem("Forward")) queueHistoryNavigation(true,1);ImGui.endDisabled();
@@ -301,6 +309,7 @@ public final class EditorApp extends Application {
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
         if (showQuickOpen) drawQuickOpen();
+        if (showTextSearch) drawTextSearch();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
         if (navigationRequest!=null) {
@@ -311,12 +320,14 @@ public final class EditorApp extends Application {
                     transition(false,() -> { navigationHistory.commit(plan,workspace);selected=plan.location().path();filter.set(plan.location().filter());error=null; });
                 } else {
                     boolean picker=quickPendingWorkspace==workspace && navigationRequest.target().equals(quickPendingPath);
+                    boolean textResult=textPendingWorkspace==workspace && navigationRequest.target().equals(textPendingPath);
                     boolean opened=navigationRequest.target().equals(selected) || transition(false,() -> { selected=navigationRequest.target();filter.set("");error=null; });
-                    if (picker && opened) { showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
+                    if ((picker || textResult) && opened) { if (picker) showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
                 }
             } catch (Exception failure) { error=failure.getMessage(); }
         }
         quickPendingWorkspace=null;quickPendingPath=null;
+        textPendingWorkspace=null;textPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
     }
     private void drawReferences() {
@@ -5547,13 +5558,44 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
         if (selected==null) return;
         if (!browserFamily.matches(selected)) browserFamily=ResourceFinder.Family.ALL;
         if (browserChangedOnly && !workspace.changed(selected)) browserChangedOnly=false;
+    }
+    private void drawTextSearch() {
+        if (!ImGui.begin("Search JSON text")) { ImGui.end();return; }
+        if (ImGui.button("Close text search")) { showTextSearch=false;ImGui.end();return; }
+        ImGui.inputText("Literal source text",textQuery);
+        if (ImGui.beginCombo("Text search family",textFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==textFamily)) textFamily=family;ImGui.endCombo(); }
+        if (ImGui.checkbox("Search applied changes only",textChangedOnly)) textChangedOnly=!textChangedOnly;
+        if (ImGui.button("Search applied JSON text")) {
+            try { activeTextQuery=new WorkspaceTextSearch.Query(textQuery.get(),textFamily,textChangedOnly);textSearchError=null; }
+            catch (IllegalArgumentException invalid) { textSearchError=invalid.getMessage(); }
+        }
+        ImGui.sameLine();if (ImGui.button("Clear text search")) { textQuery.set("");activeTextQuery=null;textSearch.clear();textSearchError=null; }
+        ImGui.textWrapped("Case-sensitive literal source search in .json files, including unknown/malformed JSON. Escapes are searched as stored; no regular expressions, JSON decoding, formulas or native loading. Search applies the form; results then refresh after applied edits. Unapplied inspector text is excluded.");
+        if (textSearchError!=null) ImGui.textWrapped(textSearchError);
+        if (activeTextQuery!=null) {
+            ImGui.textWrapped("Results for: "+activeTextQuery.text()+"; "+activeTextQuery.family().label()+(activeTextQuery.changedOnly() ? "; applied changes only" : ""));
+            var result=textSearch.query(workspace,activeTextQuery);
+            ImGui.textWrapped(result.matches()+" non-overlapping matches; "+result.hits().size()+" shown; "+result.scannedFiles()+" / "+result.eligibleFiles()+" eligible JSON files searched; "+result.scannedBytes()+" bytes read.");
+            if (result.incomplete()) ImGui.textWrapped("Incomplete search: "+result.tooLarge()+" oversized, "+result.invalidText()+" invalid UTF-8/control-text, "+result.byteBudgetSkipped()+" byte-budget and "+result.fileBudgetSkipped()+" file-budget skips. Skipped files may contain matches.");
+            if (result.truncated()) ImGui.textWrapped("Only the first 200 matches in sorted path/source order are shown; narrow the search.");
+            int index=0;for (var hit : result.hits()) {
+                ImGui.pushID(index++);
+                if (ImGui.button("Open resource")) { resourceNavigation.request(workspace,hit.path());textPendingPath=hit.path();textPendingWorkspace=workspace; }
+                ImGui.sameLine();ImGui.textUnformatted("Line "+hit.line()+", column "+hit.column()+" (UTF-16)");
+                ImGui.textWrapped(hit.path());
+                ImGui.textUnformatted((hit.clippedBefore() ? "..." : "")+hit.excerpt()+(hit.clippedAfter() ? "..." : ""));
+                ImGui.popID();
+            }
+        }
+        ImGui.textWrapped("Limits: 1 MiB/file, 16 MiB read, 4,096 eligible files, 200 results, 256 query characters and 160-character excerpts. Columns count decoded UTF-16 units. Open selects the resource using the draft guard; it does not jump to a field or edit text.");
+        ImGui.end();
     }
     private void drawQuickOpen() {
         if (!ImGui.begin("Quick Open resource")) { ImGui.end();return; }
