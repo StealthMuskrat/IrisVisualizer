@@ -319,6 +319,10 @@
     "disabledComponents": {
       "classification": "generation",
       "reason": "Controls platform dimension-type borrowing, dimension-owned datapack sources or serialized disabled generation components. Editing performs no fetching, file access, registry lookup or component discovery."
+    },
+    "structures": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
     }
   },
   "biome": {
@@ -481,6 +485,10 @@
     "carvingBiome": {
       "classification": "generation",
       "reason": "Registers a biome in native reachable traversal; not cave terrain substitution. Exact file selection only."
+    },
+    "structures": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
     }
   },
   "generator": {
@@ -649,6 +657,10 @@
     "depositVariants": {
       "classification": "generation",
       "reason": "Ordered native world-Y remap rules: first successful cave-biome, then region, then dimension mapping. Literal string-map and atomic band controls preserve unsupported data; native material resolution and generation remain unavailable."
+    },
+    "structures": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
     }
   },
   "importedStructures": {
@@ -3535,6 +3547,114 @@
     "max": {
       "classification": "generation",
       "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
+    }
+  },
+  "structurePlacement": {
+    "structures": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "nativeStructures": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "placementId": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "nativeSuppression": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "distribution": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "spacing": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "separation": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "salt": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "density": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "ringCount": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "ringDistance": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "ringSpread": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "minHeight": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "maxHeight": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "underground": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "anchor": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "caveBiomes": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "caveAnchorAttempts": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "caveAnchorScanStep": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "caveMinimumClearance": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "underwater": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "terrain": {
+      "classification": "read-only",
+      "reason": "Advanced placement-specific terrain/foundation settings are preserved. The current placement controls cover scheduling and sources."
+    },
+    "stilt": {
+      "classification": "read-only",
+      "reason": "Advanced placement-specific terrain/foundation settings are preserved. The current placement controls cover scheduling and sources."
+    }
+  },
+  "nativeStructureSource": {
+    "structure": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "weight": {
+      "classification": "generation",
+      "reason": "Controls authored structure placement sources, identity, distribution, vertical/cave anchors or scheduling. Registry contents, assembly, cave search and actual placement are unvalidated."
+    },
+    "jigsaw": {
+      "classification": "read-only",
+      "reason": "Advanced native jigsaw overrides are preserved without live registry/pool/processor or assembly validation."
     }
   }
 }

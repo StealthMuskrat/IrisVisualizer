@@ -811,6 +811,20 @@ jobs:
           python editor/tools/extract_native_structure_palette_fields.py IrisStructureStiltSettings.java IrisStructureTerrain.java IrisMaterialPalette.java IrisBlockData.java IrisVanillaStructureAdjustment.java IrisImportedStructureControl.java StructureStiltSettings.java StructureTerrainSettings.java generated-native-structure-palette-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-native-structure-palette-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/native-structure-palette-fields.properties).Hash) { throw 'Pinned native structure palette definitions differ' }
+      - name: Verify pinned structure placement scheduling and source contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructurePlacement.java' -OutFile IrisStructurePlacement.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/IrisNativeStructure.java' -OutFile IrisNativeStructure.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/StructureDistribution.java' -OutFile StructureDistribution.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructureAnchorMode.java' -OutFile IrisStructureAnchorMode.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/NativeStructureSuppression.java' -OutFile NativeStructureSuppression.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/nativegen/NativeStructurePlacementPlanner.java' -OutFile NativeStructurePlacementPlanner.java
+          python editor/tools/test_structure_placement_fields.py IrisDimension.java IrisBiome.java IrisRegion.java IrisStructurePlacement.java IrisNativeStructure.java StructureDistribution.java IrisStructureAnchorMode.java NativeStructureSuppression.java PackStructurePlacementValidator.java NativeStructurePlacementPlanner.java PackValidator.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_structure_placement_fields.py IrisDimension.java IrisBiome.java IrisRegion.java IrisStructurePlacement.java IrisNativeStructure.java StructureDistribution.java IrisStructureAnchorMode.java NativeStructureSuppression.java PackStructurePlacementValidator.java NativeStructurePlacementPlanner.java PackValidator.java generated-structure-placement-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-structure-placement-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/structure-placement-fields.properties).Hash) { throw 'Pinned structure placement definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

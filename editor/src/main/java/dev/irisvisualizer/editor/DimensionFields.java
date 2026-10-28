@@ -26,6 +26,7 @@ public final class DimensionFields {
         paths.addAll(DimensionTypeFields.readOnlyPaths(document));
         paths.addAll(DimensionStacks.readOnlyPaths(document));
         for (String field : document.fields()) {
+            if (StructurePlacements.LIST_FIELDS.contains(field)) { paths.addAll(StructurePlacements.readOnlyPaths(document));continue; }
             if (DimensionIntegrations.EDITABLE.contains(field)) continue;
             if (List.of("importedFeatures","importedStructures").contains(field)) { paths.addAll(NativeGenerationFilters.readOnlyPaths(document,field));continue; }
             if (DimensionGenerationControls.ROOT_FIELDS.contains(field)) continue;
