@@ -29,6 +29,7 @@ public final class EditorApp extends Application {
     private final BlockAliasAudit.Cache blockAliasAudits = new BlockAliasAudit.Cache();
     private final ExpressionReferenceAudit.Cache expressionAudits = new ExpressionReferenceAudit.Cache();
     private final ResourceNavigation resourceNavigation = new ResourceNavigation();
+    private final NavigationHistory navigationHistory = new NavigationHistory();
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
     private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
@@ -129,6 +130,16 @@ public final class EditorApp extends Application {
                 ImGui.textWrapped(workspace.historyNote());
                 if (ImGui.menuItem("Review applied edits")) showAppliedHistory=true;
                 ImGui.beginDisabled(workspace.undoCount()+workspace.redoCount()==0);if (ImGui.menuItem("Clear applied-edit history")) workspace.clearHistory();ImGui.endDisabled();
+                ImGui.endMenu();
+            }
+            if (ImGui.beginMenu("Navigate")) {
+                var back=navigationHistory.back();var forward=navigationHistory.forward();
+                ImGui.beginDisabled(back.isEmpty());if (ImGui.menuItem("Back")) queueHistoryNavigation(false,1);ImGui.endDisabled();
+                ImGui.beginDisabled(forward.isEmpty());if (ImGui.menuItem("Forward")) queueHistoryNavigation(true,1);ImGui.endDisabled();
+                drawNavigationDestinations("Back history",back,false);drawNavigationDestinations("Forward history",forward,true);
+                if (ImGui.beginMenu("Recent resources")) { int index=0;for (String path : navigationHistory.recent()) { ImGui.pushID(index++);if (ImGui.menuItem(path.length()>128 ? path.substring(0,128)+"..." : path)) selectResource(path);if (ImGui.isItemHovered()) ImGui.setTooltip(path);ImGui.popID(); }ImGui.endMenu(); }
+                if (ImGui.menuItem("Clear navigation history")) navigationHistory.clear();
+                ImGui.textWrapped("Up to 128 resource locations and 32 unique recent files in this pack, including search text. File selection only; applied edit history stays separate. New/Open/Import starts fresh navigation history.");
                 ImGui.endMenu();
             }
             ImGui.text(workspace.dirty() ? "Unsaved changes" : "Saved / no applied changes");
@@ -273,8 +284,17 @@ public final class EditorApp extends Application {
         if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
-        String navigationTarget=resourceNavigation.take(workspace);
-        if (navigationTarget!=null) { try { transition(false,() -> { selected=navigationTarget;filter.set(""); }); } catch (Exception failure) { error=failure.getMessage(); } }
+        navigationHistory.observe(workspace,selected,filter.get());
+        var navigationRequest=resourceNavigation.takeRequest(workspace);
+        if (navigationRequest!=null) {
+            try {
+                var plan=navigationRequest.plan();
+                if (plan!=null) {
+                    navigationHistory.validate(plan,workspace);
+                    transition(false,() -> { navigationHistory.commit(plan,workspace);selected=plan.location().path();filter.set(plan.location().filter());error=null; });
+                } else if (!navigationRequest.target().equals(selected)) transition(false,() -> { selected=navigationRequest.target();filter.set("");error=null; });
+            } catch (Exception failure) { error=failure.getMessage(); }
+        }
         if (showAppliedHistory) drawAppliedHistory();
     }
     private void drawReferences() {
@@ -299,7 +319,7 @@ public final class EditorApp extends Application {
             };
             ImGui.textWrapped(status);
             if (link.state() == ReferenceDiagnostics.State.EXACT_FILE && ImGui.smallButton("Open##reference-" + link.field())) {
-                try { if (transition(false, () -> { selected = link.target(); filter.set(""); })) break; }
+                try { resourceNavigation.request(workspace,link.target());break; }
                 catch (Exception failure) { error = failure.getMessage(); }
             }
         }
@@ -5505,7 +5525,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null; } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get()); } else navigationHistory.observe(workspace,selected,filter.get()); }
         return committed;
     }
     private void drawAppliedHistory() {
@@ -5549,8 +5569,15 @@ public final class EditorApp extends Application {
         try { transition(false,() -> { selected=forward ? workspace.redo() : workspace.undo();filter.set("");error=null; }); }
         catch (Exception failure) { error=failure.getMessage(); }
     }
+    private void queueHistoryNavigation(boolean forward,int steps) {
+        try { resourceNavigation.request(workspace,navigationHistory.plan(workspace,forward,steps)); }
+        catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawNavigationDestinations(String label,List<NavigationHistory.Destination> entries,boolean forward) {
+        if (ImGui.beginMenu(label)) { for (var entry : entries) { ImGui.pushID(entry.steps());String path=entry.location().path();if (ImGui.menuItem(entry.steps()+". "+(path.length()>128 ? path.substring(0,128)+"..." : path))) queueHistoryNavigation(forward,entry.steps());if (ImGui.isItemHovered()) ImGui.setTooltip(path+"\nSearch: "+entry.location().filter());ImGui.popID(); }ImGui.endMenu(); }
+    }
     private void selectResource(String path) {
-        try { transition(false, () -> { selected = path; }); }
+        try { resourceNavigation.request(workspace,path); }
         catch (Exception failure) { error = failure.getMessage(); }
     }
     private boolean discardArrayDrafts(String field, String appliedKey) {
@@ -5607,13 +5634,13 @@ public final class EditorApp extends Application {
                     if (name == null) return;
                     PackWorkspace next = StarterPack.create(name);
                     String dimension = "dimensions/" + StarterPack.normalizeName(name) + ".json";
-                    transition(true, () -> { workspace = next; selected = dimension; });
+                    transition(true, () -> { workspace = next; selected = dimension;filter.set(""); });
                 }
                 case "Open", "Import" -> {
                     Path path = choose(action.equals("Open"), false);
                     if (path != null) transition(true, () -> {
                         PackWorkspace next = action.equals("Open") ? PackWorkspace.open(path) : PackWorkspace.importZip(path);
-                        workspace = next; selected = null;
+                        workspace = next; selected = null;filter.set("");
                     });
                 }
                 case "Save" -> { if (!appliedValuesOnlyAllowed() || !saveWorkspace()) return; }
