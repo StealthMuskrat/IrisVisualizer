@@ -5,6 +5,7 @@ import imgui.app.Application;
 import imgui.app.Configuration;
 import imgui.app.WindowGlfw;
 import imgui.flag.ImGuiTreeNodeFlags;
+import imgui.flag.ImGuiInputTextFlags;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.system.MemoryUtil;
@@ -93,6 +94,12 @@ public final class EditorApp extends Application {
         });
     }
     private final InspectorDrafts drafts = new InspectorDrafts();
+    private boolean showAppliedHistory;
+    private PackWorkspace reviewedWorkspace;
+    private long reviewedHistoryId=-1;
+    private final AppliedEditReview.Cache editReviews=new AppliedEditReview.Cache();
+    private AppliedEditReview.Comparison reviewedComparison;
+    private ImString reviewedBefore,reviewedAfter;
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
@@ -120,6 +127,7 @@ public final class EditorApp extends Application {
                 ImGui.textWrapped(workspace.undoCount()+" undo / "+workspace.redoCount()+" redo; "+workspace.historyBytes()+" snapshot bytes.");
                 ImGui.textWrapped("Applied byte edits only, up to 128 edits / 32 MiB. Resource/folder creation or duplication clears history. Save retains it. History is memory-only and ends when the pack is replaced or the editor closes.");
                 ImGui.textWrapped(workspace.historyNote());
+                if (ImGui.menuItem("Review applied edits")) showAppliedHistory=true;
                 ImGui.beginDisabled(workspace.undoCount()+workspace.redoCount()==0);if (ImGui.menuItem("Clear applied-edit history")) workspace.clearHistory();ImGui.endDisabled();
                 ImGui.endMenu();
             }
@@ -267,6 +275,7 @@ public final class EditorApp extends Application {
         ImGui.end();
         String navigationTarget=resourceNavigation.take(workspace);
         if (navigationTarget!=null) { try { transition(false,() -> { selected=navigationTarget;filter.set(""); }); } catch (Exception failure) { error=failure.getMessage(); } }
+        if (showAppliedHistory) drawAppliedHistory();
     }
     private void drawReferences() {
         String base = ResourceTypes.base(selected);
@@ -5496,8 +5505,45 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) previous.clearHistory(); }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null; } }
         return committed;
+    }
+    private void drawAppliedHistory() {
+        if (!ImGui.begin("Applied edit history")) { ImGui.end();return; }
+        if (ImGui.button("Close history review")) { showAppliedHistory=false;ImGui.end();return; }
+        ImGui.textWrapped("Review retained applied byte edits. Before/after text describes one edit, not the complete destination of a multi-step restore. Undo/Redo through an edit includes intervening edits across resources and uses the unapplied-text guard. Nothing is written to disk until Save.");
+        ImGui.textWrapped(workspace.undoCount()+" undo / "+workspace.redoCount()+" redo; "+workspace.historyNote());
+        if (reviewedWorkspace!=workspace) { reviewedWorkspace=workspace;reviewedHistoryId=-1; }
+        var undo=workspace.historySteps(false);var redo=workspace.historySteps(true);
+        drawAppliedHistoryChoices("Undo timeline (next first)",undo);drawAppliedHistoryChoices("Redo timeline (next first)",redo);
+        var active=java.util.stream.Stream.concat(undo.stream(),redo.stream()).filter(step -> step.id()==reviewedHistoryId).findFirst().orElse(null);
+        if (active==null) reviewedHistoryId=-1;
+        var comparison=editReviews.inspect(workspace,reviewedHistoryId);
+        if (comparison!=reviewedComparison) { reviewedComparison=comparison;reviewedBefore=comparison==null ? null : new ImString(comparison.before().text(),Math.max(128,comparison.before().text().getBytes(StandardCharsets.UTF_8).length+1));reviewedAfter=comparison==null ? null : new ImString(comparison.after().text(),Math.max(128,comparison.after().text().getBytes(StandardCharsets.UTF_8).length+1)); }
+        if (active!=null && comparison!=null) {
+            ImGui.textWrapped("Edit #"+active.id()+": "+active.path());
+            ImGui.textWrapped((active.forward() ? "Redo " : "Undo ")+active.steps()+" applied edit(s), including the selected edit. Intervening edits are listed below; the text panes show only this selected edit.");
+            if (ImGui.treeNode("Affected edits (next first)")) { for (var step : active.forward() ? redo : undo) if (step.steps()<=active.steps()) ImGui.textWrapped("#"+step.id()+": "+step.path());ImGui.treePop(); }
+            drawAppliedHistoryText("Before applied edit",comparison.before(),reviewedBefore);drawAppliedHistoryText("After applied edit",comparison.after(),reviewedAfter);
+            if (ImGui.button((active.forward() ? "Redo " : "Undo ")+active.steps()+" edit(s) through #"+active.id())) {
+                try { transition(false,() -> { selected=active.forward() ? workspace.redoThrough(active.id()) : workspace.undoThrough(active.id());filter.set("");error=null; }); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+        } else ImGui.textWrapped("Choose an available edit to review. Cleared, evicted and discarded Redo entries cannot be restored.");
+        ImGui.textWrapped("Text display: at most 64 KiB encoded and 16,384 UTF-16 characters per side. Binary/control-byte, invalid UTF-8 and larger snapshots show metadata only. Snapshot bytes remain unchanged; no JSON or native source is parsed or evaluated. Unsupported world previews remain disabled.");
+        if (error!=null) ImGui.textWrapped(error);ImGui.end();
+    }
+    private void drawAppliedHistoryChoices(String label,List<AppliedEditReview.Step> steps) {
+        ImGui.beginDisabled(steps.isEmpty());
+        if (ImGui.beginCombo(label,steps.isEmpty() ? "No retained edits" : "Choose an edit")) {
+            for (var step : steps) { ImGui.pushID(Long.toString(step.id()));String path=step.path().length()>128 ? step.path().substring(0,128)+"..." : step.path();if (ImGui.selectable(step.steps()+". #"+step.id()+" "+path+" ("+step.beforeBytes()+" -> "+step.afterBytes()+" bytes)",step.id()==reviewedHistoryId)) reviewedHistoryId=step.id();ImGui.popID(); }
+            ImGui.endCombo();
+        }ImGui.endDisabled();
+    }
+    private void drawAppliedHistoryText(String label,AppliedEditReview.Text text,ImString buffer) {
+        ImGui.textWrapped(label+": "+text.bytes()+" bytes"+(text.truncated() ? " (text truncated; full bytes retained)" : ""));
+        if (text.kind()==AppliedEditReview.Kind.TEXT) ImGui.inputTextMultiline(label,buffer,-1,150,ImGuiInputTextFlags.ReadOnly);
+        else ImGui.textWrapped(switch (text.kind()) { case TOO_LARGE -> "Text display skipped above the encoded-byte limit.";case INVALID_UTF8 -> "Text display skipped because the snapshot is not strict UTF-8.";case BINARY -> "Text display skipped because the snapshot contains binary/control bytes.";default -> "Text unavailable."; });
     }
     private void restoreAppliedEdit(boolean forward) {
         try { transition(false,() -> { selected=forward ? workspace.redo() : workspace.undo();filter.set("");error=null; }); }
