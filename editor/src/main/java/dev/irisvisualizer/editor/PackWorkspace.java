@@ -11,6 +11,7 @@ public final class PackWorkspace {
     private final Set<String> changedDirectories = new HashSet<>();
     private final Set<String> created = new HashSet<>();
     private long resourceRevision, editRevision;
+    private long saveRevision;
     private final Set<String> changed = new HashSet<>();
     private final Set<String> directories = new TreeSet<>();
     private final Map<String, byte[]> savedHashes = new HashMap<>();
@@ -161,6 +162,48 @@ public final class PackWorkspace {
     public byte[] read(String path) { return Objects.requireNonNull(files.get(path), "Unknown resource").clone(); }
     public boolean dirty() { return !changed.isEmpty() || !changedDirectories.isEmpty(); }
     public Path directory() { return directory; }
+    // Save may advance per-file baselines before a later write fails; review caches must notice those advances.
+    long saveRevision() { return saveRevision; }
+    List<WorkspaceChanges.Entry> pendingChanges() {
+        var entries=new ArrayList<WorkspaceChanges.Entry>();
+        for (String path : changed) entries.add(new WorkspaceChanges.Entry(path,created.contains(path) ? WorkspaceChanges.Kind.NEW_FILE : WorkspaceChanges.Kind.MODIFIED_FILE,files.get(path).length));
+        for (String path : changedDirectories) entries.add(new WorkspaceChanges.Entry(path,WorkspaceChanges.Kind.NEW_FOLDER,0));
+        entries.sort(Comparator.comparing(WorkspaceChanges.Entry::path));return List.copyOf(entries);
+    }
+    WorkspaceChanges.Check checkPendingChange(WorkspaceChanges.Entry entry,long byteLimit) {
+        if (byteLimit<0 || byteLimit>WorkspaceChanges.MAX_CHECK_BYTES) throw new IllegalArgumentException("Invalid disk-check byte limit");
+        if (directory==null) return diskCheck(entry,WorkspaceChanges.Status.NO_ACTIVE_FOLDER,-1,"No active folder. Save or Save As first chooses a destination; imported ZIPs have no active folder.");
+        try {
+            rejectLinks(directory);
+            if (!Files.isDirectory(directory,LinkOption.NOFOLLOW_LINKS)) return diskCheck(entry,WorkspaceChanges.Status.CONFLICT,-1,"The active pack folder is missing or is no longer a directory.");
+            Path file=checkedTarget(directory,safe(entry.path()));
+            java.nio.file.attribute.BasicFileAttributes attributes;
+            try { attributes=Files.readAttributes(file,java.nio.file.attribute.BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS); }
+            catch (NoSuchFileException missing) {
+                return diskCheck(entry,entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE ? WorkspaceChanges.Status.CONFLICT : WorkspaceChanges.Status.AVAILABLE,-1,
+                        entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE ? "The resource was removed outside the editor." : "The destination does not currently exist. Permissions and future races are not checked.");
+            }
+            if (entry.kind()==WorkspaceChanges.Kind.NEW_FOLDER) return diskCheck(entry,attributes.isDirectory() ? WorkspaceChanges.Status.FOLDER_EXISTS : WorkspaceChanges.Status.CONFLICT,-1,
+                    attributes.isDirectory() ? "The destination is already a directory. Its contents are not inspected." : "The folder destination is occupied by a non-directory.");
+            if (entry.kind()==WorkspaceChanges.Kind.NEW_FILE) return diskCheck(entry,WorkspaceChanges.Status.CONFLICT,attributes.size(),"A new-file destination is already occupied. Save will not overwrite it, even if its bytes are identical.");
+            if (!attributes.isRegularFile()) return diskCheck(entry,WorkspaceChanges.Status.CONFLICT,attributes.size(),"The resource destination is no longer a regular file.");
+            if (attributes.size()>byteLimit) return diskCheck(entry,WorkspaceChanges.Status.TOO_LARGE,attributes.size(),"Disk file exceeds the bounded review limit. Save still performs its own full conflict check.");
+            var digest=java.security.MessageDigest.getInstance("SHA-256");long total=0;
+            try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) {
+                byte[] buffer=new byte[8192];int count;
+                while ((count=input.read(buffer,0,(int)Math.min(buffer.length,byteLimit-total+1)))!=-1) {
+                    total+=count;
+                    if (total>byteLimit) return diskCheck(entry,WorkspaceChanges.Status.TOO_LARGE,total,"Disk file grew beyond the bounded review limit while reading.");
+                    digest.update(buffer,0,count);
+                }
+            }
+            boolean matches=Arrays.equals(savedHashes.get(entry.path()),digest.digest());
+            return diskCheck(entry,matches ? WorkspaceChanges.Status.BASELINE_MATCH : WorkspaceChanges.Status.CONFLICT,total,
+                    matches ? "Disk bytes match the saved baseline at this check. This is not a guarantee that a later Save will succeed." : "Disk bytes differ from the saved baseline. Review disk changes by reopening, or save the applied workspace to a fresh folder with Save As/Save Copy.");
+        } catch (IOException | SecurityException failure) { return diskCheck(entry,WorkspaceChanges.Status.IO_ERROR,-1,"Disk check could not complete: "+failure.getMessage()); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
+    }
+    private WorkspaceChanges.Check diskCheck(WorkspaceChanges.Entry entry,WorkspaceChanges.Status status,long bytes,String detail) { return new WorkspaceChanges.Check(entry,directory,status,bytes,detail); }
     public int undoCount() { return history.undoCount(); }
     public int redoCount() { return history.redoCount(); }
     public long historyBytes() { return history.bytes(); }
@@ -233,16 +276,19 @@ public final class PackWorkspace {
             else Files.write(file, entry.getValue(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
             created.remove(entry.getKey());
             savedHashes.put(entry.getKey(), hash(entry.getValue()));
+            saveRevision++;
         }
         directory = target.toRealPath();
         for (var entry : files.entrySet()) savedHashes.put(entry.getKey(), hash(entry.getValue()));
         changed.clear(); created.clear(); changedDirectories.clear();
+        saveRevision++;
     }
     /** Full in-memory snapshot to a fresh folder, then adopt its save baseline without clearing edit history. */
     public void saveAs(Path target) throws IOException {
         Path destination=freshDestination(target);var snapshot=freshSnapshot();snapshot.save(destination);
         directory=snapshot.directory;savedHashes.clear();savedHashes.putAll(snapshot.savedHashes);
         changed.clear();created.clear();changedDirectories.clear();
+        saveRevision++;
     }
     /** Full in-memory snapshot without changing this workspace's folder, baseline, revisions or history. */
     public void saveCopy(Path target) throws IOException { Path destination=freshDestination(target);var snapshot=freshSnapshot();snapshot.save(destination); }

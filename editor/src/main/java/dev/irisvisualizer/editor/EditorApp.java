@@ -103,6 +103,12 @@ public final class EditorApp extends Application {
     private WorkspaceTextSearch.Query activeTextQuery;
     private String textSearchError,textPendingPath;
     private PackWorkspace textPendingWorkspace;
+    private boolean showPendingChanges;
+    private final WorkspaceChanges.Cache pendingChanges=new WorkspaceChanges.Cache();
+    private final ImString changesQuery=new ImString(1024);
+    private WorkspaceChanges.Filter changesFilter=WorkspaceChanges.Filter.ALL;
+    private String changesSelected,changesPendingPath;
+    private PackWorkspace changesPendingWorkspace;
     @Override protected void preRun() {
         long handle = ((WindowGlfw) getWindow()).getHandle();
         glfwSetWindowCloseCallback(handle, window -> {
@@ -134,6 +140,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New image-map definition")) createResource("image-maps");
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
+                if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
                 ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
                 ImGui.textWrapped("Save As switches the active folder. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
                 ImGui.endMenu();
@@ -310,6 +317,7 @@ public final class EditorApp extends Application {
         ImGui.end();
         if (showQuickOpen) drawQuickOpen();
         if (showTextSearch) drawTextSearch();
+        if (showPendingChanges) drawPendingChanges();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
         if (navigationRequest!=null) {
@@ -321,13 +329,15 @@ public final class EditorApp extends Application {
                 } else {
                     boolean picker=quickPendingWorkspace==workspace && navigationRequest.target().equals(quickPendingPath);
                     boolean textResult=textPendingWorkspace==workspace && navigationRequest.target().equals(textPendingPath);
+                    boolean pendingChange=changesPendingWorkspace==workspace && navigationRequest.target().equals(changesPendingPath);
                     boolean opened=navigationRequest.target().equals(selected) || transition(false,() -> { selected=navigationRequest.target();filter.set("");error=null; });
-                    if ((picker || textResult) && opened) { if (picker) showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
+                    if ((picker || textResult || pendingChange) && opened) { if (picker) showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
                 }
             } catch (Exception failure) { error=failure.getMessage(); }
         }
         quickPendingWorkspace=null;quickPendingPath=null;
         textPendingWorkspace=null;textPendingPath=null;
+        changesPendingWorkspace=null;changesPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
     }
     private void drawReferences() {
@@ -5558,13 +5568,48 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
         if (selected==null) return;
         if (!browserFamily.matches(selected)) browserFamily=ResourceFinder.Family.ALL;
         if (browserChangedOnly && !workspace.changed(selected)) browserChangedOnly=false;
+    }
+    private void drawPendingChanges() {
+        if (!ImGui.begin("Pending workspace changes")) { ImGui.end();return; }
+        if (ImGui.button("Close pending changes")) { showPendingChanges=false;ImGui.end();return; }
+        ImGui.inputText("Pending path contains",changesQuery);
+        if (ImGui.beginCombo("Pending change kind",changesFilter.label())) { for (var kind : WorkspaceChanges.Filter.values()) if (ImGui.selectable(kind.label(),kind==changesFilter)) changesFilter=kind;ImGui.endCombo(); }
+        if (ImGui.button("Clear pending filters")) { changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL; }
+        ImGui.textWrapped("Applied in-memory changes since the current save baseline, including opaque/unknown files and new empty folders. Unapplied inspector text is excluded. This is a pending-write inventory, not a diff or a complete scan for external disk edits.");
+        ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "None" : workspace.directory().toString()));
+        try {
+            var result=pendingChanges.query(workspace,new WorkspaceChanges.Query(changesQuery.get(),changesFilter));
+            ImGui.textWrapped(result.newFiles()+" new files; "+result.modifiedFiles()+" modified files; "+result.newFolders()+" new folders; "+result.fileBytes()+" current file bytes across all pending changes.");
+            ImGui.textWrapped(result.matches()+" matching changes; "+result.entries().size()+" shown in path order.");
+            if (result.truncated()) ImGui.textWrapped("Only the first 200 matching changes are shown. Narrow the path/kind filters to reach other entries.");
+            if (result.total()==0) ImGui.textWrapped("No applied changes are pending. Unchanged resources are not checked for external disk edits.");
+            if (result.entries().stream().noneMatch(entry -> entry.path().equals(changesSelected))) changesSelected=result.entries().isEmpty() ? null : result.entries().getFirst().path();
+            int index=0;for (var entry : result.entries()) {
+                ImGui.pushID(index++);if (ImGui.selectable("Select change",entry.path().equals(changesSelected))) changesSelected=entry.path();ImGui.sameLine();ImGui.textUnformatted(entry.kind().label()+": "+entry.path());ImGui.popID();
+            }
+            var entry=result.entries().stream().filter(item -> item.path().equals(changesSelected)).findFirst().orElse(null);
+            if (entry!=null) {
+                ImGui.separator();ImGui.textWrapped(entry.kind().label()+": "+entry.path());
+                if (entry.kind()!=WorkspaceChanges.Kind.NEW_FOLDER) {
+                    ImGui.textUnformatted(entry.bytes()+" applied bytes");
+                    if (ImGui.button("Open changed resource")) { resourceNavigation.request(workspace,entry.path());changesPendingPath=entry.path();changesPendingWorkspace=workspace; }
+                }
+                if (ImGui.button("Check / refresh selected destination")) pendingChanges.check(workspace,entry);
+                var check=pendingChanges.checked(workspace,entry);
+                if (check==null) ImGui.textWrapped("Destination not checked for this workspace state.");
+                else { ImGui.textWrapped("Last explicit check: "+check.status());ImGui.textWrapped(check.detail());if (check.diskBytes()>=0) ImGui.textUnformatted(check.diskBytes()+" disk bytes observed"); }
+            }
+            ImGui.textWrapped("Disk checks inspect only the selected destination and hash modified files up to 16 MiB, stopping with an overflow byte if a file grows. They never write, merge or discard data, and do not check free space, permissions or every save prerequisite. Filesystem changes require explicit Refresh; an earlier result cannot guarantee a later Save. Save always repeats its full preflight. Save As/Save Copy write complete snapshots to fresh folders.");
+            if (ImGui.button("Save applied workspace")) perform("Save");ImGui.sameLine();if (ImGui.button("Save As fresh folder")) perform("Save As");ImGui.sameLine();if (ImGui.button("Save Copy to fresh folder")) perform("Save Copy");
+        } catch (IllegalArgumentException failure) { ImGui.textWrapped(failure.getMessage()); }
+        ImGui.end();
     }
     private void drawTextSearch() {
         if (!ImGui.begin("Search JSON text")) { ImGui.end();return; }
