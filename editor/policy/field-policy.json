@@ -385,6 +385,10 @@
     "decorators": {
       "classification": "generation",
       "reason": "Biome decoration entries grouped by part with native chance/reservoir selection; authoring does not simulate placement."
+    },
+    "customDerivitives": {
+      "classification": "generation",
+      "reason": "Ordered custom-biome datapack definitions with explicit bounded list operations; native selection uses owning biome distribution. Final removal restores absence and all registry/datapack compatibility remains unvalidated."
     }
   },
   "generator": {
@@ -2899,6 +2903,100 @@
     "style": {
       "classification": "generation",
       "reason": "Native optional stack-boundary blend with exact amplitude 0..256, contextual SIMPLEX versus inline FLAT defaults and all shared style/source/cache/fracture controls. No seam noise or terrain layout is evaluated."
+    }
+  },
+  "customBiome": {
+    "id": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "temperature": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "humidity": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "spawns": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "tags": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "downfallType": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "ambientParticle": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "category": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "spawnRarity": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "skyColor": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "fogColor": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "waterColor": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "waterFogColor": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "grassColor": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    },
+    "foliageColor": {
+      "classification": "generation",
+      "reason": "Bounded custom-biome datapack authoring: native climate/color/enum defaults, syntax-only local IDs/tags, optional particle and ordered spawn entries. Unknown bytes and unsupported values remain preserved; no native datapack or preview is generated."
+    }
+  },
+  "customBiomeSpawn": {
+    "type": {
+      "classification": "generation",
+      "reason": "Custom-biome emitted spawn data with fully namespaced syntax-only type keys, pinned enum/default/weight bounds and exact positive ordered count pairs. Native content-gate and target-version behavior are unvalidated."
+    },
+    "minCount": {
+      "classification": "generation",
+      "reason": "Custom-biome emitted spawn data with fully namespaced syntax-only type keys, pinned enum/default/weight bounds and exact positive ordered count pairs. Native content-gate and target-version behavior are unvalidated."
+    },
+    "maxCount": {
+      "classification": "generation",
+      "reason": "Custom-biome emitted spawn data with fully namespaced syntax-only type keys, pinned enum/default/weight bounds and exact positive ordered count pairs. Native content-gate and target-version behavior are unvalidated."
+    },
+    "weight": {
+      "classification": "generation",
+      "reason": "Custom-biome emitted spawn data with fully namespaced syntax-only type keys, pinned enum/default/weight bounds and exact positive ordered count pairs. Native content-gate and target-version behavior are unvalidated."
+    },
+    "group": {
+      "classification": "generation",
+      "reason": "Custom-biome emitted spawn data with fully namespaced syntax-only type keys, pinned enum/default/weight bounds and exact positive ordered count pairs. Native content-gate and target-version behavior are unvalidated."
+    }
+  },
+  "customBiomeParticle": {
+    "particle": {
+      "classification": "generation",
+      "reason": "Nullable custom-biome ambient particle data: fully namespaced syntax-only particle keys and exact native rarity 1..10000. The editor never resolves live particle registries or renders particles."
+    },
+    "rarity": {
+      "classification": "generation",
+      "reason": "Nullable custom-biome ambient particle data: fully namespaced syntax-only particle keys and exact native rarity 1..10000. The editor never resolves live particle registries or renders particles."
     }
   }
 }

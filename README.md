@@ -42,3 +42,5 @@ Noise-fracture trees now support bounded recursive child editing across composit
 Style-fracture objects now have bounded recursive controls across existing style contexts, with FLAT child defaults, source/cache settings and independent child multipliers. Deeper or unsupported data is preserved, and unsupported previews remain disabled.
 
 Dimension stacking now supports staged ordered layers, native host/mutual-exclusion checks, exact spacer/blend controls and shared recursive style editing. Upper-terrain references are authorable; target content and native layout/generation remain unvalidated. Unsupported previews remain disabled.
+
+Custom-biome definitions now have bounded climate, color, enum, tag, particle and spawn controls with lossless nested list editing. Registry/datapack/version compatibility remains unvalidated, and unsupported previews remain disabled.

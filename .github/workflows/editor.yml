@@ -650,6 +650,21 @@ jobs:
           python editor/tools/extract_dimension_stack_fields.py IrisDimension.java IrisDimensionStack.java IrisDimensionStackBlend.java PackDimensionValidator.java DimensionStackContext.java generated-dimension-stack-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-dimension-stack-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-stack-fields.properties).Hash) { throw 'Pinned dimension-stack definitions differ' }
+      - name: Verify pinned custom-biome definitions and datapack consumers
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeCustom.java' -OutFile IrisBiomeCustom.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeCustomSpawn.java' -OutFile IrisBiomeCustomSpawn.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeCustomParticle.java' -OutFile IrisBiomeCustomParticle.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeCustomCategory.java' -OutFile IrisBiomeCustomCategory.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeCustomPrecipType.java' -OutFile IrisBiomeCustomPrecipType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/biome/IrisBiomeCustomSpawnType.java' -OutFile IrisBiomeCustomSpawnType.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/datapack/IrisDatapackCompiler.java' -OutFile IrisDatapackCompiler.java
+          python editor/tools/test_custom_biome_fields.py IrisBiomeCustom.java IrisBiomeCustomSpawn.java IrisBiomeCustomParticle.java IrisBiomeCustomCategory.java IrisBiomeCustomPrecipType.java IrisBiomeCustomSpawnType.java IrisBiome.java IrisBiomeDerivatives.java IrisDatapackCompiler.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_custom_biome_fields.py IrisBiomeCustom.java IrisBiomeCustomSpawn.java IrisBiomeCustomParticle.java IrisBiomeCustomCategory.java IrisBiomeCustomPrecipType.java IrisBiomeCustomSpawnType.java IrisBiome.java IrisBiomeDerivatives.java IrisDatapackCompiler.java generated-custom-biome-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-custom-biome-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/custom-biome-fields.properties).Hash) { throw 'Pinned custom-biome definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
