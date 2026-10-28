@@ -184,6 +184,7 @@ public final class EditorApp extends Application {
                     drawSurfaceLayerFallback(document);
                     drawDimensionHeights(document);
                     drawWorldBoundary(document);
+                    drawDimensionType(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
                     drawHydrology(document);
@@ -2176,6 +2177,72 @@ public final class EditorApp extends Application {
     private void changeGeneralBlockPalette(GeneralBlockPalettes.Target target,RiverProfiles.Action action,int index,String value,String appliedKey) {
         try { commitProfileChange(target.listPrefix(),target.change(selected,workspace.read(selected),action,index,value),appliedKey); }
         catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawDimensionType(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Environment and dimension type")) return;
+        ImGui.pushID("dimensionType");
+        ImGui.textWrapped("These settings author the generated dimension type. Inherit follows the base environment; effective values depend on the target platform/version. Registry, generated datapack and existing-world compatibility are unvalidated. Iris can refuse hotloads that change environment or the generated type; close and reopen Studio after such changes.");
+        ImGui.textWrapped("A borrowed dimension type can override dimensionOptions and fullbright on supported modded platforms. borrowedDimensionType remains read-only here. No live world is modified.");
+        ImGui.textWrapped(DimensionTypeFields.help("environment"));String environmentToken=document.token("environment");
+        if (environmentToken==null) {
+            if (ImGui.button("Enable environment (NORMAL)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.enableRoot(selected,workspace.read(selected),"environment")));
+        } else {
+            try {
+                String current=document.stringToken("environment");if (!DimensionTypeFields.environments().contains(current)) ImGui.textWrapped("Stored environment is unknown; it is preserved until you select a pinned choice.");
+                if (ImGui.beginCombo("Environment",current)) {
+                    for (String choice : DimensionTypeFields.environments()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.setEnvironment(selected,workspace.read(selected),choice)));
+                    ImGui.endCombo();
+                }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored environment has an unsupported type (read-only)."); }
+        }
+        ImGui.textWrapped(DimensionTypeFields.help("fullbright"));String bright=document.token("fullbright");
+        if (bright==null) {
+            if (ImGui.button("Enable fullbright (false)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.enableRoot(selected,workspace.read(selected),"fullbright")));
+        } else if (!bright.equals("true") && !bright.equals("false")) ImGui.textWrapped("Stored fullbright has an unsupported type (read-only).");
+        else if (ImGui.checkbox("Fullbright",bright.equals("true"))) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.setFullbright(selected,workspace.read(selected),!bright.equals("true"))));
+        ImGui.textWrapped("Fullbright sets the generated type's ambient light to 1 without rewriting the stored ambientLight override. CUSTOM uses the native overworld base for type options.");
+        LosslessJson options;
+        try { options=DimensionTypeFields.object(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored dimensionOptions is null, a snippet or unsupported value (read-only).");ImGui.popID();return; }
+        if (options==null) {
+            if (ImGui.button("Create dimension options (inherit all)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.enable(selected,workspace.read(selected))));
+            ImGui.popID();return;
+        }
+        for (String field : DimensionTypeFields.STATES) {
+            ImGui.pushID(field);ImGui.textWrapped(DimensionTypeFields.help(field));String token=options.token(field);
+            if (token==null) {
+                if (ImGui.button("Enable "+field+" (inherit)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.enableField(selected,workspace.read(selected),field)));
+            } else if (!DimensionTypeFields.supported(options,field)) ImGui.textWrapped("Stored state is not a string (read-only).");
+            else {
+                String current=options.stringToken(field);if (!DimensionTypeFields.stateChoices().contains(current)) ImGui.textWrapped("Unknown stored state is preserved until a pinned choice is selected.");
+                if (ImGui.beginCombo(field,current.equals("DEFAULT") ? "Inherit base" : current)) {
+                    for (String state : DimensionTypeFields.stateChoices()) if (ImGui.selectable(state.equals("DEFAULT") ? "Inherit base (DEFAULT)" : state,state.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.setState(selected,workspace.read(selected),field,state)));
+                    ImGui.endCombo();
+                }
+            }
+            ImGui.popID();
+        }
+        for (String field : DimensionTypeFields.NUMBERS) {
+            ImGui.pushID(field);ImGui.textWrapped(DimensionTypeFields.help(field));ImGui.textWrapped(DimensionTypeFields.constraints(field));String token=options.token(field),key=DimensionTypeFields.prefix()+field;
+            if (DimensionTypeFields.nullable(field)) ImGui.textWrapped(field.equals("fixedTime") ? "Null enables the normal time cycle. -1 inherits the base time behavior; these are distinct states." : "Null disables clouds. -1 inherits the base cloud behavior and cannot set an explicit cloud plane at Y -1.");
+            if (token==null) {
+                if (ImGui.button("Enable "+field+" (inherit -1)")) applyRoutingExtra(() -> workspace.replace(selected,DimensionTypeFields.enableField(selected,workspace.read(selected),field)));
+            } else if (!DimensionTypeFields.supported(options,field)) ImGui.textWrapped("Stored value has an unsupported type or integer width (read-only).");
+            else {
+                if (token.equals("null")) ImGui.textWrapped(field.equals("fixedTime") ? "Current: normal time cycle" : "Current: clouds disabled");
+                else {
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+                    if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionTypeFields.setNumber(selected,workspace.read(selected),field,input.get())));
+                }
+                if (ImGui.button("Inherit base (-1)")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionTypeFields.setNumber(selected,workspace.read(selected),field,"-1")));
+                if (DimensionTypeFields.nullable(field) && !token.equals("null")) {
+                    if (ImGui.button(field.equals("fixedTime") ? "Normal time cycle (null)" : "Disable clouds (null)")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionTypeFields.setNull(selected,workspace.read(selected),field)));
+                }
+            }
+            ImGui.popID();
+        }
+        for (String path : DimensionTypeFields.readOnlyPaths(document)) ImGui.textWrapped(path+" (read-only)");
+        ImGui.popID();
     }
     private void drawWorldBoundary(LosslessJson document) {
         if (!ImGui.collapsingHeader("World border")) return;

@@ -211,6 +211,18 @@
     "worldBoundary": {
       "classification": "generation",
       "reason": "Optional native border and image-map domain configuration. Absent/null leaves the live native border unchanged; no runtime border is applied by the editor."
+    },
+    "environment": {
+      "classification": "generation",
+      "reason": "Generated dimension-type configuration with native base inheritance and fullbright ambient override; the editor does not resolve registries, hotload or existing-world compatibility."
+    },
+    "fullbright": {
+      "classification": "generation",
+      "reason": "Generated dimension-type configuration with native base inheritance and fullbright ambient override; the editor does not resolve registries, hotload or existing-world compatibility."
+    },
+    "dimensionOptions": {
+      "classification": "generation",
+      "reason": "Generated dimension-type configuration with native base inheritance and fullbright ambient override; the editor does not resolve registries, hotload or existing-world compatibility."
     }
   },
   "biome": {
@@ -2793,6 +2805,60 @@
     "z": {
       "classification": "generation",
       "reason": "Finite native border center coordinate within +/-29999984, applied as an atomic X/Z pair; no live world is contacted."
+    }
+  },
+  "dimensionTypeOptions": {
+    "coordinateScale": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "ambientLight": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "fixedTime": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "cloudHeight": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "monsterSpawnBlockLightLimit": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "ultrawarm": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "natural": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "piglinSafe": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "respawnAnchorWorks": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "bedWorks": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "raids": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "skylight": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
+    },
+    "ceiling": {
+      "classification": "generation",
+      "reason": "Bounded generated dimension-type override; DEFAULT and numeric -1 inherit the native base, while nullable time/cloud fields preserve distinct cycle/disabled states. Exact integer widths and unknown data remain protected."
     }
   }
 }

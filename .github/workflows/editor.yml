@@ -611,6 +611,18 @@ jobs:
           python editor/tools/extract_world_boundary_fields.py IrisDimension.java IrisWorldBoundary.java IrisWorldBoundaryCenter.java BukkitEnginePlatformHooks.java ModdedStudioHotloadService.java generated-world-boundary-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-world-boundary-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/world-boundary-fields.properties).Hash) { throw 'Pinned world-border definitions differ' }
+      - name: Verify pinned dimension-type options and native resolution
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionTypeOptions.java' -OutFile IrisDimensionTypeOptions.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/world/IrisEnvironment.java' -OutFile IrisEnvironment.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/datapack/v1192/DataFixerV1192.java' -OutFile DataFixerV1192.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/IrisDimensionRuntimeContract.java' -OutFile IrisDimensionRuntimeContract.java
+          python editor/tools/test_dimension_type_fields.py IrisDimension.java IrisDimensionTypeOptions.java IrisEnvironment.java DataFixerV1192.java IrisDimensionRuntimeContract.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_type_fields.py IrisDimension.java IrisDimensionTypeOptions.java IrisEnvironment.java DataFixerV1192.java IrisDimensionRuntimeContract.java generated-dimension-type-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-type-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-type-fields.properties).Hash) { throw 'Pinned dimension-type definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
