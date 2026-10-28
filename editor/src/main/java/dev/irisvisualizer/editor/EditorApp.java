@@ -6,6 +6,7 @@ import imgui.app.Configuration;
 import imgui.app.WindowGlfw;
 import imgui.flag.ImGuiTreeNodeFlags;
 import imgui.flag.ImGuiInputTextFlags;
+import imgui.flag.ImGuiWindowFlags;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.system.MemoryUtil;
@@ -40,14 +41,17 @@ public final class EditorApp extends Application {
     private PackWorkspace imageWorkspace;
     private String imagePath, imageError;
     private int imageTexture, imageWidth, imageHeight;
+    private long imageRevision=-1;
+    private AssetImage.Decoded imageData;
+    private ImageViewport imageViewport;
     private void clearImage() {
         if (imageTexture != 0) glDeleteTextures(imageTexture);
-        imageTexture = 0; imageError = null;
+        imageTexture = 0; imageError = null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() { clearImage(); super.disposeImGui(); }
     private void drawImageAsset() {
-        if (imageWorkspace != workspace || !java.util.Objects.equals(imagePath, selected)) {
-            clearImage(); imageWorkspace = workspace; imagePath = selected;
+        if (imageWorkspace != workspace || imageRevision!=workspace.revision() || !java.util.Objects.equals(imagePath, selected)) {
+            clearImage(); imageWorkspace = workspace; imagePath = selected;imageRevision=workspace.revision();
             if (AssetImage.supportedPath(selected)) {
                 try {
                     if (workspace.size(selected) > AssetImage.MAX_ENCODED_BYTES) throw new IllegalArgumentException("Asset image exceeds 16 MiB encoded limit");
@@ -65,6 +69,7 @@ public final class EditorApp extends Application {
                         if (glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH) != image.width())
                             throw new IllegalStateException("GPU image allocation failed");
                         imageWidth = image.width(); imageHeight = image.height();
+                        imageData=image;imageViewport=new ImageViewport(imageWidth,imageHeight);
                     } finally {
                         glBindTexture(GL_TEXTURE_2D, previous); glPixelStorei(GL_UNPACK_ALIGNMENT, alignment); MemoryUtil.memFree(buffer);
                     }
@@ -73,12 +78,36 @@ public final class EditorApp extends Application {
         }
         if (!AssetImage.supportedPath(selected)) return;
         ImGui.separator(); ImGui.textWrapped("Read-only image asset — first frame");
-        if (imageError != null) { ImGui.textWrapped(imageError); return; }
+        if (imageError != null) { ImGui.textWrapped(imageError);if (ImGui.button("Retry image decode/upload")) imageRevision=-1;return; }
         if (imageTexture != 0) {
-            ImGui.text(imageWidth + " × " + imageHeight + " pixels");
-            float scale = Math.min(1f, Math.min(Math.max(1, ImGui.getContentRegionAvailX()) / imageWidth,
-                    Math.max(1, ImGui.getContentRegionAvailY() - 24) / imageHeight));
-            ImGui.image((long)imageTexture, imageWidth * scale, imageHeight * scale);
+            ImGui.text(imageWidth + " × " + imageHeight + " decoded pixels");
+            if (ImGui.button("Fit image")) imageViewport.fit();ImGui.sameLine();if (ImGui.button("1:1 image")) imageViewport.actualSize();
+            ImGui.sameLine();if (ImGui.button("Zoom -")) imageViewport.zoom(1/1.25);ImGui.sameLine();if (ImGui.button("Zoom +")) imageViewport.zoom(1.25);
+            ImGui.textWrapped("Wheel: zoom at pointer. Left-drag: pan. Hover: decoded pixel RGBA. Fit never enlarges; 1:1 uses one logical display unit per source pixel.");
+            float availableWidth=Math.max(1,ImGui.getContentRegionAvailX()),availableHeight=Math.max(1,ImGui.getContentRegionAvailY()-ImGui.getTextLineHeightWithSpacing());
+            if (ImGui.beginChild("Read-only image canvas",availableWidth,availableHeight,false,ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse)) {
+                float canvasWidth=Math.max(1,ImGui.getContentRegionAvailX()),canvasHeight=Math.max(1,ImGui.getContentRegionAvailY());
+                imageViewport.resize(canvasWidth,canvasHeight);
+                float originX=ImGui.getCursorScreenPosX(),originY=ImGui.getCursorScreenPosY();
+                ImGui.invisibleButton("Image pointer navigation",canvasWidth,canvasHeight);
+                boolean hovered=ImGui.isItemHovered(),active=ImGui.isItemActive();
+                double mouseX=ImGui.getMousePosX()-originX,mouseY=ImGui.getMousePosY()-originY;
+                if (active && ImGui.isMouseDragging(0)) imageViewport.pan(ImGui.getIO().getMouseDeltaX(),ImGui.getIO().getMouseDeltaY());
+                if (hovered && ImGui.getIO().getMouseWheel()!=0) imageViewport.zoom(Math.pow(1.25,Math.max(-8,Math.min(8,ImGui.getIO().getMouseWheel()))),Math.max(0,Math.min(canvasWidth,mouseX)),Math.max(0,Math.min(canvasHeight,mouseY)));
+                var draw=ImGui.getWindowDrawList();float cell=Math.max(16,(float)Math.ceil(Math.max(canvasWidth,canvasHeight)/32));
+                for (int row=0;row<32 && row*cell<canvasHeight;row++) for (int column=0;column<32 && column*cell<canvasWidth;column++) {
+                    int color=(row+column)%2==0 ? 0xffeeeeee : 0xffcccccc;
+                    draw.addRectFilled(originX+column*cell,originY+row*cell,originX+Math.min(canvasWidth,(column+1)*cell),originY+Math.min(canvasHeight,(row+1)*cell),color);
+                }
+                var view=imageViewport.geometry();
+                draw.addImage((long)imageTexture,originX+(float)view.left(),originY+(float)view.top(),originX+(float)view.right(),originY+(float)view.bottom(),(float)view.u0(),(float)view.v0(),(float)view.u1(),(float)view.v1());
+                if (hovered) {
+                    var pixel=imageViewport.pixelAt(mouseX,mouseY);
+                    if (pixel!=null) { int argb=imageData.argbAt(pixel.x(),pixel.y());ImGui.setTooltip("Pixel ("+pixel.x()+", "+pixel.y()+")  R "+((argb>>>16)&255)+"  G "+((argb>>>8)&255)+"  B "+(argb&255)+"  A "+(argb>>>24)); }
+                }
+            }
+            ImGui.endChild();
+            ImGui.textUnformatted(String.format(java.util.Locale.ROOT,"%.2f%% (%s)",100*imageViewport.scale(),imageViewport.fitting() ? "fit" : "manual"));
         }
     }
     private boolean styled, closeRequested;

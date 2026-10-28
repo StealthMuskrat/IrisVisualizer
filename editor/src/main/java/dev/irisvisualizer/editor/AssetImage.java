@@ -11,8 +11,19 @@ public final class AssetImage {
     public static final int MAX_EDGE = 4096;
     public static final long MAX_PIXELS = 4_194_304;
     public record Decoded(int width, int height, byte[] rgba) {
-        public Decoded { rgba = rgba.clone(); }
+        public Decoded {
+            try { checkSize(width,height); }
+            catch (IOException invalid) { throw new IllegalArgumentException(invalid.getMessage(),invalid); }
+            if (rgba==null || rgba.length!=(long)width*height*4) throw new IllegalArgumentException("Decoded image must contain exactly four bytes per pixel");
+            rgba = rgba.clone();
+        }
         @Override public byte[] rgba() { return rgba.clone(); }
+        /** Decoded source channels, independent of display blending. No full-raster copy for pointer inspection. */
+        public int argbAt(int x,int y) {
+            if (x<0 || y<0 || x>=width || y>=height) throw new IndexOutOfBoundsException("Pixel is outside the decoded image");
+            int offset=(y*width+x)*4;
+            return ((rgba[offset+3]&255)<<24)|((rgba[offset]&255)<<16)|((rgba[offset+1]&255)<<8)|(rgba[offset+2]&255);
+        }
     }
     public static boolean supportedPath(String path) {
         if (path == null) return false;
