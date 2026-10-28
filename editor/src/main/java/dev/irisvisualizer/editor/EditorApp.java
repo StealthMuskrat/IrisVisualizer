@@ -603,6 +603,7 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         drawBiomeDerivatives(document);
+        drawCustomBiomes(document);
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
         drawBiomeDecorators(document);
@@ -628,7 +629,116 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawCustomBiomes(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Custom biome definitions")) return;
+        ImGui.pushID("customBiomes");ImGui.textWrapped("Native field: customDerivitives. A nonempty list enables custom biome definitions. One definition is used directly; multiple definitions are selected through the owning biome's noise distribution, so order matters. No custom datapack or biome preview is generated here.");
+        ImGui.textWrapped("New IDs use simple lowercase letters, digits, _ and - (editor subset), with uniqueness checked within this list. Generated registry keys, aliases, registry contents and target-version compatibility are unvalidated. Editor limit: 64 definitions or entries per nested list.");
+        List<LosslessJson> entries;
+        try { entries=CustomBiomes.entries(document); } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored custom list contains snippets or unsupported entries (read-only).");ImGui.popID();return; }
+        if (entries==null) entries=List.of();if (entries.size()>CustomBiomes.MAXIMUM_ENTRIES) { ImGui.textWrapped("Stored list exceeds the editor limit (read-only).");ImGui.popID();return; }
+        String key=CustomBiomes.prefix()+"new.id";ImString id=values.computeIfAbsent(key,ignored -> new ImString("",256));ImGui.inputText("New custom ID",id);drafts.update(key,"",id.get());
+        ImGui.beginDisabled(entries.size()>=CustomBiomes.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add custom definition");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(CustomBiomes.prefix(),CustomBiomes.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,id.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        for (int index=0;index<entries.size();index++) {
+            if (!ImGui.treeNode("Custom definition "+index)) continue;
+            var context=CustomBiomes.Context.biome(index);var entry=entries.get(index);RiverProfiles.Action action=null;String copyKey=context.prefix()+"duplicate.id";ImString copyId=values.computeIfAbsent(copyKey,ignored -> new ImString("",256));ImGui.inputText("Duplicate with new ID",copyId);drafts.update(copyKey,"",copyId.get());
+            ImGui.beginDisabled(entries.size()>=CustomBiomes.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate definition")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button(entries.size()==1 ? "Remove final definition (restore absence)" : "Remove definition")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move definition up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Move definition down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { try { commitProfileChange(CustomBiomes.prefix(),CustomBiomes.change(selected,workspace.read(selected),action,index,action==RiverProfiles.Action.DUPLICATE ? copyId.get() : null),action==RiverProfiles.Action.DUPLICATE ? copyKey : null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();return; }
+            drawCustomText(entry,context,"id");drawCustomScalar(entry,context,"temperature");drawCustomScalar(entry,context,"humidity");drawCustomScalar(entry,context,"spawnRarity");drawCustomEnum(entry,context,"category");drawCustomEnum(entry,context,"downfallType");
+            if (ImGui.treeNode("Biome colors")) {
+                ImGui.textWrapped("Sky, fog, water and water-fog colors are always emitted by native datagen; use #RRGGBB here. Grass and foliage accept blank to omit their override. Other stored string formats are retained until explicitly replaced.");
+                for (String field : CustomBiomes.COLORS) drawCustomText(entry,context,field);ImGui.treePop();
+            }
+            drawCustomTags(entry,context);drawCustomParticle(entry,context);drawCustomSpawns(entry,context);ImGui.treePop();
+        }
+        if (ImGui.treeNode("Other custom-biome data (read-only)")) { for (String path : CustomBiomes.readOnlyPaths(document)) ImGui.textWrapped(path);ImGui.treePop(); }
+        ImGui.popID();
+    }
+    private void drawCustomText(LosslessJson node,CustomBiomes.Context context,String field) {
+        ImGui.pushID(context.prefix()+field);ImGui.textWrapped(CustomBiomes.help(context,field));String stored;
+        try { stored=node.token(field)==null ? CustomBiomes.defaultToken(context,field) : node.stringToken(field); }
+        catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored value is not a string (read-only).");ImGui.popID();return; }
+        String key=context.prefix()+field;ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(256,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,stored,input.get());
+        if (ImGui.button(node.token(field)==null ? "Write explicit value" : "Apply")) commitRiverOverride(key,() -> workspace.replace(selected,CustomBiomes.setText(selected,workspace.read(selected),context,field,input.get())));
+        ImGui.popID();
+    }
+    private void drawCustomScalar(LosslessJson node,CustomBiomes.Context context,String field) {
+        ImGui.pushID(context.prefix()+field);ImGui.textWrapped(CustomBiomes.help(context,field));ImGui.textWrapped(CustomBiomes.constraints(context,field));String token=node.token(field),key=context.prefix()+field;
+        if (token==null) {
+            if (ImGui.button("Enable "+field+" ("+CustomBiomes.defaultToken(context,field)+")")) applyRoutingExtra(() -> workspace.replace(selected,CustomBiomes.enableScalar(selected,workspace.read(selected),context,field)));
+        } else if (!CustomBiomes.numericSupported(node,context,field)) ImGui.textWrapped("Stored number has an unsupported type or integer width (read-only).");
+        else {
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+            if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,CustomBiomes.setScalar(selected,workspace.read(selected),context,field,input.get())));
+        }
+        ImGui.popID();
+    }
+    private void drawCustomEnum(LosslessJson node,CustomBiomes.Context context,String field) {
+        ImGui.pushID(context.prefix()+field);ImGui.textWrapped(CustomBiomes.help(context,field));String current;
+        try { current=node.token(field)==null ? CustomBiomes.defaultToken(context,field) : context.spawn()>=0 && field.equals("group") && node.token(field).equals("null") ? "Null (native MISC fallback)" : node.stringToken(field); }
+        catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored enum has an unsupported type (read-only).");ImGui.popID();return; }
+        if (ImGui.beginCombo(field,current.length()>128 ? "Stored enum" : current)) { for (String choice : CustomBiomes.choices(context,field)) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,CustomBiomes.setEnum(selected,workspace.read(selected),context,field,choice)));ImGui.endCombo(); }
+        ImGui.popID();
+    }
+    private void drawCustomParticle(LosslessJson entry,CustomBiomes.Context owner) {
+        if (!ImGui.treeNode("Ambient particle")) return;
+        ImGui.textWrapped("Particle keys are fully namespaced syntax only; the live registry is not checked. Native probability is 1 / rarity. Absent/null disables particles.");
+        try {
+            var particle=CustomBiomes.particle(entry);
+            if (particle==null) {
+                if (ImGui.button("Enable particle (minecraft:flash, rarity 35)")) applyRoutingExtra(() -> workspace.replace(selected,CustomBiomes.enableParticle(selected,workspace.read(selected),owner)));
+            } else {
+                var context=owner.particleTarget();drawCustomText(particle,context,"particle");drawCustomScalar(particle,context,"rarity");ImGui.textWrapped("Disable discards the entire particle object, including advanced data, and writes null.");
+                if (ImGui.button("Disable ambient particle")) {
+                    try { byte[] next=CustomBiomes.disableParticle(selected,workspace.read(selected),owner);String prefix=context.prefix();if (drafts.transitionUnder(prefix,() -> !drafts.anyUnder(prefix) || JOptionPane.showConfirmDialog(null,"Discard unapplied particle text and disable this particle object?","Unapplied particle text",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION,() -> workspace.replace(selected,next))) { values.keySet().removeIf(key -> key.startsWith(prefix));error=null; } } catch (Exception failure) { error=failure.getMessage(); }
+                }
+            }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored particle is a snippet or unsupported value (read-only)."); }
+        ImGui.treePop();
+    }
+    private void drawCustomCounts(LosslessJson node,CustomBiomes.Context context) {
+        ImGui.textWrapped("Apply positive exact spawn counts together; this editor requires minimum <= maximum. Native integer width permits up to 2147483647; target-version spawn behavior is unvalidated.");
+        if (!CustomBiomes.numericSupported(node,context,"minCount") || !CustomBiomes.numericSupported(node,context,"maxCount")) { ImGui.textWrapped("Stored count pair has an unsupported type/width (read-only).");return; }
+        String min=node.token("minCount")==null ? CustomBiomes.defaultToken(context,"minCount") : node.token("minCount"),max=node.token("maxCount")==null ? CustomBiomes.defaultToken(context,"maxCount") : node.token("maxCount"),minKey=context.prefix()+"minCount",maxKey=context.prefix()+"maxCount";
+        ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(min,Math.max(128,min.length()+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(max,Math.max(128,max.length()+1)));ImGui.inputText("Minimum count",minimum);drafts.update(minKey,min,minimum.get());ImGui.inputText("Maximum count",maximum);drafts.update(maxKey,max,maximum.get());
+        if (ImGui.button("Apply count pair")) { try { workspace.replace(selected,CustomBiomes.setCounts(selected,workspace.read(selected),context,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+    }
+    private void drawCustomSpawns(LosslessJson entry,CustomBiomes.Context owner) {
+        if (!ImGui.treeNode("Custom spawn entries")) return;
+        ImGui.textWrapped("Native datagen emits this list independently of spawnRarity, including when rarity is 0. A native content gate may omit entity types missing on the target server. This editor checks fully namespaced key syntax, not registries or runtime spawning.");
+        List<LosslessJson> rows;
+        try { rows=CustomBiomes.spawns(entry); } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored spawn list is mixed, null or a snippet (read-only).");ImGui.treePop();return; }
+        if (rows==null) rows=List.of();if (rows.size()>CustomBiomes.MAXIMUM_ENTRIES) { ImGui.textWrapped("Stored spawn list exceeds the editor limit (read-only).");ImGui.treePop();return; }
+        String prefix=CustomBiomes.listPrefix(owner,"spawns"),key=prefix+"new.type",initial=CustomBiomes.defaultToken(owner.spawn(0),"type");ImString type=values.computeIfAbsent(key,ignored -> new ImString(initial,4096));ImGui.inputText("New entity type",type);drafts.update(key,initial,type.get());ImGui.beginDisabled(rows.size()>=CustomBiomes.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add spawn entry");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,CustomBiomes.changeSpawn(selected,workspace.read(selected),owner,RiverProfiles.Action.ADD,-1,type.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        for (int index=0;index<rows.size();index++) {
+            if (!ImGui.treeNode("Spawn "+index)) continue;
+            RiverProfiles.Action action=null;ImGui.beginDisabled(rows.size()>=CustomBiomes.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate spawn")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button(rows.size()==1 ? "Remove final spawn (restore absence)" : "Remove spawn")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move spawn up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==rows.size()-1);if (ImGui.button("Move spawn down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { try { commitProfileChange(prefix,CustomBiomes.changeSpawn(selected,workspace.read(selected),owner,action,index,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.treePop();return; }
+            var context=owner.spawn(index);var row=rows.get(index);drawCustomText(row,context,"type");drawCustomEnum(row,context,"group");drawCustomScalar(row,context,"weight");drawCustomCounts(row,context);ImGui.treePop();
+        }
+        ImGui.treePop();
+    }
+    private void drawCustomTags(LosslessJson entry,CustomBiomes.Context owner) {
+        if (!ImGui.treeNode("Authored biome tags")) return;
+        ImGui.textWrapped("Native datagen combines authored tags with inherited vanilla-derivative tags and deduplicates emitted membership. These are authored values only; effective registry membership is not resolved. Use namespaced tag keys without #.");
+        List<String> tags;
+        try { tags=CustomBiomes.tags(entry); } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored tag list is mixed, null or unsupported (read-only).");ImGui.treePop();return; }
+        if (tags==null) tags=List.of();if (tags.size()>CustomBiomes.MAXIMUM_ENTRIES) { ImGui.textWrapped("Stored tag list exceeds the editor limit (read-only).");ImGui.treePop();return; }
+        String prefix=CustomBiomes.listPrefix(owner,"tags"),key=prefix+"new.tag";ImString tag=values.computeIfAbsent(key,ignored -> new ImString("",4096));ImGui.inputText("New tag key",tag);drafts.update(key,"",tag.get());ImGui.beginDisabled(tags.size()>=CustomBiomes.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add authored tag");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,CustomBiomes.changeTag(selected,workspace.read(selected),owner,RiverProfiles.Action.ADD,-1,tag.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        for (int index=0;index<tags.size();index++) {
+            ImGui.pushID("customTag"+index);String stored=tags.get(index),rowKey=prefix+index;int slot=index;ImString input=values.computeIfAbsent(rowKey,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Tag",input);drafts.update(rowKey,stored,input.get());if (ImGui.button("Apply tag")) commitRiverOverride(rowKey,() -> workspace.replace(selected,CustomBiomes.setTag(selected,workspace.read(selected),owner,slot,input.get())));
+            RiverProfiles.Action action=null;ImGui.beginDisabled(tags.size()>=CustomBiomes.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate tag")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button(tags.size()==1 ? "Remove final tag (restore absence)" : "Remove tag")) action=RiverProfiles.Action.REMOVE;
+            ImGui.beginDisabled(index==0);if (ImGui.button("Move tag up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==tags.size()-1);if (ImGui.button("Move tag down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+            if (action!=null) { try { commitProfileChange(prefix,CustomBiomes.changeTag(selected,workspace.read(selected),owner,action,index,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+            ImGui.popID();
+        }
+        ImGui.treePop();
     }
     private void drawFloatingBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Floating child biomes")) return;

@@ -4,7 +4,7 @@ Standalone Windows x64 visualizer and generation-focused pack editor for Iris, t
 
 **Status: editor implementation in progress; native world previews disabled.** The Windows x64 ImGui editor opens folders/ZIPs, preserves original/unknown data, edits supported dimension, region, biome and generator settings, and inspects image assets. Full schema coverage and interactive GUI/GPU verification remain pending. No custom replacement terrain generator is included. Native parity has not been established.
 
-See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40611867629](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40611867629). Download its IrisVisualizer-windows-x64 artifact to try the editor.
+See [the editor guide](editor/README.md) for build/run instructions. Windows editor CI builds a downloadable ZIP with an external Java 25 x64 runtime requirement; package/runtime/native-loading checks passed in [Windows run 40613745952](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/40613745952). Download its IrisVisualizer-windows-x64 artifact to try the editor.
 
 ## Verify the first batch
 
@@ -42,3 +42,5 @@ Noise-fracture trees now support bounded recursive child editing across composit
 Style-fracture objects now have bounded recursive controls across existing style contexts, with FLAT child defaults, source/cache settings and independent child multipliers. Deeper or unsupported data is preserved, and unsupported previews remain disabled.
 
 Dimension stacking now supports staged ordered layers, native host/mutual-exclusion checks, exact spacer/blend controls and shared recursive style editing. Upper-terrain references are authorable; target content and native layout/generation remain unvalidated. Unsupported previews remain disabled.
+
+Custom-biome definitions now have bounded climate, color, enum, tag, particle and spawn controls with lossless nested list editing. Registry/datapack/version compatibility remains unvalidated, and unsupported previews remain disabled.

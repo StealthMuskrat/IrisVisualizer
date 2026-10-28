@@ -1,13 +1,13 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in seventy-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in seventy-six pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
 | dimension | 82 | 58 | 52 | 24 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 38 | 32 | 4 |
+| biome | 42 | 39 | 33 | 3 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
@@ -72,6 +72,9 @@ Direct nonstatic/nontransient private fields in seventy-three pinned source clas
 | staticObjectRotation | 3 | 3 | 3 | 0 |
 | position | 3 | 3 | 3 | 0 |
 | decorator | 17 | 17 | 17 | 0 |
+| customBiome | 15 | 15 | 15 | 0 |
+| customBiomeSpawn | 5 | 5 | 5 | 0 |
+| customBiomeParticle | 2 | 2 | 2 | 0 |
 | dimensionStack | 3 | 3 | 3 | 0 |
 | dimensionStackBlend | 2 | 2 | 2 | 0 |
 | dimensionTypeOptions | 13 | 13 | 13 | 0 |
@@ -92,7 +95,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `carvingBiome`, `customDerivitives`, `proceduralObjects`, `structures`.
+Unclassified: `carvingBiome`, `proceduralObjects`, `structures`.
 
 ## biomeGeneratorLink
 
@@ -347,6 +350,18 @@ Unclassified: none.
 Unclassified: none.
 
 ## decorator
+
+Unclassified: none.
+
+## customBiome
+
+Unclassified: none.
+
+## customBiomeSpawn
+
+Unclassified: none.
+
+## customBiomeParticle
 
 Unclassified: none.
 
