@@ -167,17 +167,24 @@ public final class PackWorkspace {
     public String historyNote() { return history.note(); }
     public String undoPath() { var edit=history.next(false);return edit==null ? null : edit.path; }
     public String redoPath() { var edit=history.next(true);return edit==null ? null : edit.path; }
+    public List<AppliedEditReview.Step> historySteps(boolean forward) { return history.steps(forward); }
+    public boolean hasHistoryEdit(long id) { return history.find(id)!=null; }
+    public AppliedEditReview.Comparison reviewHistoryEdit(long id) { var edit=history.find(id);return edit==null ? null : edit.review(); }
     public void clearHistory() { history.clear("Applied-edit history cleared."); }
     /** Restores exact bytes in memory. Save remains an explicit, conflict-checked operation. */
     public String undo() throws IOException { return restoreHistory(false); }
     public String redo() throws IOException { return restoreHistory(true); }
+    public String undoThrough(long id) throws IOException { return restoreHistoryThrough(id,false); }
+    public String redoThrough(long id) throws IOException { return restoreHistoryThrough(id,true); }
     private String restoreHistory(boolean forward) throws IOException {
         var edit=history.next(forward);
         if (edit==null) throw new IOException(forward ? "No applied edit to redo" : "No applied edit to undo");
-        byte[] current=files.get(edit.path);
-        if (current==null || !edit.matches(current,forward)) throw new IOException("Applied-edit history no longer matches this resource");
-        byte[] restored=edit.restore(forward);checkReplacementSize(edit.path,restored);
-        installReplacement(edit.path,restored);history.moved(forward);return edit.path;
+        return restoreHistoryThrough(edit.id,forward);
+    }
+    private String restoreHistoryThrough(long id,boolean forward) throws IOException {
+        var plan=history.plan(id,forward,files,MAX_BYTES);
+        for (var entry : plan.restored().entrySet()) { files.put(entry.getKey(),entry.getValue());updateChanged(entry.getKey(),entry.getValue()); }
+        editRevision++;for (int i=0;i<plan.steps();i++) history.moved(forward);return plan.target();
     }
     private void checkReplacementSize(String path,byte[] data) throws IOException {
         long total=files.values().stream().mapToLong(value -> value.length).sum()-files.get(path).length+data.length;
@@ -185,8 +192,10 @@ public final class PackWorkspace {
     }
     private void installReplacement(String path,byte[] data) {
         files.put(path,data);
+        updateChanged(path,data);editRevision++;
+    }
+    private void updateChanged(String path,byte[] data) {
         if (created.contains(path) || !Arrays.equals(savedHashes.get(path),hash(data))) changed.add(path);else changed.remove(path);
-        editRevision++;
     }
     /** The schema/policy editor must authorize changes before using this internal byte-storage API. */
     public void replace(String path, byte[] data) throws IOException {
