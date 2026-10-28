@@ -25,6 +25,7 @@ public final class EditorApp extends Application {
     private String riverCatalogDimension;
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
     private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
+    private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
     private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
     private PackWorkspace referenceWorkspace;
     private String referencePath;
@@ -186,6 +187,7 @@ public final class EditorApp extends Application {
                     drawWorldBoundary(document);
                     drawDimensionType(document);
                     drawDimensionStack(document);
+                    drawResourceSelectors(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
                     drawHydrology(document);
@@ -230,7 +232,7 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks dimension regions, region biome lists, biome generators and child biomes only. Exact files are not validated; Iris aliases and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks a bounded subset of dimension selectors/stacks, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -604,6 +606,7 @@ public final class EditorApp extends Application {
         }
         drawBiomeDerivatives(document);
         drawCustomBiomes(document);
+        drawResourceSelectors(document);
         drawSurfaceLayerFallback(document);
         drawBiomeLayers(document);
         drawBiomeDecorators(document);
@@ -629,7 +632,29 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("3D terrain profile")) drawTerrain3D(document);
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
-            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+            for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !ResourceSelectors.BIOME_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawResourceSelectors(LosslessJson document) {
+        if (!ImGui.collapsingHeader(ResourceTypes.base(selected).equals("dimensions") ? "Focused biome and region" : "Reachable carving-biome reference")) return;
+        ImGui.textWrapped("Choices are exact in-pack file keys; target contents, aliases, compatibility exclusions and effective selection are unvalidated. Missing stored strings stay preserved until explicitly replaced or cleared. These controls do not sample or preview generation.");
+        if (ResourceTypes.base(selected).equals("dimensions")) ImGui.textWrapped("A usable focused biome takes priority and resolves its containing region, or a native fallback region. Focused region is used when no usable biome focus takes priority. Native buffet mode can override focus. Clearing one selector leaves the other unchanged.");
+        else ImGui.textWrapped("carvingBiome only registers a reachable biome; it does not replace terrain under carvings. Cave selection comes from region caveBiomes. Self/cyclic references may be authored; native traversal handles visited keys and no traversal runs here.");
+        for (String field : ResourceSelectors.fields(selected)) {
+            ImGui.pushID(ResourceSelectors.prefix(selected,field));ImGui.textWrapped(ResourceSelectors.help(field));
+            if (!ResourceSelectors.supported(document,field)) ImGui.textWrapped("Stored selector is not a string (read-only).");
+            else {
+                String current=ResourceSelectors.stored(document,field);var choices=selectorCatalogs.choices(workspace,field);
+                if (!current.isBlank() && !choices.contains(current)) ImGui.textWrapped("Stored selector has no exact file match; it is preserved and native aliases are unchecked.");
+                if (ImGui.beginCombo(field,current.isBlank() ? "None (absent/blank)" : current.length()>128 ? "Stored selector" : current)) {
+                    if (ImGui.selectable("None (write empty string)",current.isBlank())) applyRoutingExtra(() -> workspace.replace(selected,ResourceSelectors.set(selected,workspace.read(selected),field,null,workspace)));
+                    for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,ResourceSelectors.set(selected,workspace.read(selected),field,choice,workspace)));
+                    ImGui.endCombo();
+                }
+                if (!current.isEmpty() && ImGui.button("Clear selector (empty string)")) applyRoutingExtra(() -> workspace.replace(selected,ResourceSelectors.set(selected,workspace.read(selected),field,null,workspace)));
+                if (choices.isEmpty()) ImGui.textWrapped("No exact "+ResourceSelectors.family(field)+" files in this pack.");
+            }
+            ImGui.popID();
+        }
     }
     private void drawCustomBiomes(LosslessJson document) {
         if (!ImGui.collapsingHeader("Custom biome definitions")) return;

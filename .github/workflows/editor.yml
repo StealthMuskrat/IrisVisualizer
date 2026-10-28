@@ -665,6 +665,18 @@ jobs:
           python editor/tools/extract_custom_biome_fields.py IrisBiomeCustom.java IrisBiomeCustomSpawn.java IrisBiomeCustomParticle.java IrisBiomeCustomCategory.java IrisBiomeCustomPrecipType.java IrisBiomeCustomSpawnType.java IrisBiome.java IrisBiomeDerivatives.java IrisDatapackCompiler.java generated-custom-biome-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-custom-biome-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/custom-biome-fields.properties).Hash) { throw 'Pinned custom-biome definitions differ' }
+      - name: Verify pinned resource selectors and native focus consumers
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/IrisEngine.java' -OutFile IrisEngine.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/IrisComplex.java' -OutFile IrisComplex.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/terrain/RegionSelection.java' -OutFile RegionSelection.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/DimensionTerrainContext.java' -OutFile DimensionTerrainContext.java
+          python editor/tools/test_resource_selector_fields.py IrisDimension.java IrisBiome.java IrisEngine.java IrisComplex.java RegionSelection.java DimensionTerrainContext.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_resource_selector_fields.py IrisDimension.java IrisBiome.java IrisEngine.java IrisComplex.java RegionSelection.java DimensionTerrainContext.java generated-resource-selector-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-resource-selector-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/resource-selector-fields.properties).Hash) { throw 'Pinned resource selector definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
