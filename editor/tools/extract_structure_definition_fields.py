@@ -10,7 +10,7 @@ PATHS = ['structure/placement/IrisStructure.java', 'structure/jigsaw/IrisJigsawP
          'structure/jigsaw/IrisJigsawMode.java', 'structure/jigsaw/IrisJigsawCompatibility.java',
          'structure/jigsaw/IrisJigsawBranchFailurePolicy.java', 'structure/object/ObjectPlaceMode.java',
          'structure/graph/StructureGraphCompiler.java', 'structure/placement/StructureAssembler.java',
-         'generation/mantle/IrisStructureComponent.java']
+         'generation/mantle/IrisStructureComponent.java', 'structure/placement/IrisStructureLocator.java']
 
 
 def read_sources(folder):
@@ -20,7 +20,7 @@ def read_sources(folder):
 
 
 def extract(*sources):
-    d, p, m, c, b, modes, compiler, assembler, component = [raw.decode('utf-8') for raw in sources]
+    d, p, m, c, b, modes, compiler, assembler, component, locator = [raw.decode('utf-8') for raw in sources]
     values = {'irisRevision': 'c3359e0a16438b1bb8468901c6171dcefdf63f7f'}
     for path, raw in zip(PATHS, sources):
         values[Path(path).stem + '.sourceSha256'] = hashlib.sha256(raw).hexdigest()
@@ -85,6 +85,10 @@ def extract(*sources):
             'mode == ObjectPlaceMode.STRUCTURE_PIECE || mode == ObjectPlaceMode.FLOATING',
             'ObjectPlaceMode undergroundMode = (mode == ObjectPlaceMode.ORGANIC_STILT || mode == ObjectPlaceMode.CEILING_HANG) ? mode : ObjectPlaceMode.STRUCTURE_PIECE;',
             'else if (pieces.size() == 1)')
+    require(locator, 'boolean replacesNative = NativeStructureSuppression.REPLACE_SOURCE == placement.getNativeSuppression();',
+            'String vanillaSource = structure.getVanillaSource();',
+            'if (vanillaSource == null || !NAMESPACED_RESOURCE_KEY.matcher(vanillaSource).matches())',
+            'suppressedVanillaSources.add(normalize(vanillaSource));')
     values.update({'folder': 'structures', 'pool.folder': 'jigsaw-pools', 'enums.null': 'modeCompatibilityBranchDefaults',
                    'reset.policy': 'removeOptionalField', 'portable.policy': 'themesCapsAndBranchTermination', 'execution.policy': 'disabled'})
     return ''.join(key + '=' + json.dumps(value, ensure_ascii=True)[1:-1] + '\n' for key, value in values.items()).encode('ascii')

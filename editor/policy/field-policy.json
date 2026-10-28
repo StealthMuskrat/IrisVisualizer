@@ -5151,8 +5151,8 @@
       "reason": "Container inventory loot tables; outside voxel-generation editing."
     },
     "vanillaSource": {
-      "classification": "read-only",
-      "reason": "Imported structure provenance metadata; not a generation backend selector."
+      "classification": "generation",
+      "reason": "Identifies imported vanilla aliases and the native source suppressed by dimension REPLACE_SOURCE placements. Typed authoring is pending; the original value remains read-only and preserved."
     }
   }
 }

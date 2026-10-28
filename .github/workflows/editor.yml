@@ -991,6 +991,7 @@ jobs:
           Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/graph/StructureGraphCompiler.java' -OutFile StructureGraphCompiler.java
           Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/StructureAssembler.java' -OutFile StructureAssembler.java
           Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/mantle/IrisStructureComponent.java' -OutFile IrisStructureComponent.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructureLocator.java' -OutFile IrisStructureLocator.java
           python editor/tools/test_structure_definition_fields.py .
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python editor/tools/extract_structure_definition_fields.py . generated-structure-definition-fields.properties

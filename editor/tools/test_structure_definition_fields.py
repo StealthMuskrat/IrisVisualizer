@@ -26,6 +26,8 @@ for index, old, new in [
     (6, b'structure.resolvedBranchFailurePolicy()', b'structure.otherPolicy()'),
     (7, b'pool.requiresFallback(structure.isRequireCaps())', b'false'),
     (8, b'ObjectPlaceMode mode = structure.getPlaceMode();', b'ObjectPlaceMode mode = ObjectPlaceMode.FLOATING;'),
+    (9, b'String vanillaSource = structure.getVanillaSource();', b'String vanillaSource = "";'),
+    (9, b'suppressedVanillaSources.add(normalize(vanillaSource));', b'suppressedVanillaSources.clear();'),
 ]:
     assert old in sources[index], old
     changed = sources.copy()
