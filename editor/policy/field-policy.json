@@ -251,6 +251,10 @@
     "terrainTransform": {
       "classification": "generation",
       "reason": "Authored dimension overlay or external transform configuration; native noise, provider resolution and output are not evaluated."
+    },
+    "imageMaps": {
+      "classification": "generation",
+      "reason": "Dimension image-map applications and named ordered masks; file presence/local relationships only, without native map or pixel evaluation."
     }
   },
   "biome": {
@@ -3083,6 +3087,46 @@
     "settings": {
       "classification": "generation",
       "reason": "Controls fitted terrain overlay offsets or exact external provider descriptor/settings; data authoring only."
+    }
+  },
+  "imageMapBinding": {
+    "key": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    },
+    "map": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    },
+    "application": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    },
+    "masks": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    }
+  },
+  "imageMapMask": {
+    "map": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    },
+    "operation": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    },
+    "inverted": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    },
+    "threshold": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
+    },
+    "falloff": {
+      "classification": "generation",
+      "reason": "Controls native dimension image-map binding or ordered named mask layer; typed authored data only, without sampling or map compatibility validation."
     }
   }
 }
