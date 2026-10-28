@@ -15,6 +15,7 @@ public final class PackWorkspace {
     private final Set<String> directories = new TreeSet<>();
     private final Map<String, byte[]> savedHashes = new HashMap<>();
     private final Set<String> foldedFiles = new HashSet<>();
+    private final AppliedEditHistory history = new AppliedEditHistory();
     private Path directory;
     public static final long MAX_BYTES = 512L * 1024 * 1024;
     public static final int MAX_FILES = 100_000;
@@ -67,7 +68,7 @@ public final class PackWorkspace {
         catch (IOException failure) {
             files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target); throw failure;
         }
-        changed.add(target); created.add(target); resourceRevision++; return target;
+        changed.add(target); created.add(target); resourceRevision++; history.clear("Resource duplicated; earlier applied-edit history was cleared."); return target;
     }
     public String createResource(String parent, String name, String dependency) throws IOException {
         String base = ResourceCreation.base(parent);
@@ -83,7 +84,7 @@ public final class PackWorkspace {
         catch (IOException failure) {
             files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target); throw failure;
         }
-        changed.add(target); created.add(target); resourceRevision++; return target;
+        changed.add(target); created.add(target); resourceRevision++; history.clear("Resource created; earlier applied-edit history was cleared."); return target;
     }
     public String createSubfolder(String parent, String name) throws IOException {
         if (!ResourceTypes.folderFamily(parent)) throw new IOException("Subfolders are supported only inside regions, biomes, generators, image-maps, blocks, expressions, objects and images; dimensions must stay flat");
@@ -97,7 +98,7 @@ public final class PackWorkspace {
         directories.add(target);
         try { validatePaths(); }
         catch (IOException failure) { directories.remove(target); throw failure; }
-        changedDirectories.add(target); resourceRevision++; return target;
+        changedDirectories.add(target); resourceRevision++; history.clear("Folder created; earlier applied-edit history was cleared."); return target;
     }
     public static PackWorkspace open(Path root) throws IOException { return open(root, LOAD_LIMITS); }
     static PackWorkspace open(Path root, LoadLimits limits) throws IOException {
@@ -160,14 +161,40 @@ public final class PackWorkspace {
     public byte[] read(String path) { return Objects.requireNonNull(files.get(path), "Unknown resource").clone(); }
     public boolean dirty() { return !changed.isEmpty() || !changedDirectories.isEmpty(); }
     public Path directory() { return directory; }
+    public int undoCount() { return history.undoCount(); }
+    public int redoCount() { return history.redoCount(); }
+    public long historyBytes() { return history.bytes(); }
+    public String historyNote() { return history.note(); }
+    public String undoPath() { var edit=history.next(false);return edit==null ? null : edit.path; }
+    public String redoPath() { var edit=history.next(true);return edit==null ? null : edit.path; }
+    public void clearHistory() { history.clear("Applied-edit history cleared."); }
+    /** Restores exact bytes in memory. Save remains an explicit, conflict-checked operation. */
+    public String undo() throws IOException { return restoreHistory(false); }
+    public String redo() throws IOException { return restoreHistory(true); }
+    private String restoreHistory(boolean forward) throws IOException {
+        var edit=history.next(forward);
+        if (edit==null) throw new IOException(forward ? "No applied edit to redo" : "No applied edit to undo");
+        byte[] current=files.get(edit.path);
+        if (current==null || !edit.matches(current,forward)) throw new IOException("Applied-edit history no longer matches this resource");
+        byte[] restored=edit.restore(forward);checkReplacementSize(edit.path,restored);
+        installReplacement(edit.path,restored);history.moved(forward);return edit.path;
+    }
+    private void checkReplacementSize(String path,byte[] data) throws IOException {
+        long total=files.values().stream().mapToLong(value -> value.length).sum()-files.get(path).length+data.length;
+        if (total>MAX_BYTES) throw new IOException("Workspace exceeds 512 MiB limit");
+    }
+    private void installReplacement(String path,byte[] data) {
+        files.put(path,data);
+        if (created.contains(path) || !Arrays.equals(savedHashes.get(path),hash(data))) changed.add(path);else changed.remove(path);
+        editRevision++;
+    }
     /** The schema/policy editor must authorize changes before using this internal byte-storage API. */
     public void replace(String path, byte[] data) throws IOException {
         path = safe(path);
         if (!files.containsKey(path)) throw new IOException("Unknown resource");
         if (Arrays.equals(files.get(path), data)) return;
-        long total = files.values().stream().mapToLong(value -> value.length).sum() - files.get(path).length + data.length;
-        if (total > MAX_BYTES) throw new IOException("Workspace exceeds 512 MiB limit");
-        files.put(path, data.clone()); changed.add(path); editRevision++;
+        checkReplacementSize(path,data);byte[] before=files.get(path),after=data.clone();
+        installReplacement(path,after);history.record(path,before,after);
     }
     public void save(Path target) throws IOException {
         target = target.toAbsolutePath().normalize();

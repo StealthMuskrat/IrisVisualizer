@@ -112,6 +112,17 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
                 ImGui.endMenu();
             }
+            if (ImGui.beginMenu("Edit")) {
+                ImGui.beginDisabled(workspace.undoCount()==0);if (ImGui.menuItem("Undo applied edit")) restoreAppliedEdit(false);ImGui.endDisabled();
+                if (workspace.undoPath()!=null) ImGui.textWrapped("Undo: "+workspace.undoPath());
+                ImGui.beginDisabled(workspace.redoCount()==0);if (ImGui.menuItem("Redo applied edit")) restoreAppliedEdit(true);ImGui.endDisabled();
+                if (workspace.redoPath()!=null) ImGui.textWrapped("Redo: "+workspace.redoPath());
+                ImGui.textWrapped(workspace.undoCount()+" undo / "+workspace.redoCount()+" redo; "+workspace.historyBytes()+" snapshot bytes.");
+                ImGui.textWrapped("Applied byte edits only, up to 128 edits / 32 MiB. Resource/folder creation or duplication clears history. Save retains it. History is memory-only and ends when the pack is replaced or the editor closes.");
+                ImGui.textWrapped(workspace.historyNote());
+                ImGui.beginDisabled(workspace.undoCount()+workspace.redoCount()==0);if (ImGui.menuItem("Clear applied-edit history")) workspace.clearHistory();ImGui.endDisabled();
+                ImGui.endMenu();
+            }
             ImGui.text(workspace.dirty() ? "Unsaved changes" : "Saved / no applied changes");
             if (drafts.any()) ImGui.text("Unapplied text: " + drafts.count());
             ImGui.endMainMenuBar();
@@ -5486,6 +5497,10 @@ public final class EditorApp extends Application {
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
         if (committed) { values.clear(); riverCatalogDimension=null; }
         return committed;
+    }
+    private void restoreAppliedEdit(boolean forward) {
+        try { transition(false,() -> { selected=forward ? workspace.redo() : workspace.undo();filter.set("");error=null; }); }
+        catch (Exception failure) { error=failure.getMessage(); }
     }
     private void selectResource(String path) {
         try { transition(false, () -> { selected = path; }); }
