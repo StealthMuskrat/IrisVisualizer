@@ -25,6 +25,8 @@ public final class EditorApp extends Application {
     private String riverCatalogDimension;
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
     private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
+    private final BlockAliasAudit.Cache blockAliasAudits = new BlockAliasAudit.Cache();
+    private final ResourceNavigation aliasNavigation = new ResourceNavigation();
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
     private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
@@ -232,6 +234,7 @@ public final class EditorApp extends Application {
                 try { drawBlockDefinition(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
             drawCoverage();
             if (bytes != null) {
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)"))
@@ -244,6 +247,8 @@ public final class EditorApp extends Application {
         if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+        String aliasTarget=aliasNavigation.take(workspace);
+        if (aliasTarget!=null) { try { transition(false,() -> { selected=aliasTarget;filter.set(""); }); } catch (Exception failure) { error=failure.getMessage(); } }
     }
     private void drawReferences() {
         String base = ResourceTypes.base(selected);
@@ -1592,7 +1597,7 @@ public final class EditorApp extends Application {
         try { block=BiomeDecorators.forceBlock(d); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored forceBlock is a snippet or unsupported (read-only).");ImGui.treePop();return; }
         ImGui.textWrapped("Optional surface-block replacement. This does not toggle forcePlace. Native paths can still apply host, fluid and plant guards; effective placement is not validated.");
         if (block!=null && ImGui.button("Restore no forced surface block (null)")) { try { commitProfileChange(context.prefix()+"forceBlock.",BiomeDecorators.restoreForceBlock(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
-        try { String stored=block==null || block.token("block")==null ? "" : block.stringToken("block"),key=context.prefix()+"forceBlock.block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(block==null ? "Block for explicit override" : "Surface block",input);drafts.update(key,stored,input.get());if (ImGui.button("Apply forced surface block")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setForceBlock(selected,workspace.read(selected),context,input.get()))); }
+        try { String stored=block==null || block.token("block")==null ? "" : block.stringToken("block"),key=context.prefix()+"forceBlock.block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(block==null ? "Block for explicit override" : "Surface block",input);drafts.update(key,stored,input.get());if (ImGui.button("Apply forced surface block")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setForceBlock(selected,workspace.read(selected),context,input.get())));if (block!=null) drawExactBlockAlias(stored,key); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block text has an unsupported type (read-only)."); }
         if (block!=null) drawInlineBlockData(block,InlineBlockData.Context.forced(context),1);ImGui.treePop();
     }
@@ -1607,7 +1612,7 @@ public final class EditorApp extends Application {
         if (ImGui.button("Add block")) { changeDecoratorBlock(context,field,RiverProfiles.Action.ADD,-1,next.get(),newKey);return; }
         for (int index=0;index<entries.size();index++) {
             ImGui.pushID(index);int blockIndex=index;var entry=entries.get(index);String prefix=context.blocksPrefix(field)+index+".";
-            try { String stored=entry.token("block")==null ? "" : entry.stringToken("block"),key=prefix+"block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Block",input);drafts.update(key,stored,input.get());if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setBlock(selected,workspace.read(selected),context,field,blockIndex,input.get()))); }
+            try { String stored=entry.token("block")==null ? "" : entry.stringToken("block"),key=prefix+"block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Block",input);drafts.update(key,stored,input.get());if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setBlock(selected,workspace.read(selected),context,field,blockIndex,input.get())));drawExactBlockAlias(stored,key); }
             catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block text has an unsupported type (read-only)."); }
             if (BiomeDecorators.weighted(field)) {
                 String token=entry.token("weight"),key=prefix+"weight";
@@ -1627,6 +1632,25 @@ public final class EditorApp extends Application {
         if (ImGui.treeNode("Block states and backups")) { ImGui.textWrapped("Structured states and bounded backups use native block-data definitions. These edits preserve the root block and stored weight. Registry, alias cycles and material-role compatibility remain unverified. Backup weights, debug and block-entity payloads stay read-only. No blocks are resolved or generated.");drawBlockDefinitionNode(entry,new BlockDefinitions.Scope(context,0));ImGui.treePop(); }
         for (String field : InlineBlockData.readOnlyPaths(entry,context.weightedRoot())) ImGui.textWrapped(field+" (read-only, preserved)");
     }
+    private void drawExactBlockAlias(String block,String key) {
+        String target=BlockDefinitions.exactAlias(workspace,block);if (target==null) return;ImGui.pushID(key+".exactAlias");
+        ImGui.textWrapped("Exact alias file present; contents, loader aliases and cycles unchecked: "+target);
+        if (ImGui.smallButton("Open exact block alias")) { try { aliasNavigation.request(workspace,target); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();
+    }
+    private void drawBlockAliasAudit() {
+        if (!ImGui.collapsingHeader("Exact block-alias references")) return;
+        var audit=blockAliasAudits.inspect(workspace);
+        ImGui.textWrapped("Read-only literal file references in blocks/ definitions and their backup chains. The audit does not run the native loader, inspect material consumers, validate registry states or prove generation safety. Backup links are conditional; reported cycles are potential cycles, including unused definitions. Save/Export remain available.");
+        ImGui.textWrapped("Limits: 512 sorted definitions, 1 MB per JSON file, 8 MB total, eight backup levels, 4096 references and 256 notices.");
+        ImGui.textWrapped(audit.definitions()+" definitions; "+audit.inspected().size()+" inspected; "+audit.parsed()+" parsed; "+audit.edges().size()+" exact references; "+audit.cycles().size()+" potential cycle groups.");
+        if (audit.incomplete()) ImGui.textWrapped("Reference coverage is incomplete; see notices below.");
+        if (!audit.inspected().contains(selected)) ImGui.textWrapped("The selected definition was not inspected within these limits. Missing links or cycles may remain unknown.");
+        var outgoing=audit.outgoing(selected);var incoming=audit.incoming(selected);if (outgoing.isEmpty()) ImGui.textWrapped("No recorded outgoing exact alias reference. Material keys without an exact local alias file remain unchecked.");
+        int index=0;for (var edge : outgoing) { ImGui.pushID(index++);ImGui.textWrapped(edge.field()+" -> "+edge.target()+(edge.implicit() ? " (implicit native air default)" : "")+(edge.conditional() ? " (conditional backup)" : ""));if (ImGui.smallButton("Open referenced alias")) { try { aliasNavigation.request(workspace,edge.target());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
+        ImGui.textWrapped(incoming.size()+" recorded incoming exact references.");for (var edge : incoming) { ImGui.pushID(index++);ImGui.textWrapped(edge.source()+": "+edge.field()+(edge.conditional() ? " (conditional backup)" : ""));if (ImGui.smallButton("Open referring definition")) { try { aliasNavigation.request(workspace,edge.source());ImGui.popID();return; } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
+        for (var cycle : audit.cycles(selected)) { ImGui.textWrapped("Potential cycle group (members, not traversal order): "+String.join(", ",cycle.members()));if (cycle.backupLinks()) ImGui.textWrapped("This group includes conditional backup links; the audit does not evaluate whether they execute."); }
+        if (ImGui.treeNode("Alias audit notices")) { for (var notice : audit.notices()) ImGui.textWrapped(notice.path()+(notice.field().isEmpty() ? "" : ": "+notice.field())+" — "+notice.message());ImGui.treePop(); }
+    }
     private void drawBlockDefinition(LosslessJson document) {
         ImGui.textWrapped("Block aliases supply native block states. Caller properties override an alias's state; an invalid merged override keeps that alias state. Otherwise an unresolved block tries its backup, then air. Registry compatibility, alias cycles and the resulting block are unchecked. No blocks are resolved or generated.");
         ImGui.textWrapped("Edit at most eight backup levels and 64 properties per state map. Weights in alias files are ignored by native alias resolution and remain read-only, along with debug and block-entity data.");
@@ -1639,7 +1663,7 @@ public final class EditorApp extends Application {
         try { String current=BlockDefinitions.block(node);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL block");if (!BlockDefinitions.blockSyntax(current)) ImGui.textWrapped("External or unsupported block text is preserved; replace it with a vanilla base block or alias key.");String key=prefix+"block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.textWrapped(node.token("block")==null ? "Implicit block: "+current : "Stored block");ImGui.inputText("Block or alias",input);drafts.update(key,current,input.get());
             if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,BlockDefinitions.setBlock(selected,workspace.read(selected),scope,input.get())));
             if ((scope.standalone() || !scope.context().fluid()) && node.token("block")!=null && ImGui.button("Reset block to implicit air")) { try { commitProfileChange(key,BlockDefinitions.resetBlock(selected,workspace.read(selected),scope),null); } catch (Exception failure) { error=failure.getMessage(); } }
-            String exact=BlockDefinitions.exactAlias(workspace,current);if (exact!=null) { ImGui.textWrapped("Exact alias file present; contents and cycles unchecked: "+exact);if (ImGui.button("Open exact alias file")) { try { transition(false,() -> { selected=exact;filter.set(""); }); } catch (Exception failure) { error=failure.getMessage(); } } }
+            String exact=BlockDefinitions.exactAlias(workspace,current);if (exact!=null) { ImGui.textWrapped("Exact alias file present; contents and cycles unchecked: "+exact);if (ImGui.button("Open exact alias file")) { try { aliasNavigation.request(workspace,exact); } catch (Exception failure) { error=failure.getMessage(); } } }
             if ((scope.standalone() || !scope.context().fluid()) && ImGui.beginCombo("Existing alias keys", "Choose an exact local alias")) { for (String alias : BlockDefinitions.aliases(workspace)) if (ImGui.selectable(alias,alias.equals(input.get()))) { input.set(alias);drafts.update(key,current,alias); }ImGui.endCombo(); }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block has an unsupported type or NUL text (read-only)."); } }
         if (ImGui.treeNode("State properties")) { drawBlockDefinitionStates(node,scope);ImGui.treePop(); }
@@ -1962,6 +1986,7 @@ public final class EditorApp extends Application {
             try {
                 String stored=value.token("block")==null ? "" : value.stringToken("block"),key=context.palettePrefix()+index+".block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(value.token("block")==null ? "Missing block" : "Block",input);drafts.update(key,stored,input.get());
                 if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,DepositGenerators.setBlock(selected,workspace.read(selected),context,row,input.get())));
+                drawExactBlockAlias(stored,key);
             } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block has an unsupported type (read-only)."); }
             RiverProfiles.Action action=null;if (ImGui.button("Duplicate block")) action=RiverProfiles.Action.DUPLICATE;
             ImGui.sameLine();ImGui.beginDisabled(palette.size()<=1);if (ImGui.button("Remove block")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
@@ -2650,6 +2675,7 @@ public final class EditorApp extends Application {
             try {
                 String stored=entry.token("block")==null ? "" : entry.stringToken("block"),key=context.findPrefix(ruleIndex)+index+".block";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(entry.token("block")==null ? "Missing find block" : "Find block",input);drafts.update(key,stored,input.get());
                 if (ImGui.button("Apply find block")) commitRiverOverride(key,() -> workspace.replace(selected,FloatingObjectReplacements.setFindBlock(selected,workspace.read(selected),context,ruleIndex,findIndex,input.get())));
+                drawExactBlockAlias(stored,key);
             } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored find block has an unsupported type (read-only)."); }
             RiverProfiles.Action action=null;
             if (ImGui.button("Duplicate find")) action=RiverProfiles.Action.DUPLICATE;
@@ -3326,6 +3352,7 @@ public final class EditorApp extends Application {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText(entry.token("block")==null ? "Required block (missing)" : "Block",input);drafts.update(key,stored,input.get());
                 if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,target.setBlock(selected,workspace.read(selected),entryIndex,input.get())));
+                drawExactBlockAlias(stored,key);
             } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block is non-string or contains NUL (read-only)."); }
             String token=entry.token("weight"),key=target.listPrefix()+index+".weight";
             if (token==null) {
@@ -3943,6 +3970,7 @@ public final class EditorApp extends Application {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(block,Math.max(4096,block.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText(entry.token("block")==null ? "Required fluid (missing)" : "Fluid block",input);drafts.update(key,block,input.get());
                 if (ImGui.button("Apply fluid")) commitRiverOverride(key,() -> workspace.replace(selected,target.setFluid(selected,workspace.read(selected),fluidIndex,input.get())));
+                drawExactBlockAlias(block,key);
             } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored fluid block is not a string (read-only)."); }
             String weight=entry.token("weight"),weightKey=target.fluidPrefix()+index+".weight";
             if (weight==null) {
@@ -4313,6 +4341,7 @@ public final class EditorApp extends Application {
                     ImString input=values.computeIfAbsent(key,ignored -> new ImString(block,Math.max(4096,block.getBytes(StandardCharsets.UTF_8).length+1)));
                     ImGui.inputText(entry.token("block")==null ? "Required block (missing)" : "Block",input); drafts.update(key,block,input.get());
                     if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,RiverMaterialFields.setBlock(selected,workspace.read(selected),target,selectedIndex,input.get())));
+                    drawExactBlockAlias(block,key);
                 } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored block name is not a string (read-only)."); }
                 drawRiverMaterialNumber(entry,target,index,"weight");
                 drawInlineBlockData(entry,new PaletteBlockData.Context(NoiseStyleFields.Target.palette(target),selectedIndex),entries.size());
