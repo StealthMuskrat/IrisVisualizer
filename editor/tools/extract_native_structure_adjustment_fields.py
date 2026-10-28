@@ -53,7 +53,7 @@ def extract(*sources):
     require(v,'Set.of("SOURCE", "PRESERVE", "BORE", "FORCE_CARVE", "VACUUM", "FLATTEN", "ENCASE")','Set.of("BOX", "ROUNDED", "ERODED")',
             '"erosionFrequency", 0.001D, 1D, blockingErrors','"floorPadding", 0, 64, blockingErrors')
     require(j,'if (!(rawValue instanceof String value) || !values.contains(value))')
-    values.update({'resolution.policy':'stackShiftsLastNonNullOverrides','band.policy':'sortedEndpoints','palettes.policy':'readOnly','registry.policy':'syntaxOnly'})
+    values.update({'resolution.policy':'stackShiftsLastNonNullOverrides','band.policy':'sortedEndpoints','palettes.policy':'separatePaletteControls','registry.policy':'syntaxOnly'})
     return ''.join(key+'='+json.dumps(value,ensure_ascii=True)[1:-1]+'\n' for key,value in values.items()).encode('ascii')
 
 if __name__=='__main__':Path(sys.argv[12]).write_bytes(extract(*(Path(path).read_bytes() for path in sys.argv[1:12])))

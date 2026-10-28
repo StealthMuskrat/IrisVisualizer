@@ -895,13 +895,26 @@ public final class EditorApp extends Application {
                     try { String low=NativeStructureAdjustments.value(object,context,"min"),high=NativeStructureAdjustments.value(object,context,"max");ImString min=values.computeIfAbsent(prefix+"min",ignored -> new ImString(low,Math.max(128,low.length()+1))),max=values.computeIfAbsent(prefix+"max",ignored -> new ImString(high,Math.max(128,high.length()+1)));ImGui.inputText("Minimum world Y",min);ImGui.inputText("Maximum world Y",max);drafts.update(key,low+"|"+high,min.get()+"|"+max.get());if (ImGui.button("Apply both Y-band endpoints")) { try { commitProfileChange(prefix,NativeStructureAdjustments.setBand(selected,workspace.read(selected),index,min.get(),max.get()),key); } catch (Exception failure) { error=failure.getMessage(); } } }
                     catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored Y band has a non-integer or unsupported-width endpoint (read-only)."); }
                 } else {
-                    ImGui.textWrapped(context.equals("stilt") ? "Native class defaults: maxDepth 64, spacing 1, cobblestone palette. Advanced palette data stays read-only. supportNonOccluding is documented for Iris-authored structures." : "Absent leaves use SOURCE/BOX, padding 0, flattenRange 64, erosion strength 0.8/frequency 0.07, lobe frequency 0 and strength 0.85. Lobe frequency 0 derives 0.3 times erosion frequency. Advanced encasePalette stays read-only; native default material depends on the world environment.");
+                    ImGui.textWrapped(context.equals("stilt") ? "Native class defaults: maxDepth 64, spacing 1, cobblestone palette. Foundation palettes are authored below. supportNonOccluding is documented for Iris-authored structures." : "Absent leaves use SOURCE/BOX, padding 0, flattenRange 64, erosion strength 0.8/frequency 0.07, lobe frequency 0 and strength 0.85. Lobe frequency 0 derives 0.3 times erosion frequency. Encasing palettes are authored below; the omitted palette uses a native environment-dependent fallback.");
                     for (String field : context.equals("stilt") ? NativeStructureAdjustments.STILT_FIELDS : NativeStructureAdjustments.TERRAIN_FIELDS) drawNativeAdjustmentValue(object,index,context,field);
+                    drawNativeStructurePalette(entry,index,context);
                 }
-                for (String field : object.fields()) if (!(context.equals("yBand") ? NativeStructureAdjustments.BAND_FIELDS : context.equals("stilt") ? NativeStructureAdjustments.STILT_FIELDS : NativeStructureAdjustments.TERRAIN_FIELDS).contains(field)) ImGui.textWrapped(context+"."+field+" (read-only, preserved)");
+                for (String field : object.fields()) if (!(context.equals("yBand") ? NativeStructureAdjustments.BAND_FIELDS : context.equals("stilt") ? NativeStructureAdjustments.STILT_FIELDS : NativeStructureAdjustments.TERRAIN_FIELDS).contains(field) && !(context.equals("stilt") && field.equals("palette") || context.equals("terrain") && field.equals("encasePalette"))) ImGui.textWrapped(context+"."+field+" (read-only, preserved)");
             }
             if (entry.token(context)!=null) { ImGui.textWrapped("Remove discards this entire override, including advanced palette/unknown data, and restores absence.");if (ImGui.button("Remove "+context+" override")) { try { commitProfileChange(prefix,NativeStructureAdjustments.removeOptional(selected,workspace.read(selected),index,context),null); } catch (Exception failure) { error=failure.getMessage(); } } }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored override is a snippet/non-object (read-only)."); }ImGui.popID();ImGui.treePop();
+    }
+    private void drawNativeStructurePalette(LosslessJson entry,int index,String owner) {
+        var context=new NativeStructurePalettes.Context(index,owner);
+        if (!ImGui.treeNode(context.member()+" material override")) return;ImGui.pushID(context.prefix());
+        ImGui.textWrapped(owner.equals("stilt") ? "Omitting this palette uses the native foundation default, minecraft:cobblestone. Writing an explicit palette starts with cobblestone and keeps native STATIC style/zoom 5 implicit. A stored null has no inline palette; its native effect is not evaluated here." : "Omitted/null encasePalette uses the native environment fallback. Writing an explicit palette starts with STONE, replacing that fallback. Encasing is used by ENCASE; this control never changes the terrain mode.");
+        try {
+            var palette=NativeStructurePalettes.object(entry,context);
+            if (palette==null) { if (ImGui.button("Write explicit "+NativeStructurePalettes.creationBlock(context)+" palette")) { try { commitProfileChange(context.prefix(),NativeStructurePalettes.create(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+            else { NativeStructurePalettes.checkEntries(palette);drawGeneralBlockPalette(palette,context.target()); }
+            var object=NativeStructureAdjustments.object(entry,owner);
+            if (object!=null && object.token(context.member())!=null) { ImGui.textWrapped("Reset discards the whole palette, including advanced data, and restores the omitted native default. Block registries, state/solid-role requirements, noise sampling and terrain integration are unverified.");if (ImGui.button("Reset to omitted palette")) { try { commitProfileChange(context.prefix(),NativeStructurePalettes.reset(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored palette is a snippet/non-object, has mixed/null entries or exceeds the 64-entry editor limit (read-only)."); }ImGui.popID();ImGui.treePop();
     }
     private void drawNativeAdjustmentValue(LosslessJson object,int index,String context,String field) {
         ImGui.pushID(field);String key=NativeStructureAdjustments.prefix(index)+(context.isEmpty() ? "" : context+".")+field;ImGui.textWrapped(NativeStructureAdjustments.help(context,field));
@@ -2926,7 +2939,7 @@ public final class EditorApp extends Application {
             ImGui.textWrapped(target.zoomConstraints());
             if (token==null) {
                 if (ImGui.button("Enable palette zoom ("+target.zoomDefault()+")")) applyRoutingExtra(() -> workspace.replace(selected,target.enableZoom(selected,workspace.read(selected))));
-            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored palette zoom has an unsupported type (read-only).");
+            } else if (!LosslessJson.numericToken(token) || target.nativeStructure() && !NativeStructurePalettes.supportedZoom(palette)) ImGui.textWrapped("Stored palette zoom has an unsupported type (read-only).");
             else {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText("Palette zoom",input);drafts.update(key,token,input.get());
@@ -2949,12 +2962,13 @@ public final class EditorApp extends Application {
         }
         String newKey=target.listPrefix()+"new.block";
         ImString newBlock=values.computeIfAbsent(newKey,ignored -> new ImString("",4096));ImGui.inputText("New block",newBlock);drafts.update(newKey,"",newBlock.get());
-        if (ImGui.button("Add block")) { changeGeneralBlockPalette(target,RiverProfiles.Action.ADD,-1,newBlock.get(),newKey);return; }
+        ImGui.beginDisabled(target.nativeStructure() && entries.size()>=NativeStructurePalettes.MAXIMUM_ENTRIES);boolean addBlock=ImGui.button("Add block");ImGui.endDisabled();
+        if (addBlock) { changeGeneralBlockPalette(target,RiverProfiles.Action.ADD,-1,newBlock.get(),newKey);return; }
         if (entries.isEmpty()) ImGui.textWrapped(target.ore() ? "Empty palette: this ore generator produces no blocks." : target.slabWall() ? "Empty palette: no material is selected. Add a block to author a material palette." : "This list is empty. Add a block to repair the required list.");
         for (int index=0;index<entries.size();index++) {
             if (!ImGui.treeNode("Block "+index)) continue;
             int entryIndex=index;var entry=entries.get(index);RiverProfiles.Action action=null;
-            if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;
+            ImGui.beginDisabled(target.nativeStructure() && entries.size()>=NativeStructurePalettes.MAXIMUM_ENTRIES);if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();
             ImGui.sameLine();ImGui.beginDisabled(entries.size()<=target.minimumEntries());
             if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
             ImGui.endDisabled();ImGui.beginDisabled(index==0);
@@ -2965,14 +2979,15 @@ public final class EditorApp extends Application {
             if (action!=null) { ImGui.treePop();changeGeneralBlockPalette(target,action,index,null,null);return; }
             try {
                 String stored=entry.token("block")==null ? "" : entry.stringToken("block"),key=target.listPrefix()+index+".block";
+                if (stored.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText(entry.token("block")==null ? "Required block (missing)" : "Block",input);drafts.update(key,stored,input.get());
                 if (ImGui.button("Apply block")) commitRiverOverride(key,() -> workspace.replace(selected,target.setBlock(selected,workspace.read(selected),entryIndex,input.get())));
-            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block is not a string (read-only)."); }
+            } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored block is non-string or contains NUL (read-only)."); }
             String token=entry.token("weight"),key=target.listPrefix()+index+".weight";
             if (token==null) {
                 if (ImGui.button("Enable weight ("+DimensionPalettes.weightDefault()+")")) applyRoutingExtra(() -> workspace.replace(selected,target.enableWeight(selected,workspace.read(selected),entryIndex)));
-            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored weight has an unsupported type (read-only).");
+            } else if (!LosslessJson.numericToken(token) || target.nativeStructure() && !NativeStructurePalettes.supportedWeight(entry)) ImGui.textWrapped("Stored weight has an unsupported type (read-only).");
             else {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
                 ImGui.inputText("Weight (1-"+DimensionPalettes.maximumWeight()+")",input);drafts.update(key,token,input.get());

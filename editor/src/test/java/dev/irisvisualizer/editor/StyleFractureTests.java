@@ -22,7 +22,7 @@ final class StyleFractureTests {
         return result;
     }
     static void run(Path temp) throws Exception {
-        check(cases().size()==113 && StyleFractures.MAXIMUM_DEPTH==8 && StyleFractures.multiplierDefault().equals("1"));
+        check(cases().size()==115 && StyleFractures.MAXIMUM_DEPTH==8 && StyleFractures.multiplierDefault().equals("1"));
         var sources=PackWorkspace.newPack(Map.of("expressions/formula.json",bytes("opaque expression"),"image-maps/map.json",bytes("opaque map")));
         int ordinal=0;
         for (var c : cases()) {

@@ -3477,8 +3477,8 @@
       "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
     },
     "palette": {
-      "classification": "read-only",
-      "reason": "Advanced native structure palette data is preserved. This context does not yet support palette entries, noise or registry material resolution."
+      "classification": "generation",
+      "reason": "Authors native adjustment weighted material palettes and shared noise/source/cache/fracture settings. Runtime material resolution, sampling and terrain integration are unvalidated."
     }
   },
   "structureTerrain": {
@@ -3523,8 +3523,8 @@
       "reason": "Controls authored native structure adjustment matching, vertical placement, foundations or terrain integration; registry contents and native placement are not evaluated."
     },
     "encasePalette": {
-      "classification": "read-only",
-      "reason": "Advanced native structure palette data is preserved. This context does not yet support palette entries, noise or registry material resolution."
+      "classification": "generation",
+      "reason": "Authors native adjustment weighted material palettes and shared noise/source/cache/fracture settings. Runtime material resolution, sampling and terrain integration are unvalidated."
     }
   },
   "structureYBand": {
