@@ -21,10 +21,12 @@ public final class DimensionFields {
     /** Report unknown root fields and unknown children of the supported object groups. */
     public static List<String> readOnlyPaths(LosslessJson document) {
         List<String> paths = new ArrayList<>();
+        paths.addAll(DimensionIntegrations.readOnlyPaths(document));
         paths.addAll(DimensionGenerationControls.readOnlyPaths(document));
         paths.addAll(DimensionTypeFields.readOnlyPaths(document));
         paths.addAll(DimensionStacks.readOnlyPaths(document));
         for (String field : document.fields()) {
+            if (DimensionIntegrations.EDITABLE.contains(field)) continue;
             if (List.of("importedFeatures","importedStructures").contains(field)) { paths.addAll(NativeGenerationFilters.readOnlyPaths(document,field));continue; }
             if (DimensionGenerationControls.ROOT_FIELDS.contains(field)) continue;
             if (SubterrainFeatures.LIST_FIELDS.contains(field)) continue;

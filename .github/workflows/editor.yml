@@ -782,6 +782,25 @@ jobs:
           python editor/tools/extract_native_structure_adjustment_fields.py IrisDimension.java IrisImportedStructureControl.java IrisVanillaStructureAdjustment.java IrisStructureStiltSettings.java IrisStructureTerrain.java IrisStructureYBand.java PackStructurePlacementValidator.java PackDimensionValidator.java StructureTerrainMode.java StructureCarveShape.java PackJsonFieldChecks.java generated-native-structure-adjustment-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-native-structure-adjustment-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/native-structure-adjustment-fields.properties).Hash) { throw 'Pinned native structure adjustment definitions differ' }
+      - name: Verify pinned dimension integration contracts and flag serialization
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/spi/src/main/java/art/arcane/iris/spi/PlatformGenerationRegistry.java' -OutFile PlatformGenerationRegistry.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/adapters/modded-common/src/main/java/art/arcane/iris/modded/ModdedGenerationRegistry.java' -OutFile ModdedGenerationRegistry.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/datapack/DatapackImportSources.java' -OutFile DatapackImportSources.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/datapack/DatapackArchive.java' -OutFile DatapackArchive.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/datapack/DatapackStartupValidation.java' -OutFile DatapackStartupValidation.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/runtime/IrisEngineMantle.java' -OutFile IrisEngineMantle.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/schema/annotation/functions/ComponentFlagFunction.java' -OutFile ComponentFlagFunction.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/loading/IrisData.java' -OutFile IrisData.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/VolmLib/210705c5ab1321dc74b86b48457fd6d5e0452944/shared/src/main/java/art/arcane/volmlib/util/mantle/flag/MantleFlag.java' -OutFile MantleFlag.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/VolmLib/210705c5ab1321dc74b86b48457fd6d5e0452944/shared/src/main/java/art/arcane/volmlib/util/mantle/flag/MantleFlagAdapter.java' -OutFile MantleFlagAdapter.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/VolmLib/210705c5ab1321dc74b86b48457fd6d5e0452944/shared/src/main/java/art/arcane/volmlib/util/mantle/flag/ReservedFlag.java' -OutFile ReservedFlag.java
+          python editor/tools/test_dimension_integration_fields.py IrisDimension.java PackDimensionValidator.java IrisDimensionRuntimeContract.java PlatformGenerationRegistry.java ModdedGenerationRegistry.java DatapackImportSources.java DatapackArchive.java DatapackStartupValidation.java IrisEngineMantle.java ComponentFlagFunction.java MantleFlag.java MantleFlagAdapter.java ReservedFlag.java IrisData.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_dimension_integration_fields.py IrisDimension.java PackDimensionValidator.java IrisDimensionRuntimeContract.java PlatformGenerationRegistry.java ModdedGenerationRegistry.java DatapackImportSources.java DatapackArchive.java DatapackStartupValidation.java IrisEngineMantle.java ComponentFlagFunction.java MantleFlag.java MantleFlagAdapter.java ReservedFlag.java IrisData.java generated-dimension-integration-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-dimension-integration-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/dimension-integration-fields.properties).Hash) { throw 'Pinned dimension integration definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
