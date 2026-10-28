@@ -1,10 +1,10 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in eighty-three pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in eighty-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 64 | 58 | 18 |
+| dimension | 82 | 65 | 59 | 17 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 40 | 34 | 2 |
@@ -75,6 +75,7 @@ Direct nonstatic/nontransient private fields in eighty-three pinned source class
 | customBiome | 15 | 15 | 15 | 0 |
 | customBiomeSpawn | 5 | 5 | 5 | 0 |
 | customBiomeParticle | 2 | 2 | 2 | 0 |
+| subterrainFeature | 20 | 20 | 20 | 0 |
 | imageMap | 25 | 25 | 25 | 0 |
 | imageMapOrigin | 2 | 2 | 2 | 0 |
 | imageMapBinding | 4 | 4 | 4 | 0 |
@@ -90,7 +91,7 @@ Direct nonstatic/nontransient private fields in eighty-three pinned source class
 
 ## dimension
 
-Unclassified: `borrowedDimensionType`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `hideOresForHiddenOre`, `importedFeatures`, `importedStructures`, `mode`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `treeSettings`, `useMantle`.
+Unclassified: `borrowedDimensionType`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `hideOresForHiddenOre`, `importedFeatures`, `importedStructures`, `mode`, `preventLeafDecay`, `structures`, `studioMode`, `treeSettings`, `useMantle`.
 
 ## importedStructures
 
@@ -369,6 +370,10 @@ Unclassified: none.
 Unclassified: none.
 
 ## customBiomeParticle
+
+Unclassified: none.
+
+## subterrainFeature
 
 Unclassified: none.
 

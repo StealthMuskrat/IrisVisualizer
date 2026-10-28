@@ -255,6 +255,10 @@
     "imageMaps": {
       "classification": "generation",
       "reason": "Dimension image-map applications and named ordered masks; file presence/local relationships only, without native map or pixel evaluation."
+    },
+    "subterrainFeatures": {
+      "classification": "generation",
+      "reason": "Dimension-owned deterministic underground feature definitions; typed authoring without native placement planning or geometry validation."
     }
   },
   "biome": {
@@ -3239,6 +3243,88 @@
     "z": {
       "classification": "generation",
       "reason": "Finite image-map world/source coordinate data; native coordinate transformation is not evaluated."
+    }
+  },
+  "subterrainFeature": {
+    "id": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "enabled": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "family": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "biome": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "allowedRegions": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "worldYRange": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "spacing": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "probability": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "length": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "radius": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "height": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "shapeWarp": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "fluid": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "fluidDepth": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "chimneyHeight": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "terraceCount": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "pillarSpacing": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "formationFraction": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "solid": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
+    },
+    "priority": {
+      "classification": "generation",
+      "reason": "Controls authored underground feature placement, shape, reference, fluid, material or priority; native registries and geometry are unvalidated."
     }
   }
 }

@@ -730,6 +730,18 @@ jobs:
           python editor/tools/extract_image_map_definition_fields.py IrisImageMap.java IrisImageMapOrigin.java IrisImageMapType.java IrisImageMapRotation.java IrisImageMapSampling.java IrisImageMapOutOfBounds.java IrisImageMapAlpha.java IrisImageMapUnknownColor.java IrisImageMapCompiler.java generated-image-map-definition-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-image-map-definition-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/image-map-definition-fields.properties).Hash) { throw 'Pinned image-map definition fields differ' }
+      - name: Verify pinned underground feature definitions and planner contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/subterrain/IrisSubterrainFeature.java' -OutFile IrisSubterrainFeature.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/subterrain/IrisSubterrainFamily.java' -OutFile IrisSubterrainFamily.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/subterrain/IrisSubterrainFluid.java' -OutFile IrisSubterrainFluid.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/subterrain/SubterrainPlanner.java' -OutFile SubterrainPlanner.java
+          python editor/tools/test_subterrain_feature_fields.py IrisDimension.java IrisSubterrainFeature.java IrisSubterrainFamily.java IrisSubterrainFluid.java IrisRange.java SubterrainPlanner.java IrisComplex.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_subterrain_feature_fields.py IrisDimension.java IrisSubterrainFeature.java IrisSubterrainFamily.java IrisSubterrainFluid.java IrisRange.java SubterrainPlanner.java IrisComplex.java generated-subterrain-feature-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-subterrain-feature-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/subterrain-feature-fields.properties).Hash) { throw 'Pinned underground feature definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

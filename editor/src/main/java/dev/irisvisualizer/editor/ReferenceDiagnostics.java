@@ -34,6 +34,7 @@ public final class ReferenceDiagnostics {
                     objectEntries(workspace,document,"staticObjects","",true,links);
                     carvingBiomes(workspace,document,links);
                     imageMaps(workspace,document,links);
+                    subterrain(workspace,document,links);
                 }
                 case "regions" -> {
                     for (String field : List.of("landBiomes", "seaBiomes", "shoreBiomes", "caveBiomes"))
@@ -54,6 +55,17 @@ public final class ReferenceDiagnostics {
         List<Link> result=new ArrayList<>(links);
         if (links.truncated) result.add(new Link("References","Inspection truncated at "+MAX_LINKS+" links",null,State.UNSUPPORTED));
         return List.copyOf(result);
+    }
+    private static void subterrain(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+        if (full(links) || document.token("subterrainFeatures")==null) return;
+        try {
+            var entries=document.objectArray("subterrainFeatures");
+            for (int index=0;index<entries.size() && !full(links);index++) {
+                String prefix="subterrainFeatures["+index+"].";var entry=entries.get(index);
+                scalar(workspace,entry,"biome","biomes",prefix,false,true,links);
+                list(workspace,entry,"allowedRegions","regions",false,prefix,links);
+            }
+        } catch (IllegalArgumentException unsupported) { links.add(new Link("subterrainFeatures","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
     private static void pngSource(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         try { String key=document.stringToken("source");links.add(key==null ? new Link("source","Absent PNG source",null,State.ABSENT_REQUIRED) : link(workspace,"source",key,"images")); }
