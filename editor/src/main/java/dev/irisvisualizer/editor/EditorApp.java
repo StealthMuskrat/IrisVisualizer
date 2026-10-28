@@ -187,6 +187,7 @@ public final class EditorApp extends Application {
                     drawSurfaceLayerFallback(document);
                     drawDimensionHeights(document);
                     drawWorldBoundary(document);
+                    drawNativeGenerationFilters(document);
                     drawDimensionGenerationControls(document);
                     drawDimensionType(document);
                     drawDimensionStack(document);
@@ -813,6 +814,62 @@ public final class EditorApp extends Application {
             ImGui.popID();
         }
         ImGui.treePop();
+    }
+    private void drawNativeGenerationFilters(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Native feature filters and structure-set frequency")) return;
+        ImGui.pushID("native-generation-filters");
+        ImGui.textWrapped("Registry keys and biome tags are syntax-only: this editor does not resolve a server registry, execute native placement or preview these settings. Existing enabled/disabled controls remain above. Feature filtering has no effect while importedFeatures.enabled is false (its native default).");
+        ImGui.textWrapped("An empty allowed-step list permits all steps; denied steps take precedence. Unknown steps in a newer server are eligible only when the allowed list is empty. Biome rules add denials on top of global filters; they never enable a feature.");
+        try { var features=NativeGenerationFilters.object(document,"importedFeatures");if (features==null) features=new LosslessJson("{}".getBytes(StandardCharsets.UTF_8));for (String field : List.of("steps","disabledSteps")) drawNativeFilterStrings(features,field,-1,NativeGenerationFilters.prefix(field)); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored importedFeatures is null/non-object (read-only)."); }
+        drawNativeFilterObjects(document,"biomeRules");drawNativeFilterObjects(document,"frequencyOverrides");ImGui.popID();
+    }
+    private void drawNativeFilterObjects(LosslessJson document,String list) {
+        if (!ImGui.treeNode(list)) return;ImGui.pushID(list);String prefix=NativeGenerationFilters.prefix(list);ImGui.textWrapped(NativeGenerationFilters.help(list));
+        List<LosslessJson> entries;
+        try { entries=NativeGenerationFilters.entries(document,list); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored policy/list is null, a snippet or has non-object entries (read-only).");ImGui.popID();ImGui.treePop();return; }
+        if (entries!=null && entries.size()>NativeGenerationFilters.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-entry editor limit (read-only).");ImGui.popID();ImGui.treePop();return; }
+        String newKey=prefix+"new";ImString newSet=null;
+        if (list.equals("frequencyOverrides")) { ImGui.textWrapped("Exact registered structure-set keys differ from structure keys. Native resolution trims/lowercases keys and uses the last matching entry. New entries leave multiplier absent (native default 1); multiplier must be 0.01..16. Requested density is not a guaranteed realized placement rate.");newSet=values.computeIfAbsent(newKey,ignored -> new ImString("",16384));ImGui.inputText("New structure-set key",newSet);drafts.update(newKey,"",newSet.get()); }
+        else ImGui.textWrapped("A new empty rule matches no biomes and denies nothing. Keys refer to server registry biomes, including namespace: selectors and #namespace:tag selectors. They are separate from Iris biome file keys.");
+        ImGui.beginDisabled(entries!=null && entries.size()>=NativeGenerationFilters.MAXIMUM_ENTRIES || newSet!=null && newSet.get().isEmpty());boolean add=ImGui.button("Add "+(list.equals("biomeRules") ? "inactive biome rule" : "frequency override"));ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,NativeGenerationFilters.change(selected,workspace.read(selected),list,RiverProfiles.Action.ADD,-1,newSet==null ? null : newSet.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+        if (entries!=null) for (int index=0;index<entries.size();index++) {
+            int item=index;var entry=entries.get(index);String entryPrefix=prefix+index+".";ImGui.pushID(index);
+            if (ImGui.treeNode("Entry "+index)) {
+                RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==entries.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+                if (action!=null) { try { commitProfileChange(prefix,NativeGenerationFilters.change(selected,workspace.read(selected),list,action,index,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();ImGui.treePop();return; }
+                if (list.equals("biomeRules")) for (String field : NativeGenerationFilters.EDITABLE) drawNativeFilterStrings(entry,field,index,entryPrefix+field+".");
+                else {
+                    for (String field : NativeGenerationFilters.FREQUENCY_FIELDS) {
+                        ImGui.pushID(field);ImGui.textWrapped(NativeGenerationFilters.help(field));String key=entryPrefix+field;
+                        try { String current=field.equals("structureSet") ? NativeGenerationFilters.structureSet(entry) : NativeGenerationFilters.multiplier(entry);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,field.equals("structureSet") ? NativeGenerationFilters.setStructureSet(selected,workspace.read(selected),item,input.get()) : NativeGenerationFilters.setMultiplier(selected,workspace.read(selected),item,input.get())));if (field.equals("multiplier") && entry.token(field)!=null && ImGui.button("Restore absent multiplier (1)")) { try { commitProfileChange(key,NativeGenerationFilters.resetMultiplier(selected,workspace.read(selected),index),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+                        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored value has an unsupported type/finite value (read-only)."); }ImGui.popID();
+                    }
+                }
+                for (String field : entry.fields()) if (!(list.equals("biomeRules") ? NativeGenerationFilters.EDITABLE : NativeGenerationFilters.FREQUENCY_FIELDS).contains(field)) ImGui.textWrapped(field+" (read-only, preserved)");ImGui.treePop();
+            }ImGui.popID();
+        }ImGui.popID();ImGui.treePop();
+    }
+    private void drawNativeFilterStrings(LosslessJson owner,String field,int rule,String prefix) {
+        if (!ImGui.treeNode(field)) return;ImGui.pushID(prefix);boolean step=rule<0;ImGui.textWrapped(NativeGenerationFilters.help(step ? field : "rule."+field));
+        List<String> strings;
+        try { strings=NativeGenerationFilters.strings(owner,field,step); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored list is null/non-string/mixed (read-only).");ImGui.popID();ImGui.treePop();return; }
+        if (strings!=null && strings.size()>NativeGenerationFilters.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-entry editor limit (read-only).");ImGui.popID();ImGui.treePop();return; }
+        String newKey=prefix+"new";ImString next=values.computeIfAbsent(newKey,ignored -> new ImString("",16384));
+        if (step) { if (ImGui.beginCombo("New step",next.get().isEmpty() ? "Choose step" : next.get())) { for (String choice : NativeGenerationFilters.steps()) if (ImGui.selectable(choice,choice.equals(next.get()))) next.set(choice);ImGui.endCombo(); } } else ImGui.inputText("New registry selector",next);drafts.update(newKey,"",next.get());
+        ImGui.beginDisabled(next.get().isEmpty() || strings!=null && strings.size()>=NativeGenerationFilters.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add string entry");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,NativeGenerationFilters.changeString(selected,workspace.read(selected),field,rule,RiverProfiles.Action.ADD,-1,next.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+        if (strings!=null) for (int index=0;index<strings.size();index++) {
+            int item=index;String current=strings.get(index),key=prefix+index;ImGui.pushID(index);
+            if (step) { ImGui.textWrapped(NativeGenerationFilters.stepHelp(current));if (ImGui.beginCombo("Step",current.length()>128 || current.indexOf(0)>=0 ? "Stored step" : current)) { for (String choice : NativeGenerationFilters.steps()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,NativeGenerationFilters.setString(selected,workspace.read(selected),field,rule,item,choice)));ImGui.endCombo(); } }
+            else if (current.indexOf(0)>=0) ImGui.textWrapped("Stored selector contains NUL (text read-only; structural removal is available).");
+            else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Registry selector",input);drafts.update(key,current,input.get());if (ImGui.button("Apply selector")) commitRiverOverride(key,() -> workspace.replace(selected,NativeGenerationFilters.setString(selected,workspace.read(selected),field,rule,item,input.get()))); }
+            RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==strings.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;
+            if (action!=null) { try { commitProfileChange(prefix,NativeGenerationFilters.changeString(selected,workspace.read(selected),field,rule,action,index,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.popID();ImGui.treePop();return; }ImGui.popID();
+        }ImGui.popID();ImGui.treePop();
     }
     private void drawDimensionGenerationControls(LosslessJson document) {
         if (!ImGui.collapsingHeader("Dimension generation and server Studio controls")) return;

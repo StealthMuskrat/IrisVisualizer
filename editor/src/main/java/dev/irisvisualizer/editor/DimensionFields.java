@@ -25,6 +25,7 @@ public final class DimensionFields {
         paths.addAll(DimensionTypeFields.readOnlyPaths(document));
         paths.addAll(DimensionStacks.readOnlyPaths(document));
         for (String field : document.fields()) {
+            if (List.of("importedFeatures","importedStructures").contains(field)) { paths.addAll(NativeGenerationFilters.readOnlyPaths(document,field));continue; }
             if (DimensionGenerationControls.ROOT_FIELDS.contains(field)) continue;
             if (SubterrainFeatures.LIST_FIELDS.contains(field)) continue;
             if (ImageMapBindings.LIST_FIELDS.contains(field)) continue;

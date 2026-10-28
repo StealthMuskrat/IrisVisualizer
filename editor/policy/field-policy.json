@@ -299,6 +299,10 @@
     "debugCrossSectionsMod": {
       "classification": "generation",
       "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    },
+    "importedFeatures": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
     }
   },
   "biome": {
@@ -647,6 +651,10 @@
     "disabledExact": {
       "classification": "generation",
       "reason": "Controls native structure placement or which sources may generate."
+    },
+    "frequencyOverrides": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
     }
   },
   "importedFeatures": {
@@ -661,6 +669,18 @@
     "disabledExact": {
       "classification": "generation",
       "reason": "Controls native placed-feature generation and source filters."
+    },
+    "steps": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    },
+    "disabledSteps": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    },
+    "biomeRules": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
     }
   },
   "interpolator": {
@@ -3371,6 +3391,30 @@
     "type": {
       "classification": "generation",
       "reason": "Controls dimension generation mode, server Studio layout or native generation/debug behavior; authoring does not activate previews or native generators."
+    }
+  },
+  "importedFeatureBiomeRule": {
+    "biomes": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    },
+    "disabled": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    },
+    "disabledExact": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    }
+  },
+  "structureSetFrequency": {
+    "structureSet": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
+    },
+    "multiplier": {
+      "classification": "generation",
+      "reason": "Controls native imported feature selection or registered structure-set placement frequency. Registry contents and native generation are not evaluated by the editor."
     }
   }
 }
