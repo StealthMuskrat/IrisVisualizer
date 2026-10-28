@@ -27,6 +27,7 @@ final class NoiseFractureTests {
         return "{\r\n \""+parts[index]+"\":"+wrap(parts,index+1,leaf)+",\"futureSibling\":9007199254740993,\"escaped\":\"雪\\u0061\"\r\n}";
     }
     private static LosslessJson at(LosslessJson object,String[] parts,int index) {
+        if (index==parts.length) return object;
         String field=parts[index];if (index+1<parts.length && parts[index+1].matches("[0-9]+")) return at(object.objectArray(field).get(Integer.parseInt(parts[index+1])),parts,index+2);
         var child=new LosslessJson(bytes(object.token(field)));return index+1==parts.length ? child : at(child,parts,index+1);
     }
