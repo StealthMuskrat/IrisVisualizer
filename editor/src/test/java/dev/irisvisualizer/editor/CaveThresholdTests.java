@@ -115,7 +115,7 @@ final class CaveThresholdTests {
         }
         rejects(() -> NoiseStyleFields.Target.threshold("generators"));
         rejects(() -> NoiseStyleFields.Target.cave("biomes", "densityThreshold.style"));
-        rejects(() -> new NoiseStyleFields.Target("biomes", null));
+        rejects(() -> new NoiseStyleFields.Target("biomes", "caveProfile.densityThreshold.style.fracture", null));
         rejects(() -> CaveThresholdFields.defaultBound("style", false));
         check(FieldCoverage.fields("styledRange").size() == 3 && FieldCoverage.fields("styledRange").stream().allMatch(FieldCoverage.Field::implemented));
         var readOnly = DimensionFields.readOnlyPaths(new LosslessJson(source));
