@@ -2068,11 +2068,11 @@
     },
     "data": {
       "classification": "generation",
-      "reason": "Native block-state properties and recursive backups. Controls cover standalone block definitions and supported style-backed palette entries; other nested contexts remain partial."
+      "reason": "Native block-state properties and recursive backups. Controls cover block definitions, supported style-backed palettes, deposit materials, object find lists and biome decorator lists/forced blocks; other contexts remain partial."
     },
     "backup": {
       "classification": "generation",
-      "reason": "Native block-state properties and recursive backups. Controls cover standalone block definitions and supported style-backed palette entries; other nested contexts remain partial."
+      "reason": "Native block-state properties and recursive backups. Controls cover block definitions, supported style-backed palettes, deposit materials, object find lists and biome decorator lists/forced blocks; other contexts remain partial."
     },
     "debug": {
       "classification": "read-only",

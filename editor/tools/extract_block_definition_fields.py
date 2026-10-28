@@ -2,7 +2,7 @@
 import hashlib,json,re,sys
 from pathlib import Path
 from extract_river_material_fields import compact
-FILES=['IrisBlockData','IrisMaterialPalette','IrisBiomePaletteLayer']
+FILES=['IrisBlockData','IrisMaterialPalette','IrisBiomePaletteLayer','IrisDepositGenerator','IrisObjectReplace','IrisDecorator','DecoratorCore']
 FIELDS={'block':('String','"air"'),'backup':('IrisBlockData','null'),'data':('KMap<String, Object>','new KMap<>()'),'debug':('boolean','false'),'tileData':('KMap<String, Object>','new KMap<>()'),'weight':('int','1')}
 def read_sources(root):return {name:(Path(root)/(name+'.java')).read_bytes() for name in FILES}
 def extract(sources):
@@ -33,6 +33,11 @@ def extract(sources):
     require(texts['IrisMaterialPalette'],'for (int i = 0; i < ix.getWeight(); i++) { blockData.add(bx); }')
     require(texts['IrisMaterialPalette'],'private KList<IrisBlockData> palette = new KList<IrisBlockData>().qadd(new IrisBlockData("STONE"));','NativeBlockState bx = ix.getBlockData(rdata);')
     require(texts['IrisBiomePaletteLayer'],'private KList<IrisBlockData> palette = new KList<IrisBlockData>().qadd(new IrisBlockData("GRASS_BLOCK"));','NativeBlockState bx = ix.getBlockData(data);')
-    values.update({'palette.policy':'materialAndBiomeLayerUseBlockData','folder':'blocks','resolution.policy':'aliasThenStateThenBackupThenAir','data.policy':'callerOverridesAliasProperties','invalidMergedState.policy':'keepAliasState','backup.default':'null','weight.policy':'consumingPaletteOnly','tileData.policy':'readOnly','execution.policy':'disabled'})
+    require(b,'if (backup != null) { return backup.getBlockDataOrPlaceholder(data); }')
+    require(texts['IrisDepositGenerator'],'for (IrisBlockData ix : palette) { NativeBlockState bx = ix.getBlockData(rdata); if (bx != null) { blockData.add(bx); } }')
+    require(texts['IrisObjectReplace'],'private KList<IrisBlockData> find = new KList<>();','for (IrisBlockData i : find) { NativeBlockState bx = i.getBlockDataOrPlaceholder(rdata); if (bx != null) { b.add(bx); } }',"return declared.indexOf('[') < 0 ? declared + block.computeProperties() : declared;",'if (!exact || propertiesMatch(findState, state))')
+    require(texts['IrisDecorator'],'private IrisBlockData forceBlock;','for (IrisBlockData i : palette) { NativeBlockState bx = i.getBlockData(data); if (bx != null) { for (int n = 0; n < i.getWeight(); n++) { blockData.add(bx); } } }','for (IrisBlockData i : topPalette) { NativeBlockState bx = i.getBlockData(data); if (bx != null) { for (int n = 0; n < i.getWeight(); n++) { blockDataTops.add(bx); } } }','resolved[i] = list.get(i).getBlockData(data);')
+    require(texts['DecoratorCore'],'decorator.getForceBlock().getBlockData(irisData)')
+    values.update({'inline.policy':'depositsFindDecoratorListsAndForceBlock','palette.policy':'materialAndBiomeLayerUseBlockData','folder':'blocks','resolution.policy':'aliasThenStateThenBackupThenAir','data.policy':'callerOverridesAliasProperties','invalidMergedState.policy':'keepAliasState','backup.default':'null','weight.policy':'consumingPaletteOnly','tileData.policy':'readOnly','execution.policy':'disabled'})
     return ''.join(key+'='+json.dumps(value,ensure_ascii=True)[1:-1]+'\n' for key,value in values.items()).encode('ascii')
 if __name__=='__main__':Path(sys.argv[2]).write_bytes(extract(read_sources(sys.argv[1])))
