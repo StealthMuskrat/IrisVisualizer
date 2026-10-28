@@ -173,6 +173,8 @@ def run(source_dir, policy_file, java_dir, output_dir):
         implemented[group].update(editable(java_dir, 'CaveProfileFields', 'OBJECT_FIELDS'))
         implemented[group].update(editable(java_dir, 'RiverPolicyFields', 'OBJECT_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'NoiseStyleFields', 'DIMENSION_FIELDS'))
+    implemented['dimension'].update(editable(java_dir, 'ResourceSelectors', 'DIMENSION_FIELDS'))
+    implemented['biome'].update(editable(java_dir, 'ResourceSelectors', 'BIOME_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'HydrologyFields', 'ROOT_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'DimensionHeights', 'OBJECT_FIELDS'))
     implemented['dimension'].update(editable(java_dir, 'DimensionPalettes', 'OBJECT_FIELDS'))

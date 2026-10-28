@@ -231,6 +231,14 @@
     "upperDimension": {
       "classification": "generation",
       "reason": "Exact in-pack dimension references with native host/order and upper/stack mutual-exclusion guards; optional stack removal restores field absence. No target-content, height/layout or native generation validation."
+    },
+    "focus": {
+      "classification": "generation",
+      "reason": "Exact in-pack selector authoring; native focus priority, compatibility and generation are not evaluated."
+    },
+    "focusRegion": {
+      "classification": "generation",
+      "reason": "Exact in-pack selector authoring; native focus priority, compatibility and generation are not evaluated."
     }
   },
   "biome": {
@@ -389,6 +397,10 @@
     "customDerivitives": {
       "classification": "generation",
       "reason": "Ordered custom-biome datapack definitions with explicit bounded list operations; native selection uses owning biome distribution. Final removal restores absence and all registry/datapack compatibility remains unvalidated."
+    },
+    "carvingBiome": {
+      "classification": "generation",
+      "reason": "Registers a biome in native reachable traversal; not cave terrain substitution. Exact file selection only."
     }
   },
   "generator": {

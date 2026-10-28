@@ -4,10 +4,10 @@ Direct nonstatic/nontransient private fields in seventy-six pinned source classe
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 58 | 52 | 24 |
+| dimension | 82 | 60 | 54 | 22 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
-| biome | 42 | 39 | 33 | 3 |
+| biome | 42 | 40 | 34 | 2 |
 | biomeGeneratorLink | 3 | 3 | 3 | 0 |
 | generator | 16 | 16 | 16 | 0 |
 | interpolator | 2 | 2 | 2 | 0 |
@@ -83,7 +83,7 @@ Direct nonstatic/nontransient private fields in seventy-six pinned source classe
 
 ## dimension
 
-Unclassified: `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `focus`, `focusRegion`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `useMantle`.
+Unclassified: `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `useMantle`.
 
 ## importedStructures
 
@@ -95,7 +95,7 @@ Unclassified: `biomeRules`, `disabledSteps`, `steps`.
 
 ## biome
 
-Unclassified: `carvingBiome`, `proceduralObjects`, `structures`.
+Unclassified: `proceduralObjects`, `structures`.
 
 ## biomeGeneratorLink
 
