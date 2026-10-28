@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in ninety-four pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in one hundred and one pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -8,6 +8,13 @@ import sys
 from pathlib import Path
 
 SOURCES = {
+ 'proceduralObjects': 'generation/decoration/IrisProceduralObjects.java',
+ 'proceduralTree': 'generation/decoration/tree/IrisProceduralTree.java',
+ 'proceduralRuin': 'generation/decoration/ruin/IrisRuin.java',
+ 'proceduralFormation': 'generation/decoration/formation/IrisFormation.java',
+ 'proceduralCoral': 'generation/decoration/coral/IrisCoral.java',
+ 'proceduralFungus': 'generation/decoration/fungus/IrisFungus.java',
+ 'proceduralCrystal': 'generation/decoration/crystal/IrisCrystal.java',
  'dimension': 'generation/terrain/IrisDimension.java',
  'structurePlacement': 'structure/placement/IrisStructurePlacement.java',
  'jigsawConfiguration': 'structure/jigsaw/IrisJigsawConfiguration.java',
@@ -135,6 +142,11 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['biome'].update(editable(java_dir, 'FloatingBiomes', 'LIST_FIELDS'))
     implemented['biome'].update(editable(java_dir, 'BiomeObjectPlacements', 'LIST_FIELDS'))
     implemented['region'].update(editable(java_dir, 'RegionObjectPlacements', 'LIST_FIELDS'))
+    for host in ['biome','region']: implemented[host].update(editable(java_dir, 'ProceduralObjects', 'OBJECT_FIELDS'))
+    implemented['proceduralObjects'] = set(editable(java_dir, 'ProceduralObjects', 'LIST_FIELDS'))
+    for group in ['proceduralTree','proceduralRuin','proceduralFormation','proceduralCoral','proceduralFungus','proceduralCrystal']: implemented[group] = set(editable(java_dir, 'ProceduralObjects'))
+    implemented['proceduralTree'].update(editable(java_dir, 'ProceduralObjects', 'TREE_FIELDS'))
+    implemented['proceduralFormation'].update(editable(java_dir, 'ProceduralObjects', 'FORMATION_FIELDS'))
     implemented['floatingBiome'] = set(editable(java_dir, 'FloatingBiomes'))
     implemented['floatingBiome'].update(editable(java_dir, 'FloatingNoiseStyles'))
     implemented['floatingBiome'].update(editable(java_dir, 'FloatingBottomPalettes'))
@@ -308,7 +320,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['importedStructures'].update(editable(java_dir, 'NativeGenerationFilters', 'STRUCTURE_FIELDS'))
     implemented['importedStructures'].update(editable(java_dir, 'NativeStructureAdjustments', 'LIST_FIELDS'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in ninety-four pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and one pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

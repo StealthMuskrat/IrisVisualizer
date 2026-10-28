@@ -845,6 +845,22 @@ jobs:
           python editor/tools/extract_native_jigsaw_fields.py IrisJigsawConfiguration.java IrisJigsawHeightmap.java IrisJigsawLiquidSettings.java PackStructurePlacementValidator.java PackJsonFieldChecks.java NativeStructureStartPlan.java generated-native-jigsaw-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-native-jigsaw-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/native-jigsaw-fields.properties).Hash) { throw 'Pinned native jigsaw definitions differ' }
+      - name: Verify pinned procedural object placement contracts
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisProceduralObjects.java' -OutFile IrisProceduralObjects.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/tree/IrisProceduralTree.java' -OutFile IrisProceduralTree.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/ruin/IrisRuin.java' -OutFile IrisRuin.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/formation/IrisFormation.java' -OutFile IrisFormation.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/coral/IrisCoral.java' -OutFile IrisCoral.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/fungus/IrisFungus.java' -OutFile IrisFungus.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/crystal/IrisCrystal.java' -OutFile IrisCrystal.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/generation/decoration/IrisProceduralPlacement.java' -OutFile IrisProceduralPlacement.java
+          python editor/tools/test_procedural_object_fields.py IrisBiome.java IrisRegion.java IrisProceduralObjects.java IrisProceduralTree.java IrisRuin.java IrisFormation.java IrisCoral.java IrisFungus.java IrisCrystal.java ObjectPlaceMode.java CarvingMode.java MantleObjectComponent.java IrisProceduralPlacement.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_procedural_object_fields.py IrisBiome.java IrisRegion.java IrisProceduralObjects.java IrisProceduralTree.java IrisRuin.java IrisFormation.java IrisCoral.java IrisFungus.java IrisCrystal.java ObjectPlaceMode.java CarvingMode.java MantleObjectComponent.java IrisProceduralPlacement.java generated-procedural-object-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-procedural-object-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/procedural-object-fields.properties).Hash) { throw 'Pinned procedural object definitions differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
