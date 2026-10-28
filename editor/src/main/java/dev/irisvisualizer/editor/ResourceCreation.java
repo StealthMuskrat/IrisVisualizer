@@ -9,7 +9,7 @@ public final class ResourceCreation {
         if (folder == null || folder.contains("\\") || folder.contains(":")) throw new IOException("Unsupported resource folder");
         String[] parts = folder.split("/", -1);
         for (String part : parts) if (part.isEmpty() || part.equals(".") || part.equals("..")) throw new IOException("Unsafe resource folder");
-        if (!Set.of("dimensions", "regions", "biomes", "generators").contains(parts[0])) throw new IOException("Creation supports dimension, region, biome and generator JSON only");
+        if (!Set.of("dimensions", "regions", "biomes", "generators", "image-maps").contains(parts[0])) throw new IOException("Creation supports dimension, region, biome, generator and image-map JSON only");
         if (parts[0].equals("dimensions") && parts.length != 1) throw new IOException("Dimensions must stay flat");
         return parts[0];
     }
@@ -18,18 +18,21 @@ public final class ResourceCreation {
             case "dimensions" -> "regions";
             case "regions" -> "biomes";
             case "biomes" -> "generators";
+            case "image-maps" -> "images";
             default -> null;
         };
     }
     public static List<String> choices(PackWorkspace workspace, String folder) throws IOException {
         String type = dependencyType(folder);
         if (type == null) return List.of();
+        if (base(folder).equals("image-maps")) return ImageMapDefinitions.sources(workspace);
         return ResourceTypes.referenceKeys(workspace,type);
     }
     static byte[] bytes(PackWorkspace workspace, String folder, String name, String dependency) throws IOException {
         String base = base(folder);
         if (dependencyType(folder) != null && !choices(workspace, folder).contains(dependency))
             throw new IOException("Choose an exact existing " + dependencyType(folder) + " key for the new resource");
+        if (base.equals("image-maps")) return ImageMapDefinitions.template(workspace,dependency);
         byte[] bytes = StarterPack.resourceTemplate(base, name);
         LosslessJson document = new LosslessJson(bytes);
         switch (base) {

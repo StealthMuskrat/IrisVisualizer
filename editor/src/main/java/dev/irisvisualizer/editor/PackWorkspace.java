@@ -72,7 +72,7 @@ public final class PackWorkspace {
     public String createResource(String parent, String name, String dependency) throws IOException {
         String base = ResourceCreation.base(parent);
         if (name == null || !name.matches("[a-z0-9_-]+")) throw new IOException("Use lowercase letters, digits, _ or - for the resource name; omit .json");
-        if (!directories.contains(parent) && files.keySet().stream().noneMatch(path -> path.startsWith(parent + "/")))
+        if (!(base.equals("image-maps") && parent.equals(base)) && !directories.contains(parent) && files.keySet().stream().noneMatch(path -> path.startsWith(parent + "/")))
             throw new IOException("Parent folder is not in this workspace");
         String key = (parent.equals(base) ? "" : parent.substring(base.length() + 1) + "/") + name;
         String target = safe(ResourceTypes.target(base + "/template.json", key));
