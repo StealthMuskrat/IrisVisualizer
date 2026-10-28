@@ -190,6 +190,7 @@ public final class EditorApp extends Application {
                     drawDimensionCarvings(document);
                     drawTerrainOverlays(document);
                     drawTerrainTransform(document);
+                    drawImageMapBindings(document);
                     drawResourceSelectors(document);
                     drawRootStyles(document, true);
                     drawCaveProfile(document);
@@ -235,14 +236,14 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks a bounded subset of dimension selectors/stacks/carving biomes, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks a bounded subset of dimension selectors/stacks/carving biomes/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
             String status = switch (link.state()) {
                 case EXACT_FILE -> "Exact file present (contents unchecked)";
                 case NO_EXACT_FILE -> "No exact file match (aliases unchecked)";
-                case ABSENT_REQUIRED -> "Required reference list is absent";
+                case ABSENT_REQUIRED -> "Required reference is absent";
                 case EMPTY_REQUIRED -> "Required reference list is empty";
                 case UNSUPPORTED -> "Reference inspection unavailable";
                 case INVALID_KEY -> "Unsupported or unsafe resource key";
@@ -636,6 +637,93 @@ public final class EditorApp extends Application {
         if (ImGui.collapsingHeader("Biome generators")) drawBiomeGenerators(document);
         if (ImGui.collapsingHeader("Other biome fields (read-only)"))
             for (String field : document.fields()) if (!BiomeFields.EDITABLE.contains(field) && !NoiseStyleFields.BIOME_FIELDS.contains(field) && !BiomeChildren.EDITABLE.contains(field) && !Terrain3DFields.OBJECT_FIELDS.contains(field) && !CaveProfileFields.OBJECT_FIELDS.contains(field) && !RiverPolicyFields.OBJECT_FIELDS.contains(field) && !SurfaceLayerFallbacks.OBJECT_FIELDS.contains(field) && !BiomeLayers.LIST_FIELDS.contains(field) && !BiomeDerivatives.EDITABLE.contains(field) && !BiomeSlabWall.OBJECT_FIELDS.contains(field) && !FloatingBiomes.LIST_FIELDS.contains(field) && !BiomeObjectPlacements.LIST_FIELDS.contains(field) && !OreGenerators.LIST_FIELDS.contains(field) && !DepositGenerators.LIST_FIELDS.contains(field) && !DepositVariants.LIST_FIELDS.contains(field) && !BiomeOreHosts.LIST_FIELDS.contains(field) && !BiomeDecorators.LIST_FIELDS.contains(field) && !CustomBiomes.LIST_FIELDS.contains(field) && !ResourceSelectors.BIOME_FIELDS.contains(field) && !field.equals("generators")) ImGui.textWrapped(field);
+    }
+    private void drawImageMapBindings(LosslessJson document) {
+        if (!ImGui.collapsingHeader("Dimension image-map bindings")) return;
+        ImGui.pushID("image-map-bindings");
+        ImGui.textWrapped("Bind exact image-maps JSON file keys to generation roles. Definition types, source PNGs, colors, target resources, native compatibility and resulting terrain remain unvalidated; no images or maps are loaded or sampled here.");
+        ImGui.textWrapped("Native local keys and mask references are trimmed and case-sensitive. TERRAIN_HEIGHT, BIOME, REGION and SURFACE_BLOCK each allow one binding; MASK and CUSTOM may repeat. MASK bindings cannot have additional mask layers. Renames/removals leave existing mask references unchanged.");
+        List<LosslessJson> entries;
+        try { entries=ImageMapBindings.entries(document); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored imageMaps is null, a snippet or mixed/non-object list (read-only).");ImGui.popID();return; }
+        if (entries!=null && entries.size()>ImageMapBindings.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-binding editor limit (read-only).");ImGui.popID();return; }
+        for (String finding : ImageMapBindings.findings(document)) ImGui.textWrapped("Applied local check: "+finding+" (does not block Save/Export)");
+        String newKey=ImageMapBindings.prefix()+"new.key",mapKey=ImageMapBindings.prefix()+"new.map",applicationKey=ImageMapBindings.prefix()+"new.application";
+        ImString name=values.computeIfAbsent(newKey,ignored -> new ImString("",4096)),map=values.computeIfAbsent(mapKey,ignored -> new ImString("",4096)),role=values.computeIfAbsent(applicationKey,ignored -> new ImString("CUSTOM",128));
+        ImGui.inputText("New local binding key",name);drafts.update(newKey,"",name.get());var mapChoices=styleSourceCatalogs.choices(workspace,"imageMap");
+        if (ImGui.beginCombo("New image-map file",map.get().isEmpty() ? "Choose an exact file" : map.get())) { for (String choice : mapChoices) if (ImGui.selectable(choice,choice.equals(map.get()))) map.set(choice);ImGui.endCombo(); }
+        if (ImGui.beginCombo("New binding application",role.get())) { for (String choice : ImageMapBindings.applications()) if (ImGui.selectable(choice,choice.equals(role.get()))) role.set(choice);ImGui.endCombo(); }
+        ImGui.beginDisabled(name.get().isBlank() || map.get().isEmpty() || entries!=null && entries.size()>=ImageMapBindings.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add binding");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(ImageMapBindings.prefix(),ImageMapBindings.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,name.get(),map.get(),role.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
+        if (entries!=null) for (int index=0;index<entries.size();index++) {
+            int bindingIndex=index;var node=entries.get(index);var context=ImageMapBindings.Context.binding(index);ImGui.pushID(context.prefix());
+            if (ImGui.treeNode("Binding "+index)) {
+                String copyKey=context.prefix()+"copy.key",copyRoleKey=context.prefix()+"copy.application";ImString copyName=values.computeIfAbsent(copyKey,ignored -> new ImString("",4096)),copyRole=values.computeIfAbsent(copyRoleKey,ignored -> new ImString("CUSTOM",128));
+                ImGui.inputText("Duplicate with new key",copyName);drafts.update(copyKey,"",copyName.get());
+                if (ImGui.beginCombo("Duplicate application (explicit)",copyRole.get())) { for (String choice : ImageMapBindings.applications()) if (ImGui.selectable(choice,choice.equals(copyRole.get()))) copyRole.set(choice);ImGui.endCombo(); }
+                ImGui.textWrapped("Duplicate preserves the raw entry except its explicitly chosen new key/application. Existing masks stay unchanged; choose a role that permits them.");
+                RiverProfiles.Action action=null;if (ImGui.button("Duplicate")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==entries.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove binding")) action=RiverProfiles.Action.REMOVE;
+                if (action!=null) { try { commitProfileChange(ImageMapBindings.prefix(),ImageMapBindings.change(selected,workspace.read(selected),action,index,copyName.get(),null,copyRole.get(),workspace),action==RiverProfiles.Action.DUPLICATE ? copyKey : null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.popID();return; }
+                try {
+                    String stored=node.token("key")==null ? "" : node.stringToken("key"),key=context.prefix()+"key";if (stored.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");
+                    ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(4096,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Local binding key",input);drafts.update(key,stored,input.get());
+                    if (ImGui.button("Apply key (mask links unchanged)")) commitRiverOverride(key,() -> workspace.replace(selected,ImageMapBindings.setKey(selected,workspace.read(selected),bindingIndex,input.get())));
+                } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored key is not editable text (read-only)."); }
+                drawImageMapReference(node,context,mapChoices);drawImageMapChoice(node,context,"application");drawImageMapMasks(document,node,index);
+                for (String field : node.fields()) if (!ImageMapBindings.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                ImGui.treePop();
+            }
+            ImGui.popID();
+        }
+        ImGui.popID();
+    }
+    private void drawImageMapReference(LosslessJson node,ImageMapBindings.Context context,List<String> choices) {
+        ImGui.textWrapped(ImageMapBindings.help(context,"map"));
+        try {
+            String current=node.token("map")==null ? "" : node.stringToken("map");
+            if (!current.isBlank() && !(context.mask()<0 ? choices.contains(current) : choices.contains(current.trim()))) ImGui.textWrapped(context.mask()<0 ? "Stored map has no exact file match; native aliases are unchecked." : "Stored mask has no unambiguous local MASK key match.");
+            if (ImGui.beginCombo(context.mask()<0 ? "Image-map resource" : "Named MASK binding",current.isEmpty() ? "Choose a reference" : current.length()>128 || current.indexOf(0)>=0 ? "Stored reference" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.setMap(selected,workspace.read(selected),context,choice,workspace)));ImGui.endCombo(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored reference is not a string (read-only)."); }
+    }
+    private void drawImageMapChoice(LosslessJson node,ImageMapBindings.Context context,String field) {
+        ImGui.textWrapped(ImageMapBindings.help(context,field));
+        try {
+            String current=ImageMapBindings.choice(node,context,field);List<String> choices=field.equals("application") ? ImageMapBindings.applications() : ImageMapBindings.operations();
+            if (ImGui.beginCombo(field,current.length()>128 || current.indexOf(0)>=0 ? "Stored enum value" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.setChoice(selected,workspace.read(selected),context,field,choice)));ImGui.endCombo(); }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored choice is not a string (read-only)."); }
+    }
+    private void drawImageMapMasks(LosslessJson document,LosslessJson owner,int binding) {
+        if (!ImGui.treeNode("Ordered mask layers")) return;
+        String prefix=ImageMapBindings.masksPrefix(binding),key=prefix+"new.map";List<LosslessJson> masks;
+        ImGui.textWrapped("References name local MASK bindings, not files. Native composition starts at weight 1, applies each operation in order and clamps after each layer. Inversion runs before threshold/falloff; a zero threshold/falloff pair preserves the sampled value. No mask composition is executed here.");
+        try { masks=ImageMapBindings.masks(owner); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored masks are a snippet/mixed/non-object list (read-only).");ImGui.treePop();return; }
+        if (masks!=null && masks.size()>ImageMapBindings.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-mask editor limit (read-only).");ImGui.treePop();return; }
+        var choices=ImageMapBindings.maskKeys(document);ImString selectedMask=values.computeIfAbsent(key,ignored -> new ImString("",4096));
+        if (ImGui.beginCombo("New local MASK reference",selectedMask.get().isEmpty() ? "Choose a MASK binding" : selectedMask.get())) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(selectedMask.get()))) selectedMask.set(choice);ImGui.endCombo(); }
+        ImGui.beginDisabled(selectedMask.get().isEmpty() || masks!=null && masks.size()>=ImageMapBindings.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add mask layer");ImGui.endDisabled();
+        if (add) { try { commitProfileChange(prefix,ImageMapBindings.changeMask(selected,workspace.read(selected),binding,RiverProfiles.Action.ADD,-1,selectedMask.get()),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
+        if (masks==null) ImGui.textWrapped("Absent/null masks mean no layers. Add seeds a local reference; MULTIPLY, false and zero scalar defaults remain implicit.");
+        else for (int index=0;index<masks.size();index++) {
+            var context=ImageMapBindings.Context.binding(binding).mask(index);var node=masks.get(index);ImGui.pushID(context.prefix());
+            if (ImGui.treeNode("Mask layer "+index)) {
+                RiverProfiles.Action action=null;if (ImGui.button("Duplicate layer")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==masks.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove layer")) action=RiverProfiles.Action.REMOVE;
+                if (action!=null) { try { commitProfileChange(prefix,ImageMapBindings.changeMask(selected,workspace.read(selected),binding,action,index,null),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();ImGui.treePop();return; }
+                drawImageMapReference(node,context,choices);drawImageMapChoice(node,context,"operation");String inverted=node.token("inverted");
+                if (inverted==null || inverted.equals("true") || inverted.equals("false")) { boolean value="true".equals(inverted);if (ImGui.checkbox("Inverted (native default false)",value)) applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.setInverted(selected,workspace.read(selected),context,!value))); } else ImGui.textWrapped("Stored inversion is not boolean (read-only).");
+                for (String field : List.of("threshold","falloff")) {
+                    ImGui.pushID(field);ImGui.textWrapped(ImageMapBindings.help(context,field));String token=node.token(field),draft=context.prefix()+field;
+                    if (token==null) { if (ImGui.button("Enable "+field+" default 0")) applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.enableScalar(selected,workspace.read(selected),context,field))); }
+                    else if (!ImageMapBindings.numericSupported(node,field)) ImGui.textWrapped("Stored scalar is not a finite number (read-only).");
+                    else { ImString input=values.computeIfAbsent(draft,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field+" (0..1)",input);drafts.update(draft,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(draft,() -> workspace.replace(selected,ImageMapBindings.setScalar(selected,workspace.read(selected),context,field,input.get()))); }
+                    ImGui.popID();
+                }
+                for (String field : node.fields()) if (!ImageMapBindings.MASK_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
+                ImGui.treePop();
+            }
+            ImGui.popID();
+        }
+        ImGui.treePop();
     }
     private void drawTerrainOverlays(LosslessJson document) {
         if (!ImGui.collapsingHeader("Terrain overlay noise")) return;
