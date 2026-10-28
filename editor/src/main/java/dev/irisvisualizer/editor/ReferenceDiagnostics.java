@@ -31,6 +31,7 @@ public final class ReferenceDiagnostics {
                         catch (IllegalArgumentException wrong) { links.add(new Link("dimensionStack","Unsupported stack object",null,State.UNSUPPORTED)); }
                     }
                     objectEntries(workspace,document,"staticObjects","",true,links);
+                    carvingBiomes(workspace,document,links);
                 }
                 case "regions" -> {
                     for (String field : List.of("landBiomes", "seaBiomes", "shoreBiomes", "caveBiomes"))
@@ -51,6 +52,13 @@ public final class ReferenceDiagnostics {
         List<Link> result=new ArrayList<>(links);
         if (links.truncated) result.add(new Link("References","Inspection truncated at "+MAX_LINKS+" links",null,State.UNSUPPORTED));
         return List.copyOf(result);
+    }
+    private static void carvingBiomes(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+        if (full(links) || document.token("carving")==null || document.token("carving").equals("null")) return;
+        try {
+            var entries=document.objectArray("carving");
+            for (int index=0;index<entries.size() && !full(links);index++) scalar(workspace,entries.get(index),"biome","biomes","carving["+index+"].",false,true,links);
+        } catch (IllegalArgumentException wrong) { links.add(new Link("carving","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
     private static void scalar(PackWorkspace workspace,LosslessJson document,String field,String type,String prefix,boolean upper,boolean selfDefault,List<Link> links) {
         if (full(links)) return;

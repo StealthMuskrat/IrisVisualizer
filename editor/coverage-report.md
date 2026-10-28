@@ -1,10 +1,10 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in seventy-six pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in seventy-seven pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| dimension | 82 | 60 | 54 | 22 |
+| dimension | 82 | 61 | 55 | 21 |
 | importedStructures | 6 | 4 | 4 | 2 |
 | importedFeatures | 6 | 3 | 3 | 3 |
 | biome | 42 | 40 | 34 | 2 |
@@ -75,6 +75,7 @@ Direct nonstatic/nontransient private fields in seventy-six pinned source classe
 | customBiome | 15 | 15 | 15 | 0 |
 | customBiomeSpawn | 5 | 5 | 5 | 0 |
 | customBiomeParticle | 2 | 2 | 2 | 0 |
+| dimensionCarving | 8 | 8 | 8 | 0 |
 | dimensionStack | 3 | 3 | 3 | 0 |
 | dimensionStackBlend | 2 | 2 | 2 | 0 |
 | dimensionTypeOptions | 13 | 13 | 13 | 0 |
@@ -83,7 +84,7 @@ Direct nonstatic/nontransient private fields in seventy-six pinned source classe
 
 ## dimension
 
-Unclassified: `borrowedDimensionType`, `carving`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `useMantle`.
+Unclassified: `borrowedDimensionType`, `datapackImports`, `debugChunkCrossSections`, `debugCrossSectionsMod`, `debugSmartBore`, `disabledComponents`, `explodeBiomePaletteSize`, `explodeBiomePalettes`, `hideOresForHiddenOre`, `imageMaps`, `importedFeatures`, `importedStructures`, `mode`, `overlayNoise`, `preventLeafDecay`, `structures`, `studioMode`, `subterrainFeatures`, `terrainTransform`, `treeSettings`, `useMantle`.
 
 ## importedStructures
 
@@ -362,6 +363,10 @@ Unclassified: none.
 Unclassified: none.
 
 ## customBiomeParticle
+
+Unclassified: none.
+
+## dimensionCarving
 
 Unclassified: none.
 
