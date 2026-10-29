@@ -5128,11 +5128,11 @@
     },
     "cellSize": {
       "classification": "generation",
-      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+      "reason": "Controls legacy planar fallback dimensions or the complete six-archetype workcell map. Explicit creation and paired exact bounds retain source data; native canonical object fit and graph viability remain unchecked."
     },
     "planarWorkcells": {
       "classification": "generation",
-      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+      "reason": "Controls legacy planar fallback dimensions or the complete six-archetype workcell map. Explicit creation and paired exact bounds retain source data; native canonical object fit and graph viability remain unchecked."
     },
     "themeSets": {
       "classification": "generation",
@@ -5153,6 +5153,32 @@
     "vanillaSource": {
       "classification": "generation",
       "reason": "Identifies imported vanilla aliases and the native source suppressed by dimension REPLACE_SOURCE placements. Typed authoring is pending; the original value remains read-only and preserved."
+    }
+  },
+  "structureWorkcell": {
+    "width": {
+      "classification": "generation",
+      "reason": "Controls native planar workcell bounds or participation. Bounds apply to disabled cells too; unknown sibling data is preserved and canonical object fit is not evaluated."
+    },
+    "height": {
+      "classification": "generation",
+      "reason": "Controls native planar workcell bounds or participation. Bounds apply to disabled cells too; unknown sibling data is preserved and canonical object fit is not evaluated."
+    },
+    "depth": {
+      "classification": "generation",
+      "reason": "Controls native planar workcell bounds or participation. Bounds apply to disabled cells too; unknown sibling data is preserved and canonical object fit is not evaluated."
+    },
+    "enabled": {
+      "classification": "generation",
+      "reason": "Controls native planar workcell bounds or participation. Bounds apply to disabled cells too; unknown sibling data is preserved and canonical object fit is not evaluated."
+    },
+    "archetype": {
+      "classification": "generation",
+      "reason": "Native planar shape identity. Assigned through explicit creation of all six canonical entries; existing identities remain read-only to retain a complete unique map."
+    },
+    "displayName": {
+      "classification": "read-only",
+      "reason": "Jigsaw Studio display metadata; not voxel generation. Preserved during bound and enabled edits."
     }
   }
 }

@@ -1,10 +1,11 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in one hundred and twelve pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in one hundred and thirteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| structureDefinition | 15 | 15 | 8 | 0 |
+| structureDefinition | 15 | 15 | 10 | 0 |
+| structureWorkcell | 6 | 6 | 5 | 0 |
 | expression | 3 | 3 | 3 | 0 |
 | expressionVariable | 5 | 5 | 5 | 0 |
 | expressionFunction | 4 | 4 | 4 | 0 |
@@ -118,6 +119,10 @@ Direct nonstatic/nontransient private fields in one hundred and twelve pinned so
 | worldBoundaryCenter | 2 | 2 | 2 | 0 |
 
 ## structureDefinition
+
+Unclassified: none.
+
+## structureWorkcell
 
 Unclassified: none.
 
