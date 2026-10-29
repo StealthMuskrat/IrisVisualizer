@@ -5,6 +5,7 @@ import imgui.app.Application;
 import imgui.app.Configuration;
 import imgui.app.WindowGlfw;
 import imgui.flag.ImGuiTreeNodeFlags;
+import imgui.flag.ImGuiKey;
 import imgui.flag.ImGuiInputTextFlags;
 import imgui.flag.ImGuiWindowFlags;
 import static org.lwjgl.glfw.GLFW.*;
@@ -137,6 +138,7 @@ public final class EditorApp extends Application {
     private WorkspaceTextSearch.Query activeTextQuery;
     private String textSearchError,textPendingPath;
     private PackWorkspace textPendingWorkspace;
+    private String selectedFolder,pendingFolderPath,pendingFolderAction;
     private boolean showPendingChanges;
     private final WorkspaceChanges.Cache pendingChanges=new WorkspaceChanges.Cache();
     private final ImString changesQuery=new ImString(1024);
@@ -250,6 +252,11 @@ public final class EditorApp extends Application {
         if (resources.isEmpty()) ImGui.textWrapped(workspace.paths().isEmpty() ? "No resources. Open a pack folder or import a ZIP." : "No matching resources.");
         ImGui.textDisabled("Ctrl-click: duplicate; Ctrl-right-click folder: create; Ctrl-middle-click folder: subfolder");
         drawResources(resources);
+        if (selectedFolder!=null && workspace.directories().contains(selectedFolder) && ImGui.isWindowFocused() && !ImGui.getIO().getWantTextInput()) {
+            if (ImGui.isKeyPressed(ImGuiKey.F2,false)) queueFolderAction(selectedFolder,"Rename");
+            if (ImGui.isKeyPressed(ImGuiKey.Delete,false)) queueFolderAction(selectedFolder,"Delete");
+        }
+        ImGui.textDisabled("Empty subfolders: right-click for Rename / Move / Delete; F2 or Delete when selected. Folder changes clear applied-edit history.");
         ImGui.end();
         ImGui.setNextWindowPos(width * .24f, 24); ImGui.setNextWindowSize(width * .48f, height);
         ImGui.begin("Visualization");
@@ -395,6 +402,7 @@ public final class EditorApp extends Application {
         if (showReferenceReview) drawPackReferenceReview();
         if (showJigsawReview) drawJigsawDependencyReview();
         if (showJsonStructure) drawJsonStructure();
+        applyPendingFolderAction();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
         if (navigationRequest!=null) {
@@ -5998,16 +6006,45 @@ public final class EditorApp extends Application {
             ImGui.pushID(node.path());
             if (node.folder()) {
                 if (!filter.get().isBlank()) ImGui.setNextItemOpen(true);
-                boolean expanded = ImGui.treeNodeEx(node.name(), ImGuiTreeNodeFlags.SpanAvailWidth);
-                if (ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(2)) createSubfolder(node.path());
-                else if (ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(1)) createResource(node.path());
+                boolean expanded = ImGui.treeNodeEx(node.name(), ImGuiTreeNodeFlags.SpanAvailWidth | (node.path().equals(selectedFolder) ? ImGuiTreeNodeFlags.Selected : 0));
+                if (!ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(0)) selectedFolder=node.path();
+                boolean createChild=ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(2),createHere=ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(1);
+                if (!ImGui.getIO().getKeyCtrl() && ImGui.beginPopupContextItem("Folder operations")) {
+                    ImGui.beginDisabled(!workspace.editableEmptyFolder(node.path()));
+                    for (String action : List.of("Rename","Move","Delete")) if (ImGui.menuItem(action+" empty folder")) queueFolderAction(node.path(),action);
+                    ImGui.endDisabled();ImGui.textWrapped("Only empty leaf subfolders in supported resource families can be changed.");ImGui.endPopup();
+                }
+                if (createChild) createSubfolder(node.path());
+                else if (createHere) createResource(node.path());
                 if (expanded) { drawResources(node.children()); ImGui.treePop(); }
             } else if (ImGui.selectable(node.name() + (workspace.changed(node.path()) ? " *" : ""), node.path().equals(selected))) {
+                selectedFolder=null;
                 if (ImGui.getIO().getKeyCtrl()) duplicateResource(node.path());
                 else if (!node.path().equals(selected)) selectResource(node.path());
             }
             ImGui.popID();
         }
+    }
+    private void queueFolderAction(String path,String action) { pendingFolderPath=path;pendingFolderAction=action; }
+    private void applyPendingFolderAction() {
+        String path=pendingFolderPath,action=pendingFolderAction;pendingFolderPath=null;pendingFolderAction=null;
+        if (path==null || action==null) return;
+        try {
+            if (!workspace.editableEmptyFolder(path)) throw new java.io.IOException("Choose an empty leaf resource subfolder. Base folders and folders containing any files or subfolders are unchanged.");
+            String next;
+            if (action.equals("Rename")) {
+                String name=JOptionPane.showInputDialog(null,"New empty folder name (lowercase letters, digits, _ or -):",path.substring(path.lastIndexOf('/')+1));if (name==null) return;
+                next=workspace.renameEmptyFolder(path,name);
+            } else if (action.equals("Move")) {
+                String parent=JOptionPane.showInputDialog(null,"Existing destination folder within "+path.substring(0,path.indexOf('/'))+"/:\nThe folder keeps its name.",path.substring(0,path.lastIndexOf('/')));if (parent==null) return;
+                next=workspace.moveEmptyFolder(path,parent);
+            } else if (action.equals("Delete")) {
+                if (JOptionPane.showConfirmDialog(null,"Remove empty folder from the workspace?\n"+path+"\nSave applies the removal to the active pack. This clears applied-edit history.","Remove empty folder",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION) return;
+                workspace.deleteEmptyFolder(path);next=null;
+            } else return;
+            selectedFolder=next;filter.set("");error=null;
+            // No resource bytes or inspector selection changed: all unapplied inspector text remains available.
+        } catch (Exception failure) { error=failure.getMessage(); }
     }
     private void importAsset() {
         try {
@@ -6061,7 +6098,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6221,11 +6258,11 @@ public final class EditorApp extends Application {
         ImGui.inputText("Pending path contains",changesQuery);
         if (ImGui.beginCombo("Pending change kind",changesFilter.label())) { for (var kind : WorkspaceChanges.Filter.values()) if (ImGui.selectable(kind.label(),kind==changesFilter)) changesFilter=kind;ImGui.endCombo(); }
         if (ImGui.button("Clear pending filters")) { changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL; }
-        ImGui.textWrapped("Applied in-memory changes since the current save baseline, including opaque/unknown files and new empty folders. Unapplied inspector text is excluded. This is a pending-write inventory, not a diff or a complete scan for external disk edits.");
+        ImGui.textWrapped("Applied in-memory changes since the current save baseline, including opaque/unknown files, new empty folders and removed empty folders. Unapplied inspector text is excluded. This is a pending-write inventory, not a diff or a complete scan for external disk edits.");
         ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "None" : workspace.directory().toString()));
         try {
             var result=pendingChanges.query(workspace,new WorkspaceChanges.Query(changesQuery.get(),changesFilter));
-            ImGui.textWrapped(result.newFiles()+" new files; "+result.modifiedFiles()+" modified files; "+result.newFolders()+" new folders; "+result.fileBytes()+" current file bytes across all pending changes.");
+            ImGui.textWrapped(result.newFiles()+" new files; "+result.modifiedFiles()+" modified files; "+result.newFolders()+" new folders; "+result.removedFolders()+" removed empty folders; "+result.fileBytes()+" current file bytes across all pending changes.");
             ImGui.textWrapped(result.matches()+" matching changes; "+result.entries().size()+" shown in path order.");
             if (result.truncated()) ImGui.textWrapped("Only the first 200 matching changes are shown. Narrow the path/kind filters to reach other entries.");
             if (result.total()==0) ImGui.textWrapped("No applied changes are pending. Unchanged resources are not checked for external disk edits.");
@@ -6236,7 +6273,7 @@ public final class EditorApp extends Application {
             var entry=result.entries().stream().filter(item -> item.path().equals(changesSelected)).findFirst().orElse(null);
             if (entry!=null) {
                 ImGui.separator();ImGui.textWrapped(entry.kind().label()+": "+entry.path());
-                if (entry.kind()!=WorkspaceChanges.Kind.NEW_FOLDER) {
+                if (entry.kind()==WorkspaceChanges.Kind.NEW_FILE || entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE) {
                     ImGui.textUnformatted(entry.bytes()+" applied bytes");
                     if (ImGui.button("Open changed resource")) { resourceNavigation.request(workspace,entry.path());changesPendingPath=entry.path();changesPendingWorkspace=workspace; }
                 }
