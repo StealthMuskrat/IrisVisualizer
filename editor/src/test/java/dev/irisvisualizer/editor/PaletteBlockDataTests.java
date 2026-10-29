@@ -22,7 +22,7 @@ final class PaletteBlockDataTests {
     private static LosslessJson entry(byte[] raw,NoiseStyleSourceTests.Case c,int index) { return palette(raw,c).objectArray("palette").get(index); }
     private static void onlyEntry(byte[] before,byte[] after,NoiseStyleSourceTests.Case c,int index) { String selected=text(entry(before,c,index).sourceBytes()),replacement=text(entry(after,c,index).sourceBytes());String all=text(before);check(all.indexOf(selected)==all.lastIndexOf(selected) && text(after).equals(all.replace(selected,replacement))); }
     static void run(Path temp) throws Exception {
-        var cases=NoiseStyleSourceTests.cases().stream().filter(c -> PaletteBlockData.supports(c.target())).toList();check(cases.size()==92);var prefixes=new HashSet<String>();int serial=0;
+        var cases=NoiseStyleSourceTests.cases().stream().filter(c -> PaletteBlockData.supports(c.target())).toList();check(cases.size()==93 && cases.stream().filter(c -> c.target().resourceBase().equals("structures")).count()==1);var prefixes=new HashSet<String>();int serial=0;
         check(cases.stream().filter(c -> c.target().proceduralPalette()).count()==52 && cases.stream().filter(c -> c.target().nativeStructurePalette()).count()==8 && cases.stream().filter(c -> c.target().ore()).count()==3);
         for (var c : cases) {
             var context=new PaletteBlockData.Context(c.target(),0);var scope=context.scope();String path=c.path();byte[] original=fixture(c,node(0,8));check(prefixes.add(path+"|"+scope.prefix()) && scope.prefix().startsWith(context.listPrefix()) && !scope.standalone() && scope.depth()==0 && scope.context().equals(context));
