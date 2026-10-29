@@ -412,17 +412,16 @@ public final class EditorApp extends Application {
         if (showAppliedHistory) drawAppliedHistory();
     }
     private void drawReferences() {
-        String base = ResourceTypes.base(selected);
-        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools", "jigsaw-pieces").contains(base)
-                || !ImGui.collapsingHeader("Resource links (partial)")) return;
+        if (!ReferenceDiagnostics.supports(selected) || !ImGui.collapsingHeader("Resource links (partial)")) return;
         if (referenceWorkspace != workspace || referenceRevision != workspace.revision() || !java.util.Objects.equals(referencePath, selected)) {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
-        if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
-        for (var link : referenceLinks) {
-            ImGui.textWrapped(link.field() + ": " + link.key());
+        ImGui.textWrapped("Checks authored expression/image-map sources in known noise styles and nested fractures, exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset; omitted defaults and unknown contexts are not resolved.");
+        int referenceIndex=0;for (var link : referenceLinks) {
+            ImGui.pushID(referenceIndex++);
+            ImGui.textWrapped(InspectorText.label(link.field(),256) + ": " + InspectorText.label(link.key(),256));
             String status = switch (link.state()) {
                 case EXACT_FILE -> "Exact file present (contents unchecked)";
                 case NO_EXACT_FILE -> "No exact file match (aliases unchecked)";
@@ -432,11 +431,13 @@ public final class EditorApp extends Application {
                 case INVALID_KEY -> "Unsupported or unsafe resource key";
             };
             ImGui.textWrapped(status);
-            if (link.state() == ReferenceDiagnostics.State.EXACT_FILE && ImGui.smallButton("Open##reference-" + link.field())) {
-                try { resourceNavigation.request(workspace,link.target());break; }
+            if (link.state() == ReferenceDiagnostics.State.EXACT_FILE && ImGui.smallButton("Open linked resource")) {
+                try { resourceNavigation.request(workspace,link.target()); }
                 catch (Exception failure) { error = failure.getMessage(); }
             }
+            ImGui.popID();
         }
+        ImGui.textWrapped("Noise inspection is bounded to 4,096 JSON nodes and 32 levels per source; labels show up to 256 characters. Declared links do not establish active source selection, formula validity or cycle safety.");
     }
     private void drawJigsawPiece(LosslessJson root) {
         if (!ImGui.collapsingHeader("Jigsaw piece")) return;
@@ -6112,7 +6113,7 @@ public final class EditorApp extends Application {
     private void drawPackReferenceReview() {
         if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }
         if (ImGui.button("Close resource-link review")) { showReferenceReview=false;ImGui.end();return; }
-        ImGui.textWrapped("Known typed fields in dimension, region, biome, image-map and structure JSON only. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
+        ImGui.textWrapped("Known typed fields in dimension, region, biome, generator, expression, image-map, structure, jigsaw-pool and jigsaw-piece JSON. Noise source links include known inline style contexts and nested fractures; both declared sources are listed even when native precedence overrides one. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
         if (ImGui.button("Scan / refresh known resource links")) packReferenceReview.refresh(workspace);
         ImGui.sameLine();if (ImGui.button("Clear link scan")) packReferenceReview.clear();
         ImGui.inputText("Source, field, key or target contains",referenceReviewQuery);

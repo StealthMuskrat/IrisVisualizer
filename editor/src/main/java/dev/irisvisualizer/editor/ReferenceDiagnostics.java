@@ -15,7 +15,7 @@ public final class ReferenceDiagnostics {
     public record Link(String field, String key, String target, State state) {}
     public static List<Link> inspect(PackWorkspace workspace, String path) {
         String base = ResourceTypes.base(path);
-        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools","jigsaw-pieces").contains(base)) return List.of();
+        if (!supports(path)) return List.of();
         if (workspace.size(path) > MAX_JSON_BYTES) return List.of(new Link("JSON", "Above 1 MB inspection limit", null, State.UNSUPPORTED));
         Links links = new Links();
         try {
@@ -58,10 +58,14 @@ public final class ReferenceDiagnostics {
                 default -> { }
             }
             if (Set.of("dimensions","regions","biomes").contains(base)) riverBiomes(workspace,path,document,links);
+            if (!full(links)) NoiseReferenceDiagnostics.inspect(workspace,base,document,link -> { if (full(links)) return false;return links.add(link); });
         } catch (IllegalArgumentException invalid) { links.add(new Link("JSON", "Invalid/ambiguous JSON", null, State.UNSUPPORTED)); }
         List<Link> result=new ArrayList<>(links);
         if (links.truncated) result.add(new Link("References","Inspection truncated at "+MAX_LINKS+" links",null,State.UNSUPPORTED));
         return List.copyOf(result);
+    }
+    public static boolean supports(String path) {
+        return Set.of("dimensions","regions","biomes","generators","expressions","image-maps","structures","jigsaw-pools","jigsaw-pieces").contains(Objects.toString(ResourceTypes.base(path),""));
     }
     private static void subterrain(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("subterrainFeatures")==null) return;
@@ -205,7 +209,7 @@ public final class ReferenceDiagnostics {
             for (int index=0;index<keys.size() && !full(links);index++) links.add(link(workspace, displayed + "[" + index + "]", keys.get(index), type));
         } catch (IllegalArgumentException mismatch) { links.add(new Link(displayed, "Non-string or unsupported list", null, State.UNSUPPORTED)); }
     }
-    private static Link link(PackWorkspace workspace, String field, String key, String type) {
+    static Link link(PackWorkspace workspace, String field, String key, String type) {
         if (!ResourceTypes.referenceKey(key))
             return new Link(field, key, null, State.INVALID_KEY);
         String target = type + "/" + key + (type.equals("objects") ? ".iob" : type.equals("images") ? ".png" : ".json");
