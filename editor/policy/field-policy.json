@@ -2890,15 +2890,15 @@
   "position": {
     "x": {
       "classification": "generation",
-      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+      "reason": "Exact coordinate or rotation axis applied atomically with the other two axes. Connector coordinates are nonnegative; native object bounds and mode-specific geometry remain unchecked."
     },
     "y": {
       "classification": "generation",
-      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+      "reason": "Exact coordinate or rotation axis applied atomically with the other two axes. Connector coordinates are nonnegative; native object bounds and mode-specific geometry remain unchecked."
     },
     "z": {
       "classification": "generation",
-      "reason": "Fixed world coordinate or rotation axis, applied atomically with the other two axes."
+      "reason": "Exact coordinate or rotation axis applied atomically with the other two axes. Connector coordinates are nonnegative; native object bounds and mode-specific geometry remain unchecked."
     }
   },
   "decorator": {
@@ -5246,7 +5246,7 @@
     },
     "connectors": {
       "classification": "generation",
-      "reason": "Connector geometry, orientation, pool targeting and joint/state/priority behavior affect assembly. Typed connector controls are pending; original data remains preserved read-only."
+      "reason": "Typed ordered connector controls preserve unknown data and literal values. Object bounds, canonical planar sockets, native orientation/matching, target pool viability and graph compatibility remain unchecked."
     },
     "displayName": {
       "classification": "read-only",
@@ -5273,6 +5273,52 @@
     "terminal": {
       "classification": "generation",
       "reason": "Controls deterministic depth/count eligibility or terminal cap behavior. Paired local bounds are authored independently; native graph minimum-count feasibility, connector compatibility and generation remain unchecked."
+    }
+  },
+  "jigsawConnector": {
+    "position": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "direction": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "top": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "pool": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "name": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "targetName": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "channel": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "joint": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "selectionPriority": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "placementPriority": {
+      "classification": "generation",
+      "reason": "Authors connector position, orientation, pool targeting, literal matching or signed expansion priority. Object bounds, mode-specific sockets, transforms and native assembly remain unchecked."
+    },
+    "finalState": {
+      "classification": "generation",
+      "reason": "Literal state used by native template/Studio block output and required nonblank by native graph/assembly validity checks. Runtime Iris assembly does not resolve this text here; registry/state parsing, export and block restoration remain unevaluated."
     }
   }
 }

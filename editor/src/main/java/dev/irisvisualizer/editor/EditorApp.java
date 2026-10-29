@@ -419,7 +419,7 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks exact structure start-pool files, pool fallback and physical membership files, piece object assets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -441,7 +441,7 @@ public final class EditorApp extends Application {
     private void drawJigsawPiece(LosslessJson root) {
         if (!ImGui.collapsingHeader("Jigsaw piece")) return;
         ImGui.pushID("jigsaw-piece");
-        ImGui.textWrapped("Literal piece settings only. Object bytes, bounds, connector transforms, graph reachability, eligibility, native compatibility and effective placement are not evaluated. Connector authoring remains read-only; unsupported previews stay disabled.");
+        ImGui.textWrapped("Literal piece settings only. Object bytes, bounds, connector transforms, graph reachability, eligibility, native compatibility and effective placement are not evaluated. Unsupported previews stay disabled.");
         try {
             String current=JigsawPieces.object(root);ImGui.textWrapped(JigsawPieces.help("object"));
             ImString query=values.computeIfAbsent("jigsawPiece#object.filter",ignored -> new ImString(1025));ImGui.inputText("Object filter",query);
@@ -459,9 +459,74 @@ public final class EditorApp extends Application {
                 if (root.token(name)!=null && ImGui.button("Use class default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.resetFlag(selected,workspace.read(selected),name)));
             } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored flag is unsupported and preserved read-only."); }ImGui.popID();
         }
-        drawJigsawPieceThemes(root);drawJigsawPieceRules(root);
+        drawJigsawPieceThemes(root);drawJigsawPieceRules(root);drawJigsawConnectors(root);
         for (String name : JigsawPieces.readOnlyFields(root)) drawReadOnlyField("jigsawPiece",name);
         ImGui.popID();
+    }
+    private void drawJigsawConnectors(LosslessJson root) {
+        if (!ImGui.treeNode("Jigsaw connectors")) return;
+        ImGui.textWrapped(JigsawConnectors.help("connectors"));
+        ImGui.textWrapped("Up to 64 connectors. Coordinates are nonnegative exact int32 triples. Object bounds and canonical planar face-center positions are unchecked. PLANAR_JIGSAW requires horizontal directions and UP_POSITIVE_Y tops; no structure mode is inferred. Names and channels match exact case and whitespace. Joint/rotation compatibility and graph reachability are not evaluated.");
+        if ("null".equals(root.token("connectors"))) {
+            ImGui.textWrapped("The native compiler rejects a null connector list. Remove only this override to restore the implicit empty list.");
+            if (ImGui.button("Remove null connector override")) { try { commitProfileChange(JigsawConnectors.entriesPrefix(),JigsawConnectors.resetEmpty(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } else try {
+            var rows=JigsawConnectors.entries(root);
+            if (rows.isEmpty()) { ImGui.textWrapped("No authored connectors. This does not establish whether the piece is usable in any graph.");if (root.token("connectors")!=null && ImGui.button("Remove empty connector override")) { try { commitProfileChange(JigsawConnectors.entriesPrefix(),JigsawConnectors.resetEmpty(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+            String add="jigsawConnector#new.",newKey=add+"pool";ImString first=values.computeIfAbsent(newKey,ignored -> new ImString(1025));String next=drawJigsawPoolKey("New connector pool",add,"jigsaw-pools",first.get());if (next!=null) first.set(next);drafts.update(newKey,"",first.get());
+            ImGui.textWrapped("New connectors store only the selected pool. Position 0/0/0, NORTH_NEGATIVE_Z facing, UP_POSITIVE_Y top, ROLLABLE joint, empty names/channel, minecraft:air finalState and zero priorities remain implicit defaults.");
+            ImGui.beginDisabled(rows.size()>=JigsawConnectors.MAX_ENTRIES);if (ImGui.button("Append connector")) { try { commitProfileChange(add,JigsawConnectors.append(selected,workspace.read(selected),first.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.endDisabled();
+            for (int index=0;index<rows.size();index++) {
+                ImGui.pushID(index);int entry=index;var row=rows.get(index);String prefix=JigsawConnectors.prefix(index);
+                if (ImGui.treeNode("Connector "+(index+1))) {
+                    try {
+                        String current=JigsawConnectors.value(row,"pool");ImGui.textWrapped(JigsawConnectors.help("pool"));String pool=drawJigsawPoolKey("Connector target pool",prefix+"pool.","jigsaw-pools",current);
+                        if (pool!=null) applyRoutingExtra(() -> workspace.replace(selected,JigsawConnectors.setPool(selected,workspace.read(selected),entry,pool,workspace)));
+                        if (!current.isEmpty() && workspace.paths().contains("jigsaw-pools/"+current+".json") && ImGui.button("Open exact connector pool")) resourceNavigation.request(workspace,"jigsaw-pools/"+current+".json");
+                    } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored pool reference has an unsupported type and remains read-only."); }
+                    ImGui.textWrapped(JigsawConnectors.help("position"));String positionPrefix=prefix+"position.",positionDraft=positionPrefix+"triple";
+                    try {
+                        var position=JigsawConnectors.position(row);String x=JigsawConnectors.axis(position,"x"),y=JigsawConnectors.axis(position,"y"),z=JigsawConnectors.axis(position,"z");if (position==null) ImGui.textUnformatted("Implicit constructor position: 0 / 0 / 0");
+                        ImString px=values.computeIfAbsent(positionPrefix+"x",ignored -> new ImString(x,Math.max(128,x.length()+1))),py=values.computeIfAbsent(positionPrefix+"y",ignored -> new ImString(y,Math.max(128,y.length()+1))),pz=values.computeIfAbsent(positionPrefix+"z",ignored -> new ImString(z,Math.max(128,z.length()+1)));ImGui.inputText("Connector X",px);ImGui.inputText("Connector Y",py);ImGui.inputText("Connector Z",pz);drafts.update(positionDraft,x+"|"+y+"|"+z,px.get()+"|"+py.get()+"|"+pz.get());
+                        if (ImGui.button("Apply XYZ together")) { try { commitProfileChange(positionPrefix,JigsawConnectors.setPosition(selected,workspace.read(selected),entry,px.get(),py.get(),pz.get()),positionDraft); } catch (Exception failure) { error=failure.getMessage(); } }
+                        if (row.token("position")!=null && ImGui.button("Use zero coordinate defaults")) { try { commitProfileChange(positionPrefix,JigsawConnectors.resetPosition(selected,workspace.read(selected),entry),positionDraft); } catch (Exception failure) { error=failure.getMessage(); } }
+                        for (String name : JigsawConnectors.otherPositionFields(position)) ImGui.textWrapped(InspectorText.label(name,256)+" (unknown position data; preserved read-only)");
+                    } catch (IllegalArgumentException invalid) {
+                        ImGui.textWrapped("Position contains a snippet or unsupported value and remains read-only; other connector fields stay independent.");
+                        if ("null".equals(row.token("position")) && ImGui.button("Remove null position override")) { try { commitProfileChange(positionPrefix,JigsawConnectors.resetPosition(selected,workspace.read(selected),entry),positionDraft); } catch (Exception failure) { error=failure.getMessage(); } }
+                    }
+                    for (String name : JigsawConnectors.CHOICES) {
+                        ImGui.pushID(name);ImGui.textWrapped(JigsawConnectors.help(name));try {
+                            String current=JigsawConnectors.value(row,name);if (row.token(name)==null) ImGui.textUnformatted("Implicit default: "+current);
+                            if (ImGui.beginCombo(name,InspectorText.label(current,128))) { for (String value : JigsawConnectors.choices(name)) if (ImGui.selectable(value,value.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,JigsawConnectors.setChoice(selected,workspace.read(selected),entry,name,value)));ImGui.endCombo(); }
+                            if (row.token(name)!=null && ImGui.button("Use class default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawConnectors.reset(selected,workspace.read(selected),entry,name)));
+                        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored enum is unsupported and preserved read-only.");if ("null".equals(row.token(name)) && ImGui.button("Restore class default from null")) applyRoutingExtra(() -> workspace.replace(selected,JigsawConnectors.reset(selected,workspace.read(selected),entry,name))); }ImGui.popID();
+                    }
+                    for (String name : JigsawConnectors.TEXT) {
+                        ImGui.pushID(name);ImGui.textWrapped(JigsawConnectors.help(name));String draft=prefix+name;
+                        try {
+                            String stored=JigsawConnectors.value(row,name);int maximum=name.equals("finalState") ? JigsawConnectors.MAX_FINAL_STATE_CHARACTERS : JigsawConnectors.MAX_TEXT_CHARACTERS;ImString input=values.computeIfAbsent(draft,ignored -> new ImString(stored,Math.max(maximum*4+1,stored.getBytes(StandardCharsets.UTF_8).length+1)));if (row.token(name)==null) ImGui.textWrapped("Implicit default: "+(stored.isEmpty() ? "(empty)" : InspectorText.label(stored,256)));
+                            ImGui.inputText(name,input);drafts.update(draft,stored,input.get());if (ImGui.button("Apply literal text")) commitRiverOverride(draft,() -> workspace.replace(selected,JigsawConnectors.setText(selected,workspace.read(selected),entry,name,input.get())));
+                            if (row.token(name)!=null && ImGui.button("Use class default")) commitRiverOverride(draft,() -> workspace.replace(selected,JigsawConnectors.reset(selected,workspace.read(selected),entry,name)));
+                        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored text is unsupported and preserved read-only.");if ("null".equals(row.token(name)) && ImGui.button("Restore class default from null")) commitRiverOverride(draft,() -> workspace.replace(selected,JigsawConnectors.reset(selected,workspace.read(selected),entry,name))); }ImGui.popID();
+                    }
+                    ImGui.textWrapped("Names/targetName/channel allow empty or surrounding spaces and have 256-character editor limits; new control characters are unsupported. finalState is nonblank literal text up to 4096 characters. Native template/Studio output uses that state, and native graph validity requires it; no state parsing, registry lookup, export or block restoration runs here. VANILLA_PORTABLE rejects nonblank Iris channels.");
+                    for (String name : JigsawConnectors.PRIORITIES) {
+                        ImGui.pushID(name);String draft=prefix+name;ImGui.textWrapped(JigsawConnectors.help(name));try {
+                            String stored=JigsawConnectors.value(row,name);ImString input=values.computeIfAbsent(draft,ignored -> new ImString(stored,Math.max(128,stored.length()+1)));if (row.token(name)==null) ImGui.textUnformatted("Implicit default: 0");ImGui.inputText(name,input);drafts.update(draft,stored,input.get());
+                            if (ImGui.button("Apply signed priority")) commitRiverOverride(draft,() -> workspace.replace(selected,JigsawConnectors.setPriority(selected,workspace.read(selected),entry,name,input.get())));
+                            if (row.token(name)!=null && ImGui.button("Use zero priority default")) commitRiverOverride(draft,() -> workspace.replace(selected,JigsawConnectors.reset(selected,workspace.read(selected),entry,name)));
+                        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored priority is unsupported and preserved read-only.");if ("null".equals(row.token(name)) && ImGui.button("Restore zero default from null")) commitRiverOverride(draft,() -> workspace.replace(selected,JigsawConnectors.reset(selected,workspace.read(selected),entry,name))); }ImGui.popID();
+                    }
+                    ImGui.textWrapped("Priorities are signed int32 values. Higher priorities run first; authored order breaks ties. Reordering can change seeded assembly behavior; no order is sampled here.");
+                    RiverProfiles.Action action=null;ImGui.beginDisabled(rows.size()>=JigsawConnectors.MAX_ENTRIES);if (ImGui.button("Duplicate connector")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button(rows.size()==1 ? "Remove last connector (empty default)" : "Remove connector")) action=RiverProfiles.Action.REMOVE;
+                    ImGui.beginDisabled(index==0);if (ImGui.button("Connector up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==rows.size()-1);if (ImGui.button("Connector down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+                    if (action!=null) { try { commitProfileChange(JigsawConnectors.entriesPrefix(),JigsawConnectors.change(selected,workspace.read(selected),index,action),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();break; }
+                    for (String name : JigsawConnectors.otherFields(row)) ImGui.textWrapped(InspectorText.label(name,256)+" (unknown connector data; preserved read-only)");ImGui.treePop();
+                }ImGui.popID();
+            }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Connector list is read-only: "+invalid.getMessage()); }
+        ImGui.treePop();
     }
     private void drawJigsawPieceThemes(LosslessJson root) {
         if (!ImGui.treeNode("Piece theme tags")) return;
