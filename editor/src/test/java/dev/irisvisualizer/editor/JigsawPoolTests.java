@@ -17,7 +17,7 @@ final class JigsawPoolTests {
     static void run(Path temp) throws Exception {
         byte[] empty=bytes("{}");var pack=PackWorkspace.newPack(Map.of(PATH,empty,"jigsaw-pools/fallback.json",bytes("not valid JSON"),"jigsaw-pieces/nested/physical.json",bytes("opaque invalid piece"),"jigsaw-pieces/雪#piece.json",empty,"jigsaw-pieces/wrong.JSON",empty,"objects/raw.iob",new byte[]{0,-1,9},"future/malformed.json",bytes("not JSON")));
         check(JigsawPools.supports(PATH) && ResourceTypes.base(PATH).equals("jigsaw-pools") && ResourceTypes.folderFamily("jigsaw-pools/nested") && ResourceFinder.Family.JIGSAW_POOLS.matches(PATH),"pool family and nested layout");
-        check(ResourceTypes.base("jigsaw-pieces/nested/physical.json")==null && ResourceTypes.fileFamily("jigsaw-pieces/nested/physical.json")==null,"piece file operations remain read-only");
+        check("jigsaw-pieces".equals(ResourceTypes.base("jigsaw-pieces/nested/physical.json")) && ResourceFinder.Family.JIGSAW_PIECES.matches("jigsaw-pieces/nested/physical.json"),"piece resources have typed file operations");
         check(JigsawPools.entries(root(empty)).isEmpty() && JigsawPools.fallback(root(empty)).isEmpty() && !JigsawPools.mandatory(root(empty)),"viewing defaults does not author fields");
         check(JigsawPools.weight(root(empty))==1 && JigsawPools.chance(root(empty))==1 && !JigsawPools.empty(root(empty)) && JigsawPools.piece(root(empty)).isEmpty(),"membership defaults");
         var catalog=new JigsawPools.Catalog();check(catalog.filter(pack,"jigsaw-pieces","").keys().equals(List.of("nested/physical","雪#piece")) && catalog.filter(pack,"jigsaw-pieces","PHYSICAL").count()==1,"literal exact-key catalog and case-insensitive filter");

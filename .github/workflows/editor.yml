@@ -1040,6 +1040,20 @@ jobs:
           python editor/tools/extract_jigsaw_pool_fields.py . generated-jigsaw-pool-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-jigsaw-pool-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/jigsaw-pool-fields.properties).Hash) { throw 'Pinned jigsaw pools differ' }
+      - name: Verify pinned jigsaw piece controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawPiece.java' -OutFile IrisJigsawPiece.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawPieceRules.java' -OutFile IrisJigsawPieceRules.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/graph/StructureGraphCompiler.java' -OutFile StructureGraphCompiler.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/StructureAssembler.java' -OutFile StructureAssembler.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/graph/JigsawPoolSelection.java' -OutFile JigsawPoolSelection.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/studio/jigsaw/JigsawStudioGraphMapper.java' -OutFile JigsawStudioGraphMapper.java
+          python editor/tools/test_jigsaw_piece_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_jigsaw_piece_fields.py . generated-jigsaw-piece-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-jigsaw-piece-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/jigsaw-piece-fields.properties).Hash) { throw 'Pinned jigsaw pieces differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

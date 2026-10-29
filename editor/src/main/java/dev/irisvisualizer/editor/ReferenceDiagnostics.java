@@ -15,7 +15,7 @@ public final class ReferenceDiagnostics {
     public record Link(String field, String key, String target, State state) {}
     public static List<Link> inspect(PackWorkspace workspace, String path) {
         String base = ResourceTypes.base(path);
-        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools").contains(base)) return List.of();
+        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools","jigsaw-pieces").contains(base)) return List.of();
         if (workspace.size(path) > MAX_JSON_BYTES) return List.of(new Link("JSON", "Above 1 MB inspection limit", null, State.UNSUPPORTED));
         Links links = new Links();
         try {
@@ -24,6 +24,10 @@ public final class ReferenceDiagnostics {
                 case "image-maps" -> pngSource(workspace,document,links);
                 case "structures" -> structurePool(workspace,document,links);
                 case "jigsaw-pools" -> jigsawPool(workspace,document,links);
+                case "jigsaw-pieces" -> {
+                    try { String key=document.stringToken("object");links.add(key==null ? new Link("object","Absent piece object",null,State.ABSENT_REQUIRED) : link(workspace,"object",key,"objects")); }
+                    catch (IllegalArgumentException invalid) { links.add(new Link("object","Non-string piece object",null,State.UNSUPPORTED)); }
+                }
                 case "dimensions" -> {
                     list(workspace,document,"regions","regions",true,links);
                     scalar(workspace,document,"focus","biomes","",false,false,links);
