@@ -5140,7 +5140,7 @@
     },
     "edit": {
       "classification": "generation",
-      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+      "reason": "Ordered block replacement rules applied to every stamped structure piece using shared find, chance, exact matching and material palette controls. Source object bytes and unknown data are preserved; native matching, state merge and palette sampling remain unchecked."
     },
     "spatialWorkcellDisplayName": {
       "classification": "read-only",
@@ -5152,7 +5152,7 @@
     },
     "vanillaSource": {
       "classification": "generation",
-      "reason": "Identifies imported vanilla aliases and the native source suppressed by dimension REPLACE_SOURCE placements. Typed authoring is pending; the original value remains read-only and preserved."
+      "reason": "Authors an empty source or exact lowercase namespaced alias. This key identifies the native source suppressed by dimension REPLACE_SOURCE placements; registry existence, placement usage and runtime graph viability remain unchecked."
     }
   },
   "structureWorkcell": {

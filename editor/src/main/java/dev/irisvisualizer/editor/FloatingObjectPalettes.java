@@ -8,17 +8,18 @@ import java.util.function.Function;
 /** Shared palette contexts for stilt material overrides and ordered replacement rules. */
 public final class FloatingObjectPalettes {
     public static final List<String> STILT_FIELDS = List.of("palette");
-    public record Context(int entry,String list,int placement,int rule,StaticObjects.Context fixed) {
+    public record Context(int entry,String list,int placement,int rule,StaticObjects.Context fixed,boolean structure) {
+        public Context(int entry,String list,int placement,int rule,StaticObjects.Context fixed) { this(entry,list,placement,rule,fixed,false); }
         public Context(int entry,String list,int placement,int rule) { this(entry,list,placement,rule,null); }
         public Context {
-            if (rule < -1 || fixed!=null && rule<0) throw new IllegalArgumentException("Select an object material palette");
-            new FloatingObjectReplacements.Context(entry,list,placement,fixed);
+            if (rule < -1 || (fixed!=null || structure) && rule<0) throw new IllegalArgumentException("Select an object material palette");
+            new FloatingObjectReplacements.Context(entry,list,placement,fixed,structure);
         }
         public boolean stilt() { return rule==-1; }
-        public FloatingObjectReplacements.Context owner() { return new FloatingObjectReplacements.Context(entry,list,placement,fixed); }
+        public FloatingObjectReplacements.Context owner() { return new FloatingObjectReplacements.Context(entry,list,placement,fixed,structure); }
         public String resourceBase() { return owner().resourceBase(); }
         public String prefix() { return stilt() ? FloatingObjectPlacements.placementPrefix(entry,list,placement)+"stiltSettings.palette." : owner().rulePrefix(rule)+"replace."; }
-        public String stylePath() { return (fixed!=null ? "staticObjects."+fixed.index() : FloatingObjectPlacements.contextPath(entry,list,placement))+(stilt() ? ".stiltSettings.palette.style" : ".edit."+rule+".replace.style"); }
+        public String stylePath() { return structure ? "edit."+rule+".replace.style" : (fixed!=null ? "staticObjects."+fixed.index() : FloatingObjectPlacements.contextPath(entry,list,placement))+(stilt() ? ".stiltSettings.palette.style" : ".edit."+rule+".replace.style"); }
         public GeneralBlockPalettes.Target target() { return GeneralBlockPalettes.Target.objectPalette(this); }
     }
     private static void authorize(String path,Context context) { FloatingObjectReplacements.authorize(path,context.owner()); }
@@ -28,7 +29,7 @@ public final class FloatingObjectPalettes {
     static LosslessJson object(LosslessJson placement,Context context) {
         LosslessJson owner;
         if (context.stilt()) { owner=FloatingPlacementDeformation.object(placement,"stiltSettings");if (owner==null) return null; }
-        else { var rules=placement.objectArray("edit");if (context.rule()>=rules.size()) throw new IllegalArgumentException("Select a replacement rule");owner=rules.get(context.rule()); }
+        else { var rules=FloatingObjectReplacements.rules(placement,context.owner());if (rules==null || context.rule()>=rules.size()) throw new IllegalArgumentException("Select a replacement rule");owner=rules.get(context.rule()); }
         String token=owner.token(member(context));return token==null || context.stilt() && token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8));
     }
     public static byte[] create(String path,byte[] original,Context context) { authorize(path,context);return editOwner(original,context,o -> { String token=o.token(member(context));if (token!=null && !(context.stilt() && token.equals("null"))) throw new IllegalArgumentException("Palette already exists or has an unsupported type");return o.enableObject(member(context)); }); }
@@ -42,6 +43,11 @@ public final class FloatingObjectPalettes {
     public static byte[] setZoom(String path,byte[] original,Context context,String input) { authorize(path,context);double value=RiverPaletteFields.checkedZoom(input);return editPalette(original,context,p -> p.number("zoom",value)); }
     static Context styleContext(String path) { return styleContext("biomes",path); }
     static Context styleContext(String resourceBase,String path) {
+        if ("structures".equals(resourceBase) && path!=null) {
+            var root=java.util.regex.Pattern.compile("edit\\.(0|[1-9][0-9]*)\\.replace\\.style").matcher(path);
+            if (root.matches()) try { return FloatingObjectReplacements.Context.structureRoot().palette(Integer.parseInt(root.group(1))); } catch (NumberFormatException invalid) { return null; }
+            return null;
+        }
         if ("dimensions".equals(resourceBase) && path!=null) {
             var fixed=java.util.regex.Pattern.compile("staticObjects\\.(0|[1-9][0-9]*)\\.edit\\.(0|[1-9][0-9]*)\\.replace\\.style").matcher(path);
             if (fixed.matches()) try { return FloatingObjectReplacements.Context.fixed(new StaticObjects.Context(Integer.parseInt(fixed.group(1)))).palette(Integer.parseInt(fixed.group(2))); } catch (NumberFormatException invalid) { return null; }

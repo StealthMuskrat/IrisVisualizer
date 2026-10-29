@@ -60,6 +60,7 @@ final class NoiseStyleSourceTests {
             var noise=new FloatingPlacementOverrides.Context(owner.entry(),owner.list(),owner.placement()).noiseTarget();result.add(new Case(NoiseStyleFields.Target.noise(noise),FloatingObjectPlacements.contextPath(owner.entry(),owner.list(),owner.placement())+".heightmap.style"));
         }
         add(result,new StaticObjects.Context(0).replacements().palette(0).target().styleTarget());
+        add(result,FloatingObjectReplacements.Context.structureRoot().palette(0).target().styleTarget());
         result.add(new Case(NoiseStyleFields.Target.noise(NoiseFields.Target.composite(0)),"composite.0.style"));result.add(new Case(NoiseStyleFields.Target.noise(NoiseFields.Target.cliffHeight()),"cliffHeightGenerator.style"));
         return result;
     }

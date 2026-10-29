@@ -20,7 +20,7 @@ final class ProceduralAccentTests {
     private static void rejects(Runnable action) { try { action.run(); } catch (IllegalArgumentException expected) { return; }throw new AssertionError("Expected rejected procedural accent operation"); }
     private static void preserved(byte[] a,byte[] b,String kind) { var x=new LosslessJson(a);var y=new LosslessJson(b);check(x.token("objects").equals(y.token("objects")) && x.token("futureRoot").equals(y.token("futureRoot")) && ProceduralObjects.object(x).token(sibling(kind)).equals(ProceduralObjects.object(y).token(sibling(kind))) && Arrays.equals(ProceduralObjects.entries(x,kind).get(1).sourceBytes(),ProceduralObjects.entries(y,kind).get(1).sourceBytes()));for (String field : List.of("seed","future","blockPalette")) check(owner(a,kind).token(field).equals(owner(b,kind).token(field))); }
     static void run(Path temp) throws Exception {
-        check(NoiseStyleSourceTests.cases().size()==167);
+        check(NoiseStyleSourceTests.cases().size()==168);
         var sources=PackWorkspace.newPack(Map.of("expressions/formula.json",bytes("opaque expression"),"image-maps/map.json",bytes("opaque map")));
         for (String base : List.of("biomes","regions")) for (String kind : List.of("trees","ruins")) for (String list : ProceduralAccents.lists(kind)) {
             String path=base+"/nested/world.json";var placement=new ProceduralObjects.Context(base,kind,0);var c=new ProceduralAccents.Context(placement,list,0);byte[] absent=root(kind,list,null),raw=root(kind,list,"[{\"block\":\"minecraft:st\\u006fne\",\"futureEntry\":9007199254740993},{\"block\":\"mod:kept\",\"futureSibling\":9223372036854775807}]");

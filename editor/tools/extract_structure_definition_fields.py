@@ -34,7 +34,8 @@ def extract(*sources):
                     'maxSizeChunks': ('int', '8'), 'mode': ('IrisJigsawMode', 'IrisJigsawMode.SPATIAL_JIGSAW'),
                     'compatibility': ('IrisJigsawCompatibility', 'IrisJigsawCompatibility.IRIS_EXTENDED'),
                     'branchFailurePolicy': ('IrisJigsawBranchFailurePolicy', 'IrisJigsawBranchFailurePolicy.FAIL_ASSEMBLY'),
-                    'requireCaps': ('boolean', 'false'), 'placeMode': ('ObjectPlaceMode', 'ObjectPlaceMode.STRUCTURE_PIECE')}
+                    'requireCaps': ('boolean', 'false'), 'placeMode': ('ObjectPlaceMode', 'ObjectPlaceMode.STRUCTURE_PIECE'),
+                    'vanillaSource': ('String', '""')}
     for field, (kind, default) in declarations.items():
         match = re.search(r'(?P<annotations>(?:\s*@[^\n]+\n)+)\s*private ' + kind + ' ' + field + r' = (?P<default>[^;]+);', d)
         if not match or match['default'] != default:
@@ -84,13 +85,29 @@ def extract(*sources):
     require(component, 'ObjectPlaceMode mode = structure.getPlaceMode();',
             'mode == ObjectPlaceMode.STRUCTURE_PIECE || mode == ObjectPlaceMode.FLOATING',
             'ObjectPlaceMode undergroundMode = (mode == ObjectPlaceMode.ORGANIC_STILT || mode == ObjectPlaceMode.CEILING_HANG) ? mode : ObjectPlaceMode.STRUCTURE_PIECE;',
-            'else if (pieces.size() == 1)')
+            'else if (pieces.size() == 1)',
+            'IrisObjectPlacement config = structure.createLootPlacement(objectKey);',
+            'if (!structure.getEdit().isEmpty()) { config.setEdit(structure.getEdit()); }',
+            'return object.place(p.getX(), placeY, p.getZ(), writer, config, rng,')
+    edit = re.search(r'@ArrayType\(min = 1, type = IrisObjectReplace.class\)\s*@Description\(("(?:[^"\\]|\\.)*")\)\s*private KList<IrisObjectReplace> edit = new KList<>\(\);', d)
+    if not edit:
+        raise ValueError('Changed structure replacement declaration')
+    values['edit.description'] = json.loads(edit[1])
+    require(d, '@RegistryListVanillaStructure', 'private String vanillaSource = "";')
     require(locator, 'boolean replacesNative = NativeStructureSuppression.REPLACE_SOURCE == placement.getNativeSuppression();',
             'String vanillaSource = structure.getVanillaSource();',
             'if (vanillaSource == null || !NAMESPACED_RESOURCE_KEY.matcher(vanillaSource).matches())',
-            'suppressedVanillaSources.add(normalize(vanillaSource));')
+            'suppressedVanillaSources.add(normalize(vanillaSource));',
+            'Pattern.compile("[a-z0-9_.-]+:[a-z0-9/._-]+")',
+            'if (replacesNative && !allowNativeSuppression)',
+            'if (!StructureGraphCatalog.guaranteesRuntimeOutput(data, structure))',
+            'vanillaAliases.add(normalize(structure.getVanillaSource()));',
+            'addLocatableKey(structure.getVanillaSource(), keys, normalizedKeys);',
+            'return key == null ? "" : key.toLowerCase(Locale.ROOT);')
     values.update({'folder': 'structures', 'pool.folder': 'jigsaw-pools', 'enums.null': 'modeCompatibilityBranchDefaults',
-                   'reset.policy': 'removeOptionalField', 'portable.policy': 'themesCapsAndBranchTermination', 'execution.policy': 'disabled'})
+                   'reset.policy': 'removeOptionalField', 'portable.policy': 'themesCapsAndBranchTermination', 'execution.policy': 'disabled',
+                   'vanillaSource.policy': 'emptyOrExactNamespacedKey', 'vanillaSource.pattern': '[a-z0-9_.-]+:[a-z0-9/._-]+',
+                   'edit.policy': 'structurePiecePlacement'})
     return ''.join(key + '=' + json.dumps(value, ensure_ascii=True)[1:-1] + '\n' for key, value in values.items()).encode('ascii')
 
 
