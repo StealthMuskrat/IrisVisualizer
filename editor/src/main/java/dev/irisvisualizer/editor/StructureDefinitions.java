@@ -84,7 +84,7 @@ public final class StructureDefinitions {
         authorize(path);if (key==null || !pools(workspace).contains(key)) throw new IllegalArgumentException("Choose an exact in-pack jigsaw-pools JSON key; contents and graph compatibility are unchecked");var root=new LosslessJson(raw);String old=value(root,"startPool");return root.token("startPool")==null ? root.enableStringPath("startPool",key) : old.equals(key) ? raw.clone() : root.stringValue("startPool",key);
     }
     public static byte[] template(PackWorkspace workspace,String key) { return setPool("structures/template.json","{}".getBytes(StandardCharsets.UTF_8),key,workspace); }
-    public static List<String> readOnlyFields(LosslessJson root) { return root.fields().stream().filter(field -> !EDITABLE.contains(field)).toList(); }
+    public static List<String> readOnlyFields(LosslessJson root) { return root.fields().stream().filter(field -> !EDITABLE.contains(field) && !StructureWorkcells.ROOT_FIELDS.contains(field)).toList(); }
     /** Only three local native portability constraints. Never gates authoring or file operations. */
     public static List<String> advisories(LosslessJson root) {
         var result=new ArrayList<String>();

@@ -428,7 +428,7 @@ public final class EditorApp extends Application {
     private void drawStructureDefinition(LosslessJson root) {
         if (!ImGui.collapsingHeader("Structure assembly definition")) return;
         ImGui.pushID("structure-definition");
-        ImGui.textWrapped("Root assembly controls only. Pool/piece contents, graph closure, workcells, themes, placement context and native compatibility remain unvalidated. Settings are not adjusted automatically; previews remain disabled.");
+        ImGui.textWrapped("Assembly controls and bounded planar workcell authoring. Pool/piece contents, graph closure, canonical object fit, themes, placement context and native compatibility remain unvalidated. Settings are not adjusted automatically; previews remain disabled.");
         try {
             String current=StructureDefinitions.value(root,"startPool");
             ImGui.textWrapped(StructureDefinitions.help("startPool"));
@@ -469,8 +469,62 @@ public final class EditorApp extends Application {
             if (root.token("requireCaps")!=null && ImGui.button("Use class cap default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.reset(selected,workspace.read(selected),"requireCaps")));
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
         for (String finding : StructureDefinitions.advisories(root)) ImGui.textWrapped(finding);
-        ImGui.textWrapped("Portability findings cover three local rules only and do not gate Apply, Save or Export. Planar workcells, themes and piece edits remain read-only. Underground placement can override placeMode; multi-piece structures generally retain assembled piece positions.");
+        ImGui.textWrapped("Portability findings cover three local rules only and do not gate Apply, Save or Export. Themes, piece edits and native source aliases remain read-only. Underground placement can override placeMode; multi-piece structures generally retain assembled piece positions.");
+        drawStructureWorkcells(root);
         if (ImGui.treeNode("Other structure data (read-only)")) { for (String field : StructureDefinitions.readOnlyFields(root)) drawReadOnlyField("structureDefinition",field);ImGui.treePop(); }
+        ImGui.popID();
+    }
+    private void drawStructureWorkcells(LosslessJson root) {
+        if (!ImGui.treeNode("Planar workcell bounds")) return;
+        ImGui.textWrapped("Used by PLANAR_JIGSAW only. Width/depth are 3..128, height 1..192, and volume is at most "+StructureWorkcells.maximumVolume()+" blocks for every cell, including disabled cells. All three dimensions apply together. Object fit and graph viability are not checked here.");
+        if (ImGui.treeNode("Legacy fallback dimensions")) {
+            String token=root.token("cellSize");ImGui.textWrapped(token==null ? "Absent cellSize uses the structure constructor's 15 x 15 x 15 dimensions." : token.equals("null") ? "Stored null cellSize uses the resolver's 16 x 16 x 16 fallback." : "Stored inline cellSize; missing axes use IrisPosition defaults of zero. Snippets and unsupported axes stay read-only.");
+            drawStructureWorkcellBounds(root,-1,null);ImGui.treePop();
+        }
+        try {
+            var entries=StructureWorkcells.entries(root);
+            if (entries.isEmpty()) {
+                ImGui.textWrapped("No explicit workcell map: all six archetypes use the applied legacy fallback dimensions. Creation preserves those applied bounds; unapplied fallback sliders remain separate.");
+                if (ImGui.button("Create six workcells from applied fallback bounds")) {
+                    try { commitProfileChange(StructureWorkcells.entriesPrefix(),StructureWorkcells.create(selected,workspace.read(selected)),null); }
+                    catch (Exception failure) { error=failure.getMessage(); }
+                }
+            } else {
+                ImGui.textWrapped("Explicit workcells override cellSize. Identity is fixed to a complete map with one entry per archetype; source order is retained.");
+                for (int index=0;index<entries.size();index++) {
+                    int cell=index;ImGui.pushID(index);String archetype=StructureWorkcells.archetype(entries.get(index));
+                    if (ImGui.treeNode(archetype)) {
+                        drawStructureWorkcellBounds(root,index,entries.get(index));
+                        try {
+                            var enabled=new ImBoolean(StructureWorkcells.entryEnabled(entries.get(index)));if (entries.get(index).token("enabled")==null) ImGui.textUnformatted("Implicit enabled default: true");
+                            if (ImGui.checkbox("Participates in planar assembly",enabled)) applyRoutingExtra(() -> workspace.replace(selected,StructureWorkcells.setEnabled(selected,workspace.read(selected),cell,enabled.get())));
+                            if (entries.get(index).token("enabled")==null && ImGui.button("Store enabled default")) applyRoutingExtra(() -> workspace.replace(selected,StructureWorkcells.setEnabled(selected,workspace.read(selected),cell,true)));
+                        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
+                        for (String field : StructureWorkcells.entryOtherFields(entries.get(index))) drawReadOnlyField("structureWorkcell",field);
+                        ImGui.treePop();
+                    }
+                    ImGui.popID();
+                }
+            }
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Workcell list is read-only: "+unsupported.getMessage()); }
+        ImGui.treePop();
+    }
+    private void drawStructureWorkcellBounds(LosslessJson root,int index,LosslessJson entry) {
+        String prefix=StructureWorkcells.prefix(index),draftKey=prefix+"bounds";ImGui.pushID(index);
+        try {
+            var size=index<0 ? StructureWorkcells.size(root,index) : StructureWorkcells.entrySize(entry);String[] stored={Integer.toString(size.width()),Integer.toString(size.height()),Integer.toString(size.depth())};ImString[] inputs=new ImString[3];
+            for (int axis=0;axis<3;axis++) {
+                String field=StructureWorkcells.DIMENSIONS.get(axis),key=prefix+field,value=stored[axis];
+                inputs[axis]=values.computeIfAbsent(key,ignored -> new ImString(value,64));int[] slider={Integer.parseInt(inputs[axis].get())};
+                if (ImGui.sliderInt(field,slider,StructureWorkcells.minimum(field),StructureWorkcells.maximum(field))) inputs[axis].set(Integer.toString(slider[0]));
+            }
+            drafts.update(draftKey,size.key(),inputs[0].get()+"|"+inputs[1].get()+"|"+inputs[2].get());
+            if (ImGui.button(index<0 ? "Store legacy bounds together" : "Apply cell bounds together")) {
+                try { commitProfileChange(prefix,StructureWorkcells.setBounds(selected,workspace.read(selected),index,inputs[0].get(),inputs[1].get(),inputs[2].get()),draftKey); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }
+            if (index<0) for (String field : StructureWorkcells.otherFields(root,index)) ImGui.textWrapped(InspectorText.label(field,256)+" (unknown legacy data; preserved read-only)");
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored dimensions are read-only: "+unsupported.getMessage()); }
         ImGui.popID();
     }
     private void drawReadOnlyField(String group,String field) {
@@ -485,10 +539,11 @@ public final class EditorApp extends Application {
             long unclassified = fields.stream().filter(field -> field.classification().equals("unclassified")).count();
             long implemented = fields.stream().filter(FieldCoverage.Field::implemented).count();
             long readOnly=fields.stream().filter(field -> field.classification().equals("read-only")).count();
-            ImGui.textWrapped(group + ": " + implemented + " editable, " + readOnly + " read-only, " + unclassified + " unclassified / " + fields.size() + " inventoried");
+            long pending=fields.stream().filter(field -> field.classification().equals("generation") && !field.implemented()).count();
+            ImGui.textWrapped(group + ": " + implemented + " authored, " + pending + " controls pending, " + readOnly + " read-only, " + unclassified + " unclassified / " + fields.size() + " inventoried");
             if (ImGui.treeNode("Fields##coverage-" + group)) {
                 for (var field : fields) {
-                    String status = field.implemented() ? "editable" : field.classification().equals("generation") ? "generation: control pending" : field.classification();
+                    String status = field.implemented() ? "authored" : field.classification().equals("generation") ? "generation: control pending" : field.classification();
                     ImGui.textWrapped(field.name() + ": " + status);
                     if (ImGui.isItemHovered()) ImGui.setTooltip(field.reason());
                 }
