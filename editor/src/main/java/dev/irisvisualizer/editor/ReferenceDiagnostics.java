@@ -27,6 +27,7 @@ public final class ReferenceDiagnostics {
                 case "jigsaw-pieces" -> {
                     try { String key=document.stringToken("object");links.add(key==null ? new Link("object","Absent piece object",null,State.ABSENT_REQUIRED) : link(workspace,"object",key,"objects")); }
                     catch (IllegalArgumentException invalid) { links.add(new Link("object","Non-string piece object",null,State.UNSUPPORTED)); }
+                    pieceConnectors(workspace,document,links);
                 }
                 case "dimensions" -> {
                     list(workspace,document,"regions","regions",true,links);
@@ -72,6 +73,17 @@ public final class ReferenceDiagnostics {
                 list(workspace,entry,"allowedRegions","regions",false,prefix,links);
             }
         } catch (IllegalArgumentException unsupported) { links.add(new Link("subterrainFeatures","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
+    }
+    private static void pieceConnectors(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+        if (full(links) || document.token("connectors")==null) return;
+        try {
+            var rows=document.objectArray("connectors");
+            for (int index=0;index<rows.size() && !full(links);index++) {
+                String field="connectors["+index+"].pool";
+                try { String key=rows.get(index).stringToken("pool");links.add(key==null ? new Link(field,"Absent connector pool",null,State.ABSENT_REQUIRED) : link(workspace,field,key,"jigsaw-pools")); }
+                catch (IllegalArgumentException invalid) { links.add(new Link(field,"Non-string connector pool",null,State.UNSUPPORTED)); }
+            }
+        } catch (IllegalArgumentException invalid) { links.add(new Link("connectors","Null/snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
     private static void jigsawPool(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         try { String fallback=JigsawPools.fallback(document);if (!fallback.isBlank()) links.add(link(workspace,"fallback",fallback,"jigsaw-pools")); }

@@ -1054,6 +1054,23 @@ jobs:
           python editor/tools/extract_jigsaw_piece_fields.py . generated-jigsaw-piece-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-jigsaw-piece-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/jigsaw-piece-fields.properties).Hash) { throw 'Pinned jigsaw pieces differ' }
+      - name: Verify pinned jigsaw connector controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawConnector.java' -OutFile IrisJigsawConnector.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/value/IrisDirection.java' -OutFile IrisDirection.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/JigsawJoint.java' -OutFile JigsawJoint.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/pack/value/IrisPosition.java' -OutFile IrisPosition.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawPiece.java' -OutFile IrisJigsawPiece.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/graph/StructureGraphCompiler.java' -OutFile StructureGraphCompiler.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/StructureAssembler.java' -OutFile StructureAssembler.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/export/VanillaStructureTemplateEncoder.java' -OutFile VanillaStructureTemplateEncoder.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/studio/jigsaw/JigsawStudioChunkWriter.java' -OutFile JigsawStudioChunkWriter.java
+          python editor/tools/test_jigsaw_connector_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_jigsaw_connector_fields.py . generated-jigsaw-connector-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-jigsaw-connector-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/jigsaw-connector-fields.properties).Hash) { throw 'Pinned jigsaw connectors differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |
