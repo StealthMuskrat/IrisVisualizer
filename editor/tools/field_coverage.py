@@ -1,4 +1,4 @@
-"""Audit direct nonstatic/nontransient declarations in one hundred and sixteen pinned Iris classes.
+"""Audit direct nonstatic/nontransient declarations in one hundred and eighteen pinned Iris classes.
 This is a bounded source inventory, not the complete inherited/generated Iris schema.
 """
 import hashlib
@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 
 SOURCES = {
+ 'jigsawPiece': 'structure/jigsaw/IrisJigsawPiece.java',
+ 'jigsawPieceRules': 'structure/jigsaw/IrisJigsawPieceRules.java',
  'jigsawPool': 'structure/jigsaw/IrisJigsawPool.java',
  'jigsawPoolEntry': 'structure/jigsaw/IrisJigsawPieceEntry.java',
  'structureDefinition': 'structure/placement/IrisStructure.java',
@@ -146,6 +148,8 @@ def run(source_dir, policy_file, java_dir, output_dir):
     policy = json.loads(policy_file.read_text())
     ui = {group: editable(java_dir, cls) for group, cls in [('dimension', 'DimensionFields'), ('biome', 'BiomeFields'), ('generator', 'GeneratorFields'), ('region', 'RegionFields')]}
     implemented = {group: set(path for path in paths if '.' not in path) for group, paths in ui.items()}
+    implemented['jigsawPiece'] = set(editable(java_dir, 'JigsawPieces'))
+    implemented['jigsawPieceRules'] = set(editable(java_dir, 'JigsawPieces', 'RULE_FIELDS'))
     implemented['jigsawPool'] = set(editable(java_dir, 'JigsawPools'))
     implemented['jigsawPoolEntry'] = set(editable(java_dir, 'JigsawPools', 'ENTRY_FIELDS'))
     implemented['structureDefinition'] = set(editable(java_dir, 'StructureDefinitions')) | set(editable(java_dir, 'StructureDefinitions', 'SOURCE_FIELDS')) | set(editable(java_dir, 'StructureDefinitions', 'MATERIAL_FIELDS')) | set(editable(java_dir, 'StructureWorkcells', 'ROOT_FIELDS')) | set(editable(java_dir, 'StructureThemes', 'ROOT_FIELDS'))
@@ -367,7 +371,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['expressionVariable'] = set(editable(java_dir, 'ExpressionDefinitions', 'VARIABLE_FIELDS'))
     implemented['expressionFunction'] = set(editable(java_dir, 'ExpressionDefinitions', 'FUNCTION_FIELDS'))
     properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and sixteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
+    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and eighteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
     details = []
     for group, relative in SOURCES.items():
         path = source_dir / Path(relative).name

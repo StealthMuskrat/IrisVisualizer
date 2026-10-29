@@ -34,6 +34,7 @@ public final class EditorApp extends Application {
     private final StructureDefinitions.PoolCache structurePools=new StructureDefinitions.PoolCache();
     private final StructureThemeReferences.Cache structureThemeReferences=new StructureThemeReferences.Cache();
     private final JigsawPools.Catalog jigsawPoolCatalog=new JigsawPools.Catalog();
+    private final JigsawPieces.Catalog jigsawPieceObjects=new JigsawPieces.Catalog();
     private final ImString structurePoolFilter=new ImString(1024);
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
@@ -191,6 +192,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
                 if (ImGui.menuItem("New structure definition")) createResource("structures");
                 if (ImGui.menuItem("New jigsaw pool with empty membership")) createResource("jigsaw-pools");
+                if (ImGui.menuItem("New jigsaw piece")) createResource("jigsaw-pieces");
                 if (ImGui.menuItem("Import image/object asset")) importAsset();
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
                 if (ImGui.menuItem("Review pack resource links")) showReferenceReview=true;
@@ -363,6 +365,10 @@ public final class EditorApp extends Application {
                 try { drawJigsawPool(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && JigsawPieces.supports(selected)) {
+                try { drawJigsawPiece(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
             if (ExpressionDefinitions.supports(selected) || "image-maps".equals(ResourceTypes.base(selected))) drawExpressionReferenceAudit();
             drawCoverage();
@@ -407,13 +413,13 @@ public final class EditorApp extends Application {
     }
     private void drawReferences() {
         String base = ResourceTypes.base(selected);
-        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools").contains(base)
+        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools", "jigsaw-pieces").contains(base)
                 || !ImGui.collapsingHeader("Resource links (partial)")) return;
         if (referenceWorkspace != workspace || referenceRevision != workspace.revision() || !java.util.Objects.equals(referencePath, selected)) {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks exact structure start-pool files, pool fallback and physical membership files, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks exact structure start-pool files, pool fallback and physical membership files, piece object assets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -431,6 +437,81 @@ public final class EditorApp extends Application {
                 catch (Exception failure) { error = failure.getMessage(); }
             }
         }
+    }
+    private void drawJigsawPiece(LosslessJson root) {
+        if (!ImGui.collapsingHeader("Jigsaw piece")) return;
+        ImGui.pushID("jigsaw-piece");
+        ImGui.textWrapped("Literal piece settings only. Object bytes, bounds, connector transforms, graph reachability, eligibility, native compatibility and effective placement are not evaluated. Connector authoring remains read-only; unsupported previews stay disabled.");
+        try {
+            String current=JigsawPieces.object(root);ImGui.textWrapped(JigsawPieces.help("object"));
+            ImString query=values.computeIfAbsent("jigsawPiece#object.filter",ignored -> new ImString(1025));ImGui.inputText("Object filter",query);
+            try {
+                var matches=jigsawPieceObjects.filter(workspace,query.get());ImGui.textUnformatted(matches.count()+" exact lowercase .iob keys; showing up to 200. Binary contents and loader aliases are unchecked.");
+                if (ImGui.beginCombo("Piece object",current.isEmpty() ? "Choose exact object key" : InspectorText.label(current,128))) { int index=0;for (String key : matches.keys()) { ImGui.pushID(index++);if (ImGui.selectable(InspectorText.label(key,256).replace("#","\\u0023"),key.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.setObject(selected,workspace.read(selected),key,workspace)));ImGui.popID(); }ImGui.endCombo(); }
+            } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            if (!current.isEmpty() && workspace.paths().contains("objects/"+current+".iob") && ImGui.button("Open exact object asset")) resourceNavigation.request(workspace,"objects/"+current+".iob");
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored object reference has an unsupported type and remains read-only."); }
+        for (String name : JigsawPieces.FLAGS) {
+            ImGui.pushID(name);try {
+                boolean current=JigsawPieces.flag(root,name);var input=new ImBoolean(current);ImGui.textWrapped(JigsawPieces.help(name));if (root.token(name)==null) ImGui.textUnformatted("Implicit default: "+current);
+                if (ImGui.checkbox(name,input)) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.setFlag(selected,workspace.read(selected),name,input.get())));
+                if (root.token(name)==null && ImGui.button("Store displayed default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.setFlag(selected,workspace.read(selected),name,current)));
+                if (root.token(name)!=null && ImGui.button("Use class default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.resetFlag(selected,workspace.read(selected),name)));
+            } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored flag is unsupported and preserved read-only."); }ImGui.popID();
+        }
+        drawJigsawPieceThemes(root);drawJigsawPieceRules(root);
+        for (String name : JigsawPieces.readOnlyFields(root)) drawReadOnlyField("jigsawPiece",name);
+        ImGui.popID();
+    }
+    private void drawJigsawPieceThemes(LosslessJson root) {
+        if (!ImGui.treeNode("Piece theme tags")) return;
+        ImGui.textWrapped(JigsawPieces.help("themes"));ImGui.textWrapped("Up to 64 exact case-sensitive tags, each up to 256 characters. Tags must be declared by structures that reach this piece; no owning structure is inferred or checked. VANILLA_PORTABLE rejects nonempty tags. Removing the last tag restores the implicit unfiltered default.");
+        if ("null".equals(root.token("themes"))) {
+            ImGui.textWrapped("Native filtering treats null as unfiltered, but the graph compiler rejects this null list. Removing only the override restores the implicit default.");
+            if (ImGui.button("Remove null theme override")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.resetEmptyThemes(selected,workspace.read(selected))));
+        } else try {
+            var tags=JigsawPieces.themes(root);if (tags.isEmpty()) { ImGui.textUnformatted("No theme restriction: available to every selected theme.");if (root.token("themes")!=null && ImGui.button("Remove empty theme override")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.resetEmptyThemes(selected,workspace.read(selected)))); }
+            String add="jigsawPiece#themes.new.",newKey=add+"tag";ImString input=values.computeIfAbsent(newKey,ignored -> new ImString(1025));ImGui.inputText("New exact theme tag",input);drafts.update(newKey,"",input.get());
+            ImGui.beginDisabled(tags.size()>=JigsawPieces.MAX_THEMES);if (ImGui.button("Append theme tag")) { try { commitProfileChange(add,JigsawPieces.appendTheme(selected,workspace.read(selected),input.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.endDisabled();
+            for (int index=0;index<tags.size();index++) {
+                ImGui.pushID(index);int row=index;String stored=tags.get(index),key=JigsawPieces.themesPrefix()+index+".tag";ImString tag=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(1025,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Theme tag",tag);drafts.update(key,stored,tag.get());
+                if (ImGui.button("Apply theme tag")) commitRiverOverride(key,() -> workspace.replace(selected,JigsawPieces.setTheme(selected,workspace.read(selected),row,tag.get())));
+                RiverProfiles.Action action=null;if (ImGui.button(tags.size()==1 ? "Remove last tag (restore unfiltered)" : "Remove tag")) action=RiverProfiles.Action.REMOVE;
+                ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Tag up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==tags.size()-1);if (ImGui.button("Tag down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+                ImGui.popID();if (action!=null) { try { commitProfileChange(JigsawPieces.themesPrefix(),JigsawPieces.changeTheme(selected,workspace.read(selected),index,action),null); } catch (Exception failure) { error=failure.getMessage(); }break; }
+            }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored theme list is read-only: "+invalid.getMessage()); }
+        ImGui.treePop();
+    }
+    private void drawJigsawPieceRules(LosslessJson root) {
+        if (!ImGui.treeNode("Piece placement rules")) return;
+        ImGui.textWrapped(JigsawPieces.help("rules"));ImGui.textWrapped("Depth bounds are 0..30. Placement counts are 0..512; a maximum of zero is unbounded within the structure safety cap. Each pair applies atomically and independently. Native minimum-count feasibility, terminal cap validity and graph constraints are unchecked. VANILLA_PORTABLE rejects nondefault rules.");
+        try {
+            var rules=JigsawPieces.rules(root);
+            if (rules==null) {
+                ImGui.textWrapped("Absent/null rules use native defaults: depths 0..30, minimum placements 0, maximum placements 0 (unbounded), terminal false. Viewing does not store them.");
+                if (ImGui.button("Create inline rule overrides")) { try { commitProfileChange("jigsawPiece#rules.",JigsawPieces.createRules(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }
+            } else {
+                for (String group : List.of("depth","placements")) {
+                    ImGui.pushID(group);try {
+                        var fields=JigsawPieces.pairFields(group);String low=JigsawPieces.ruleToken(rules,fields.get(0)),high=JigsawPieces.ruleToken(rules,fields.get(1)),prefix="jigsawPiece#rules."+group+".",key=prefix+"pair";
+                        ImGui.textWrapped(JigsawPieces.help(fields.get(0)));ImGui.textWrapped(JigsawPieces.help(fields.get(1)));
+                        ImString minimum=values.computeIfAbsent(prefix+"minimum",ignored -> new ImString(low,Math.max(128,low.length()+1))),maximum=values.computeIfAbsent(prefix+"maximum",ignored -> new ImString(high,Math.max(128,high.length()+1)));ImGui.inputText("Minimum",minimum);ImGui.inputText("Maximum",maximum);drafts.update(key,low+"|"+high,minimum.get()+"|"+maximum.get());
+                        if (ImGui.button("Apply paired bounds")) { try { commitProfileChange(prefix,JigsawPieces.setPair(selected,workspace.read(selected),group,minimum.get(),maximum.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
+                        if ((rules.token(fields.get(0))!=null || rules.token(fields.get(1))!=null) && ImGui.button("Use pair class defaults")) { try { commitProfileChange(prefix,JigsawPieces.resetPair(selected,workspace.read(selected),group),key); } catch (Exception failure) { error=failure.getMessage(); } }
+                    } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored pair contains an unsupported integer type and remains read-only; other settings stay independent."); }ImGui.popID();
+                }
+                try {
+                    boolean current=JigsawPieces.terminal(rules);var input=new ImBoolean(current);ImGui.textWrapped(JigsawPieces.help("terminal"));if (rules.token("terminal")==null) ImGui.textUnformatted("Implicit terminal default: false");
+                    if (ImGui.checkbox("Physical terminal cap",input)) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.setTerminal(selected,workspace.read(selected),input.get())));
+                    if (rules.token("terminal")==null && ImGui.button("Store terminal default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.setTerminal(selected,workspace.read(selected),false)));
+                    if (rules.token("terminal")!=null && ImGui.button("Use terminal class default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.resetTerminal(selected,workspace.read(selected))));
+                } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored terminal flag is unsupported and remains read-only."); }
+                for (String name : JigsawPieces.otherRules(rules)) ImGui.textWrapped(InspectorText.label(name,256)+" (unknown rule data; preserved read-only)");
+            }
+            if (root.token("rules")!=null && (rules==null || rules.fields().isEmpty()) && ImGui.button("Remove null/empty rule override")) { try { commitProfileChange("jigsawPiece#rules.",JigsawPieces.resetEmptyRules(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored rules are not an inline object and remain read-only."); }
+        ImGui.treePop();
     }
     private String drawJigsawPoolKey(String label,String prefix,String family,String current) {
         ImString query=values.computeIfAbsent(prefix+"filter",ignored -> new ImString(1025));ImGui.inputText(label+" filter",query);
@@ -5906,7 +5987,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();jigsawPoolCatalog.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {

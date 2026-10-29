@@ -1,9 +1,11 @@
 # Editor field coverage
 
-Direct nonstatic/nontransient private fields in one hundred and sixteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
+Direct nonstatic/nontransient private fields in one hundred and eighteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
+| jigsawPiece | 7 | 7 | 5 | 0 |
+| jigsawPieceRules | 5 | 5 | 5 | 0 |
 | jigsawPool | 3 | 3 | 3 | 0 |
 | jigsawPoolEntry | 4 | 4 | 4 | 0 |
 | structureDefinition | 15 | 15 | 13 | 0 |
@@ -120,6 +122,14 @@ Direct nonstatic/nontransient private fields in one hundred and sixteen pinned s
 | dimensionTypeOptions | 13 | 13 | 13 | 0 |
 | worldBoundary | 5 | 5 | 5 | 0 |
 | worldBoundaryCenter | 2 | 2 | 2 | 0 |
+
+## jigsawPiece
+
+Unclassified: none.
+
+## jigsawPieceRules
+
+Unclassified: none.
 
 ## jigsawPool
 

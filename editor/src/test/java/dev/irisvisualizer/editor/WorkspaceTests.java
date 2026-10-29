@@ -118,6 +118,7 @@ public final class WorkspaceTests {
    StructureThemeTests.run(temp);
    StructureMaterialTests.run(temp);
    JigsawPoolTests.run(temp);
+   JigsawPieceTests.run(temp);
    StructureThemeReferenceTests.run(temp);
    var tree=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json","asset.iob"),List.of("empty"),"");
    check(tree.size()==4 && tree.get(0).folder() && tree.get(3).path().equals("asset.iob"));

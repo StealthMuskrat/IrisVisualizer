@@ -5222,5 +5222,57 @@
       "classification": "generation",
       "reason": "Controls literal weighted pool membership, independent eligibility chance or explicit empty-branch termination. Atomic kind conversions avoid empty/piece ambiguity; native selection and effective probabilities are not evaluated."
     }
+  },
+  "jigsawPiece": {
+    "object": {
+      "classification": "generation",
+      "reason": "Authors a literal object reference, rotation/collision flag, exact theme tag list or optional placement rules. Object content, graph reachability, native eligibility and compatibility remain unchecked."
+    },
+    "rotatable": {
+      "classification": "generation",
+      "reason": "Authors a literal object reference, rotation/collision flag, exact theme tag list or optional placement rules. Object content, graph reachability, native eligibility and compatibility remain unchecked."
+    },
+    "collidable": {
+      "classification": "generation",
+      "reason": "Authors a literal object reference, rotation/collision flag, exact theme tag list or optional placement rules. Object content, graph reachability, native eligibility and compatibility remain unchecked."
+    },
+    "themes": {
+      "classification": "generation",
+      "reason": "Authors a literal object reference, rotation/collision flag, exact theme tag list or optional placement rules. Object content, graph reachability, native eligibility and compatibility remain unchecked."
+    },
+    "rules": {
+      "classification": "generation",
+      "reason": "Authors a literal object reference, rotation/collision flag, exact theme tag list or optional placement rules. Object content, graph reachability, native eligibility and compatibility remain unchecked."
+    },
+    "connectors": {
+      "classification": "generation",
+      "reason": "Connector geometry, orientation, pool targeting and joint/state/priority behavior affect assembly. Typed connector controls are pending; original data remains preserved read-only."
+    },
+    "displayName": {
+      "classification": "read-only",
+      "reason": "Optional author-facing Studio label, forwarded into Studio variant display metadata; outside voxel-generation authoring."
+    }
+  },
+  "jigsawPieceRules": {
+    "minimumDepth": {
+      "classification": "generation",
+      "reason": "Controls deterministic depth/count eligibility or terminal cap behavior. Paired local bounds are authored independently; native graph minimum-count feasibility, connector compatibility and generation remain unchecked."
+    },
+    "maximumDepth": {
+      "classification": "generation",
+      "reason": "Controls deterministic depth/count eligibility or terminal cap behavior. Paired local bounds are authored independently; native graph minimum-count feasibility, connector compatibility and generation remain unchecked."
+    },
+    "minimumPlacements": {
+      "classification": "generation",
+      "reason": "Controls deterministic depth/count eligibility or terminal cap behavior. Paired local bounds are authored independently; native graph minimum-count feasibility, connector compatibility and generation remain unchecked."
+    },
+    "maximumPlacements": {
+      "classification": "generation",
+      "reason": "Controls deterministic depth/count eligibility or terminal cap behavior. Paired local bounds are authored independently; native graph minimum-count feasibility, connector compatibility and generation remain unchecked."
+    },
+    "terminal": {
+      "classification": "generation",
+      "reason": "Controls deterministic depth/count eligibility or terminal cap behavior. Paired local bounds are authored independently; native graph minimum-count feasibility, connector compatibility and generation remain unchecked."
+    }
   }
 }
