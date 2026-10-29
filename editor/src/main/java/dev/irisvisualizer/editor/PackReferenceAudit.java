@@ -4,14 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Set;
 
 /** Bounded aggregation of existing typed link diagnostics; never authorizes rename, move or deletion. */
 public final class PackReferenceAudit {
     public static final int MAX_FILES=512, MAX_FINDINGS=4096, MAX_NOTICES=256, MAX_RESULTS=200, MAX_QUERY_CHARACTERS=256;
     public static final long MAX_BYTES=8_000_000;
     public static final int MAX_DISPLAY_CHARACTERS=256;
-    private static final Set<String> FAMILIES=Set.of("dimensions","regions","biomes","image-maps","structures","jigsaw-pools","jigsaw-pieces");
     public record Finding(String source,String field,String key,String target,ReferenceDiagnostics.State state) {}
     public record Notice(String path,String message) {}
     public record Audit(int eligibleFiles,int inspectedFiles,long bytes,int skippedFiles,List<Finding> findings,List<Notice> notices,int omittedNotices,boolean incomplete) {
@@ -58,7 +56,7 @@ public final class PackReferenceAudit {
         Objects.requireNonNull(workspace);Objects.requireNonNull(limits);var scan=new Scan(limits);
         int eligible=0,considered=0,inspected=0,skipped=0;long bytes=0;
         for (String path : workspace.paths()) {
-            if (!FAMILIES.contains(Objects.toString(ResourceTypes.base(path),""))) continue;
+            if (!ReferenceDiagnostics.supports(path)) continue;
             eligible++;
             if (considered++>=limits.files()) { skipped++;scan.notice(path,"File budget reached; this resource was not inspected.");continue; }
             if (scan.findings.size()>=limits.findings()) { skipped++;scan.notice(path,"Finding budget reached; this resource was not inspected.");continue; }

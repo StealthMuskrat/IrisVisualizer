@@ -75,6 +75,7 @@ public final class WorkspaceTests {
    CustomBiomeTests.run(temp);
    ResourceSelectorTests.run(temp);
    ReferenceLinkTests.run(temp);
+   NoiseReferenceTests.run(temp);
    DimensionCarvingTests.run(temp);
    TerrainOverlayTests.run(temp);
    TerrainTransformTests.run(temp);
