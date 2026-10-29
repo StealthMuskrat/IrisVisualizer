@@ -33,6 +33,7 @@ public final class EditorApp extends Application {
     private final NavigationHistory navigationHistory = new NavigationHistory();
     private final StructureDefinitions.PoolCache structurePools=new StructureDefinitions.PoolCache();
     private final StructureThemeReferences.Cache structureThemeReferences=new StructureThemeReferences.Cache();
+    private final JigsawPools.Catalog jigsawPoolCatalog=new JigsawPools.Catalog();
     private final ImString structurePoolFilter=new ImString(1024);
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
@@ -189,6 +190,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
                 if (ImGui.menuItem("New structure definition")) createResource("structures");
+                if (ImGui.menuItem("New jigsaw pool with empty membership")) createResource("jigsaw-pools");
                 if (ImGui.menuItem("Import image/object asset")) importAsset();
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
                 if (ImGui.menuItem("Review pack resource links")) showReferenceReview=true;
@@ -357,6 +359,10 @@ public final class EditorApp extends Application {
                 try { drawStructureDefinition(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (bytes != null && JigsawPools.supports(selected)) {
+                try { drawJigsawPool(new LosslessJson(bytes)); }
+                catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            }
             if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
             if (ExpressionDefinitions.supports(selected) || "image-maps".equals(ResourceTypes.base(selected))) drawExpressionReferenceAudit();
             drawCoverage();
@@ -401,13 +407,13 @@ public final class EditorApp extends Application {
     }
     private void drawReferences() {
         String base = ResourceTypes.base(selected);
-        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps", "structures").contains(base)
+        if (base == null || !java.util.Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools").contains(base)
                 || !ImGui.collapsingHeader("Resource links (partial)")) return;
         if (referenceWorkspace != workspace || referenceRevision != workspace.revision() || !java.util.Objects.equals(referencePath, selected)) {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks exact structure start-pool files, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks exact structure start-pool files, pool fallback and physical membership files, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset.");
         for (var link : referenceLinks) {
             ImGui.textWrapped(link.field() + ": " + link.key());
@@ -425,6 +431,78 @@ public final class EditorApp extends Application {
                 catch (Exception failure) { error = failure.getMessage(); }
             }
         }
+    }
+    private String drawJigsawPoolKey(String label,String prefix,String family,String current) {
+        ImString query=values.computeIfAbsent(prefix+"filter",ignored -> new ImString(1025));ImGui.inputText(label+" filter",query);
+        String chosen=null;try {
+            var matches=jigsawPoolCatalog.filter(workspace,family,query.get());ImGui.textUnformatted(matches.count()+" exact keys; showing up to 200. Target contents and aliases are unchecked.");
+            if (ImGui.beginCombo(label,current.isEmpty() ? "Choose exact key" : InspectorText.label(current,128))) { int row=0;for (String key : matches.keys()) { ImGui.pushID(row++);if (ImGui.selectable(InspectorText.label(key,256).replace("#","\\u0023"),key.equals(current))) chosen=key;ImGui.popID(); }ImGui.endCombo(); }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+        return chosen;
+    }
+    private void drawJigsawPool(LosslessJson root) {
+        if (!ImGui.collapsingHeader("Jigsaw pool")) return;
+        ImGui.pushID("jigsaw-pool");
+        ImGui.textWrapped("Literal pool settings only. Selection, chance gates, themes, terminal roles, graph reachability and object compatibility are not evaluated. Native selection tries only the direct fallback in the same selection, and can use it alone at maximum depth. Ordered membership changes can change seeded results. Unsupported previews remain disabled.");
+        try {
+            String current=JigsawPools.fallback(root);ImGui.textWrapped(JigsawPools.help("fallback"));
+            if (root.token("fallback")==null || root.token("fallback").equals("null")) ImGui.textUnformatted("Implicit/native fallback: no direct fallback");
+            String chosen=drawJigsawPoolKey("Direct fallback","jigsawPool#fallback.","jigsaw-pools",current);
+            if (chosen!=null) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.setFallback(selected,workspace.read(selected),chosen,workspace)));
+            if (ImGui.button("Store no direct fallback")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.setFallback(selected,workspace.read(selected),"",workspace)));
+            if (root.token("fallback")!=null && ImGui.button("Use fallback class default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.reset(selected,workspace.read(selected),"fallback")));
+            if (!current.isEmpty() && workspace.paths().contains("jigsaw-pools/"+current+".json") && ImGui.button("Open exact fallback JSON")) resourceNavigation.request(workspace,"jigsaw-pools/"+current+".json");
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored fallback is unsupported and preserved read-only."); }
+        try {
+            boolean current=JigsawPools.mandatory(root);var input=new ImBoolean(current);ImGui.textWrapped(JigsawPools.help("mandatoryFallback"));
+            if (root.token("mandatoryFallback")==null) ImGui.textUnformatted("Implicit mandatoryFallback default: false");
+            if (ImGui.checkbox("Mandatory direct fallback",input)) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.setMandatory(selected,workspace.read(selected),input.get())));
+            if (root.token("mandatoryFallback")==null && ImGui.button("Store mandatory fallback default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.setMandatory(selected,workspace.read(selected),false)));
+            if (root.token("mandatoryFallback")!=null && ImGui.button("Use mandatory fallback class default")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.reset(selected,workspace.read(selected),"mandatoryFallback")));
+            if (current) ImGui.textWrapped("Native graphs require a direct fallback when this flag is true. VANILLA_PORTABLE rejects mandatoryFallback=true. Structure requireCaps can also require a fallback; no structure context is inferred here.");
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored mandatoryFallback is unsupported and preserved read-only."); }
+        ImGui.textWrapped(JigsawPools.help("pieces"));ImGui.textWrapped("At most 64 memberships are editable. New entries inherit weight 1, chance 1 and empty=false unless explicitly created as empty. An empty membership terminates a branch without a physical piece; it cannot serve as a physical start piece or required terminal cap. Empty=true and a nonblank piece key together are rejected by the native compiler.");
+        if ("null".equals(root.token("pieces"))) {
+            ImGui.textWrapped("Stored null memberships are unsupported. Restore the implicit empty list to repair this override.");
+            if (ImGui.button("Remove null membership override")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.resetEmpty(selected,workspace.read(selected))));
+        } else try {
+            var rows=JigsawPools.entries(root);
+            if (rows.isEmpty()) { ImGui.textWrapped("No declared memberships. Start pools need usable physical entries; adding a membership does not prove native eligibility.");if (root.token("pieces")!=null && ImGui.button("Remove empty membership override")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.resetEmpty(selected,workspace.read(selected)))); }
+            try { ImGui.textUnformatted("Declared positive-weight total: "+JigsawPools.totalWeight(rows)); } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Weight total unavailable for unsupported or nonpositive weights."); }
+            ImString first=values.computeIfAbsent("jigsawPool#new.piece",ignored -> new ImString(1025));String choice=drawJigsawPoolKey("New physical piece","jigsawPool#new.","jigsaw-pieces",first.get());if (choice!=null) first.set(choice);drafts.update("jigsawPool#new.piece","",first.get());
+            ImGui.beginDisabled(rows.size()>=JigsawPools.MAX_ENTRIES);
+            if (ImGui.button("Append physical membership")) { try { commitProfileChange("jigsawPool#new.",JigsawPools.append(selected,workspace.read(selected),false,first.get(),workspace),"jigsawPool#new.piece"); } catch (Exception failure) { error=failure.getMessage(); } }
+            ImGui.sameLine();if (ImGui.button("Append empty membership")) { try { commitProfileChange("jigsawPool#new.",JigsawPools.append(selected,workspace.read(selected),true,null,workspace),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.endDisabled();
+            for (int index=0;index<rows.size();index++) {
+                ImGui.pushID(index);int entry=index;var row=rows.get(index);String prefix=JigsawPools.prefix(index);
+                if (ImGui.treeNode("Membership "+(index+1))) {
+                    try {
+                        String key=JigsawPools.piece(row);boolean empty=JigsawPools.empty(row);ImGui.textWrapped(empty ? "Explicit empty membership" : "Physical piece: "+InspectorText.label(key,256));
+                        if (empty && !key.isBlank()) ImGui.textWrapped("Ambiguous stored entry: empty=true also declares a piece. Use an explicit conversion below to repair it.");
+                        String next=drawJigsawPoolKey("Physical piece",prefix+"piece.","jigsaw-pieces",key);
+                        if (next!=null) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.setMembership(selected,workspace.read(selected),entry,false,next,workspace)));
+                        if (ImGui.button("Use empty membership (remove piece reference)")) applyRoutingExtra(() -> workspace.replace(selected,JigsawPools.setMembership(selected,workspace.read(selected),entry,true,null,workspace)));
+                        if (!key.isEmpty() && workspace.paths().contains("jigsaw-pieces/"+key+".json") && ImGui.button("Open exact piece JSON")) resourceNavigation.request(workspace,"jigsaw-pieces/"+key+".json");
+                    } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored piece/empty types are unsupported; weight and chance remain independently editable."); }
+                    for (String field : List.of("weight","chance")) {
+                        ImGui.pushID(field);try {
+                            if (field.equals("weight")) JigsawPools.weight(row);else JigsawPools.chance(row);
+                            String stored=row.token(field)==null ? "1" : row.token(field),draft=prefix+field;ImGui.textWrapped(JigsawPools.help(field));if (row.token(field)==null) ImGui.textUnformatted("Implicit default: 1");
+                            ImString input=values.computeIfAbsent(draft,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(draft,stored,input.get());
+                            if (ImGui.button("Apply "+field)) commitRiverOverride(draft,() -> workspace.replace(selected,field.equals("weight") ? JigsawPools.setWeight(selected,workspace.read(selected),entry,input.get()) : JigsawPools.setChance(selected,workspace.read(selected),entry,input.get())));
+                        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored "+field+" has an unsupported type and remains read-only."); }ImGui.popID();
+                    }
+                    ImGui.textWrapped("Chance is an independent membership eligibility gate before weighted selection. Zero never passes; one always passes. VANILLA_PORTABLE rejects nondefault chance gates. The editor does not compute effective probabilities.");
+                    RiverProfiles.Action action=null;ImGui.beginDisabled(rows.size()>=JigsawPools.MAX_ENTRIES);if (ImGui.button("Duplicate membership")) action=RiverProfiles.Action.DUPLICATE;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(rows.size()<=1);if (ImGui.button("Remove membership")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
+                    ImGui.beginDisabled(index==0);if (ImGui.button("Membership up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==rows.size()-1);if (ImGui.button("Membership down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
+                    if (action!=null) { try { commitProfileChange(JigsawPools.entriesPrefix(),JigsawPools.change(selected,workspace.read(selected),action,index),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();break; }
+                    for (String field : JigsawPools.otherFields(row,true)) ImGui.textWrapped(InspectorText.label(field,256)+" (unknown membership data; preserved read-only)");
+                    ImGui.treePop();
+                }ImGui.popID();
+            }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Membership list is read-only: "+invalid.getMessage()); }
+        for (String field : JigsawPools.otherFields(root,false)) drawReadOnlyField("jigsawPool",field);
+        ImGui.popID();
     }
     private void drawStructureDefinition(LosslessJson root) {
         if (!ImGui.collapsingHeader("Structure assembly definition")) return;
@@ -5802,7 +5880,7 @@ public final class EditorApp extends Application {
     private void createResource(String parent) {
         try {
             ResourceCreation.base(parent);
-            String name = JOptionPane.showInputDialog(null, "New resource name (omit .json):", "new_resource");
+            String name = JOptionPane.showInputDialog(null, parent.startsWith("jigsaw-pools") ? "New pool name (omit .json; starts with one empty membership):" : "New resource name (omit .json):", "new_resource");
             if (name == null) return;
             String dependency = null, type = ResourceCreation.dependencyType(parent);
             if (type != null) {
@@ -5828,7 +5906,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();jigsawPoolCatalog.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {

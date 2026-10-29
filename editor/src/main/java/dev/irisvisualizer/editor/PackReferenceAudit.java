@@ -11,7 +11,7 @@ public final class PackReferenceAudit {
     public static final int MAX_FILES=512, MAX_FINDINGS=4096, MAX_NOTICES=256, MAX_RESULTS=200, MAX_QUERY_CHARACTERS=256;
     public static final long MAX_BYTES=8_000_000;
     public static final int MAX_DISPLAY_CHARACTERS=256;
-    private static final Set<String> FAMILIES=Set.of("dimensions","regions","biomes","image-maps","structures");
+    private static final Set<String> FAMILIES=Set.of("dimensions","regions","biomes","image-maps","structures","jigsaw-pools");
     public record Finding(String source,String field,String key,String target,ReferenceDiagnostics.State state) {}
     public record Notice(String path,String message) {}
     public record Audit(int eligibleFiles,int inspectedFiles,long bytes,int skippedFiles,List<Finding> findings,List<Notice> notices,int omittedNotices,boolean incomplete) {

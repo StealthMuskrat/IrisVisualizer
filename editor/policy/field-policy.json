@@ -5190,5 +5190,37 @@
       "classification": "generation",
       "reason": "Positive signed 32-bit relative theme weight consumed by the native long-total selector. Editing does not sample RNG or evaluate piece eligibility."
     }
+  },
+  "jigsawPool": {
+    "pieces": {
+      "classification": "generation",
+      "reason": "Authors literal pool memberships, direct fallback or required fallback behavior. Native graph reachability, terminal eligibility, compatibility and fallback viability remain unchecked."
+    },
+    "fallback": {
+      "classification": "generation",
+      "reason": "Authors literal pool memberships, direct fallback or required fallback behavior. Native graph reachability, terminal eligibility, compatibility and fallback viability remain unchecked."
+    },
+    "mandatoryFallback": {
+      "classification": "generation",
+      "reason": "Authors literal pool memberships, direct fallback or required fallback behavior. Native graph reachability, terminal eligibility, compatibility and fallback viability remain unchecked."
+    }
+  },
+  "jigsawPoolEntry": {
+    "piece": {
+      "classification": "generation",
+      "reason": "Controls literal weighted pool membership, independent eligibility chance or explicit empty-branch termination. Atomic kind conversions avoid empty/piece ambiguity; native selection and effective probabilities are not evaluated."
+    },
+    "weight": {
+      "classification": "generation",
+      "reason": "Controls literal weighted pool membership, independent eligibility chance or explicit empty-branch termination. Atomic kind conversions avoid empty/piece ambiguity; native selection and effective probabilities are not evaluated."
+    },
+    "chance": {
+      "classification": "generation",
+      "reason": "Controls literal weighted pool membership, independent eligibility chance or explicit empty-branch termination. Atomic kind conversions avoid empty/piece ambiguity; native selection and effective probabilities are not evaluated."
+    },
+    "empty": {
+      "classification": "generation",
+      "reason": "Controls literal weighted pool membership, independent eligibility chance or explicit empty-branch termination. Atomic kind conversions avoid empty/piece ambiguity; native selection and effective probabilities are not evaluated."
+    }
   }
 }
