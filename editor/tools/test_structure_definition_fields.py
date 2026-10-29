@@ -7,6 +7,7 @@ result = extract(*sources).decode('ascii')
 for token in ['maxDepth.default=7\n', 'maxDepth.maximum=30\n', 'maxSizeChunks.maximum=32\n',
               'requireCaps.default=false\n', 'mode.default=SPATIAL_JIGSAW\n',
               'placeMode.default=STRUCTURE_PIECE\n', 'pool.folder=jigsaw-pools\n',
+              'vanillaSource.default=\n', 'vanillaSource.policy=emptyOrExactNamespacedKey\n', 'edit.policy=structurePiecePlacement\n',
               'branchFailurePolicy.choices=FAIL_ASSEMBLY,TERMINATE_BRANCH\n']:
     assert token in result, token
 for index, old, new in [
@@ -28,6 +29,15 @@ for index, old, new in [
     (8, b'ObjectPlaceMode mode = structure.getPlaceMode();', b'ObjectPlaceMode mode = ObjectPlaceMode.FLOATING;'),
     (9, b'String vanillaSource = structure.getVanillaSource();', b'String vanillaSource = "";'),
     (9, b'suppressedVanillaSources.add(normalize(vanillaSource));', b'suppressedVanillaSources.clear();'),
+    (0, b'private String vanillaSource = "";', b'private String vanillaSource = "minecraft:village";'),
+    (0, b'@ArrayType(min = 1, type = IrisObjectReplace.class)', b'@ArrayType(min = 0, type = IrisObjectReplace.class)'),
+    (8, b'config.setEdit(structure.getEdit());', b'config.setEdit(new KList<>());'),
+    (8, b'if (!structure.getEdit().isEmpty())', b'if (false)'),
+    (9, b'[a-z0-9_.-]+:[a-z0-9/._-]+', b'.*'),
+    (9, b'replacesNative && !allowNativeSuppression', b'false'),
+    (9, b'!StructureGraphCatalog.guaranteesRuntimeOutput(data, structure)', b'false'),
+    (9, b'vanillaAliases.add(normalize(structure.getVanillaSource()));', b'vanillaAliases.clear();'),
+    (9, b'key.toLowerCase(Locale.ROOT)', b'key.trim()'),
 ]:
     assert old in sources[index], old
     changed = sources.copy()

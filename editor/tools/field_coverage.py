@@ -144,7 +144,7 @@ def run(source_dir, policy_file, java_dir, output_dir):
     policy = json.loads(policy_file.read_text())
     ui = {group: editable(java_dir, cls) for group, cls in [('dimension', 'DimensionFields'), ('biome', 'BiomeFields'), ('generator', 'GeneratorFields'), ('region', 'RegionFields')]}
     implemented = {group: set(path for path in paths if '.' not in path) for group, paths in ui.items()}
-    implemented['structureDefinition'] = set(editable(java_dir, 'StructureDefinitions')) | set(editable(java_dir, 'StructureWorkcells', 'ROOT_FIELDS')) | set(editable(java_dir, 'StructureThemes', 'ROOT_FIELDS'))
+    implemented['structureDefinition'] = set(editable(java_dir, 'StructureDefinitions')) | set(editable(java_dir, 'StructureDefinitions', 'SOURCE_FIELDS')) | set(editable(java_dir, 'StructureDefinitions', 'MATERIAL_FIELDS')) | set(editable(java_dir, 'StructureWorkcells', 'ROOT_FIELDS')) | set(editable(java_dir, 'StructureThemes', 'ROOT_FIELDS'))
     implemented['structureWorkcell'] = set(editable(java_dir, 'StructureWorkcells')) | set(editable(java_dir, 'StructureWorkcells', 'CREATION_FIELDS'))
     implemented['structureTheme'] = set(editable(java_dir, 'StructureThemes')) | set(editable(java_dir, 'StructureThemes', 'CREATION_FIELDS'))
     implemented['generator'].update(editable(java_dir, 'CompositeNoise'))

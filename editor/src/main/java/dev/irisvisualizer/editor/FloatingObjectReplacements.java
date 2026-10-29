@@ -17,24 +17,31 @@ public final class FloatingObjectReplacements {
             if (!"1".equals(DATA.getProperty("find.minimum")) || !"emptyDisables".equals(DATA.getProperty("edit.policy")) || !DimensionPalettes.classBlock().equals(DATA.getProperty("palette.block"))) throw new IOException("Unsupported replacement policy");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
-    public record Context(int entry,String list,int placement,StaticObjects.Context fixed) {
+    public record Context(int entry,String list,int placement,StaticObjects.Context fixed,boolean structure) {
+        public Context(int entry,String list,int placement,StaticObjects.Context fixed) { this(entry,list,placement,fixed,false); }
         public Context(int entry,String list,int placement) { this(entry,list,placement,null); }
         public Context {
-            if (fixed==null) { if (!FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select an object placement"); }
+            if (structure) { if (fixed!=null || entry!=0 || list!=null || placement!=0) throw new IllegalArgumentException("Ambiguous structure replacement owner"); }
+            else if (fixed==null) { if (!FloatingObjectPlacements.validContext(entry,list,placement)) throw new IllegalArgumentException("Select an object placement"); }
             else { if (entry!=0 || list!=null || placement!=0) throw new IllegalArgumentException("Ambiguous fixed object owner");StaticObjects.verifyReplacementDefinitions(); }
         }
         public static Context fixed(StaticObjects.Context context) { return new Context(0,null,0,java.util.Objects.requireNonNull(context)); }
-        public String resourceBase() { return fixed!=null ? "dimensions" : FloatingObjectPlacements.resourceBase(entry); }
-        public String prefix() { return (fixed!=null ? fixed.prefix() : FloatingObjectPlacements.placementPrefix(entry,list,placement))+"edit#"; }
+        public static Context structureRoot() { return new Context(0,null,0,null,true); }
+        public String resourceBase() { return structure ? "structures" : fixed!=null ? "dimensions" : FloatingObjectPlacements.resourceBase(entry); }
+        public String prefix() { return structure ? "structureEdit#" : (fixed!=null ? fixed.prefix() : FloatingObjectPlacements.placementPrefix(entry,list,placement))+"edit#"; }
         public String rulePrefix(int rule) { if (rule<0) throw new IllegalArgumentException("Select a rule");return prefix()+rule+"."; }
         public String findPrefix(int rule) { return rulePrefix(rule)+"find#"; }
-        public FloatingObjectPalettes.Context palette(int rule) { return new FloatingObjectPalettes.Context(entry,list,placement,rule,fixed); }
+        public FloatingObjectPalettes.Context palette(int rule) { return new FloatingObjectPalettes.Context(entry,list,placement,rule,fixed,structure); }
     }
-    static void authorize(String path,Context context) { if (context.fixed()!=null) StaticObjects.authorize(path);else FloatingObjectPlacements.authorize(path,context.entry(),context.list()); }
+    static void authorize(String path,Context context) { if (context.structure()) { if (!StructureDefinitions.supports(path)) throw new IllegalArgumentException("Select a structures JSON resource"); }else if (context.fixed()!=null) StaticObjects.authorize(path);else FloatingObjectPlacements.authorize(path,context.entry(),context.list()); }
     public static String definition(String field) { return DATA.getProperty(field); }
-    static byte[] editPlacement(byte[] original,Context context,java.util.function.Function<LosslessJson,byte[]> action) { return context.fixed()!=null ? StaticObjects.edit(original,context.fixed(),action) : FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),action); }
+    static byte[] editPlacement(byte[] original,Context context,java.util.function.Function<LosslessJson,byte[]> action) {
+        if (context.structure()) { var root=new LosslessJson(original);rules(root,context);byte[] next=action.apply(root);rules(new LosslessJson(next),context);return next; }
+        return context.fixed()!=null ? StaticObjects.edit(original,context.fixed(),action) : FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),action);
+    }
     static byte[] editRule(byte[] original,Context context,int rule,java.util.function.Function<LosslessJson,byte[]> action) { return editPlacement(original,context,p -> p.objectArrayEdit("edit",rule,action)); }
     static List<LosslessJson> rules(LosslessJson placement) { return placement.token("edit")==null ? null : placement.objectArray("edit"); }
+    static List<LosslessJson> rules(LosslessJson placement,Context context) { var rows=rules(placement);if (context.structure() && rows!=null && rows.size()>64) throw new IllegalArgumentException("Structure replacement controls have a 64-rule limit; original data remains read-only");return rows; }
     static List<LosslessJson> find(LosslessJson rule) { return rule.token("find")==null ? null : rule.objectArray("find"); }
     public static byte[] enable(String path,byte[] original,Context context) { authorize(path,context);return editPlacement(original,context,p -> p.enable("edit","[]")); }
     private static void block(String value) { if (value==null || value.isBlank()) throw new IllegalArgumentException("Enter a nonblank block; registry/state and alias validation is pending"); }

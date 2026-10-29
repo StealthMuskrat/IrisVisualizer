@@ -470,11 +470,26 @@ public final class EditorApp extends Application {
             if (root.token("requireCaps")!=null && ImGui.button("Use class cap default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.reset(selected,workspace.read(selected),"requireCaps")));
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
         for (String finding : StructureDefinitions.advisories(root)) ImGui.textWrapped(finding);
-        ImGui.textWrapped("Portability findings cover three local rules only and do not gate Apply, Save or Export. Piece edits and native source aliases remain read-only. Underground placement can override placeMode; multi-piece structures generally retain assembled piece positions.");
+        ImGui.textWrapped("Portability findings cover three local rules only and do not gate Apply, Save or Export. Underground placement can override placeMode; multi-piece structures generally retain assembled piece positions.");
         drawStructureWorkcells(root);
         drawStructureThemes(root);
+        drawStructureVanillaSource(root);
+        drawFloatingReplacements(root,FloatingObjectReplacements.Context.structureRoot());
         if (ImGui.treeNode("Other structure data (read-only)")) { for (String field : StructureDefinitions.readOnlyFields(root)) drawReadOnlyField("structureDefinition",field);ImGui.treePop(); }
         ImGui.popID();
+    }
+    private void drawStructureVanillaSource(LosslessJson root) {
+        if (!ImGui.treeNode("Vanilla structure source")) return;
+        ImGui.textWrapped(StructureDefinitions.sourceHelp());ImGui.textWrapped(StructureDefinitions.sourceAdvisory(root));
+        ImGui.textWrapped("Use an empty value or an exact lowercase namespace:path key, up to 256 characters. Editing this alias does not update placements or native registry resources. Runtime effects are not previewed.");
+        try {
+            String stored=StructureDefinitions.vanillaSource(root),key="structureSource#vanillaSource";
+            if (root.token("vanillaSource")==null) ImGui.textUnformatted("Implicit default: empty source");
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(1025,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Native source key",input);drafts.update(key,stored,input.get());
+            if (ImGui.button("Apply source key")) commitRiverOverride(key,() -> workspace.replace(selected,StructureDefinitions.setVanillaSource(selected,workspace.read(selected),input.get())));
+            if (root.token("vanillaSource")!=null && ImGui.button("Use empty source default")) commitRiverOverride(key,() -> workspace.replace(selected,StructureDefinitions.resetVanillaSource(selected,workspace.read(selected))));
+        } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored source is unsupported and preserved read-only."); }
+        ImGui.treePop();
     }
     private void drawStructureThemes(LosslessJson root) {
         if (!ImGui.treeNode("Structure themes")) return;
@@ -2993,10 +3008,11 @@ public final class EditorApp extends Application {
     }
     private void drawFloatingReplacements(LosslessJson placement,FloatingObjectReplacements.Context context) {
         if (!ImGui.treeNode("Object block replacements")) return;
+        if (context.structure()) ImGui.textWrapped("These rules apply to every stamped piece in this structure. The editor supports up to 64 ordered rules. Native matching, chance, state merging and palette sampling remain unevaluated. Loot data and source object files are preserved.");
         if (context.fixed()!=null) ImGui.textWrapped("Fixed object rules use this entry's seed. Replacements run on the scaled object before block-state rotation. Native loading requires nonempty find and replacement palettes; empty lists can be repaired here. No object transformation or content compatibility is evaluated.");
         ImGui.textWrapped("Rules run in stored order using native chance and state/material matching. Source .iob bytes remain unchanged. Registry, aliases, block states and effective replacements are not resolved here.");List<LosslessJson> rules;
-        try { rules=FloatingObjectReplacements.rules(placement); }
-        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored rules contain snippets or unsupported values (read-only).");ImGui.treePop();return; }
+        try { rules=FloatingObjectReplacements.rules(placement,context); }
+        catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored rules contain snippets, unsupported values or exceed this owner's editor limit (read-only).");ImGui.treePop();return; }
         if (rules==null) {
             if (ImGui.button("Enable empty replacement list")) {
                 try { commitProfileChange(context.prefix(),FloatingObjectReplacements.enable(selected,workspace.read(selected),context),null); } catch (Exception failure) { error=failure.getMessage(); }

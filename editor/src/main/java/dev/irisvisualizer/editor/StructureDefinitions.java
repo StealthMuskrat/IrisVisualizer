@@ -14,13 +14,16 @@ public final class StructureDefinitions {
     public static final List<String> EDITABLE = List.of("startPool","maxDepth","maxSizeChunks","mode","compatibility","branchFailurePolicy","requireCaps","placeMode");
     public static final List<String> NUMBERS = List.of("maxDepth","maxSizeChunks");
     public static final List<String> ENUMS = List.of("mode","compatibility","branchFailurePolicy","placeMode");
+    public static final List<String> SOURCE_FIELDS = List.of("vanillaSource");
+    public static final List<String> MATERIAL_FIELDS = List.of("edit");
+    public static final int MAX_SOURCE_CHARACTERS=256;
     public static final int MAX_DISPLAYED_POOLS=200,MAX_POOL_QUERY=256;
     private static final List<String> NULL_DEFAULTS=List.of("mode","compatibility","branchFailurePolicy");
     private static final Properties DATA=new Properties();
     static {
         try (var input=StructureDefinitions.class.getResourceAsStream("/structure-definition-fields.properties")) {
             if (input==null) throw new IOException("Missing pinned structure definitions");DATA.load(input);
-            if (!"structures".equals(DATA.getProperty("folder")) || !"jigsaw-pools".equals(DATA.getProperty("pool.folder")) || !"themesCapsAndBranchTermination".equals(DATA.getProperty("portable.policy"))) throw new IOException("Unsupported structure definition policy");
+            if (!"structures".equals(DATA.getProperty("folder")) || !"jigsaw-pools".equals(DATA.getProperty("pool.folder")) || !"themesCapsAndBranchTermination".equals(DATA.getProperty("portable.policy")) || !"emptyOrExactNamespacedKey".equals(DATA.getProperty("vanillaSource.policy")) || !"structurePiecePlacement".equals(DATA.getProperty("edit.policy"))) throw new IOException("Unsupported structure definition policy");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
     public static boolean supports(String path) { return "structures".equals(ResourceTypes.base(path)); }
@@ -84,7 +87,19 @@ public final class StructureDefinitions {
         authorize(path);if (key==null || !pools(workspace).contains(key)) throw new IllegalArgumentException("Choose an exact in-pack jigsaw-pools JSON key; contents and graph compatibility are unchecked");var root=new LosslessJson(raw);String old=value(root,"startPool");return root.token("startPool")==null ? root.enableStringPath("startPool",key) : old.equals(key) ? raw.clone() : root.stringValue("startPool",key);
     }
     public static byte[] template(PackWorkspace workspace,String key) { return setPool("structures/template.json","{}".getBytes(StandardCharsets.UTF_8),key,workspace); }
-    public static List<String> readOnlyFields(LosslessJson root) { return root.fields().stream().filter(field -> !EDITABLE.contains(field) && !StructureWorkcells.ROOT_FIELDS.contains(field) && !StructureThemes.ROOT_FIELDS.contains(field)).toList(); }
+    public static String vanillaSource(LosslessJson root) { return root.token("vanillaSource")==null ? DATA.getProperty("vanillaSource.default") : root.stringToken("vanillaSource"); }
+    public static String sourceHelp() { return DATA.getProperty("vanillaSource.description"); }
+    public static boolean sourceKey(String key) { return key!=null && key.length()<=MAX_SOURCE_CHARACTERS && key.matches(DATA.getProperty("vanillaSource.pattern")); }
+    public static byte[] setVanillaSource(String path,byte[] raw,String key) {
+        authorize(path);if (key==null || !key.isEmpty() && !sourceKey(key)) throw new IllegalArgumentException("Use an empty source or an exact lowercase namespace:path key up to 256 characters");
+        var root=new LosslessJson(raw);String old=vanillaSource(root);return root.token("vanillaSource")==null ? root.enableStringPath("vanillaSource",key) : old.equals(key) ? raw.clone() : root.stringValue("vanillaSource",key);
+    }
+    public static byte[] resetVanillaSource(String path,byte[] raw) { authorize(path);var root=new LosslessJson(raw);vanillaSource(root);return root.token("vanillaSource")==null ? raw.clone() : root.removeField("vanillaSource"); }
+    public static String sourceAdvisory(LosslessJson root) {
+        try { String key=vanillaSource(root);return key.isEmpty() ? "No vanilla alias is declared. Dimension REPLACE_SOURCE placements require a nonempty namespaced source and a runtime-viable graph." : sourceKey(key) ? "This source key also identifies the native structure suppressed by dimension REPLACE_SOURCE placements. Registry existence, placement usage and graph viability are unchecked." : "The stored source is outside the authored key syntax or size limit. It is preserved; REPLACE_SOURCE requires an exact lowercase namespaced source."; }
+        catch (IllegalArgumentException invalid) { return "The stored source has an unsupported type and remains read-only. Native suppression and alias behavior are unchecked."; }
+    }
+    public static List<String> readOnlyFields(LosslessJson root) { return root.fields().stream().filter(field -> !EDITABLE.contains(field) && !SOURCE_FIELDS.contains(field) && !MATERIAL_FIELDS.contains(field) && !StructureWorkcells.ROOT_FIELDS.contains(field) && !StructureThemes.ROOT_FIELDS.contains(field)).toList(); }
     /** Only three local native portability constraints. Never gates authoring or file operations. */
     public static List<String> advisories(LosslessJson root) {
         var result=new ArrayList<String>();

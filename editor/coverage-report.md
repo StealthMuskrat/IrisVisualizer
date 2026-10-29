@@ -4,7 +4,7 @@ Direct nonstatic/nontransient private fields in one hundred and fourteen pinned 
 
 | Class | Declared | Classified | Implemented editable | Unclassified |
 | --- | ---: | ---: | ---: | ---: |
-| structureDefinition | 15 | 15 | 11 | 0 |
+| structureDefinition | 15 | 15 | 13 | 0 |
 | structureWorkcell | 6 | 6 | 5 | 0 |
 | structureTheme | 2 | 2 | 2 | 0 |
 | expression | 3 | 3 | 3 | 0 |
