@@ -32,6 +32,7 @@ public final class EditorApp extends Application {
     private final ResourceNavigation resourceNavigation = new ResourceNavigation();
     private final NavigationHistory navigationHistory = new NavigationHistory();
     private final StructureDefinitions.PoolCache structurePools=new StructureDefinitions.PoolCache();
+    private final StructureThemeReferences.Cache structureThemeReferences=new StructureThemeReferences.Cache();
     private final ImString structurePoolFilter=new ImString(1024);
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
@@ -469,10 +470,76 @@ public final class EditorApp extends Application {
             if (root.token("requireCaps")!=null && ImGui.button("Use class cap default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.reset(selected,workspace.read(selected),"requireCaps")));
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
         for (String finding : StructureDefinitions.advisories(root)) ImGui.textWrapped(finding);
-        ImGui.textWrapped("Portability findings cover three local rules only and do not gate Apply, Save or Export. Themes, piece edits and native source aliases remain read-only. Underground placement can override placeMode; multi-piece structures generally retain assembled piece positions.");
+        ImGui.textWrapped("Portability findings cover three local rules only and do not gate Apply, Save or Export. Piece edits and native source aliases remain read-only. Underground placement can override placeMode; multi-piece structures generally retain assembled piece positions.");
         drawStructureWorkcells(root);
+        drawStructureThemes(root);
         if (ImGui.treeNode("Other structure data (read-only)")) { for (String field : StructureDefinitions.readOnlyFields(root)) drawReadOnlyField("structureDefinition",field);ImGui.treePop(); }
         ImGui.popID();
+    }
+    private void drawStructureThemes(LosslessJson root) {
+        if (!ImGui.treeNode("Structure themes")) return;
+        ImGui.textWrapped(StructureThemes.help("themeSets"));
+        ImGui.textWrapped("Positive signed 32-bit weights; at most 64 entries and 256 characters for new keys. Keys are exact and case-sensitive, with no leading/trailing ASCII whitespace. Existing keys stay fixed because jigsaw pieces refer to them. Reordering changes seeded selection; no theme is sampled here. Graph reachability and start-piece eligibility remain unchecked.");
+        String token=root.token("themeSets");
+        if ("null".equals(token)) {
+            ImGui.textWrapped("Stored null themeSets is invalid in the native compiler. Restoring the implicit default removes only this null field.");
+            if (ImGui.button("Restore implicit unthemed default")) applyRoutingExtra(() -> workspace.replace(selected,StructureThemes.resetEmpty(selected,workspace.read(selected))));
+            ImGui.treePop();return;
+        }
+        try {
+            var rows=StructureThemes.entries(root);
+            if (rows.isEmpty()) {
+                ImGui.textWrapped(token==null ? "Implicit default: no declared themes; native selection uses the unthemed path." : "Explicit empty list: native selection uses the unthemed path.");
+                if (token!=null && ImGui.button("Remove empty theme override")) applyRoutingExtra(() -> workspace.replace(selected,StructureThemes.resetEmpty(selected,workspace.read(selected))));
+            }
+            try { ImGui.textUnformatted("Applied positive-weight total: "+StructureThemes.totalWeight(rows)); }
+            catch (IllegalArgumentException invalid) { ImGui.textWrapped("Weight total unavailable until unsupported or nonpositive weights are repaired."); }
+            String add=StructureThemes.newPrefix(),addDraft=add+"pair";
+            ImString newKey=values.computeIfAbsent(add+"key",ignored -> new ImString(1024)),newWeight=values.computeIfAbsent(add+"weight",ignored -> new ImString("1",64));
+            ImGui.inputText("New exact theme key",newKey);ImGui.inputText("New theme weight",newWeight);drafts.update(addDraft,"|1",newKey.get()+"|"+newWeight.get());
+            ImGui.beginDisabled(rows.size()>=StructureThemes.MAX_ENTRIES);if (ImGui.button("Add declared theme")) {
+                try { commitProfileChange(add,StructureThemes.append(selected,workspace.read(selected),newKey.get(),newWeight.get()),addDraft); }
+                catch (Exception failure) { error=failure.getMessage(); }
+            }ImGui.endDisabled();
+            for (int index=0;index<rows.size();index++) {
+                int entry=index;var row=rows.get(index);String prefix=StructureThemes.prefix(index);ImGui.pushID(index);
+                if (ImGui.treeNode("Theme entry "+(index+1))) {
+                    try {
+                        String key=StructureThemes.key(row);ImGui.textWrapped("Fixed key: "+(key.isEmpty() ? "(absent or empty required key)" : InspectorText.label(key,256)));
+                        if (ImGui.button("Review global piece tag mentions")) { try { structureThemeReferences.refresh(workspace,key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+                    } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored key has an unsupported type and remains read-only."); }
+                    try {
+                        StructureThemes.weight(row);String stored=row.token("weight")==null ? "1" : row.token("weight"),key=prefix+"weight";
+                        if (row.token("weight")==null) ImGui.textUnformatted("Implicit weight default: 1");
+                        ImString weight=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(64,stored.length()+1)));ImGui.inputText("Weight",weight);drafts.update(key,stored,weight.get());
+                        if (ImGui.button("Apply positive weight")) commitRiverOverride(key,() -> workspace.replace(selected,StructureThemes.setWeight(selected,workspace.read(selected),entry,weight.get())));
+                    } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored weight is unsupported (read-only)."); }
+                    String copy=prefix+"copy.",copyKey=copy+"key";ImString duplicateKey=values.computeIfAbsent(copyKey,ignored -> new ImString(1024));
+                    ImGui.inputText("Copy applied entry as new key",duplicateKey);drafts.update(copyKey,"",duplicateKey.get());
+                    ImGui.beginDisabled(rows.size()>=StructureThemes.MAX_ENTRIES);if (ImGui.button("Append copy with new key")) {
+                        try { commitProfileChange(copy,StructureThemes.copy(selected,workspace.read(selected),index,duplicateKey.get()),copyKey); }
+                        catch (Exception failure) { error=failure.getMessage(); }
+                    }ImGui.endDisabled();
+                    StructureThemes.Direction move=null;
+                    ImGui.beginDisabled(index==0);if (ImGui.button("Move theme up")) move=StructureThemes.Direction.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==rows.size()-1);if (ImGui.button("Move theme down")) move=StructureThemes.Direction.DOWN;ImGui.endDisabled();
+                    if (move!=null) { try { commitProfileChange(StructureThemes.entriesPrefix(),StructureThemes.move(selected,workspace.read(selected),index,move),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();ImGui.popID();break; }
+                    for (String field : StructureThemes.otherFields(row)) ImGui.textWrapped(InspectorText.label(field,256)+" (unknown theme data; preserved read-only)");
+                    ImGui.treePop();
+                }
+                ImGui.popID();
+            }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Theme list is read-only: "+invalid.getMessage()); }
+        var review=structureThemeReferences.current(workspace);
+        if (review!=null && ImGui.treeNode("Global piece tag review")) {
+            ImGui.textWrapped("Exact applied tag mentions for "+InspectorText.label(review.key(),256)+" in jigsaw-pieces/*.json only. These pieces may belong to other structures; graph membership and native eligibility are unchecked. This review never authorizes key rename or removal.");
+            ImGui.textWrapped(review.inspected()+" / "+review.eligible()+" source files inspected; "+review.bytes()+" bytes; "+review.skipped()+" skipped; "+review.matchedFiles()+" files with explicit mentions; "+review.unfiltered()+" inspected files with absent/null/empty tag lists.");
+            if (review.incomplete()) ImGui.textWrapped("The review is incomplete; counts describe inspected text only.");if (review.truncated()) ImGui.textWrapped("Only the first 200 matching files are displayed.");
+            int row=0;for (var hit : review.hits()) { ImGui.pushID(row++);if (ImGui.button("Open piece JSON")) { try { resourceNavigation.request(workspace,hit.path()); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.sameLine();ImGui.textUnformatted(InspectorText.label(hit.path(),256)+" : "+hit.occurrences()+" explicit mentions");ImGui.popID(); }
+            for (var notice : review.notices()) ImGui.textWrapped(InspectorText.label(notice.path(),256)+": "+notice.detail());if (review.omittedNotices()>0) ImGui.textUnformatted(review.omittedNotices()+" additional notices omitted.");
+            ImGui.textWrapped("Explicit review only: up to 256 files, 1 MB per file, 8 MB total, 200 matching files and 32 notices. Applied edits invalidate the result. Original files, drafts and Save/Export remain independent.");
+            ImGui.treePop();
+        }
+        ImGui.treePop();
     }
     private void drawStructureWorkcells(LosslessJson root) {
         if (!ImGui.treeNode("Planar workcell bounds")) return;
@@ -5745,7 +5812,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
