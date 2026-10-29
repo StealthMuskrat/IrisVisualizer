@@ -18,6 +18,8 @@ public final class PackWorkspace {
     private final Set<String> changed = new HashSet<>();
     private final Set<String> directories = new TreeSet<>();
     private final Map<String, byte[]> savedHashes = new HashMap<>();
+    private final Map<String, Long> contentRevisions = new HashMap<>();
+    private long contentSequence;
     private final Set<String> foldedFiles = new HashSet<>();
     private final AppliedEditHistory history = new AppliedEditHistory();
     private Path directory;
@@ -60,6 +62,10 @@ public final class PackWorkspace {
     }
     public long resourceRevision() { return resourceRevision; }
     public long revision() { return resourceRevision + editRevision; }
+    /** In-memory byte identity only. Save, folder changes and edits to other files do not advance it. */
+    public long contentRevision(String path) {
+        Long revision=contentRevisions.get(path);if (revision==null) throw new IllegalArgumentException("Unknown resource");return revision;
+    }
     private record AssetPlan(AssetImports.Source source,String target,long budget) {}
     private AssetPlan planAssetImport(Path source,String key,long maximumBytes) throws IOException {
         if (maximumBytes<0 || maximumBytes>MAX_BYTES) throw new IllegalArgumentException("Invalid workspace asset-import budget");
@@ -93,7 +99,7 @@ public final class PackWorkspace {
         add(target, files.get(source).clone());
         try { validatePaths(); }
         catch (IOException failure) {
-            files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target); throw failure;
+            files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target);contentRevisions.remove(target); throw failure;
         }
         changed.add(target); created.add(target); resourceRevision++; history.clear("Resource duplicated; earlier applied-edit history was cleared."); return target;
     }
@@ -109,7 +115,7 @@ public final class PackWorkspace {
         add(target, bytes);
         try { validatePaths(); }
         catch (IOException failure) {
-            files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target); throw failure;
+            files.remove(target); foldedFiles.remove(target.toLowerCase(Locale.ROOT)); savedHashes.remove(target);contentRevisions.remove(target); throw failure;
         }
         changed.add(target); created.add(target); resourceRevision++; history.clear("Resource created; earlier applied-edit history was cleared."); return target;
     }
@@ -302,7 +308,10 @@ public final class PackWorkspace {
     }
     private String restoreHistoryThrough(long id,boolean forward) throws IOException {
         var plan=history.plan(id,forward,files,MAX_BYTES);
-        for (var entry : plan.restored().entrySet()) { files.put(entry.getKey(),entry.getValue());updateChanged(entry.getKey(),entry.getValue()); }
+        for (var entry : plan.restored().entrySet()) {
+            if (!Arrays.equals(files.get(entry.getKey()),entry.getValue())) contentRevisions.put(entry.getKey(),++contentSequence);
+            files.put(entry.getKey(),entry.getValue());updateChanged(entry.getKey(),entry.getValue());
+        }
         editRevision++;for (int i=0;i<plan.steps();i++) history.moved(forward);return plan.target();
     }
     private void checkReplacementSize(String path,byte[] data) throws IOException {
@@ -310,7 +319,7 @@ public final class PackWorkspace {
         if (total>MAX_BYTES) throw new IOException("Workspace exceeds 512 MiB limit");
     }
     private void installReplacement(String path,byte[] data) {
-        files.put(path,data);
+        files.put(path,data);contentRevisions.put(path,++contentSequence);
         updateChanged(path,data);editRevision++;
     }
     private void updateChanged(String path,byte[] data) {
@@ -426,7 +435,7 @@ public final class PackWorkspace {
     private void add(String key, byte[] bytes) throws IOException {
         if (files.size() >= MAX_FILES) throw new IOException("Too many pack files");
         if (!foldedFiles.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource paths: " + key);
-        files.put(key, bytes); savedHashes.put(key, hash(bytes));
+        files.put(key, bytes); savedHashes.put(key, hash(bytes));contentRevisions.put(key,++contentSequence);
     }
     private void validatePaths() throws IOException { validatePaths(null); }
     private void validatePaths(String additionalFile) throws IOException {
