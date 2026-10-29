@@ -113,6 +113,7 @@ public final class WorkspaceTests {
    PackReferenceAuditTests.run(temp);
    JigsawDependencyReviewTests.run(temp);
    ImageViewportTests.run(temp);
+   AsyncAssetImageTests.run(temp);
    AssetImportTests.run(temp);
    JsonStructureTests.run(temp);
    ReadOnlyPolicyTests.run(temp);

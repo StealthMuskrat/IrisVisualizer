@@ -44,47 +44,52 @@ public final class EditorApp extends Application {
     private String referencePath;
     private long referenceRevision = -1;
     private List<ReferenceDiagnostics.Link> referenceLinks = List.of();
-    private PackWorkspace imageWorkspace;
-    private String imagePath, imageError;
+    private final AsyncAssetImage imageLoader=new AsyncAssetImage();
+    private String imageError;
     private int imageTexture, imageWidth, imageHeight;
-    private long imageRevision=-1;
+    private long imageRequest=-1;
+    private boolean imageUploadAttempted;
     private AssetImage.Decoded imageData;
     private ImageViewport imageViewport;
     private void clearImage() {
         if (imageTexture != 0) glDeleteTextures(imageTexture);
-        imageTexture = 0; imageError = null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
+        imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
-    @Override protected void disposeImGui() { clearImage(); super.disposeImGui(); }
-    private void drawImageAsset() {
-        if (imageWorkspace != workspace || imageRevision!=workspace.revision() || !java.util.Objects.equals(imagePath, selected)) {
-            clearImage(); imageWorkspace = workspace; imagePath = selected;imageRevision=workspace.revision();
-            if (AssetImage.supportedPath(selected)) {
-                try {
-                    if (workspace.size(selected) > AssetImage.MAX_ENCODED_BYTES) throw new IllegalArgumentException("Asset image exceeds 16 MiB encoded limit");
-                    AssetImage.Decoded image = AssetImage.decode(workspace.read(selected));
-                    if (image.width() > glGetInteger(GL_MAX_TEXTURE_SIZE) || image.height() > glGetInteger(GL_MAX_TEXTURE_SIZE))
-                        throw new IllegalArgumentException("Image exceeds this GPU's texture size limit");
-                    int previous = glGetInteger(GL_TEXTURE_BINDING_2D), alignment = glGetInteger(GL_UNPACK_ALIGNMENT);
-                    var buffer = MemoryUtil.memAlloc(image.width() * image.height() * 4);
-                    try {
-                        buffer.put(image.rgba()).flip(); imageTexture = glGenTextures();
-                        glBindTexture(GL_TEXTURE_2D, imageTexture); glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width(), image.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-                        if (glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH) != image.width())
-                            throw new IllegalStateException("GPU image allocation failed");
-                        imageWidth = image.width(); imageHeight = image.height();
-                        imageData=image;imageViewport=new ImageViewport(imageWidth,imageHeight);
-                    } finally {
-                        glBindTexture(GL_TEXTURE_2D, previous); glPixelStorei(GL_UNPACK_ALIGNMENT, alignment); MemoryUtil.memFree(buffer);
-                    }
-                } catch (Exception failure) { clearImage(); imageError = failure.getMessage(); }
-            }
+    @Override protected void disposeImGui() {
+        try { imageLoader.close();clearImage(); }
+        finally { super.disposeImGui(); }
+    }
+    private void uploadImage(AssetImage.Decoded image) {
+        if (image.width()>glGetInteger(GL_MAX_TEXTURE_SIZE) || image.height()>glGetInteger(GL_MAX_TEXTURE_SIZE)) throw new IllegalArgumentException("Image exceeds this GPU's texture size limit");
+        int previous=glGetInteger(GL_TEXTURE_BINDING_2D),alignment=glGetInteger(GL_UNPACK_ALIGNMENT);
+        var buffer=MemoryUtil.memAlloc(image.width()*image.height()*4);
+        try {
+            buffer.put(image.rgba()).flip();imageTexture=glGenTextures();
+            glBindTexture(GL_TEXTURE_2D,imageTexture);glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,image.width(),image.height(),0,GL_RGBA,GL_UNSIGNED_BYTE,buffer);
+            if (glGetTexLevelParameteri(GL_TEXTURE_2D,0,GL_TEXTURE_WIDTH)!=image.width()) throw new IllegalStateException("GPU image allocation failed");
+            imageWidth=image.width();imageHeight=image.height();imageData=image;imageViewport=new ImageViewport(imageWidth,imageHeight);
+        } finally {
+            glBindTexture(GL_TEXTURE_2D,previous);glPixelStorei(GL_UNPACK_ALIGNMENT,alignment);MemoryUtil.memFree(buffer);
         }
+    }
+    private void retryImage() {
+        var next=imageLoader.retry(workspace,selected);clearImage();imageRequest=next.request();imageUploadAttempted=false;
+    }
+    private void drawImageAsset() {
+        var load=imageLoader.select(workspace,selected);
+        if (imageRequest!=load.request()) { clearImage();imageRequest=load.request();imageUploadAttempted=false; }
         if (!AssetImage.supportedPath(selected)) return;
+        if (load.phase()==AsyncAssetImage.Phase.READY && !imageUploadAttempted) {
+            imageUploadAttempted=true;
+            try { uploadImage(load.image()); }
+            catch (Exception failure) { clearImage();imageError=InspectorText.label(failure.getMessage()==null ? "Image upload failed" : failure.getMessage(),512); }
+        }
         ImGui.separator(); ImGui.textWrapped("Read-only image asset — first frame");
-        if (imageError != null) { ImGui.textWrapped(imageError);if (ImGui.button("Retry image decode/upload")) imageRevision=-1;return; }
+        if (load.phase()==AsyncAssetImage.Phase.LOADING) { ImGui.textWrapped("Loading selected image... Other editing remains available.");return; }
+        String failure=load.phase()==AsyncAssetImage.Phase.FAILED ? load.error() : imageError;
+        if (failure!=null) { ImGui.textWrapped(failure);if (ImGui.button("Retry image decode/upload")) retryImage();return; }
         if (imageTexture != 0) {
             ImGui.text(imageWidth + " × " + imageHeight + " decoded pixels");
             if (ImGui.button("Fit image")) imageViewport.fit();ImGui.sameLine();if (ImGui.button("1:1 image")) imageViewport.actualSize();
