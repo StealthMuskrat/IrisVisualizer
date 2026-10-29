@@ -1012,6 +1012,20 @@ jobs:
           python editor/tools/extract_structure_workcell_fields.py . generated-structure-workcell-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-structure-workcell-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/structure-workcell-fields.properties).Hash) { throw 'Pinned workcell definitions differ' }
+      - name: Verify pinned structure theme controls
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/IrisStructure.java' -OutFile IrisStructure.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawThemeSet.java' -OutFile IrisJigsawThemeSet.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/graph/JigsawPoolSelection.java' -OutFile JigsawPoolSelection.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/jigsaw/IrisJigsawPiece.java' -OutFile IrisJigsawPiece.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/graph/StructureGraphCompiler.java' -OutFile StructureGraphCompiler.java
+          Invoke-WebRequest 'https://raw.githubusercontent.com/VolmitSoftware/Iris/c3359e0a16438b1bb8468901c6171dcefdf63f7f/core/src/main/java/art/arcane/iris/structure/placement/StructureAssembler.java' -OutFile StructureAssembler.java
+          python editor/tools/test_structure_theme_fields.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/extract_structure_theme_fields.py . generated-structure-theme-fields.properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-structure-theme-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/structure-theme-fields.properties).Hash) { throw 'Pinned structure themes differ' }
       - name: Audit pinned field coverage and editor classifications
         shell: pwsh
         run: |

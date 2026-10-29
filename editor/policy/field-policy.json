@@ -5136,7 +5136,7 @@
     },
     "themeSets": {
       "classification": "generation",
-      "reason": "Controls structure workcell geometry, theme selection or piece block replacement. Typed controls are pending; source data remains read-only and preserved."
+      "reason": "Declares structure-wide weighted themes. New-key creation, copying, reordering and positive weight edits preserve existing piece-tag identities; graph reachability and native eligibility remain unchecked."
     },
     "edit": {
       "classification": "generation",
@@ -5179,6 +5179,16 @@
     "displayName": {
       "classification": "read-only",
       "reason": "Jigsaw Studio display metadata; not voxel generation. Preserved during bound and enabled edits."
+    }
+  },
+  "structureTheme": {
+    "key": {
+      "classification": "generation",
+      "reason": "Exact case-sensitive identity used by piece theme tags. Assigned only when adding or copying a declared theme; existing identities remain read-only pending reference-aware maintenance."
+    },
+    "weight": {
+      "classification": "generation",
+      "reason": "Positive signed 32-bit relative theme weight consumed by the native long-total selector. Editing does not sample RNG or evaluate piece eligibility."
     }
   }
 }
