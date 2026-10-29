@@ -149,6 +149,11 @@ public final class EditorApp extends Application {
     private PackReferenceAudit.View referenceReviewView=PackReferenceAudit.View.ALL;
     private String referenceReviewPendingPath;
     private PackWorkspace referenceReviewPendingWorkspace;
+    private boolean showJigsawReview,jigsawProblemsOnly;
+    private final JigsawDependencyReview.Cache jigsawReview=new JigsawDependencyReview.Cache();
+    private final ImString jigsawReviewQuery=new ImString(1024);
+    private String jigsawReviewRoot;
+    private JigsawDependencyReview.Scope jigsawReviewScope=JigsawDependencyReview.Scope.ALL;
     private boolean showJsonStructure;
     private final JsonStructure.Cache jsonSourceCache=new JsonStructure.Cache();
     private JsonStructure.Snapshot jsonActiveSnapshot,jsonWholeSnapshot,jsonTokenSnapshot;
@@ -196,6 +201,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Import image/object asset")) importAsset();
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
                 if (ImGui.menuItem("Review pack resource links")) showReferenceReview=true;
+                if (ImGui.menuItem("Review jigsaw dependencies")) showJigsawReview=true;
                 ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
                 ImGui.textWrapped("Save As switches the active folder. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
                 ImGui.endMenu();
@@ -369,6 +375,7 @@ public final class EditorApp extends Application {
                 try { drawJigsawPiece(new LosslessJson(bytes)); }
                 catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
             }
+            if (JigsawDependencyReview.supports(selected) && ImGui.button("Review jigsaw dependencies")) { jigsawReviewRoot=selected;showJigsawReview=true; }
             if (BlockDefinitions.supports(selected)) drawBlockAliasAudit();
             if (ExpressionDefinitions.supports(selected) || "image-maps".equals(ResourceTypes.base(selected))) drawExpressionReferenceAudit();
             drawCoverage();
@@ -386,6 +393,7 @@ public final class EditorApp extends Application {
         if (showTextSearch) drawTextSearch();
         if (showPendingChanges) drawPendingChanges();
         if (showReferenceReview) drawPackReferenceReview();
+        if (showJigsawReview) drawJigsawDependencyReview();
         if (showJsonStructure) drawJsonStructure();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
@@ -417,7 +425,7 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks authored expression/image-map sources in known noise styles and nested fractures, exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks authored expression/image-map sources in known noise styles and nested fractures, exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, placement Iris-structure selections/cave-biome restrictions, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset; omitted defaults and unknown contexts are not resolved.");
         int referenceIndex=0;for (var link : referenceLinks) {
             ImGui.pushID(referenceIndex++);
@@ -6053,7 +6061,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6109,6 +6117,64 @@ public final class EditorApp extends Application {
         ImGui.inputTextMultiline("Selected original token",jsonTokenText,-1,180,ImGuiInputTextFlags.ReadOnly);
         ImGui.textWrapped("Limits: 1 MB source, 4,096 nodes, 32 indexed child levels, 200 nodes/page, 256 search characters and 16,384-character token/pointer previews. Labels escape controls and shorten long text; token panes preserve source spelling. Pointers use / segments and ~0 / ~1 escapes, not dotted field paths. Save/Export remain independent; unsupported previews stay disabled.");
         ImGui.end();
+    }
+    private void drawJigsawDependencyReview() {
+        if (!ImGui.begin("Jigsaw dependency review")) { ImGui.end();return; }
+        if (ImGui.button("Close dependency review")) { showJigsawReview=false;ImGui.end();return; }
+        ImGui.textWrapped("Authored file paths from one pinned structure, pool or piece. This follows declared start pools, direct fallback fields, physical memberships, connector pools and object-file presence. Repeated paths and cycle groups do not establish runtime execution or invalidity. Native fallback uses a direct fallback only; following its own declarations here is a file review, not fallback execution.");
+        ImGui.beginDisabled(!JigsawDependencyReview.supports(selected));
+        if (ImGui.button("Scan selected structure / pool / piece")) {
+            try { var next=jigsawReview.refresh(workspace,selected);jigsawReviewRoot=next.root(); }
+            catch (Exception failure) { error=failure.getMessage(); }
+        }
+        ImGui.endDisabled();
+        ImGui.beginDisabled(jigsawReviewRoot==null || !workspace.paths().contains(jigsawReviewRoot));
+        if (ImGui.button("Refresh pinned root")) { try { jigsawReview.refresh(workspace,jigsawReviewRoot); } catch (Exception failure) { error=failure.getMessage(); } }
+        ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Clear dependency scan")) jigsawReview.clear();
+        ImGui.textWrapped("Pinned root: "+InspectorText.label(jigsawReviewRoot,256));
+        ImGui.inputText("Dependency path, field or key contains",jigsawReviewQuery);
+        if (ImGui.beginCombo("Dependency link scope",jigsawReviewScope.label())) { for (var scope : JigsawDependencyReview.Scope.values()) if (ImGui.selectable(scope.label(),scope==jigsawReviewScope)) jigsawReviewScope=scope;ImGui.endCombo(); }
+        if (ImGui.checkbox("Only non-exact diagnostics",jigsawProblemsOnly)) jigsawProblemsOnly=!jigsawProblemsOnly;
+        if (ImGui.button("Clear dependency filters")) { jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false; }
+        var review=jigsawReview.current(workspace,jigsawReviewRoot);
+        if (review==null) ImGui.textWrapped("No scan for this root and applied workspace state. Scan explicitly; selecting or opening another resource keeps the pinned root. Applied edits and resource changes require a refresh.");
+        else {
+            ImGui.textWrapped(review.nodes().size()+" visited resources; "+review.jsonFiles()+" JSON files inspected; "+review.bytes()+" JSON bytes; "+review.edges().size()+" recorded diagnostics; "+review.count(ReferenceDiagnostics.State.EXACT_FILE)+" exact-file links; "+review.cycles().size()+" repeated-path groups; "+review.fallbackCycles().size()+" fallback-only groups.");
+            ImGui.textWrapped(review.incomplete() ? "Some outgoing dependencies are unknown because of unsupported data or review limits. See recorded diagnostics and notices." : "No unsupported data or review limits encountered in these known fields. Coverage and native validation remain partial.");
+            if (ImGui.treeNode("Recorded route to current selection")) {
+                var route=review.route(selected);
+                if (route.isEmpty()) ImGui.textWrapped("The current selection has no recorded visited path from this root.");
+                for (int i=0;i<Math.min(64,route.size());i++) { var node=route.get(i);ImGui.textWrapped(node.distance()+": "+InspectorText.label(node.path(),256)+(node.via()==null ? "" : " via "+InspectorText.label(node.via(),256))); }
+                if (route.size()>64) ImGui.textWrapped("Only the first 64 route resources are displayed.");
+                ImGui.textWrapped("This is one shortest authored-link path. It does not establish generation reachability or connector eligibility.");ImGui.treePop();
+            }
+            try {
+                var query=new JigsawDependencyReview.Query(jigsawReviewQuery.get(),jigsawReviewScope,selected,jigsawProblemsOnly);
+                var result=jigsawReview.query(workspace,jigsawReviewRoot,query);ImGui.textWrapped(result.matches()+" matching link diagnostics; "+result.edges().size()+" shown.");
+                if (result.truncated()) ImGui.textWrapped("The first 200 matching diagnostics are shown. Narrow the filters for later links.");
+                int index=0;for (var edge : result.edges()) {
+                    ImGui.pushID(index++);ImGui.textUnformatted(edge.state()+": "+InspectorText.label(edge.field(),256));ImGui.textWrapped(InspectorText.label(edge.source(),256));ImGui.textWrapped("Stored key / diagnostic: "+InspectorText.label(edge.key(),256));
+                    if (edge.target()!=null) ImGui.textWrapped("Exact target: "+InspectorText.label(edge.target(),256));
+                    if (ImGui.smallButton("Open dependency source")) queueReferenceReviewOpen(edge.source());
+                    if (edge.state()==ReferenceDiagnostics.State.EXACT_FILE && edge.target()!=null) { ImGui.sameLine();if (ImGui.smallButton("Open dependency target")) queueReferenceReviewOpen(edge.target()); }
+                    ImGui.popID();
+                }
+                if (ImGui.treeNode("Visited resource paths")) {
+                    var matches=review.nodes().stream().filter(node -> query.text().isEmpty() || node.path().toLowerCase(java.util.Locale.ROOT).contains(query.text())).toList();
+                    ImGui.textWrapped(matches.size()+" matching visited resources; showing up to 200. Link scope/diagnostic filters apply to links only.");
+                    int nodeIndex=0;for (var node : matches.stream().limit(200).toList()) { ImGui.pushID(nodeIndex++);ImGui.textWrapped(node.distance()+" / "+node.status()+": "+InspectorText.label(node.path(),256));if (ImGui.smallButton("Open visited resource")) queueReferenceReviewOpen(node.path());ImGui.popID(); }ImGui.treePop();
+                }
+            } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            if (ImGui.treeNode("Repeated authored-path groups")) { drawJigsawCycleGroups(review.cycles());ImGui.textWrapped("Sorted component members are not an ordered cycle witness. Recursive pool/piece declarations can be intentional; matching, rules and termination are unchecked.");ImGui.treePop(); }
+            if (ImGui.treeNode("Fallback-only authored groups")) { drawJigsawCycleGroups(review.fallbackCycles());ImGui.textWrapped("These are literal fallback fields, not a claim that the native direct-fallback path recurses.");ImGui.treePop(); }
+            if (ImGui.treeNode("Dependency review notices")) { for (var notice : review.notices()) { ImGui.textWrapped(InspectorText.label(notice.path(),256));ImGui.textWrapped(notice.message()); }if (review.omittedNotices()>0) ImGui.textWrapped(review.omittedNotices()+" further notices omitted.");ImGui.treePop(); }
+        }
+        ImGui.textWrapped("Limits: 512 visited resources, 256 inspected JSON files, 1 MB/file, 8 MB JSON total, 4,096 edges, 128 notices and 200 displayed matches. Object payloads are never read. Scans inspect applied memory only. Geometry, theme/rule eligibility, binary bounds, priorities, registry/state compatibility, native assembly, noise/material dependencies and package export closure are unchecked. No files are changed; this review cannot authorize rename/move/delete. Save/Export remain available; unsupported previews remain disabled.");
+        ImGui.end();
+    }
+    private void drawJigsawCycleGroups(List<List<String>> groups) {
+        ImGui.textWrapped(groups.size()+" groups; showing up to 20 groups and 20 members per group.");
+        int index=0;for (var group : groups.stream().limit(20).toList()) { ImGui.pushID(index++);if (ImGui.treeNode(group.size()+" component members")) { for (String path : group.stream().limit(20).toList()) { ImGui.textWrapped(InspectorText.label(path,256));if (ImGui.smallButton("Open component member##"+group.indexOf(path))) queueReferenceReviewOpen(path); }if (group.size()>20) ImGui.textWrapped("Additional members omitted from display.");ImGui.treePop(); }ImGui.popID(); }
     }
     private void drawPackReferenceReview() {
         if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }

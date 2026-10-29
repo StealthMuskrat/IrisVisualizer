@@ -57,7 +57,10 @@ public final class ReferenceDiagnostics {
                 }
                 default -> { }
             }
-            if (Set.of("dimensions","regions","biomes").contains(base)) riverBiomes(workspace,path,document,links);
+            if (Set.of("dimensions","regions","biomes").contains(base)) {
+                riverBiomes(workspace,path,document,links);
+                structurePlacements(workspace,document,links);
+            }
             if (!full(links)) NoiseReferenceDiagnostics.inspect(workspace,base,document,link -> { if (full(links)) return false;return links.add(link); });
         } catch (IllegalArgumentException invalid) { links.add(new Link("JSON", "Invalid/ambiguous JSON", null, State.UNSUPPORTED)); }
         List<Link> result=new ArrayList<>(links);
@@ -66,6 +69,20 @@ public final class ReferenceDiagnostics {
     }
     public static boolean supports(String path) {
         return Set.of("dimensions","regions","biomes","generators","expressions","image-maps","structures","jigsaw-pools","jigsaw-pieces").contains(Objects.toString(ResourceTypes.base(path),""));
+    }
+    private static void structurePlacements(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+        if (full(links) || document.token("structures")==null) return;
+        try {
+            var rows=document.objectArray("structures");
+            for (int index=0;index<rows.size() && !full(links);index++) {
+                var row=rows.get(index);String prefix="structures["+index+"].";
+                // Native registry structures and native jigsaw pools are not local Iris resource keys.
+                for (String field : List.of("structures","caveBiomes")) {
+                    if (row.token(field)==null || row.token(field).equals("null")) continue;
+                    list(workspace,row,field,field.equals("structures") ? "structures" : "biomes",false,prefix,links);
+                }
+            }
+        } catch (IllegalArgumentException unsupported) { links.add(new Link("structures","Null/snippet/mixed/non-object placement list",null,State.UNSUPPORTED)); }
     }
     private static void subterrain(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("subterrainFeatures")==null) return;
