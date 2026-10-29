@@ -19,7 +19,7 @@ final class StructureDefinitionTests {
         check(StructureDefinitions.value(root,"maxDepth").equals("7") && StructureDefinitions.value(root,"maxSizeChunks").equals("8") && StructureDefinitions.value(root,"requireCaps").equals("false") && StructureDefinitions.value(root,"mode").equals("SPATIAL_JIGSAW") && StructureDefinitions.value(root,"placeMode").equals("STRUCTURE_PIECE") && Arrays.equals(root.sourceBytes(),empty));
         var files=new LinkedHashMap<String,byte[]>();files.put(PATH,empty);files.put("jigsaw-pools/nested/start.json",bytes("{not a valid pool"));files.put("jigsaw-pools/escaped_雪.json",bytes("{}"));files.put("jigsaw-pools/UPPER.JSON",bytes("{}"));files.put("objects/raw.iob",new byte[]{0,-1,5});
         var pack=PackWorkspace.newPack(files);var cache=new StructureDefinitions.PoolCache();var pools=cache.choices(pack);
-        check(pools.equals(List.of("escaped_雪","nested/start")) && cache.choices(pack)==pools && ResourceFinder.Family.STRUCTURES.matches(PATH) && ResourceFinder.Family.OTHER.matches("jigsaw-pools/nested/start.json"));
+        check(pools.equals(List.of("escaped_雪","nested/start")) && cache.choices(pack)==pools && ResourceFinder.Family.STRUCTURES.matches(PATH) && ResourceFinder.Family.JIGSAW_POOLS.matches("jigsaw-pools/nested/start.json"));
         var match=cache.filter(pack,"START");check(match.count()==1 && match.keys().equals(List.of("nested/start")) && cache.filter(pack," start ")==match);
         try { match.keys().clear();throw new AssertionError(); } catch (UnsupportedOperationException expected) { }
         rejects(() -> cache.filter(pack,"x".repeat(257)));rejects(() -> cache.filter(pack,"x\u0000"));rejects(() -> cache.filter(pack,null));

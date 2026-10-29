@@ -12,7 +12,7 @@ public final class ResourceFinder {
     public static final int MAX_RESULTS=100,MAX_QUERY_CHARACTERS=256,MAX_TOKENS=8;
     public static final long MAX_INDEX_CHARACTERS=16_000_000;
     public enum Family {
-        ALL("All resources",null),DIMENSIONS("Dimensions","dimensions"),REGIONS("Regions","regions"),BIOMES("Biomes","biomes"),GENERATORS("Generators","generators"),IMAGE_MAPS("Image maps","image-maps"),BLOCKS("Block aliases","blocks"),EXPRESSIONS("Expressions","expressions"),STRUCTURES("Structures","structures"),OBJECTS("Object assets","objects"),IMAGES("Image assets","images"),OTHER("Other files",null);
+        ALL("All resources",null),DIMENSIONS("Dimensions","dimensions"),REGIONS("Regions","regions"),BIOMES("Biomes","biomes"),GENERATORS("Generators","generators"),IMAGE_MAPS("Image maps","image-maps"),BLOCKS("Block aliases","blocks"),EXPRESSIONS("Expressions","expressions"),STRUCTURES("Structures","structures"),JIGSAW_POOLS("Jigsaw pools","jigsaw-pools"),OBJECTS("Object assets","objects"),IMAGES("Image assets","images"),OTHER("Other files",null);
         private final String label,base;
         Family(String label,String base) { this.label=label;this.base=base; }
         public String label() { return label; }

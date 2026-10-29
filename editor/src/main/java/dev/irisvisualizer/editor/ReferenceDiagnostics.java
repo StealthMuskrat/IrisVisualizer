@@ -15,7 +15,7 @@ public final class ReferenceDiagnostics {
     public record Link(String field, String key, String target, State state) {}
     public static List<Link> inspect(PackWorkspace workspace, String path) {
         String base = ResourceTypes.base(path);
-        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps", "structures").contains(base)) return List.of();
+        if (base == null || !Set.of("dimensions", "regions", "biomes", "image-maps", "structures", "jigsaw-pools").contains(base)) return List.of();
         if (workspace.size(path) > MAX_JSON_BYTES) return List.of(new Link("JSON", "Above 1 MB inspection limit", null, State.UNSUPPORTED));
         Links links = new Links();
         try {
@@ -23,6 +23,7 @@ public final class ReferenceDiagnostics {
             switch (base) {
                 case "image-maps" -> pngSource(workspace,document,links);
                 case "structures" -> structurePool(workspace,document,links);
+                case "jigsaw-pools" -> jigsawPool(workspace,document,links);
                 case "dimensions" -> {
                     list(workspace,document,"regions","regions",true,links);
                     scalar(workspace,document,"focus","biomes","",false,false,links);
@@ -67,6 +68,22 @@ public final class ReferenceDiagnostics {
                 list(workspace,entry,"allowedRegions","regions",false,prefix,links);
             }
         } catch (IllegalArgumentException unsupported) { links.add(new Link("subterrainFeatures","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
+    }
+    private static void jigsawPool(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+        try { String fallback=JigsawPools.fallback(document);if (!fallback.isBlank()) links.add(link(workspace,"fallback",fallback,"jigsaw-pools")); }
+        catch (IllegalArgumentException invalid) { links.add(new Link("fallback","Non-string fallback",null,State.UNSUPPORTED)); }
+        if (document.token("pieces")==null) { links.add(new Link("pieces","No explicit memberships; start-pool eligibility unchecked",null,State.ABSENT_REQUIRED));return; }
+        try {
+            var rows=document.objectArray("pieces");if (rows.isEmpty()) links.add(new Link("pieces","Empty membership list; start-pool eligibility unchecked",null,State.EMPTY_REQUIRED));
+            for (int index=0;index<rows.size() && !full(links);index++) {
+                var row=rows.get(index);String field="pieces["+index+"].piece";
+                try {
+                    String key=JigsawPools.piece(row);
+                    if (JigsawPools.empty(row)) { if (!key.isBlank()) links.add(new Link(field,"Ambiguous empty membership also declares a piece",null,State.UNSUPPORTED)); }
+                    else links.add(key.isBlank() ? new Link(field,"Physical membership has no piece",null,State.ABSENT_REQUIRED) : link(workspace,field,key,"jigsaw-pieces"));
+                } catch (IllegalArgumentException invalid) { links.add(new Link(field,"Unsupported piece or empty flag",null,State.UNSUPPORTED)); }
+            }
+        } catch (IllegalArgumentException invalid) { links.add(new Link("pieces","Null/snippet/mixed/non-object membership list",null,State.UNSUPPORTED)); }
     }
     private static void structurePool(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         try { String key=document.stringToken("startPool");links.add(key==null ? new Link("startPool","Absent start pool",null,State.ABSENT_REQUIRED) : link(workspace,"startPool",key,"jigsaw-pools")); }
