@@ -36,7 +36,7 @@ public final class WorkspaceChanges {
         public int total() { return newFiles+modifiedFiles+newFolders+removedFolders; }
         public boolean truncated() { return matches>entries.size(); }
     }
-    public enum Status { NO_ACTIVE_FOLDER, AVAILABLE, FOLDER_EXISTS, BASELINE_MATCH, REMOVAL_READY, CONFLICT, TOO_LARGE, IO_ERROR }
+    public enum Status { NO_ACTIVE_FOLDER, AVAILABLE, FOLDER_EXISTS, BASELINE_MATCH, REMOVAL_READY, CONFLICT, TOO_LARGE, REVIEW_LIMIT, IO_ERROR }
     /** Point-in-time advisory only. Save always performs its own full preflight. */
     public record Check(Entry entry, Path folder, Status status, long diskBytes, String detail) {}
     public static final class Cache {

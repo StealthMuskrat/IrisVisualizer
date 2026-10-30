@@ -304,6 +304,15 @@ public final class PackWorkspace implements PackResourceView {
         for (String path : removedDirectories) entries.add(new WorkspaceChanges.Entry(path,WorkspaceChanges.Kind.REMOVED_FOLDER,0));
         entries.sort(Comparator.comparing(WorkspaceChanges.Entry::path));return List.copyOf(entries);
     }
+    /** UI metadata capture only: no file payloads, hashing or disk I/O. */
+    PendingDiskReview.Source capturePendingDiskReview(WorkspaceChanges.Entry selected) throws IOException {
+        var entries=pendingChanges();
+        if (selected!=null) {
+            if (!entries.contains(selected)) throw new IOException("This pending destination is no longer available");
+            entries=List.of(selected);
+        }
+        return new PendingDiskReview.Source(directory,entries,savedHashes,removedDirectories,relocatedDirectoryTargets);
+    }
     WorkspaceChanges.Check checkPendingChange(WorkspaceChanges.Entry entry,long byteLimit) {
         if (byteLimit<0 || byteLimit>WorkspaceChanges.MAX_CHECK_BYTES) throw new IllegalArgumentException("Invalid disk-check byte limit");
         if (directory==null) return diskCheck(entry,WorkspaceChanges.Status.NO_ACTIVE_FOLDER,-1,"No active folder. Save or Save As first chooses a destination; imported ZIPs have no active folder.");
@@ -562,11 +571,11 @@ public final class PackWorkspace implements PackResourceView {
             return digest.digest();
         } catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
     }
-    private static void rejectLinks(Path path) throws IOException {
+    static void rejectLinks(Path path) throws IOException {
         for (Path part = path; part != null; part = part.getParent())
             if (Files.isSymbolicLink(part)) throw new IOException("Destination contains a symbolic link: " + part);
     }
-    private static Path checkedTarget(Path root, String key) throws IOException {
+    static Path checkedTarget(Path root, String key) throws IOException {
         Path current = root;
         for (String part : key.split("/")) {
             current = current.resolve(part);
@@ -576,7 +585,7 @@ public final class PackWorkspace implements PackResourceView {
         }
         return current;
     }
-    private static String safe(String key) throws IOException {
+    static String safe(String key) throws IOException {
         if (key.isBlank() || key.startsWith("/") || key.contains("\\") || key.contains(":")) throw new IOException("Unsafe pack path: " + key);
         String[] parts = key.split("/", -1);
         if (parts.length > MAX_PATH_SEGMENTS) throw new IOException("Pack path exceeds 64 segments");

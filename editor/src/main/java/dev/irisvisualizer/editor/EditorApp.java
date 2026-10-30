@@ -91,7 +91,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -181,6 +181,9 @@ public final class EditorApp extends Application {
     private String selectedFolder,pendingFolderPath,pendingFolderAction;
     private boolean showPendingChanges;
     private final WorkspaceChanges.Cache pendingChanges=new WorkspaceChanges.Cache();
+    private final AsyncPendingDiskReview pendingDiskReview=new AsyncPendingDiskReview();
+    private boolean changesAttentionOnly;
+    private String changesDiskError;
     private final ImString changesQuery=new ImString(1024);
     private WorkspaceChanges.Filter changesFilter=WorkspaceChanges.Filter.ALL;
     private String changesSelected,changesPendingPath;
@@ -512,7 +515,8 @@ public final class EditorApp extends Application {
         changesPendingWorkspace=null;changesPendingPath=null;
         referenceReviewPendingWorkspace=null;referenceReviewPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
-        saveAsTransfer.finish(workspace); // All frame edits, history actions and workspace navigation have completed.
+        saveAsTransfer.finish(workspace);
+        pendingDiskReview.poll(workspace); // All frame edits, history actions and workspace navigation have completed.
     }
     private void drawReferences() {
         if (!ReferenceDiagnostics.supports(selected) || !ImGui.collapsingHeader("Resource links (partial)")) return;
@@ -6331,7 +6335,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6578,15 +6582,44 @@ public final class EditorApp extends Application {
                     ImGui.textUnformatted(entry.bytes()+" applied bytes");
                     if (ImGui.button("Open changed resource")) { resourceNavigation.request(workspace,entry.path());changesPendingPath=entry.path();changesPendingWorkspace=workspace; }
                 }
-                if (ImGui.button("Check / refresh selected destination")) pendingChanges.check(workspace,entry);
-                var check=pendingChanges.checked(workspace,entry);
-                if (check==null) ImGui.textWrapped("Destination not checked for this workspace state.");
-                else { ImGui.textWrapped("Last explicit check: "+check.status());ImGui.textWrapped(check.detail());if (check.diskBytes()>=0) ImGui.textUnformatted(check.diskBytes()+" disk bytes observed"); }
+                ImGui.beginDisabled(pendingDiskReview.busy());
+                if (ImGui.button("Check / refresh selected destination")) startPendingDiskReview(entry);
+                ImGui.endDisabled();
             }
-            ImGui.textWrapped("Disk checks inspect only the selected destination and hash modified files up to 16 MiB, stopping with an overflow byte if a file grows. They never write, merge or discard data, and do not check free space, permissions or every save prerequisite. Filesystem changes require explicit Refresh; an earlier result cannot guarantee a later Save. Save always repeats its full preflight. Save As/Save Copy write complete snapshots to fresh folders.");
+            drawPendingDiskReview();
+            ImGui.textWrapped("Disk reviews run in the background from captured saved-baseline metadata. Only pending destinations are inspected; unchanged resources and unapplied text are excluded. Limits: 16 MiB per modified file, 256 MiB combined reads (plus one overflow probe byte), 100,000 folder children across removal checks, and 100,000 captured entries / 16 million metadata path characters. Skips and failures remain visible. Reviews never write, merge or discard data. They do not check free space, permissions or every save prerequisite and are not an interprocess lock. Edits, Undo/Redo, Save and New/Open invalidate without rescanning. Disk changes require explicit Refresh. Save always repeats its own full preflight; a successful review cannot guarantee a later Save.");
             if (ImGui.button("Save applied workspace")) perform("Save");ImGui.sameLine();if (ImGui.button("Save As fresh folder")) perform("Save As");ImGui.sameLine();if (ImGui.button("Save Copy to fresh folder")) perform("Save Copy");
         } catch (IllegalArgumentException failure) { ImGui.textWrapped(failure.getMessage()); }
         ImGui.end();
+    }
+    private void startPendingDiskReview(WorkspaceChanges.Entry entry) {
+        try { pendingDiskReview.start(workspace,entry);changesDiskError=null; }
+        catch (Exception failure) { changesDiskError=InspectorText.label(failure.getMessage(),512); }
+    }
+    private void drawPendingDiskReview() {
+        ImGui.separator();ImGui.beginDisabled(pendingDiskReview.busy());
+        if (ImGui.button("Check / refresh all pending destinations")) startPendingDiskReview(null);
+        ImGui.endDisabled();ImGui.sameLine();
+        if (ImGui.button("Cancel / clear disk review")) { pendingDiskReview.clear();changesDiskError=null; }
+        var state=pendingDiskReview.poll(workspace);
+        if (state.phase()==AsyncPendingDiskReview.Phase.CHECKING) {
+            ImGui.textWrapped("Checking captured pending destinations: "+state.checked()+" / "+state.total()+"; "+state.bytes()+" disk bytes read.");
+            if (ImGui.button("Cancel active disk review")) pendingDiskReview.cancel();
+        } else if (state.detail()!=null) ImGui.textWrapped(state.detail());
+        if (pendingDiskReview.busy() && state.phase()!=AsyncPendingDiskReview.Phase.CHECKING) ImGui.textWrapped("The cancelled worker is finishing; another review can start when it stops.");
+        if (changesDiskError!=null) ImGui.textWrapped(changesDiskError);
+        if (state.phase()!=AsyncPendingDiskReview.Phase.READY) return;
+        var report=state.report();ImGui.textWrapped("Point-in-time disk review: "+report.checks().size()+" destinations; "+report.bytesRead()+" bytes read. Active folder: "+(report.directory()==null ? "None" : InspectorText.label(report.directory().toString(),512)));
+        for (var status : WorkspaceChanges.Status.values()) if (report.count(status)>0) ImGui.textUnformatted(status+": "+report.count(status));
+        if (ImGui.checkbox("Show conflicts and unchecked destinations only",changesAttentionOnly)) changesAttentionOnly=!changesAttentionOnly;
+        var page=pendingDiskReview.query(workspace,new WorkspaceChanges.Query(changesQuery.get(),changesFilter),changesAttentionOnly);
+        if (page==null) return;
+        ImGui.textWrapped(page.matches()+" matching disk results; "+page.checks().size()+" shown.");
+        if (page.truncated()) ImGui.textWrapped("Only the first 200 matching results are shown; narrow the path/kind filters.");
+        for (var check : page.checks()) {
+            ImGui.separator();ImGui.textWrapped(check.entry().kind().label()+": "+InspectorText.label(check.entry().path(),512));
+            ImGui.textWrapped(check.status()+": "+check.detail());if (check.diskBytes()>=0) ImGui.textUnformatted(check.diskBytes()+" disk bytes observed");
+        }
     }
     private void drawTextSearch() {
         if (!ImGui.begin("Search JSON text")) { ImGui.end();return; }
