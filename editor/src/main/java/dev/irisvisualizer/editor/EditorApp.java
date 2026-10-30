@@ -56,7 +56,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -139,7 +139,7 @@ public final class EditorApp extends Application {
     private boolean showTextSearch,textChangedOnly;
     private final ImString textQuery=new ImString(1024);
     private ResourceFinder.Family textFamily=ResourceFinder.Family.ALL;
-    private final WorkspaceTextSearch.Cache textSearch=new WorkspaceTextSearch.Cache();
+    private final AsyncWorkspaceTextSearch textSearch=new AsyncWorkspaceTextSearch();
     private WorkspaceTextSearch.Query activeTextQuery;
     private String textSearchError,textPendingPath;
     private PackWorkspace textPendingWorkspace;
@@ -6297,33 +6297,38 @@ public final class EditorApp extends Application {
     }
     private void drawTextSearch() {
         if (!ImGui.begin("Search JSON text")) { ImGui.end();return; }
-        if (ImGui.button("Close text search")) { showTextSearch=false;ImGui.end();return; }
+        if (ImGui.button("Close text search")) { textSearch.clear();activeTextQuery=null;showTextSearch=false;ImGui.end();return; }
         ImGui.inputText("Literal source text",textQuery);
         if (ImGui.beginCombo("Text search family",textFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==textFamily)) textFamily=family;ImGui.endCombo(); }
         if (ImGui.checkbox("Search applied changes only",textChangedOnly)) textChangedOnly=!textChangedOnly;
         if (ImGui.button("Search applied JSON text")) {
-            try { activeTextQuery=new WorkspaceTextSearch.Query(textQuery.get(),textFamily,textChangedOnly);textSearchError=null; }
+            try { activeTextQuery=new WorkspaceTextSearch.Query(textQuery.get(),textFamily,textChangedOnly);textSearch.retry(workspace,activeTextQuery);textSearchError=null; }
             catch (IllegalArgumentException invalid) { textSearchError=invalid.getMessage(); }
         }
-        ImGui.sameLine();if (ImGui.button("Clear text search")) { textQuery.set("");activeTextQuery=null;textSearch.clear();textSearchError=null; }
-        ImGui.textWrapped("Case-sensitive literal source search in .json files, including unknown/malformed JSON. Escapes are searched as stored; no regular expressions, JSON decoding, formulas or native loading. Search applies the form; results then refresh after applied edits. Unapplied inspector text is excluded.");
+        ImGui.sameLine();if (ImGui.button("Cancel / clear text search")) { textQuery.set("");activeTextQuery=null;textSearch.clear();textSearchError=null; }
+        ImGui.textWrapped("Case-sensitive literal source search in .json files, including unknown/malformed JSON. Escapes are searched as stored; no regular expressions, JSON decoding, formulas or native loading. Search applies the form; results refresh in the background after applied edits. Changed-files searches also refresh after Save changes the baseline. Unapplied inspector text is excluded.");
         if (textSearchError!=null) ImGui.textWrapped(textSearchError);
         if (activeTextQuery!=null) {
             ImGui.textWrapped("Results for: "+activeTextQuery.text()+"; "+activeTextQuery.family().label()+(activeTextQuery.changedOnly() ? "; applied changes only" : ""));
-            var result=textSearch.query(workspace,activeTextQuery);
-            ImGui.textWrapped(result.matches()+" non-overlapping matches; "+result.hits().size()+" shown; "+result.scannedFiles()+" / "+result.eligibleFiles()+" eligible JSON files searched; "+result.scannedBytes()+" bytes read.");
-            if (result.incomplete()) ImGui.textWrapped("Incomplete search: "+result.tooLarge()+" oversized, "+result.invalidText()+" invalid UTF-8/control-text, "+result.byteBudgetSkipped()+" byte-budget and "+result.fileBudgetSkipped()+" file-budget skips. Skipped files may contain matches.");
-            if (result.truncated()) ImGui.textWrapped("Only the first 200 matches in sorted path/source order are shown; narrow the search.");
-            int index=0;for (var hit : result.hits()) {
-                ImGui.pushID(index++);
-                if (ImGui.button("Open resource")) { resourceNavigation.request(workspace,hit.path());textPendingPath=hit.path();textPendingWorkspace=workspace; }
-                ImGui.sameLine();ImGui.textUnformatted("Line "+hit.line()+", column "+hit.column()+" (UTF-16)");
-                ImGui.textWrapped(hit.path());
-                ImGui.textUnformatted((hit.clippedBefore() ? "..." : "")+hit.excerpt()+(hit.clippedAfter() ? "..." : ""));
-                ImGui.popID();
+            var search=textSearch.select(workspace,activeTextQuery);
+            if (search.phase()==AsyncWorkspaceTextSearch.Phase.SEARCHING) ImGui.textWrapped("Searching applied JSON in the background... Editing and Save/Export remain available.");
+            else if (search.phase()==AsyncWorkspaceTextSearch.Phase.FAILED) ImGui.textWrapped("Text search failed: "+search.error()+". Search again to retry.");
+            var result=search.result();
+            if (result!=null) {
+                ImGui.textWrapped(result.matches()+" non-overlapping matches; "+result.hits().size()+" shown; "+result.scannedFiles()+" / "+result.eligibleFiles()+" eligible JSON files searched; "+result.scannedBytes()+" bytes read.");
+                if (result.incomplete()) ImGui.textWrapped("Incomplete search: "+result.tooLarge()+" oversized, "+result.invalidText()+" invalid UTF-8/control-text, "+result.byteBudgetSkipped()+" byte-budget and "+result.fileBudgetSkipped()+" file-budget skips. Skipped files may contain matches.");
+                if (result.truncated()) ImGui.textWrapped("Only the first 200 matches in sorted path/source order are shown; narrow the search.");
+                int index=0;for (var hit : result.hits()) {
+                    ImGui.pushID(index++);
+                    if (ImGui.button("Open resource")) { resourceNavigation.request(workspace,hit.path());textPendingPath=hit.path();textPendingWorkspace=workspace; }
+                    ImGui.sameLine();ImGui.textUnformatted("Line "+hit.line()+", column "+hit.column()+" (UTF-16)");
+                    ImGui.textWrapped(hit.path());
+                    ImGui.textUnformatted((hit.clippedBefore() ? "..." : "")+hit.excerpt()+(hit.clippedAfter() ? "..." : ""));
+                    ImGui.popID();
+                }
             }
         }
-        ImGui.textWrapped("Limits: 1 MiB/file, 16 MiB read, 4,096 eligible files, 200 results, 256 query characters and 160-character excerpts. Columns count decoded UTF-16 units. Open selects the resource using the draft guard; it does not jump to a field or edit text.");
+        ImGui.textWrapped("Limits: 1 MiB/file, 16 MiB read, 4,096 eligible files, 200 results, 256 query characters and 160-character excerpts. The search snapshot records up to 100,000 eligible paths / 16 million UTF-16 path characters; narrow the family or changed-files filter if that limit is reached. Cancel/close discards pending work and results. Columns count decoded UTF-16 units. Open selects the resource using the draft guard; it does not jump to a field or edit text.");
         ImGui.end();
     }
     private void drawQuickOpen() {
