@@ -117,10 +117,11 @@ public final class JsonStructure {
         public void clear() { workspace=null;path=null;revision=-1;snapshot=null; }
         public Snapshot inspect(PackWorkspace current,String selected) {
             Objects.requireNonNull(current);
-            if (workspace==current && Objects.equals(path,selected) && revision==current.revision() && snapshot!=null) return snapshot;
             boolean present=selected!=null && current.paths().contains(selected);
+            long stamp=present ? current.contentRevision(selected) : -1;
+            if (workspace==current && Objects.equals(path,selected) && revision==stamp && snapshot!=null) return snapshot;
             snapshot=!present || !supports(selected) ? new Snapshot(Status.NOT_JSON,present ? current.size(selected) : 0,"",List.of(),"Select an existing .json resource to inspect its source.") : current.size(selected)>MAX_BYTES ? new Snapshot(Status.TOO_LARGE,current.size(selected),"",List.of(),"Structure/source display is limited to 1 MB; original bytes remain saveable/exportable.") : JsonStructure.inspect(current.read(selected));
-            workspace=current;path=selected;revision=current.revision();return snapshot;
+            workspace=current;path=selected;revision=stamp;return snapshot;
         }
     }
 }
