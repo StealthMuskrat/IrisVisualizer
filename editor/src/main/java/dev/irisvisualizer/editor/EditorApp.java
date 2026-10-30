@@ -438,7 +438,7 @@ public final class EditorApp extends Application {
             referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
             referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
         }
-        ImGui.textWrapped("Checks authored expression/image-map sources in known noise styles and nested fractures, exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, placement Iris-structure selections/cave-biome restrictions, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
+        ImGui.textWrapped("Checks authored exact block-alias files in known material palettes, deposit palettes, replacement find lists, decorator block lists/forced blocks and standalone block definitions (including eight backup levels), authored expression/image-map sources in known noise styles and nested fractures, exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, placement Iris-structure selections/cave-biome restrictions, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
         if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset; omitted defaults and unknown contexts are not resolved.");
         int referenceIndex=0;for (var link : referenceLinks) {
             ImGui.pushID(referenceIndex++);
@@ -458,7 +458,7 @@ public final class EditorApp extends Application {
             }
             ImGui.popID();
         }
-        ImGui.textWrapped("Noise inspection is bounded to 4,096 JSON nodes and 32 levels per source; labels show up to 256 characters. Declared links do not establish active source selection, formula validity or cycle safety.");
+        ImGui.textWrapped("Noise and material inspection each use at most 4,096 JSON nodes and 32 levels per source; labels show up to 256 characters. Material links list authored exact alias files only; omitted defaults, missing alias files, Minecraft registry names, string block filters and native fallback mappings are not resolved. Declared links do not establish active source selection, formula validity or cycle safety.");
     }
     private void drawJigsawPiece(LosslessJson root) {
         if (!ImGui.collapsingHeader("Jigsaw piece")) return;
@@ -6221,7 +6221,7 @@ public final class EditorApp extends Application {
     private void drawPackReferenceReview() {
         if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }
         if (ImGui.button("Close resource-link review")) { showReferenceReview=false;ImGui.end();return; }
-        ImGui.textWrapped("Known typed fields in dimension, region, biome, generator, expression, image-map, structure, jigsaw-pool and jigsaw-piece JSON. Noise source links include known inline style contexts and nested fractures; both declared sources are listed even when native precedence overrides one. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
+        ImGui.textWrapped("Known typed fields in dimension, region, biome, generator, expression, image-map, structure, jigsaw-pool, jigsaw-piece and block-definition JSON. Material links include authored exact aliases in known palettes, replacement find lists, deposit/decorator blocks and eight backup levels. Bare block names without a matching alias file are not missing-resource findings. Implicit defaults, registry states, string block filters and native fallback mappings are not resolved. Noise source links include known inline style contexts and nested fractures; both declared sources are listed even when native precedence overrides one. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
         if (ImGui.button("Scan / refresh known resource links")) packReferenceReview.refresh(workspace);
         ImGui.sameLine();if (ImGui.button("Clear link scan")) packReferenceReview.clear();
         ImGui.inputText("Source, field, key or target contains",referenceReviewQuery);
