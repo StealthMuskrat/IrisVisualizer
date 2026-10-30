@@ -39,7 +39,13 @@ public final class EditorApp extends Application {
     private final ResourceNavigation resourceNavigation = new ResourceNavigation();
     private final NavigationHistory navigationHistory = new NavigationHistory();
     private final StructureDefinitions.PoolCache structurePools=new StructureDefinitions.PoolCache();
-    private final StructureThemeReferences.Cache structureThemeReferences=new StructureThemeReferences.Cache();
+    private final AsyncStructureThemeReview structureThemeReferences=new AsyncStructureThemeReview();
+    private boolean showStructureThemeReview;
+    private final ImString themeReviewKey=new ImString(2048),themeReviewFilter=new ImString(2048);
+    private String themeReviewError;
+    private int themeReviewPage;
+    private StructureThemeReferences.Review themeReviewedReview;
+    private final StructureThemeReferences.PageCache themeReviewPages=new StructureThemeReferences.PageCache();
     private final JigsawPools.Catalog jigsawPoolCatalog=new JigsawPools.Catalog();
     private final JigsawPieces.Catalog jigsawPieceObjects=new JigsawPieces.Catalog();
     private final ImString structurePoolFilter=new ImString(1024);
@@ -62,7 +68,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -203,6 +209,7 @@ public final class EditorApp extends Application {
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
         var fallbackState=blockFallbackAudits.poll(workspace);if (fallbackReviewedAudit!=null && fallbackState.audit()!=fallbackReviewedAudit) clearFallbackOverlapView();
+        var themeState=structureThemeReferences.poll(workspace);if (themeReviewedReview!=null && themeState.review()!=themeReviewedReview) clearThemeReviewView();
         blockAliasAudits.poll(workspace);expressionAudits.poll(workspace);
         packReferenceReview.poll(workspace);
         jigsawReview.poll(workspace,jigsawReviewRoot);
@@ -228,6 +235,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
                 if (ImGui.menuItem("Review pack resource links")) showReferenceReview=true;
                 if (ImGui.menuItem("Review jigsaw dependencies")) showJigsawReview=true;
+                if (ImGui.menuItem("Review global piece theme tags")) showStructureThemeReview=true;
                 ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
                 ImGui.textWrapped("Save As switches the active folder. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
                 ImGui.endMenu();
@@ -425,6 +433,7 @@ public final class EditorApp extends Application {
         if (showPendingChanges) drawPendingChanges();
         if (showReferenceReview) drawPackReferenceReview();
         if (showJigsawReview) drawJigsawDependencyReview();
+        if (showStructureThemeReview) drawStructureThemeReview();
         if (showJsonStructure) drawJsonStructure();
         applyPendingFolderAction();
         navigationHistory.observe(workspace,selected,filter.get());
@@ -793,7 +802,7 @@ public final class EditorApp extends Application {
                 if (ImGui.treeNode("Theme entry "+(index+1))) {
                     try {
                         String key=StructureThemes.key(row);ImGui.textWrapped("Fixed key: "+(key.isEmpty() ? "(absent or empty required key)" : InspectorText.label(key,256)));
-                        if (ImGui.button("Review global piece tag mentions")) { try { structureThemeReferences.refresh(workspace,key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
+                        if (ImGui.button("Review global piece tag mentions")) { try { openStructureThemeReview(key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
                     } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored key has an unsupported type and remains read-only."); }
                     try {
                         StructureThemes.weight(row);String stored=row.token("weight")==null ? "1" : row.token("weight"),key=prefix+"weight";
@@ -816,16 +825,6 @@ public final class EditorApp extends Application {
                 ImGui.popID();
             }
         } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Theme list is read-only: "+invalid.getMessage()); }
-        var review=structureThemeReferences.current(workspace);
-        if (review!=null && ImGui.treeNode("Global piece tag review")) {
-            ImGui.textWrapped("Exact applied tag mentions for "+InspectorText.label(review.key(),256)+" in jigsaw-pieces/*.json only. These pieces may belong to other structures; graph membership and native eligibility are unchecked. This review never authorizes key rename or removal.");
-            ImGui.textWrapped(review.inspected()+" / "+review.eligible()+" source files inspected; "+review.bytes()+" bytes; "+review.skipped()+" skipped; "+review.matchedFiles()+" files with explicit mentions; "+review.unfiltered()+" inspected files with absent/null/empty tag lists.");
-            if (review.incomplete()) ImGui.textWrapped("The review is incomplete; counts describe inspected text only.");if (review.truncated()) ImGui.textWrapped("Only the first 200 matching files are displayed.");
-            int row=0;for (var hit : review.hits()) { ImGui.pushID(row++);if (ImGui.button("Open piece JSON")) { try { resourceNavigation.request(workspace,hit.path()); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.sameLine();ImGui.textUnformatted(InspectorText.label(hit.path(),256)+" : "+hit.occurrences()+" explicit mentions");ImGui.popID(); }
-            for (var notice : review.notices()) ImGui.textWrapped(InspectorText.label(notice.path(),256)+": "+notice.detail());if (review.omittedNotices()>0) ImGui.textUnformatted(review.omittedNotices()+" additional notices omitted.");
-            ImGui.textWrapped("Explicit review only: up to 256 files, 1 MB per file, 8 MB total, 200 matching files and 32 notices. Applied edits invalidate the result. Original files, drafts and Save/Export remain independent.");
-            ImGui.treePop();
-        }
         ImGui.treePop();
     }
     private void drawStructureWorkcells(LosslessJson root) {
@@ -6167,7 +6166,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6249,6 +6248,43 @@ public final class EditorApp extends Application {
         if (node.limited()) ImGui.textWrapped("Some direct children or descendants are not indexed. The original token remains preserved.");
         ImGui.inputTextMultiline("Selected original token",jsonTokenText,-1,180,ImGuiInputTextFlags.ReadOnly);
         ImGui.textWrapped("Limits: 1 MB source, 4,096 nodes, 32 indexed child levels, 200 nodes/page, 256 search characters and 16,384-character token/pointer previews. Labels escape controls and shorten long text; token panes preserve source spelling. Pointers use / segments and ~0 / ~1 escapes, not dotted field paths. Save/Export remain independent; unsupported previews stay disabled.");
+        ImGui.end();
+    }
+    private void clearThemeReviewView() { themeReviewedReview=null;themeReviewPages.clear();themeReviewPage=0; }
+    private void openStructureThemeReview(String key) {
+        StructureThemeReferences.validateKey(key);themeReviewKey.set(key);showStructureThemeReview=true;structureThemeReferences.refresh(workspace,key);themeReviewError=null;
+    }
+    private void drawStructureThemeReview() {
+        if (!ImGui.begin("Global piece theme tag review")) { ImGui.end();return; }
+        if (ImGui.button("Close piece theme review")) { structureThemeReferences.clear();clearThemeReviewView();showStructureThemeReview=false;ImGui.end();return; }
+        ImGui.textWrapped("Exact case-sensitive decoded tag mentions in applied jigsaw-piece JSON. Pieces may belong to other structures; graph membership, native eligibility and effective theme selection are unchecked. No key rename, removal, tag edit or generation is authorized by these results.");
+        ImGui.inputText("Exact tag to review",themeReviewKey);
+        if (ImGui.button("Scan / replace piece tag review")) { try { structureThemeReferences.refresh(workspace,themeReviewKey.get());themeReviewError=null; } catch (Exception failure) { themeReviewError=InspectorText.label(failure.getMessage(),512); } }
+        var state=structureThemeReferences.poll(workspace);ImGui.beginDisabled(state.key()==null);
+        if (ImGui.button("Refresh pinned tag")) { structureThemeReferences.refresh(workspace,state.key());themeReviewError=null; }
+        ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Cancel / clear piece tag review")) { structureThemeReferences.clear();clearThemeReviewView();themeReviewError=null; }
+        state=structureThemeReferences.poll(workspace);ImGui.textWrapped("Pinned review tag: "+(state.key()==null ? "None" : InspectorText.label(state.key(),256)));
+        if (themeReviewError!=null) ImGui.textWrapped(themeReviewError);
+        if (state.phase()==AsyncStructureThemeReview.Phase.SCANNING) ImGui.textWrapped("Reviewing piece tags in the background... Editing and Save/Export remain available. A new request replaces pending work; Cancel discards the result.");
+        else if (state.phase()==AsyncStructureThemeReview.Phase.FAILED) ImGui.textWrapped("Piece tag review failed: "+state.error()+". Refresh explicitly to retry.");
+        else if (state.review()==null) ImGui.textWrapped("No review for the current applied workspace state. Applied edits/Undo/Redo and resource changes require an explicit refresh. Selection, drafts, Save/Export and collapsing this window do not rescan.");
+        var review=state.review();
+        if (review==null) clearThemeReviewView();
+        else {
+            if (themeReviewedReview!=review) { clearThemeReviewView();themeReviewedReview=review; }
+            ImGui.textWrapped(review.inspected()+" / "+review.eligible()+" source files inspected; "+review.bytes()+" JSON bytes; "+review.skipped()+" skipped; "+review.matchedFiles()+" inspected files with explicit mentions; "+review.unfiltered()+" inspected files with absent/null/empty tag lists.");
+            if (review.incomplete()) ImGui.textWrapped("Incomplete review: skipped or unsupported pieces may contain matching tags. Counts describe inspected text only.");
+            if (review.truncated()) ImGui.textWrapped("Some matching inspected files were not retained. Path filtering and paging cover retained matches only.");
+            if (ImGui.inputText("Retained matching piece path contains",themeReviewFilter)) themeReviewPage=0;
+            if (ImGui.button("Clear piece path filter")) { themeReviewFilter.set("");themeReviewPage=0; }
+            try {
+                var page=themeReviewPages.page(review,themeReviewFilter.get(),themeReviewPage);themeReviewPage=page.page();ImGui.textWrapped(page.matches()+" retained matching files after the path filter; page "+(page.page()+1)+"; "+page.hits().size()+" shown.");
+                ImGui.beginDisabled(!page.previous());if (ImGui.smallButton("Previous piece tag matches")) themeReviewPage--;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(!page.next());if (ImGui.smallButton("Next piece tag matches")) themeReviewPage++;ImGui.endDisabled();
+                int row=0;for (var hit : page.hits()) { ImGui.pushID(row++);if (ImGui.button("Open matching piece JSON")) { try { resourceNavigation.request(workspace,hit.path()); } catch (Exception failure) { themeReviewError=InspectorText.label(failure.getMessage(),512); } }ImGui.sameLine();ImGui.textUnformatted(InspectorText.label(hit.path(),256)+" : "+hit.occurrences()+" explicit mentions");ImGui.popID(); }
+            } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            if (ImGui.treeNode("Piece theme review notices")) { for (var notice : review.notices()) ImGui.textWrapped(InspectorText.label(notice.path(),256)+": "+notice.detail());if (review.omittedNotices()>0) ImGui.textUnformatted(review.omittedNotices()+" additional notices omitted.");ImGui.treePop(); }
+        }
+        ImGui.textWrapped("Limits: exact 1-256 UTF-16-character key without controls; first 256 sorted eligible pieces, 1 MB/file, 8 MB copied/inspected JSON, up to 256 retained matching files, 200 displayed per page and 32 notices. Oversized/byte-skipped pieces are not read; later small files may fit. Eligible path capture is bounded to 100,000 paths / 16 million UTF-16 characters. Unrelated and binary payloads are excluded. Open uses the existing deferred draft guard and keeps this review available while browsing a piece. Original bytes and unsupported previews remain unchanged.");
         ImGui.end();
     }
     private void drawJigsawDependencyReview() {
