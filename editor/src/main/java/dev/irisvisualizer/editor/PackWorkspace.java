@@ -450,6 +450,13 @@ public final class PackWorkspace implements PackResourceView {
         changed.clear();created.clear();changedDirectories.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);
         saveRevision++;
     }
+    /** UI-only baseline adoption after a guarded, successfully published immutable Save As snapshot. */
+    void adoptCopiedBaseline(Path target,ZipExportSource.Baseline baseline) throws IOException {
+        if (baseline==null || baseline.summary().revision()!=revision() || !baseline.matches(files.keySet(),directories)) throw new IOException("Applied workspace differs from the published Save As snapshot");
+        Path destination=target.toAbsolutePath().normalize();var hashes=baseline.copyHashes();
+        directory=destination;savedHashes.clear();savedHashes.putAll(hashes);
+        changed.clear();created.clear();changedDirectories.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);saveRevision++;
+    }
     /** Full in-memory snapshot without changing this workspace's folder, baseline, revisions or history. */
     public void saveCopy(Path target) throws IOException { Path destination=freshDestination(target);var snapshot=freshSnapshot();snapshot.save(destination); }
     private PackWorkspace freshSnapshot() throws IOException {
