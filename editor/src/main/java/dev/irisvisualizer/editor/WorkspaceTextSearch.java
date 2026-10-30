@@ -35,7 +35,7 @@ public final class WorkspaceTextSearch {
                 throw new IllegalArgumentException("Invalid text-search limits");
         }
     }
-    private static String decode(byte[] bytes) throws CharacterCodingException {
+    static String decode(byte[] bytes) throws CharacterCodingException {
         return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
     }

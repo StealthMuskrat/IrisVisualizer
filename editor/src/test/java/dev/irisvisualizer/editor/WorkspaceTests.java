@@ -119,6 +119,7 @@ public final class WorkspaceTests {
    AsyncAssetImageTests.run(temp);
    AssetImportTests.run(temp);
    JsonStructureTests.run(temp);
+   SourceMatchTests.run(temp);
    ReadOnlyPolicyTests.run(temp);
    StructureDefinitionTests.run(temp);
    StructureWorkcellTests.run(temp);
