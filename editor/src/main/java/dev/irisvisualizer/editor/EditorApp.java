@@ -27,7 +27,13 @@ public final class EditorApp extends Application {
     private String selected, error;
     private String riverCatalogDimension;
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
-    private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
+    private final AsyncDefinitionAudit<BlockFallbacks.Audit> blockFallbackAudits = new AsyncDefinitionAudit<>(DefinitionAuditSource.Family.DIMENSION_FALLBACKS,BlockFallbacks::inspect);
+    private final FallbackOverlapReview.Cache fallbackOverlapPages=new FallbackOverlapReview.Cache();
+    private final ImString fallbackOverlapQuery=new ImString(1024);
+    private boolean fallbackCurrentDimensionOnly;
+    private BlockFallbacks.Audit fallbackReviewedAudit;
+    private String fallbackGroup;
+    private int fallbackGroupPage,fallbackDefinitionPage;
     private final AsyncDefinitionAudit<BlockAliasAudit.Audit> blockAliasAudits = new AsyncDefinitionAudit<>(DefinitionAuditSource.Family.BLOCK_ALIASES,BlockAliasAudit::inspect);
     private final AsyncDefinitionAudit<ExpressionReferenceAudit.Audit> expressionAudits = new AsyncDefinitionAudit<>(DefinitionAuditSource.Family.EXPRESSIONS,ExpressionReferenceAudit::inspect);
     private final ResourceNavigation resourceNavigation = new ResourceNavigation();
@@ -56,7 +62,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -196,6 +202,7 @@ public final class EditorApp extends Application {
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
+        var fallbackState=blockFallbackAudits.poll(workspace);if (fallbackReviewedAudit!=null && fallbackState.audit()!=fallbackReviewedAudit) clearFallbackOverlapView();
         blockAliasAudits.poll(workspace);expressionAudits.poll(workspace);
         packReferenceReview.poll(workspace);
         jigsawReview.poll(workspace,jigsawReviewRoot);
@@ -2366,17 +2373,42 @@ public final class EditorApp extends Application {
         if (ImGui.button(previous==null ? "Add property" : "Apply property")) { try { commitProfileChange(scope.prefix()+"data.",BlockDefinitions.setState(selected,workspace.read(selected),scope,previous,name.get(),BlockDefinitions.Kind.valueOf(kind.get()),value.get()),key); } catch (Exception failure) { error=failure.getMessage(); } }
         if (previous!=null && ImGui.button("Remove property")) { try { commitProfileChange(scope.prefix()+"data.",BlockDefinitions.removeState(selected,workspace.read(selected),scope,previous),null); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();
     }
+    private void clearFallbackOverlapView() { fallbackOverlapPages.clear();fallbackReviewedAudit=null;fallbackGroup=null;fallbackGroupPage=0;fallbackDefinitionPage=0; }
+    private void drawFallbackOverlapReview() {
+        ImGui.textWrapped("Advisory normalized source identity only. Native target resolution and iteration-dependent winners are unchecked. Recorded overlaps may be incomplete; this never blocks Save/Export.");
+        var audit=drawDefinitionAuditControls("fallbackOverlapAudit",blockFallbackAudits);
+        if (audit==null) { clearFallbackOverlapView();return; }
+        if (fallbackReviewedAudit!=audit) { clearFallbackOverlapView();fallbackReviewedAudit=audit; }
+        ImGui.textWrapped(audit.inspectedDimensions()+" supported dimension resources / "+audit.readDimensions()+" JSON files read / "+audit.eligibleDimensions()+" eligible top-level dimensions; "+audit.bytes()+" JSON bytes; "+audit.skippedDimensions()+" files skipped; "+audit.definitions()+" recorded nonblank definitions; "+audit.overlaps().size()+" recorded overlap groups.");
+        ImGui.textWrapped(audit.incomplete() ? "Incomplete audit: later/unsupported data may add overlaps or definitions to existing groups. Counts describe recorded data only." : "No unsupported data or audit limits encountered. Registry, targets and native winners remain unchecked.");
+        if (ImGui.inputText("Overlap source, target or path contains",fallbackOverlapQuery)) { fallbackGroupPage=0;fallbackDefinitionPage=0; }
+        if (ImGui.checkbox("Groups mentioning current dimension",fallbackCurrentDimensionOnly)) { fallbackCurrentDimensionOnly=!fallbackCurrentDimensionOnly;fallbackGroupPage=0;fallbackDefinitionPage=0; }
+        if (ImGui.button("Clear overlap filters")) { fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;fallbackGroupPage=0;fallbackDefinitionPage=0; }
+        try {
+            var page=fallbackOverlapPages.page(audit,new FallbackOverlapReview.Query(fallbackOverlapQuery.get(),fallbackCurrentDimensionOnly ? selected : null),fallbackGroupPage);fallbackGroupPage=page.page();
+            ImGui.textWrapped(page.matches()+" matching recorded groups; page "+(page.page()+1)+"; "+page.entries().size()+" shown.");
+            ImGui.beginDisabled(!page.previous());if (ImGui.smallButton("Previous overlap groups")) fallbackGroupPage--;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(!page.next());if (ImGui.smallButton("Next overlap groups")) fallbackGroupPage++;ImGui.endDisabled();
+            if (page.entries().stream().noneMatch(group -> group.normalizedSource().equals(fallbackGroup))) { fallbackGroup=page.entries().isEmpty() ? null : page.entries().getFirst().normalizedSource();fallbackDefinitionPage=0; }
+            int index=0;for (var group : page.entries()) {
+                ImGui.pushID(index++);if (ImGui.smallButton(group.normalizedSource().equals(fallbackGroup) ? "Selected overlap" : "Select overlap")) { fallbackGroup=group.normalizedSource();fallbackDefinitionPage=0; }ImGui.sameLine();ImGui.textUnformatted(InspectorText.label(group.normalizedSource(),256)+" ("+group.definitions().size()+" recorded definitions)");ImGui.popID();
+            }
+            var group=page.entries().stream().filter(item -> item.normalizedSource().equals(fallbackGroup)).findFirst().orElse(null);
+            if (group!=null) {
+                var definitions=FallbackOverlapReview.definitions(group,fallbackDefinitionPage);fallbackDefinitionPage=definitions.page();ImGui.separator();ImGui.textWrapped("Selected source: "+InspectorText.label(group.normalizedSource(),256)+"; definition page "+(definitions.page()+1)+"; "+definitions.entries().size()+" / "+definitions.matches()+" recorded definitions shown.");
+                ImGui.textWrapped("All recorded definitions for this group are shown across pages, including other dimensions when the current-dimension filter is active. Their order does not predict a native winner.");
+                ImGui.beginDisabled(!definitions.previous());if (ImGui.smallButton("Previous overlap definitions")) fallbackDefinitionPage--;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(!definitions.next());if (ImGui.smallButton("Next overlap definitions")) fallbackDefinitionPage++;ImGui.endDisabled();
+                index=0;for (var item : definitions.entries()) { ImGui.pushID(index++);ImGui.textWrapped(InspectorText.label(item.path(),256)+" | "+InspectorText.label(item.source(),256)+" -> "+InspectorText.label(item.target(),512));if (ImGui.smallButton("Open fallback definition resource")) { try { resourceNavigation.request(workspace,item.path()); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID(); }
+            }
+        } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+        if (ImGui.treeNode("Fallback overlap audit notices")) { for (var notice : audit.notices()) ImGui.textWrapped(InspectorText.label(notice.path(),256)+": "+notice.message());if (audit.omittedNotices()>0) ImGui.textWrapped(audit.omittedNotices()+" additional notices omitted.");ImGui.treePop(); }
+        ImGui.textWrapped("Limits: 512 top-level dimension candidates, 1 MB/file, 8 MB JSON, 4,096 recorded definitions, 256 notices and 200 groups/definitions per page. Oversized files are skipped; scanning stops at the first byte or definition overflow. Labels escape controls and shorten long values; Open uses the draft guard to show original source data. No mappings are changed or resolved by this review.");
+    }
     private void drawBlockFallbacks(LosslessJson document) {
         if (!ImGui.collapsingHeader("Missing-block fallbacks")) return;ImGui.pushID("blockFallbacks");
         ImGui.textWrapped(BlockFallbacks.help());
         ImGui.textWrapped("Native resolution tries the registry, then legacy renames, then one fallback target lookup. Fallback targets are not followed through other fallback rules. Source ids use base material identity. Registry readiness, block/state validity, aliases and effective content compatibility are not evaluated here.");
         ImGui.textWrapped("Iris collects fallback maps from every top-level dimension JSON in the pack. Duplicate and aliased sources can overlap across files or within a map. Native file/property iteration determines the winner; the editor does not predict it. Removing a mapping here leaves other dimension maps intact.");
-        if (ImGui.treeNode("Pack-wide source overlaps")) {
-            var audit=blockFallbackAudits.inspect(workspace);ImGui.text(audit.inspectedDimensions()+" dimensions inspected; "+audit.definitions()+" nonblank definitions; "+audit.overlaps().size()+" overlapping sources.");
-            ImGui.textWrapped("Advisory only: normalized source identity is checked; no target resolution or runtime winner is computed. Unsupported resources are listed below. This check never blocks Save/Export.");
-            for (var overlap : audit.overlaps()) if (ImGui.treeNode(overlap.normalizedSource())) { for (var item : overlap.definitions()) ImGui.textWrapped(item.path()+" | "+item.source()+" -> "+item.target());ImGui.treePop(); }
-            for (var notice : audit.notices()) ImGui.textWrapped(notice.path()+": "+notice.message());ImGui.treePop();
-        }
+        if (ImGui.treeNode("Pack-wide source overlaps")) { drawFallbackOverlapReview();ImGui.treePop(); }
         List<LosslessJson.StringProperty> rows;
         try { rows=BlockFallbacks.entries(document); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored fallback map is null, mixed, a snippet or unsupported (read-only).");ImGui.popID();return; }
         if (rows==null) {
@@ -6135,7 +6167,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {

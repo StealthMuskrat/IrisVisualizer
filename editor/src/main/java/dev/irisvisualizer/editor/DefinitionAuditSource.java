@@ -13,7 +13,7 @@ final class DefinitionAuditSource implements PackResourceView {
     static final int MAX_DEFINITIONS=512;
     static final long MAX_BYTES=8_000_000,MAX_PATH_CHARACTERS=16_000_000;
     enum Family {
-        BLOCK_ALIASES("block aliases",BlockDefinitions::supports), EXPRESSIONS("expression sources",ExpressionDefinitions::supports);
+        BLOCK_ALIASES("block aliases",BlockDefinitions::supports), EXPRESSIONS("expression sources",ExpressionDefinitions::supports), DIMENSION_FALLBACKS("dimension fallbacks",DimensionFields::dimension);
         private final String label;
         private final Predicate<String> supports;
         Family(String label,Predicate<String> supports) { this.label=label;this.supports=supports; }

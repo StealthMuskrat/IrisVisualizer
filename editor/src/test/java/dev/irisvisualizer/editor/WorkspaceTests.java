@@ -65,6 +65,7 @@ public final class WorkspaceTests {
    StaticObjectTests.run(temp);
    StaticObjectMaterialTests.run(temp);
    BlockFallbackTests.run(temp);
+   FallbackOverlapReviewTests.run(temp);
    BiomeDecoratorTests.run(temp);
    NoiseStyleSourceTests.run(temp);
    WorldBoundaryTests.run(temp);
