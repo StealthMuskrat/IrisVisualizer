@@ -48,48 +48,60 @@ public final class WorkspaceTextSearch {
         boolean after=end<text.length() && text.charAt(end)!='\r' && text.charAt(end)!='\n';
         return new Hit(path,line,offset-lineStart+1,offset,text.substring(start,end),start>lineStart,after);
     }
+    static boolean eligible(String path,Query query,java.util.function.Predicate<String> changed) {
+        return path.toLowerCase(Locale.ROOT).endsWith(".json") && query.family().matches(path) && (!query.changedOnly() || changed.test(path));
+    }
+    static Result search(PackResourceView current,Query query,java.util.function.Predicate<String> changed,java.util.function.BooleanSupplier cancelled) {
+        return search(current,query,changed,new Limits(MAX_FILE_BYTES,MAX_TOTAL_BYTES,MAX_FILES,MAX_RESULTS),cancelled);
+    }
+    static Result search(PackResourceView current,Query query,java.util.function.Predicate<String> changed,Limits limits,java.util.function.BooleanSupplier cancelled) {
+        Objects.requireNonNull(current);Objects.requireNonNull(query);Objects.requireNonNull(changed);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
+        int eligible=0,considered=0,scanned=0,matches=0,large=0,invalid=0,byteSkipped=0,fileSkipped=0;
+        long bytes=0;var hits=new ArrayList<Hit>();
+        for (String path : current.paths()) {
+            if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
+            if (!eligible(path,query,changed)) continue;
+            eligible++;
+            if (considered++>=limits.files()) { fileSkipped++;continue; }
+            int size=current.size(path);
+            if (size>limits.fileBytes()) { large++;continue; }
+            if (size>limits.totalBytes()-bytes) { byteSkipped++;continue; }
+            bytes+=size;String text;
+            try { text=decode(current.read(path)); }
+            catch (CharacterCodingException failure) { invalid++;continue; }
+            if (text.chars().anyMatch(c -> Character.isISOControl(c) && c!='\r' && c!='\n' && c!='\t')) { invalid++;continue; }
+            if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
+            scanned++;int cursor=0,line=1,lineStart=0;
+            for (int offset=text.indexOf(query.text());offset>=0;offset=text.indexOf(query.text(),offset+query.text().length())) {
+                if ((matches & 1023)==0 && cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
+                matches++;
+                if (hits.size()>=limits.results()) continue;
+                while (cursor<offset) {
+                    char c=text.charAt(cursor++);
+                    if (c=='\r') { if (cursor<offset && text.charAt(cursor)=='\n') cursor++;line++;lineStart=cursor; }
+                    else if (c=='\n') { line++;lineStart=cursor; }
+                }
+                hits.add(hit(path,text,offset,line,lineStart));
+            }
+        }
+        if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
+        return new Result(eligible,scanned,bytes,matches,large,invalid,byteSkipped,fileSkipped,hits);
+    }
     public static final class Cache {
         private final Limits limits;
         private PackWorkspace workspace;
-        private long revision=-1;
-        private boolean dirty;
+        private long revision=-1,saveRevision=-1;
         private Query previous;
         private Result result;
         public Cache() { this(new Limits(MAX_FILE_BYTES,MAX_TOTAL_BYTES,MAX_FILES,MAX_RESULTS)); }
         Cache(Limits limits) { this.limits=Objects.requireNonNull(limits); }
-        public void clear() { workspace=null;revision=-1;previous=null;result=null; }
+        public void clear() { workspace=null;revision=-1;saveRevision=-1;previous=null;result=null; }
         public Result query(PackWorkspace current, Query query) {
             Objects.requireNonNull(current);Objects.requireNonNull(query);
             if (workspace==current && revision==current.revision() && query.equals(previous)
-                    && (!query.changedOnly() || dirty==current.dirty())) return result;
-            int eligible=0,considered=0,scanned=0,matches=0,large=0,invalid=0,byteSkipped=0,fileSkipped=0;
-            long bytes=0;var hits=new ArrayList<Hit>();
-            for (String path : current.paths()) {
-                if (!path.toLowerCase(Locale.ROOT).endsWith(".json") || !query.family().matches(path)
-                        || query.changedOnly() && !current.changed(path)) continue;
-                eligible++;
-                if (considered++>=limits.files()) { fileSkipped++;continue; }
-                int size=current.size(path);
-                if (size>limits.fileBytes()) { large++;continue; }
-                if (size>limits.totalBytes()-bytes) { byteSkipped++;continue; }
-                bytes+=size;String text;
-                try { text=decode(current.read(path)); }
-                catch (CharacterCodingException failure) { invalid++;continue; }
-                if (text.chars().anyMatch(c -> Character.isISOControl(c) && c!='\r' && c!='\n' && c!='\t')) { invalid++;continue; }
-                scanned++;int cursor=0,line=1,lineStart=0;
-                for (int offset=text.indexOf(query.text());offset>=0;offset=text.indexOf(query.text(),offset+query.text().length())) {
-                    matches++;
-                    if (hits.size()>=limits.results()) continue;
-                    while (cursor<offset) {
-                        char c=text.charAt(cursor++);
-                        if (c=='\r') { if (cursor<offset && text.charAt(cursor)=='\n') cursor++;line++;lineStart=cursor; }
-                        else if (c=='\n') { line++;lineStart=cursor; }
-                    }
-                    hits.add(hit(path,text,offset,line,lineStart));
-                }
-            }
-            result=new Result(eligible,scanned,bytes,matches,large,invalid,byteSkipped,fileSkipped,hits);
-            workspace=current;revision=current.revision();dirty=current.dirty();previous=query;return result;
+                    && (!query.changedOnly() || saveRevision==current.saveRevision())) return result;
+            result=search(current,query,current::changed,limits,() -> false);
+            workspace=current;revision=current.revision();saveRevision=current.saveRevision();previous=query;return result;
         }
     }
 }

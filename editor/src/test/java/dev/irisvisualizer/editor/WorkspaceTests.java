@@ -109,6 +109,7 @@ public final class WorkspaceTests {
    ResourceFinderTests.run(temp);
    WorkspaceCopyTests.run(temp);
    WorkspaceTextSearchTests.run(temp);
+   AsyncWorkspaceTextSearchTests.run(temp);
    WorkspaceChangesTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
