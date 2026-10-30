@@ -112,6 +112,7 @@ public final class WorkspaceTests {
    WorkspaceChangesTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
+   AsyncPackReferenceReviewTests.run(temp);
    JigsawDependencyReviewTests.run(temp);
    ImageViewportTests.run(temp);
    AsyncAssetImageTests.run(temp);

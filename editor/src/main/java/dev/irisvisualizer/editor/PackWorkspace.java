@@ -6,7 +6,7 @@ import java.util.*;
 import java.util.zip.*;
 
 /** UI-owned, byte-preserving pack data. Preview validation has no authority over file operations. */
-public final class PackWorkspace {
+public final class PackWorkspace implements PackResourceView {
     private final NavigableMap<String, byte[]> files = new TreeMap<>();
     private final Set<String> changedDirectories = new HashSet<>();
     private final Set<String> savedDirectories = new HashSet<>();

@@ -69,7 +69,7 @@ public final class BlockDefinitions {
     public static byte[] removeState(String path,byte[] raw,Scope scope,String key) { return edit(path,raw,scope,o -> o.objectEdit("data",m -> { limit(m,false);state(m,key);return m.removeField(key); },false)); }
     public static byte[] template() { return ("{\n  \"block\": \"minecraft:stone\"\n}\n").getBytes(StandardCharsets.UTF_8); }
     public static List<String> aliases(PackWorkspace workspace) { return ResourceTypes.referenceKeys(workspace,"blocks"); }
-    public static String exactAlias(PackWorkspace workspace,String value) { if (value==null || !ResourceTypes.referenceKey(value)) return null;String target="blocks/"+value+".json";return workspace.paths().contains(target) ? target : null; }
+    public static String exactAlias(PackResourceView workspace,String value) { if (value==null || !ResourceTypes.referenceKey(value)) return null;String target="blocks/"+value+".json";return workspace.paths().contains(target) ? target : null; }
     static List<String> readOnlyPaths(LosslessJson root) { return readOnlyPaths(root,false); }
     static List<String> readOnlyPaths(LosslessJson root,boolean weighted) { var paths=new ArrayList<String>();scan(root,0,"",paths,weighted);return List.copyOf(paths); }
     private static void scan(LosslessJson node,int depth,String prefix,List<String> paths,boolean weighted) {
