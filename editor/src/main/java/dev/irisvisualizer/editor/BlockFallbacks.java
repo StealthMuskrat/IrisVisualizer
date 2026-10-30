@@ -8,6 +8,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 /** Literal fallback authoring and advisory source overlap checks; no registry resolution runs. */
 public final class BlockFallbacks {
@@ -51,26 +53,47 @@ public final class BlockFallbacks {
         public Overlap { definitions=List.copyOf(definitions); }
     }
     public record Notice(String path,String message) {}
-    public record Audit(int inspectedDimensions,int definitions,List<Overlap> overlaps,List<Notice> notices) {
+    public static final int MAX_DIMENSIONS=512,MAX_DEFINITIONS=4096,MAX_NOTICES=256;
+    public static final long MAX_AUDIT_BYTES=8_000_000;
+    public record Audit(int inspectedDimensions,int definitions,List<Overlap> overlaps,List<Notice> notices,int eligibleDimensions,int readDimensions,long bytes,int skippedDimensions,int omittedNotices,boolean incomplete) {
         public Audit { overlaps=List.copyOf(overlaps);notices=List.copyOf(notices); }
     }
-    public static Audit inspect(PackWorkspace workspace) {
-        Objects.requireNonNull(workspace);var grouped=new TreeMap<String,List<Definition>>();var notices=new ArrayList<Notice>();int dimensions=0,count=0;
-        for (String path : workspace.paths()) {
-            if (!DimensionFields.dimension(path)) continue;
-            if (workspace.size(path)>ReferenceDiagnostics.MAX_JSON_BYTES) { notices.add(new Notice(path,"Above the 1 MB inspection limit; overlap check is incomplete for this resource."));continue; }
+    record Limits(int dimensions,long bytes,int definitions,int notices) {
+        Limits { if (dimensions<1 || dimensions>MAX_DIMENSIONS || bytes<0 || bytes>MAX_AUDIT_BYTES || definitions<1 || definitions>MAX_DEFINITIONS || notices<1 || notices>MAX_NOTICES) throw new IllegalArgumentException("Invalid fallback audit limits"); }
+    }
+    private static final class Scan {
+        final Limits limits;final List<Notice> notices=new ArrayList<>();int omitted;boolean incomplete;
+        Scan(Limits limits) { this.limits=limits; }
+        void notice(String path,String message,boolean partial) { incomplete|=partial;if (notices.size()<limits.notices()) notices.add(new Notice(path,message));else { omitted++;incomplete=true; } }
+    }
+    private static void checkCancelled(BooleanSupplier cancelled) { if (cancelled.getAsBoolean()) throw new CancellationException("Fallback overlap audit cancelled"); }
+    public static Audit inspect(PackResourceView workspace) { return inspect(workspace,() -> false); }
+    public static Audit inspect(PackResourceView workspace,BooleanSupplier cancelled) { return inspect(workspace,new Limits(MAX_DIMENSIONS,MAX_AUDIT_BYTES,MAX_DEFINITIONS,MAX_NOTICES),cancelled); }
+    static Audit inspect(PackResourceView workspace,Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(workspace);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);checkCancelled(cancelled);
+        var paths=workspace.paths().stream().filter(DimensionFields::dimension).sorted().toList();var grouped=new TreeMap<String,List<Definition>>();var scan=new Scan(limits);
+        int dimensions=0,count=0,read=0,skipped=Math.max(0,paths.size()-limits.dimensions());long bytes=0;boolean stopped=false;
+        if (skipped>0) scan.notice("dimensions/","Dimension-file limit reached; only the first "+limits.dimensions()+" sorted top-level dimension files are considered.",true);
+        for (int i=0;i<Math.min(paths.size(),limits.dimensions());i++) {
+            checkCancelled(cancelled);String path=paths.get(i);
+            if (stopped) { skipped++;continue; }
+            int size=workspace.size(path);
+            if (size>ReferenceDiagnostics.MAX_JSON_BYTES) { skipped++;scan.notice(path,"Above the 1 MB inspection limit; overlap check is incomplete for this resource.",true);continue; }
+            if (size>limits.bytes()-bytes) { skipped++;stopped=true;scan.notice(path,"Total JSON byte budget reached; this and remaining dimension files are not inspected.",true);continue; }
+            bytes+=size;read++;
             try {
-                var rows=entries(new LosslessJson(workspace.read(path)));dimensions++;
+                var rows=entries(new LosslessJson(workspace.read(path)));checkCancelled(cancelled);dimensions++;
                 if (rows==null) continue;
                 for (var row : rows) {
-                    String normalized=normalizedSource(row.key());
-                    if (normalized==null || row.value().isBlank()) { notices.add(new Notice(path,"Blank source/target entry is ignored by the native fallback reader or normalizer: "+row.key()));continue; }
+                    checkCancelled(cancelled);String normalized=normalizedSource(row.key());
+                    if (normalized==null || row.value().isBlank()) { scan.notice(path,"Blank source/target entry is ignored by the native fallback reader or normalizer: "+InspectorText.label(row.key(),256),false);continue; }
+                    if (count>=limits.definitions()) { stopped=true;scan.notice(path,"Definition limit reached; remaining entries in this map and later dimension files are unknown.",true);break; }
                     grouped.computeIfAbsent(normalized,ignored -> new ArrayList<>()).add(new Definition(path,row.key(),row.value()));count++;
                 }
-            } catch (IllegalArgumentException unsupported) { notices.add(new Notice(path,"Unsupported JSON or fallback map; overlap check is incomplete for this resource. Stored data is preserved.")); }
+            } catch (IllegalArgumentException unsupported) { scan.notice(path,"Unsupported JSON or fallback map; overlap check is incomplete for this resource. Stored data is preserved.",true); }
         }
-        var overlaps=new ArrayList<Overlap>();for (var group : grouped.entrySet()) if (group.getValue().size()>1) overlaps.add(new Overlap(group.getKey(),group.getValue()));
-        return new Audit(dimensions,count,overlaps,notices);
+        var overlaps=new ArrayList<Overlap>();for (var group : grouped.entrySet()) { checkCancelled(cancelled);if (group.getValue().size()>1) overlaps.add(new Overlap(group.getKey(),group.getValue())); }
+        checkCancelled(cancelled);return new Audit(dimensions,count,overlaps,scan.notices,paths.size(),read,bytes,skipped,scan.omitted,scan.incomplete);
     }
     public static final class AuditCache {
         private PackWorkspace workspace;
