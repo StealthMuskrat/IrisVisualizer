@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 /** Bounded breadth-first review of authored jigsaw file dependencies, never native assembly or export closure. */
 public final class JigsawDependencyReview {
@@ -58,23 +60,28 @@ public final class JigsawDependencyReview {
             default -> false;
         };
     }
-    public static Review inspect(PackWorkspace workspace,String root) { return inspect(workspace,root,new Limits(MAX_NODES,MAX_JSON_FILES,MAX_BYTES,MAX_EDGES,MAX_NOTICES)); }
-    static Review inspect(PackWorkspace workspace,String root,Limits limits) {
-        Objects.requireNonNull(workspace);Objects.requireNonNull(limits);
+    public static Review inspect(PackResourceView workspace,String root) { return inspect(workspace,root,() -> false); }
+    public static Review inspect(PackResourceView workspace,String root,BooleanSupplier cancelled) { return inspect(workspace,root,new Limits(MAX_NODES,MAX_JSON_FILES,MAX_BYTES,MAX_EDGES,MAX_NOTICES),cancelled); }
+    static Review inspect(PackResourceView workspace,String root,Limits limits) { return inspect(workspace,root,limits,() -> false); }
+    private static void checkCancelled(BooleanSupplier cancelled) { if (cancelled.getAsBoolean()) throw new CancellationException("Jigsaw dependency review cancelled"); }
+    static Review inspect(PackResourceView workspace,String root,Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(workspace);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);checkCancelled(cancelled);
         if (!supports(root) || !workspace.paths().contains(root)) throw new IllegalArgumentException("Select an existing structure, jigsaw pool or jigsaw piece JSON resource");
         var scan=new Scan(limits);var nodes=new ArrayList<Node>();var edges=new ArrayList<Edge>();var queued=new java.util.LinkedHashSet<String>();var queue=new ArrayDeque<Pending>();
         queue.add(new Pending(root,0,null,null));queued.add(root);int files=0;long bytes=0;
         while (!queue.isEmpty()) {
-            var next=queue.remove();String path=next.path();Status status;
+            checkCancelled(cancelled);var next=queue.remove();String path=next.path();Status status;
             if ("objects".equals(ResourceTypes.fileFamily(path))) status=Status.OBJECT_PRESENT; // Metadata only: never read/decode the payload.
             else if (files>=limits.files()) { status=Status.SKIPPED;scan.notice(path,"JSON file budget reached; outgoing dependencies are unknown."); }
             else if (workspace.size(path)>ReferenceDiagnostics.MAX_JSON_BYTES) { status=Status.SKIPPED;scan.notice(path,"Above the 1 MB JSON limit; outgoing dependencies are unknown."); }
             else if (workspace.size(path)>limits.bytes()-bytes) { status=Status.SKIPPED;scan.notice(path,"Total JSON byte budget reached; outgoing dependencies are unknown."); }
+            else if (workspace instanceof JigsawScanSource source && !source.captured(path)) { status=Status.SKIPPED;scan.notice(path,"JSON was not copied within the snapshot limits (4,096 files / 16 MB; root first, then lexical order); outgoing dependencies are unknown."); }
             else {
                 files++;bytes+=workspace.size(path);status=Status.INSPECTED;
                 String base=ResourceTypes.base(path);
-                for (var link : ReferenceDiagnostics.inspect(workspace,path)) {
-                    if (!included(base,link.field())) continue;
+                var links=ReferenceDiagnostics.inspect(workspace,path);checkCancelled(cancelled);
+                for (var link : links) {
+                    checkCancelled(cancelled);if (!included(base,link.field())) continue;
                     if (edges.size()>=limits.edges()) { scan.notice(path,"Edge budget reached; remaining dependencies from this resource are unknown.");break; }
                     edges.add(new Edge(path,link.field(),link.key(),link.target(),link.state()));
                     if (link.state()==ReferenceDiagnostics.State.UNSUPPORTED) { scan.incomplete=true;if (link.field().equals("JSON")) status=Status.UNAVAILABLE; }
@@ -85,10 +92,12 @@ public final class JigsawDependencyReview {
             }
             nodes.add(new Node(path,next.distance(),next.parent(),next.via(),status));
         }
-        var filesInGraph=nodes.stream().map(Node::path).toList();
+        checkCancelled(cancelled);var filesInGraph=nodes.stream().map(Node::path).toList();
         var graph=edges.stream().filter(e -> e.state()==ReferenceDiagnostics.State.EXACT_FILE).map(e -> new LiteralReferenceGraph.Link(e.source(),e.target())).toList();
         var fallbacks=edges.stream().filter(e -> e.field().equals("fallback") && e.state()==ReferenceDiagnostics.State.EXACT_FILE).map(e -> new LiteralReferenceGraph.Link(e.source(),e.target())).toList();
-        return new Review(root,nodes,files,bytes,edges,LiteralReferenceGraph.cycles(filesInGraph,graph),LiteralReferenceGraph.cycles(filesInGraph,fallbacks),scan.notices,scan.omitted,scan.incomplete);
+        var cycles=LiteralReferenceGraph.cycles(filesInGraph,graph);checkCancelled(cancelled);
+        var fallbackCycles=LiteralReferenceGraph.cycles(filesInGraph,fallbacks);checkCancelled(cancelled);
+        return new Review(root,nodes,files,bytes,edges,cycles,fallbackCycles,scan.notices,scan.omitted,scan.incomplete);
     }
     private static boolean contains(String value,String query) { return value!=null && value.toLowerCase(Locale.ROOT).contains(query); }
     public static Result filter(Review review,Query query) {

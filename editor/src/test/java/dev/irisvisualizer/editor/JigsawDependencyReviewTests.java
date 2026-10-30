@@ -17,7 +17,7 @@ final class JigsawDependencyReviewTests {
     private static final String ROOT="structures/root.json",MAIN="jigsaw-pools/main.json",OTHER="jigsaw-pools/other.json",PIECE="jigsaw-pieces/start.json",LEAF="jigsaw-pieces/leaf.json",LEAF_POOL="jigsaw-pools/leaf.json",OBJECT="objects/model.iob";
     private static final JigsawDependencyReview.Query ALL=new JigsawDependencyReview.Query("",JigsawDependencyReview.Scope.ALL,null,false);
     private static boolean has(List<ReferenceDiagnostics.Link> links,String field,ReferenceDiagnostics.State state) { return links.stream().anyMatch(link -> link.field().equals(field) && link.state()==state); }
-    private static Map<String,byte[]> fixture() {
+    static Map<String,byte[]> fixture() {
         var files=new LinkedHashMap<String,byte[]>();
         files.put(ROOT,bytes("{\r\n \"startPool\":\"main\",\"future\":{\"startPool\":\"ignored\"},\"edit\":[{\"find\":[],\"replace\":{\"style\":{\"expression\":\"formula\"}}}]\r\n}"));
         files.put(MAIN,bytes("{\"fallback\":\"other\",\"pieces\":[{\"piece\":\"start\",\"chance\":0e0},{\"empty\":true}]}"));
