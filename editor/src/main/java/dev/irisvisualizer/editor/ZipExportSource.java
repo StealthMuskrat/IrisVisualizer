@@ -44,4 +44,18 @@ public final class ZipExportSource {
         }
         check(cancelled);
     }
+    /** Shares the exact captured bytes with the folder writer; no live workspace or source-disk access. */
+    void writeDirectory(FolderCopies.Ownership output,BooleanSupplier cancelled,Progress progress) throws IOException {
+        int entries=0;long bytes=0;check(cancelled);progress.update(entries,bytes);
+        for (String directory : directories) { check(cancelled);output.directory(directory);progress.update(++entries,bytes); }
+        for (var entry : files.entrySet()) {
+            check(cancelled);byte[] data=entry.getValue();
+            try (var stream=output.open(entry.getKey())) {
+                for (int offset=0;offset<data.length;) { check(cancelled);int count=Math.min(64*1024,data.length-offset);stream.write(data,offset,count);offset+=count;bytes+=count;progress.update(entries,bytes); }
+            }
+            progress.update(++entries,bytes);
+        }
+        check(cancelled);
+    }
+
 }

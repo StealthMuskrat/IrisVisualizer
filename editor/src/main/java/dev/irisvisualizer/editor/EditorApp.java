@@ -25,6 +25,10 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private final AsyncFolderCopy folderCopy=new AsyncFolderCopy();
+    private boolean showFolderCopy;
+    private String folderCopyMessage;
+    private Path pendingCopyOpen;
     private final AsyncZipExport zipExport=new AsyncZipExport();
     private boolean showZipExport;
     private String zipExportMessage;
@@ -83,7 +87,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -254,6 +258,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Import image/object batch")) importAssetBatch();
                 if (ImGui.menuItem("Review captured asset batch")) showAssetBatchImport=true;
                 if (ImGui.menuItem("Review ZIP export progress")) showZipExport=true;
+                if (ImGui.menuItem("Review Save Copy progress")) showFolderCopy=true;
                 ImGui.beginDisabled(!AssetReplacement.supports(selected));if (ImGui.menuItem("Replace selected image/object asset")) chooseAssetReplacement(selected);ImGui.endDisabled();
                 if (ImGui.menuItem("Review captured asset replacement")) showAssetReplacement=true;
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
@@ -459,11 +464,17 @@ public final class EditorApp extends Application {
         if (showReferenceReview) drawPackReferenceReview();
         if (showJigsawReview) drawJigsawDependencyReview();
         if (showStructureThemeReview) drawStructureThemeReview();
+        if (showFolderCopy) drawFolderCopy();
         if (showZipExport) drawZipExport();
         if (showAssetBatchImport) drawAssetBatchImport();
         if (showAssetImport) drawAssetImport();
         if (showAssetReplacement) drawAssetReplacement();
         if (showJsonStructure) drawJsonStructure();
+        if (pendingCopyOpen!=null) {
+            Path path=pendingCopyOpen;pendingCopyOpen=null;
+            try { transition(true,() -> { PackWorkspace next=PackWorkspace.open(path);workspace=next;selected=null;filter.set("");error=null; }); }
+            catch (Exception failure) { folderCopyMessage=InspectorText.label(failure.getMessage(),512); }
+        }
         applyPendingFolderAction();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
@@ -6757,6 +6768,30 @@ public final class EditorApp extends Application {
         int result = save ? chooser.showSaveDialog(null) : chooser.showOpenDialog(null);
         return result == JFileChooser.APPROVE_OPTION ? chooser.getSelectedFile().toPath() : null;
     }
+    private void drawFolderCopy() {
+        if (!ImGui.begin("Captured Save Copy")) { ImGui.end();return; }
+        if (ImGui.button("Hide Save Copy progress")) { showFolderCopy=false;ImGui.end();return; }
+        var state=folderCopy.poll();ImGui.textWrapped("Save Copy captures the current applied workspace and writes a separate folder. Later edits, Save and New/Open do not change that snapshot. The active folder, dirty state, Undo/Redo and inspector drafts stay available; this action does not mark the workspace saved.");
+        if (state.source()!=null) { var source=state.source();ImGui.textWrapped("Captured applied revision: "+source.revision()+"; "+source.files()+" files, "+source.directories()+" explicit folders, "+source.bytes()+" bytes.");ImGui.textWrapped("Captured pack: "+(source.activeDirectory()==null ? "Not saved to a folder" : InspectorText.label(source.activeDirectory().toString(),512))); }
+        if (state.directory()!=null) ImGui.textWrapped("Chosen copy folder: "+InspectorText.label(state.directory().toString(),512));
+        if (state.phase()==AsyncFolderCopy.Phase.COPYING || state.phase()==AsyncFolderCopy.Phase.CANCELLING || state.phase()==AsyncFolderCopy.Phase.PUBLISHING) {
+            ImGui.textUnformatted("Completed source entries: "+state.entries()+"; file bytes written: "+state.bytes());
+            if (state.phase()==AsyncFolderCopy.Phase.PUBLISHING) ImGui.textWrapped("Publishing the completed copy. Publication has begun and cannot be cancelled.");
+            else if (state.phase()==AsyncFolderCopy.Phase.CANCELLING) ImGui.textWrapped("Cancellation accepted. Waiting for streams to close and staging cleanup to finish.");
+            else if (ImGui.button("Cancel copy before publication")) folderCopyMessage=folderCopy.cancel() ? "Cancellation accepted before publication." : "Copy cannot be cancelled now; review its result.";
+        } else {
+            if (state.phase()==AsyncFolderCopy.Phase.SUCCEEDED) {
+                ImGui.textWrapped("Save Copy completed for the captured revision. The current workspace may contain later edits.");ImGui.textWrapped("Published copy: "+InspectorText.label(state.receipt().directory().toString(),512));
+                if (ImGui.button("Open completed copy with normal workspace guards")) { pendingCopyOpen=state.receipt().directory();resourceNavigation.clear(); }
+            } else if (state.detail()!=null) ImGui.textWrapped(state.detail());
+            else ImGui.textWrapped("No active copy. File > Save Copy chooses a new or empty folder and starts a captured copy.");
+            if (ImGui.button("Save Copy of current applied workspace")) perform("Save Copy");
+            ImGui.beginDisabled(folderCopy.busy());if (ImGui.button("Clear completed Save Copy receipt")) { folderCopy.clear();folderCopyMessage=null; }ImGui.endDisabled();
+        }
+        if (folderCopyMessage!=null) ImGui.textWrapped(folderCopyMessage);
+        ImGui.textWrapped("One copy at a time; hiding this panel retains work. Limits: 512 MiB, 100,000 file/folder entries and 16 million UTF-16 path characters. Choose a new or empty directory outside the captured pack; same-folder, nested, ancestor, file and symbolic-link targets are refused. The destination is rechecked after staging. Existing empty folders are removed only nonrecursively at publication; a failed move restores the empty folder when its path remains free. Copies do not replace existing files. Cleanup removes only tracked staging entries and leaves unexpected content in place. Process termination or cleanup failure can leave temporary or newly created parent folders. Opening a completed copy is a separate guarded action. Unsupported previews stay disabled.");
+        ImGui.end();
+    }
     private void drawZipExport() {
         if (!ImGui.begin("Captured ZIP export")) { ImGui.end();return; }
         if (ImGui.button("Hide ZIP export progress")) { showZipExport=false;ImGui.end();return; }
@@ -6797,10 +6832,13 @@ public final class EditorApp extends Application {
                     });
                 }
                 case "Save" -> { if (!appliedValuesOnlyAllowed() || !saveWorkspace()) return; }
-                case "Save As", "Save Copy" -> {
-                    if (!appliedValuesOnlyAllowed()) return;
-                    Path path=choose(true,true);if (path==null) return;
-                    if (action.equals("Save As")) workspace.saveAs(path);else workspace.saveCopy(path);
+                case "Save As" -> {
+                    if (!appliedValuesOnlyAllowed()) return;Path path=choose(true,true);if (path==null) return;workspace.saveAs(path);
+                }
+                case "Save Copy" -> {
+                    if (folderCopy.busy()) { showFolderCopy=true;return; }
+                    if (!appliedValuesOnlyAllowed()) return;Path path=choose(true,true);if (path==null) return;
+                    folderCopy.start(workspace,path);folderCopyMessage=null;showFolderCopy=true;
                 }
                 case "Export" -> {
                     if (zipExport.busy()) { showZipExport=true;return; }
