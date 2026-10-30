@@ -17,7 +17,14 @@ import java.util.Objects;
 
 /** Worker-only full snapshot copies. No source disk reads, live workspace access or baseline adoption. */
 public final class FolderCopies {
-    public record Receipt(Path directory,ZipExportSource.Summary source) {}
+    public record Receipt(Path directory,ZipExportSource.Summary source,ZipExportSource.Baseline baseline) {
+        public Receipt(Path directory,ZipExportSource.Summary source) { this(directory,source,null); }
+    }
+    /** Fingerprints run on the worker; baseline authority is bound only after a successful publication. */
+    static Receipt copyForSaveAs(ZipExportSource source,Path target,ZipExports.Control control,ZipExportSource.Progress progress) throws IOException {
+        var baseline=source.prepareBaseline(control::cancelled);var copy=copy(source,target,control,progress);
+        return new Receipt(copy.directory(),copy.source(),baseline.publishedAt(target,copy.directory()));
+    }
     private record Stamp(Object key,FileTime modified) {}
     private record Plan(Path directory,Path anchor,Stamp expected) {}
     private record Created(Path path,Object key,boolean directory) {}
@@ -63,22 +70,22 @@ public final class FolderCopies {
     }
     private static Stamp empty(Path directory) throws IOException {
         var attributes=Files.readAttributes(directory,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);
-        if (!attributes.isDirectory()) throw new IOException("Save Copy destination must be a new or empty directory");
-        try (var children=Files.list(directory)) { if (children.findAny().isPresent()) throw new IOException("Save Copy destination is not empty: "+directory); }
+        if (!attributes.isDirectory()) throw new IOException("Snapshot destination must be a new or empty directory");
+        try (var children=Files.list(directory)) { if (children.findAny().isPresent()) throw new IOException("Snapshot destination is not empty: "+directory); }
         return new Stamp(attributes.fileKey(),attributes.lastModifiedTime());
     }
     private static Plan plan(ZipExportSource source,Path target) throws IOException {
-        if (target==null) throw new IOException("Choose a new or empty Save Copy directory");target=target.toAbsolutePath().normalize();rejectLinks(target);
+        if (target==null) throw new IOException("Choose a new or empty Snapshot directory");target=target.toAbsolutePath().normalize();rejectLinks(target);
         Path ancestor=target;var missing=new java.util.ArrayDeque<Path>();
         while (!Files.exists(ancestor,LinkOption.NOFOLLOW_LINKS)) { if (ancestor.getFileName()!=null) missing.addFirst(ancestor.getFileName());ancestor=ancestor.getParent();if (ancestor==null) throw new IOException("No existing copy destination ancestor"); }
         if (!Files.isDirectory(ancestor,LinkOption.NOFOLLOW_LINKS)) throw new IOException("Copy destination parent is not a directory");Path anchor=ancestor.toRealPath(),resolved=anchor;for (Path part : missing) resolved=resolved.resolve(part);
-        Path active=source.summary().activeDirectory();if (active!=null && (resolved.startsWith(active) || active.startsWith(resolved))) throw new IOException("Save Copy outside the captured pack; same, nested and ancestor destinations are not supported");
+        Path active=source.summary().activeDirectory();if (active!=null && (resolved.startsWith(active) || active.startsWith(resolved))) throw new IOException("Copy outside the captured pack; same, nested and ancestor destinations are not supported");
         if (resolved.getParent()==null) throw new IOException("Choose a new or empty copy directory");
         Stamp expected=Files.exists(resolved,LinkOption.NOFOLLOW_LINKS) ? empty(resolved) : null;
         // Existing empty target directories stage beside themselves, never inside the directory being replaced.
         if (expected!=null) anchor=resolved.getParent().toRealPath();return new Plan(resolved,anchor,expected);
     }
-    private static void sameDestination(Plan expected,Plan current) throws IOException { if (!expected.directory().equals(current.directory()) || !Objects.equals(expected.expected(),current.expected())) throw new IOException("Save Copy destination changed after capture started"); }
+    private static void sameDestination(Plan expected,Plan current) throws IOException { if (!expected.directory().equals(current.directory()) || !Objects.equals(expected.expected(),current.expected())) throw new IOException("Snapshot destination changed after capture started"); }
     private static void parents(Path parent,List<Created> created) throws IOException {
         rejectLinks(parent);var missing=new java.util.ArrayDeque<Path>();Path ancestor=parent;
         while (!Files.exists(ancestor,LinkOption.NOFOLLOW_LINKS)) { missing.addFirst(ancestor);ancestor=ancestor.getParent();if (ancestor==null) throw new IOException("Copy destination parent disappeared"); }

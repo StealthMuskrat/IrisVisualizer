@@ -28,6 +28,14 @@ public final class AsyncFolderCopy implements AutoCloseable {
             var source=current.captureZipExport();Path path=directory.toAbsolutePath().normalize();var job=new Job(++generation,source,path);pending=job;snapshot=new Snapshot(generation,Phase.COPYING,source.summary(),path,0,0,null,null);lock.notifyAll();return snapshot;
         }
     }
+    /** UI-captured immutable source only; callers retain their own UI-owned adoption tokens. */
+    Snapshot startSnapshot(ZipExportSource source,Path directory) throws IOException {
+        Objects.requireNonNull(source);Objects.requireNonNull(directory);
+        synchronized (lock) {
+            if (closed) throw new IllegalStateException("Folder copy is closed");if (pending!=null || active!=null) throw new IOException("A folder copy is active; wait for completion or cancellation before starting another");
+            Path path=directory.toAbsolutePath().normalize();var job=new Job(++generation,source,path);pending=job;snapshot=new Snapshot(generation,Phase.COPYING,source.summary(),path,0,0,null,null);lock.notifyAll();return snapshot;
+        }
+    }
     public Snapshot poll() {
         synchronized (lock) {
             var job=active!=null ? active : pending;if (closed || job==null) return snapshot;

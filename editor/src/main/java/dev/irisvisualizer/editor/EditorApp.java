@@ -25,10 +25,14 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private final AsyncSaveAs saveAsTransfer=new AsyncSaveAs();
+    private boolean showSaveAsTransfer;
+    private String saveAsMessage;
     private final AsyncFolderCopy folderCopy=new AsyncFolderCopy();
     private boolean showFolderCopy;
     private String folderCopyMessage;
     private Path pendingCopyOpen;
+    private boolean pendingCopyFromSaveAs;
     private final AsyncZipExport zipExport=new AsyncZipExport();
     private boolean showZipExport;
     private String zipExportMessage;
@@ -87,7 +91,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -259,6 +263,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Review captured asset batch")) showAssetBatchImport=true;
                 if (ImGui.menuItem("Review ZIP export progress")) showZipExport=true;
                 if (ImGui.menuItem("Review Save Copy progress")) showFolderCopy=true;
+                if (ImGui.menuItem("Review Save As progress")) showSaveAsTransfer=true;
                 ImGui.beginDisabled(!AssetReplacement.supports(selected));if (ImGui.menuItem("Replace selected image/object asset")) chooseAssetReplacement(selected);ImGui.endDisabled();
                 if (ImGui.menuItem("Review captured asset replacement")) showAssetReplacement=true;
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
@@ -266,7 +271,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Review jigsaw dependencies")) showJigsawReview=true;
                 if (ImGui.menuItem("Review global piece theme tags")) showStructureThemeReview=true;
                 ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
-                ImGui.textWrapped("Save As switches the active folder. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
+                ImGui.textWrapped("Save As switches the active folder after a completed, still-current snapshot. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
                 ImGui.endMenu();
             }
             if (ImGui.beginMenu("Edit")) {
@@ -464,6 +469,7 @@ public final class EditorApp extends Application {
         if (showReferenceReview) drawPackReferenceReview();
         if (showJigsawReview) drawJigsawDependencyReview();
         if (showStructureThemeReview) drawStructureThemeReview();
+        if (showSaveAsTransfer) drawSaveAsTransfer();
         if (showFolderCopy) drawFolderCopy();
         if (showZipExport) drawZipExport();
         if (showAssetBatchImport) drawAssetBatchImport();
@@ -471,9 +477,9 @@ public final class EditorApp extends Application {
         if (showAssetReplacement) drawAssetReplacement();
         if (showJsonStructure) drawJsonStructure();
         if (pendingCopyOpen!=null) {
-            Path path=pendingCopyOpen;pendingCopyOpen=null;
-            try { transition(true,() -> { PackWorkspace next=PackWorkspace.open(path);workspace=next;selected=null;filter.set("");error=null; }); }
-            catch (Exception failure) { folderCopyMessage=InspectorText.label(failure.getMessage(),512); }
+            Path path=pendingCopyOpen;boolean fromSaveAs=pendingCopyFromSaveAs;pendingCopyOpen=null;pendingCopyFromSaveAs=false;
+            try { if (transition(true,() -> { PackWorkspace next=PackWorkspace.open(path);workspace=next;selected=null;filter.set("");error=null; })) { if (fromSaveAs) saveAsMessage=null;else folderCopyMessage=null; } }
+            catch (Exception failure) { error=InspectorText.label(failure.getMessage(),512);if (fromSaveAs) saveAsMessage=error;else folderCopyMessage=error; }
         }
         applyPendingFolderAction();
         navigationHistory.observe(workspace,selected,filter.get());
@@ -506,6 +512,7 @@ public final class EditorApp extends Application {
         changesPendingWorkspace=null;changesPendingPath=null;
         referenceReviewPendingWorkspace=null;referenceReviewPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
+        saveAsTransfer.finish(workspace); // All frame edits, history actions and workspace navigation have completed.
     }
     private void drawReferences() {
         if (!ReferenceDiagnostics.supports(selected) || !ImGui.collapsingHeader("Resource links (partial)")) return;
@@ -6768,6 +6775,30 @@ public final class EditorApp extends Application {
         int result = save ? chooser.showSaveDialog(null) : chooser.showOpenDialog(null);
         return result == JFileChooser.APPROVE_OPTION ? chooser.getSelectedFile().toPath() : null;
     }
+    private void drawSaveAsTransfer() {
+        if (!ImGui.begin("Captured Save As")) { ImGui.end();return; }
+        if (ImGui.button("Hide Save As progress")) { showSaveAsTransfer=false;ImGui.end();return; }
+        var state=saveAsTransfer.poll(workspace);ImGui.textWrapped("Save As captures applied values, prepares saved-file fingerprints and writes a separate folder in the background. At the end of the frame, the editor switches to that folder only if the same workspace, applied revision and save baseline are still current. Drafts and Undo/Redo remain available.");
+        if (state.target()!=null) { var source=state.target().source();ImGui.textWrapped("Captured applied revision: "+source.revision()+"; "+source.files()+" files, "+source.directories()+" explicit folders, "+source.bytes()+" bytes.");ImGui.textWrapped("Chosen Save As folder: "+InspectorText.label(state.target().destination().toString(),512)); }
+        boolean pending=state.phase()==AsyncSaveAs.Phase.COPYING || state.phase()==AsyncSaveAs.Phase.CANCELLING || state.phase()==AsyncSaveAs.Phase.PUBLISHING || state.phase()==AsyncSaveAs.Phase.READY;
+        if (pending) {
+            ImGui.textUnformatted("Completed copied entries: "+state.entries()+"; file bytes written: "+state.bytes());
+            if (state.phase()==AsyncSaveAs.Phase.PUBLISHING) ImGui.textWrapped("Publishing the complete captured folder. Publication can no longer be cancelled.");
+            else if (state.phase()==AsyncSaveAs.Phase.CANCELLING) ImGui.textWrapped("Cancellation accepted before publication; waiting for cleanup.");
+            else if (state.phase()==AsyncSaveAs.Phase.READY) ImGui.textWrapped("Copy published; final workspace check runs after this frame's edits and navigation.");
+            else { ImGui.textWrapped("Preparing fingerprints or staging captured files. Later applied edits or Save/New/Open will keep the output as a separate copy.");if (ImGui.button("Cancel Save As before publication")) saveAsMessage=saveAsTransfer.cancel() ? "Cancellation accepted." : "Transfer can no longer be cancelled; review its result."; }
+            if (ImGui.button("Keep this transfer as a copy without switching folders")) saveAsTransfer.keepCopy();
+        } else {
+            if (state.phase()==AsyncSaveAs.Phase.ADOPTED) ImGui.textWrapped("Save As completed and its folder became active. Later edits still require Save.");
+            else if (state.phase()==AsyncSaveAs.Phase.COPIED) ImGui.textWrapped("Captured copy completed; the current workspace and save baseline were kept.");
+            if (state.receipt()!=null && (state.phase()==AsyncSaveAs.Phase.ADOPTED || state.phase()==AsyncSaveAs.Phase.COPIED)) { ImGui.textWrapped("Published folder: "+InspectorText.label(state.receipt().directory().toString(),512));if (ImGui.button("Open published Save As copy with workspace guards")) { pendingCopyOpen=state.receipt().directory();pendingCopyFromSaveAs=true;resourceNavigation.clear(); } }
+            if (ImGui.button("Save As current applied workspace")) perform("Save As");
+            ImGui.beginDisabled(saveAsTransfer.busy());if (ImGui.button("Clear completed Save As receipt")) { saveAsTransfer.clear();saveAsMessage=null; }ImGui.endDisabled();
+        }
+        if (state.detail()!=null) ImGui.textWrapped(state.detail());if (saveAsMessage!=null) ImGui.textWrapped(saveAsMessage);
+        ImGui.textWrapped("One Save As transfer at a time. Limits: 512 MiB, 100,000 file/folder entries and 16 million UTF-16 path characters. The folder-copy destination, staging, cancellation and cleanup checks also apply here. Baseline adoption uses fingerprints of the captured bytes that were published; it does not adopt later external disk changes. Ordinary Save continues its independent conflict preflight. If the workspace or save state changes, the output remains a separate copy instead of clearing newer dirty edits or switching another workspace. Hiding this window retains work. Unsupported previews stay disabled.");
+        ImGui.end();
+    }
     private void drawFolderCopy() {
         if (!ImGui.begin("Captured Save Copy")) { ImGui.end();return; }
         if (ImGui.button("Hide Save Copy progress")) { showFolderCopy=false;ImGui.end();return; }
@@ -6782,7 +6813,7 @@ public final class EditorApp extends Application {
         } else {
             if (state.phase()==AsyncFolderCopy.Phase.SUCCEEDED) {
                 ImGui.textWrapped("Save Copy completed for the captured revision. The current workspace may contain later edits.");ImGui.textWrapped("Published copy: "+InspectorText.label(state.receipt().directory().toString(),512));
-                if (ImGui.button("Open completed copy with normal workspace guards")) { pendingCopyOpen=state.receipt().directory();resourceNavigation.clear(); }
+                if (ImGui.button("Open completed copy with normal workspace guards")) { pendingCopyOpen=state.receipt().directory();pendingCopyFromSaveAs=false;resourceNavigation.clear(); }
             } else if (state.detail()!=null) ImGui.textWrapped(state.detail());
             else ImGui.textWrapped("No active copy. File > Save Copy chooses a new or empty folder and starts a captured copy.");
             if (ImGui.button("Save Copy of current applied workspace")) perform("Save Copy");
@@ -6833,7 +6864,9 @@ public final class EditorApp extends Application {
                 }
                 case "Save" -> { if (!appliedValuesOnlyAllowed() || !saveWorkspace()) return; }
                 case "Save As" -> {
-                    if (!appliedValuesOnlyAllowed()) return;Path path=choose(true,true);if (path==null) return;workspace.saveAs(path);
+                    if (saveAsTransfer.busy()) { showSaveAsTransfer=true;return; }
+                    if (!appliedValuesOnlyAllowed()) return;Path path=choose(true,true);if (path==null) return;
+                    saveAsTransfer.start(workspace,path);saveAsMessage=null;showSaveAsTransfer=true;
                 }
                 case "Save Copy" -> {
                     if (folderCopy.busy()) { showFolderCopy=true;return; }
