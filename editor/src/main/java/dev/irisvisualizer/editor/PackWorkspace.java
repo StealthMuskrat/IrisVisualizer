@@ -248,10 +248,14 @@ public final class PackWorkspace implements PackResourceView {
             final Map<Path,java.nio.file.attribute.BasicFileAttributes> parents=new HashMap<>();
             private String key(Path path) throws IOException { return budget.entry(base.relativize(path).toString().replace('\\','/')); }
             @Override public FileVisitResult preVisitDirectory(Path dir,java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
-                monitor.check();rejectLinks(dir);parents.put(dir,attributes);if(!dir.equals(base))result.directories.add(key(dir));budget.progress(result,0);return FileVisitResult.CONTINUE;
+                monitor.check();rejectLinks(dir);var before=PackLoads.attributes(dir);
+                if(!before.isDirectory())throw new IOException("Pack folder changed before loading: "+dir);
+                parents.put(dir,before);if(!dir.equals(base))result.directories.add(key(dir));budget.progress(result,0);return FileVisitResult.CONTINUE;
             }
             @Override public FileVisitResult visitFile(Path path,java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
                 monitor.check();String key=key(path);checkedTarget(base,key);
+                // File-tree enumeration may carry cached Windows attributes. Use matching explicit reads at both ends.
+                attributes=PackLoads.attributes(path);
                 if(attributes.isSymbolicLink() || !attributes.isRegularFile())throw new IOException("Unsupported or linked pack entry: "+key);
                 if(attributes.size()>budget.remaining())throw new IOException("Pack exceeds workspace byte limit");byte[] data;
                 try(var input=Files.newInputStream(path,LinkOption.NOFOLLOW_LINKS)) { data=budget.read(input,result,budget.remaining()); }

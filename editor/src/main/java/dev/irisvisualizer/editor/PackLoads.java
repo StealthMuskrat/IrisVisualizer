@@ -34,9 +34,15 @@ public final class PackLoads {
         return new Prepared(workspace,new Receipt(kind,path,workspace.directory(),workspace.paths().size(),workspace.directories().size(),bytes));
     }
     static BasicFileAttributes attributes(Path path) throws IOException { return Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS); }
+    static boolean same(BasicFileAttributes before,BasicFileAttributes after) {
+        // Directory size is provider-specific; compare file lengths only for regular files.
+        return before.isRegularFile()==after.isRegularFile() && before.isDirectory()==after.isDirectory()
+                && (!before.isRegularFile() || before.size()==after.size())
+                && before.lastModifiedTime().equals(after.lastModifiedTime()) && Objects.equals(before.fileKey(),after.fileKey());
+    }
     static void unchanged(Path path,BasicFileAttributes before) throws IOException {
         PackWorkspace.rejectLinks(path);var after=attributes(path);
-        if (before.isRegularFile()!=after.isRegularFile() || before.isDirectory()!=after.isDirectory() || before.size()!=after.size() || !before.lastModifiedTime().equals(after.lastModifiedTime()) || !Objects.equals(before.fileKey(),after.fileKey())) throw new IOException("Pack source changed during loading: "+path);
+        if (!same(before,after)) throw new IOException("Pack source changed during loading: "+path);
     }
     private PackLoads() {}
 }

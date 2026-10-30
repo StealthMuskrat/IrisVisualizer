@@ -28,7 +28,15 @@ final class PackLoadTests {
     private static void stopped(AsyncPackLoad loader) throws Exception { long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(loader.busy() && System.nanoTime()<end)Thread.sleep(1);check(!loader.busy()); }
     private static void awaitIgnoringInterrupts(CountDownLatch latch) { while(true)try { latch.await();return; }catch(InterruptedException ignored){} }
     private static int central(byte[] zip) { for(int i=0;i<zip.length-3;i++)if(zip[i]==0x50 && zip[i+1]==0x4b && zip[i+2]==1 && zip[i+3]==2)return i;throw new AssertionError("No central directory"); }
+    private record Attributes(boolean isRegularFile,boolean isDirectory,long size,FileTime lastModifiedTime,Object fileKey) implements java.nio.file.attribute.BasicFileAttributes {
+        public FileTime lastAccessTime(){return lastModifiedTime;}public FileTime creationTime(){return lastModifiedTime;}public boolean isSymbolicLink(){return false;}public boolean isOther(){return false;}
+    }
     static void run(Path temp) throws Exception {
+        // Cached directory-enumeration sizes are not comparable with explicit Windows attribute reads.
+        var time=FileTime.fromMillis(42);check(PackLoads.same(new Attributes(false,true,4096,time,null),new Attributes(false,true,0,time,null)));
+        check(!PackLoads.same(new Attributes(false,true,4096,time,null),new Attributes(false,true,0,FileTime.fromMillis(43),null)));
+        check(!PackLoads.same(new Attributes(true,false,4096,time,null),new Attributes(true,false,0,time,null)));
+        check(!PackLoads.same(new Attributes(false,true,0,time,"old"),new Attributes(false,true,0,time,"new")));
         byte[] opaque={0,1,-1,4};byte[] unknown=bytes("invalid JSON 雪");String file="blocks/base.json";
         var seed=PackWorkspace.newPack(Map.of(file,bytes("{\r\n \"block\":\"minecraft:stone\",\"future\":9007199254740993\r\n}"),"future/unknown.json",unknown,"objects/exact.iob",opaque,"empty.bin",new byte[0]));seed.createSubfolder("blocks","empty");
         Path root=temp.resolve("pack-load-source"),archive=temp.resolve("pack-load-source.zip");seed.save(root);var original=PackWorkspace.open(root);original.exportZip(archive);
