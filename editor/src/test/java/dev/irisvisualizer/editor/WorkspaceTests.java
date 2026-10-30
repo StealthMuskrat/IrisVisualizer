@@ -116,6 +116,7 @@ public final class WorkspaceTests {
    PendingDiskReviewTests.run(temp);
    PackLoadTests.run(temp);
    FileSaveTests.run(temp);
+   SaveMetadataTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);
