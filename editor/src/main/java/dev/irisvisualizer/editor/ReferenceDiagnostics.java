@@ -13,7 +13,7 @@ public final class ReferenceDiagnostics {
     private static boolean full(List<Link> links) { if (links.size()<MAX_LINKS) return false;((Links)links).truncated=true;return true; }
     public enum State { EXACT_FILE, NO_EXACT_FILE, ABSENT_REQUIRED, EMPTY_REQUIRED, UNSUPPORTED, INVALID_KEY }
     public record Link(String field, String key, String target, State state) {}
-    public static List<Link> inspect(PackWorkspace workspace, String path) {
+    public static List<Link> inspect(PackResourceView workspace, String path) {
         String base = ResourceTypes.base(path);
         if (!supports(path)) return List.of();
         if (workspace.size(path) > MAX_JSON_BYTES) return List.of(new Link("JSON", "Above 1 MB inspection limit", null, State.UNSUPPORTED));
@@ -71,7 +71,7 @@ public final class ReferenceDiagnostics {
     public static boolean supports(String path) {
         return Set.of("dimensions","regions","biomes","generators","expressions","image-maps","structures","jigsaw-pools","jigsaw-pieces","blocks").contains(Objects.toString(ResourceTypes.base(path),""));
     }
-    private static void structurePlacements(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void structurePlacements(PackResourceView workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("structures")==null) return;
         try {
             var rows=document.objectArray("structures");
@@ -85,7 +85,7 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException unsupported) { links.add(new Link("structures","Null/snippet/mixed/non-object placement list",null,State.UNSUPPORTED)); }
     }
-    private static void subterrain(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void subterrain(PackResourceView workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("subterrainFeatures")==null) return;
         try {
             var entries=document.objectArray("subterrainFeatures");
@@ -96,7 +96,7 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException unsupported) { links.add(new Link("subterrainFeatures","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
-    private static void pieceConnectors(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void pieceConnectors(PackResourceView workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("connectors")==null) return;
         try {
             var rows=document.objectArray("connectors");
@@ -107,7 +107,7 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException invalid) { links.add(new Link("connectors","Null/snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
-    private static void jigsawPool(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void jigsawPool(PackResourceView workspace,LosslessJson document,List<Link> links) {
         try { String fallback=JigsawPools.fallback(document);if (!fallback.isBlank()) links.add(link(workspace,"fallback",fallback,"jigsaw-pools")); }
         catch (IllegalArgumentException invalid) { links.add(new Link("fallback","Non-string fallback",null,State.UNSUPPORTED)); }
         if (document.token("pieces")==null) { links.add(new Link("pieces","No explicit memberships; start-pool eligibility unchecked",null,State.ABSENT_REQUIRED));return; }
@@ -123,15 +123,15 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException invalid) { links.add(new Link("pieces","Null/snippet/mixed/non-object membership list",null,State.UNSUPPORTED)); }
     }
-    private static void structurePool(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void structurePool(PackResourceView workspace,LosslessJson document,List<Link> links) {
         try { String key=document.stringToken("startPool");links.add(key==null ? new Link("startPool","Absent start pool",null,State.ABSENT_REQUIRED) : link(workspace,"startPool",key,"jigsaw-pools")); }
         catch (IllegalArgumentException unsupported) { links.add(new Link("startPool","Non-string start pool",null,State.UNSUPPORTED)); }
     }
-    private static void pngSource(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void pngSource(PackResourceView workspace,LosslessJson document,List<Link> links) {
         try { String key=document.stringToken("source");links.add(key==null ? new Link("source","Absent PNG source",null,State.ABSENT_REQUIRED) : link(workspace,"source",key,"images")); }
         catch (IllegalArgumentException unsupported) { links.add(new Link("source","Non-string PNG source",null,State.UNSUPPORTED)); }
     }
-    private static void imageMaps(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void imageMaps(PackResourceView workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("imageMaps")==null) return;
         try {
             var entries=document.objectArray("imageMaps");
@@ -142,14 +142,14 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException unsupported) { links.add(new Link("imageMaps","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
-    private static void carvingBiomes(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void carvingBiomes(PackResourceView workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("carving")==null || document.token("carving").equals("null")) return;
         try {
             var entries=document.objectArray("carving");
             for (int index=0;index<entries.size() && !full(links);index++) scalar(workspace,entries.get(index),"biome","biomes","carving["+index+"].",false,true,links);
         } catch (IllegalArgumentException wrong) { links.add(new Link("carving","Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
-    private static void scalar(PackWorkspace workspace,LosslessJson document,String field,String type,String prefix,boolean upper,boolean selfDefault,List<Link> links) {
+    private static void scalar(PackResourceView workspace,LosslessJson document,String field,String type,String prefix,boolean upper,boolean selfDefault,List<Link> links) {
         if (full(links)) return;
         String token=document.token(field);if (token==null || (upper || selfDefault) && token.equals("null")) return;
         try {
@@ -158,7 +158,7 @@ public final class ReferenceDiagnostics {
             links.add(link(workspace,prefix+field,key,type));
         } catch (IllegalArgumentException wrong) { links.add(new Link(prefix+field,"Non-string reference",null,State.UNSUPPORTED)); }
     }
-    private static void objectEntries(PackWorkspace workspace,LosslessJson document,String field,String prefix,boolean fixed,List<Link> links) {
+    private static void objectEntries(PackResourceView workspace,LosslessJson document,String field,String prefix,boolean fixed,List<Link> links) {
         if (full(links) || document.token(field)==null) return;
         try {
             var entries=document.objectArray(field);
@@ -171,7 +171,7 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException wrong) { links.add(new Link(prefix+field,"Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
-    private static void floating(PackWorkspace workspace,LosslessJson document,List<Link> links) {
+    private static void floating(PackResourceView workspace,LosslessJson document,List<Link> links) {
         String field="floatingChildBiomes";if (full(links) || document.token(field)==null || document.token(field).equals("null")) return;
         try {
             var entries=document.objectArray(field);
@@ -182,7 +182,7 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException wrong) { links.add(new Link(field,"Snippet/mixed/non-object list",null,State.UNSUPPORTED)); }
     }
-    private static void riverBiomes(PackWorkspace workspace, String path, LosslessJson document, List<Link> links) {
+    private static void riverBiomes(PackResourceView workspace, String path, LosslessJson document, List<Link> links) {
         if (full(links)) return;
         LosslessJson policy;
         try { policy = RiverPolicyFields.object(path,document); }
@@ -194,7 +194,7 @@ public final class ReferenceDiagnostics {
             list(workspace,policy,field,"biomes",false,"riverPolicy.",links);
         }
     }
-    private static void biomeGenerators(PackWorkspace workspace, LosslessJson document, List<Link> links) {
+    private static void biomeGenerators(PackResourceView workspace, LosslessJson document, List<Link> links) {
         if (full(links)) return;
         if (document.token("generators") == null) {
             links.add(new Link("generators", "Implicit defaults not inspected", null, State.UNSUPPORTED)); return;
@@ -211,10 +211,10 @@ public final class ReferenceDiagnostics {
             }
         } catch (IllegalArgumentException mismatch) { links.add(new Link("generators", "Snippet/mixed/non-object list", null, State.UNSUPPORTED)); }
     }
-    private static void list(PackWorkspace workspace, LosslessJson document, String field, String type, boolean required, List<Link> links) {
+    private static void list(PackResourceView workspace, LosslessJson document, String field, String type, boolean required, List<Link> links) {
         list(workspace,document,field,type,required,"",links);
     }
-    private static void list(PackWorkspace workspace, LosslessJson document, String field, String type, boolean required, String prefix, List<Link> links) {
+    private static void list(PackResourceView workspace, LosslessJson document, String field, String type, boolean required, String prefix, List<Link> links) {
         if (full(links)) return;
         String displayed = prefix+field;
         if (document.token(field) == null) {
@@ -227,7 +227,7 @@ public final class ReferenceDiagnostics {
             for (int index=0;index<keys.size() && !full(links);index++) links.add(link(workspace, displayed + "[" + index + "]", keys.get(index), type));
         } catch (IllegalArgumentException mismatch) { links.add(new Link(displayed, "Non-string or unsupported list", null, State.UNSUPPORTED)); }
     }
-    static Link link(PackWorkspace workspace, String field, String key, String type) {
+    static Link link(PackResourceView workspace, String field, String key, String type) {
         if (!ResourceTypes.referenceKey(key))
             return new Link(field, key, null, State.INVALID_KEY);
         String target = type + "/" + key + (type.equals("objects") ? ".iob" : type.equals("images") ? ".png" : ".json");

@@ -51,11 +51,14 @@ public final class PackReferenceAudit {
         Scan(Limits limits) { this.limits=limits; }
         void notice(String path,String message) { incomplete=true;if (notices.size()<limits.notices()) notices.add(new Notice(path,message));else omitted++; }
     }
-    public static Audit inspect(PackWorkspace workspace) { return inspect(workspace,new Limits(MAX_FILES,MAX_BYTES,MAX_FINDINGS,MAX_NOTICES)); }
-    static Audit inspect(PackWorkspace workspace,Limits limits) {
+    public static Audit inspect(PackResourceView workspace) { return inspect(workspace,new Limits(MAX_FILES,MAX_BYTES,MAX_FINDINGS,MAX_NOTICES)); }
+    static Audit inspect(PackResourceView workspace,java.util.function.BooleanSupplier cancelled) { return inspect(workspace,new Limits(MAX_FILES,MAX_BYTES,MAX_FINDINGS,MAX_NOTICES),cancelled); }
+    static Audit inspect(PackResourceView workspace,Limits limits) { return inspect(workspace,limits,() -> false); }
+    private static Audit inspect(PackResourceView workspace,Limits limits,java.util.function.BooleanSupplier cancelled) {
         Objects.requireNonNull(workspace);Objects.requireNonNull(limits);var scan=new Scan(limits);
         int eligible=0,considered=0,inspected=0,skipped=0;long bytes=0;
         for (String path : workspace.paths()) {
+            if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
             if (!ReferenceDiagnostics.supports(path)) continue;
             eligible++;
             if (considered++>=limits.files()) { skipped++;scan.notice(path,"File budget reached; this resource was not inspected.");continue; }
@@ -65,6 +68,7 @@ public final class PackReferenceAudit {
             if (size>limits.bytes()-bytes) { skipped++;scan.notice(path,"Byte budget reached; this resource was not inspected.");continue; }
             bytes+=size;inspected++;
             var links=ReferenceDiagnostics.inspect(workspace,path);
+            if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
             int remaining=limits.findings()-scan.findings.size();
             for (int i=0;i<Math.min(remaining,links.size());i++) {
                 var link=links.get(i);scan.findings.add(new Finding(path,link.field(),link.key(),link.target(),link.state()));
@@ -72,6 +76,7 @@ public final class PackReferenceAudit {
             }
             if (links.size()>remaining) scan.notice(path,"Finding budget reached within this resource; remaining link diagnostics were omitted.");
         }
+        if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
         return new Audit(eligible,inspected,bytes,skipped,scan.findings,scan.notices,scan.omitted,scan.incomplete);
     }
     private static boolean contains(String value,String query) { return value!=null && value.toLowerCase(Locale.ROOT).contains(query); }

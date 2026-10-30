@@ -56,7 +56,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { imageLoader.close();clearImage(); }
+        try { packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -151,7 +151,7 @@ public final class EditorApp extends Application {
     private String changesSelected,changesPendingPath;
     private PackWorkspace changesPendingWorkspace;
     private boolean showReferenceReview,reviewIncomingOnly;
-    private final PackReferenceAudit.Cache packReferenceReview=new PackReferenceAudit.Cache();
+    private final AsyncPackReferenceReview packReferenceReview=new AsyncPackReferenceReview();
     private final ImString referenceReviewQuery=new ImString(1024);
     private PackReferenceAudit.View referenceReviewView=PackReferenceAudit.View.ALL;
     private String referenceReviewPendingPath;
@@ -188,6 +188,7 @@ public final class EditorApp extends Application {
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
+        packReferenceReview.poll(workspace);
 
         if (closeRequested) {
             closeRequested = false;
@@ -6220,16 +6221,18 @@ public final class EditorApp extends Application {
     }
     private void drawPackReferenceReview() {
         if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }
-        if (ImGui.button("Close resource-link review")) { showReferenceReview=false;ImGui.end();return; }
+        if (ImGui.button("Close resource-link review")) { packReferenceReview.clear();showReferenceReview=false;ImGui.end();return; }
         ImGui.textWrapped("Known typed fields in dimension, region, biome, generator, expression, image-map, structure, jigsaw-pool, jigsaw-piece and block-definition JSON. Material links include authored exact aliases in known palettes, replacement find lists, deposit/decorator blocks and eight backup levels. Bare block names without a matching alias file are not missing-resource findings. Implicit defaults, registry states, string block filters and native fallback mappings are not resolved. Noise source links include known inline style contexts and nested fractures; both declared sources are listed even when native precedence overrides one. Exact file presence does not establish target-content validity, native alias resolution or generation compatibility. Unknown fields, other resource families and other references are not covered. This review cannot establish that rename, move or deletion is safe.");
         if (ImGui.button("Scan / refresh known resource links")) packReferenceReview.refresh(workspace);
-        ImGui.sameLine();if (ImGui.button("Clear link scan")) packReferenceReview.clear();
+        ImGui.sameLine();if (ImGui.button("Cancel / clear link scan")) packReferenceReview.clear();
         ImGui.inputText("Source, field, key or target contains",referenceReviewQuery);
         if (ImGui.beginCombo("Link state",referenceReviewView.label())) { for (var view : PackReferenceAudit.View.values()) if (ImGui.selectable(view.label(),view==referenceReviewView)) referenceReviewView=view;ImGui.endCombo(); }
         if (ImGui.checkbox("Known incoming links to current selection",reviewIncomingOnly)) reviewIncomingOnly=!reviewIncomingOnly;
         if (ImGui.button("Clear link filters")) { referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false; }
-        var audit=packReferenceReview.current(workspace);
-        if (audit==null) ImGui.textWrapped("No scan for the current applied workspace state. Scan explicitly after New/Open/Import or an applied edit/resource change; changing filters does not rescan.");
+        var scan=packReferenceReview.poll(workspace);var audit=scan.audit();
+        if (scan.phase()==AsyncPackReferenceReview.Phase.SCANNING) ImGui.textWrapped("Scanning resource links in the background... Editing and Save/Export remain available. Refresh starts a new review; Cancel discards the result.");
+        else if (scan.phase()==AsyncPackReferenceReview.Phase.FAILED) ImGui.textWrapped("Resource link scan failed: "+scan.error()+". Refresh explicitly to retry.");
+        else if (audit==null) ImGui.textWrapped("No scan for the current applied workspace state. Scan explicitly after New/Open/Import or an applied edit/resource change; changing filters does not rescan.");
         else {
             ImGui.textWrapped(audit.inspectedFiles()+" / "+audit.eligibleFiles()+" eligible resources inspected; "+audit.bytes()+" bytes; "+audit.skippedFiles()+" skipped files; "+audit.findings().size()+" recorded diagnostics.");
             ImGui.textWrapped(audit.count(ReferenceDiagnostics.State.EXACT_FILE)+" exact-file links; "+audit.count(ReferenceDiagnostics.State.NO_EXACT_FILE)+" no-exact-file links; "+(audit.count(ReferenceDiagnostics.State.ABSENT_REQUIRED)+audit.count(ReferenceDiagnostics.State.EMPTY_REQUIRED))+" required-field diagnostics; "+audit.count(ReferenceDiagnostics.State.INVALID_KEY)+" invalid keys; "+audit.count(ReferenceDiagnostics.State.UNSUPPORTED)+" unsupported diagnostics.");
@@ -6251,7 +6254,7 @@ public final class EditorApp extends Application {
                 }
             } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
         }
-        ImGui.textWrapped("Explicit scan limits: 512 eligible files, 8 MB total, 1 MB/file, 4,096 recorded diagnostics and 256 notices. Per-resource checks also cap links. Filtering shows up to 200 matches with 256 search characters. Long labels are shortened to 256 UTF-16 characters plus ellipsis; control characters are escaped for display. Scans read applied memory only; drafts, disk state and formulas are not inspected. Save/Export remain available; no data is rewritten and no native resource is loaded.");
+        ImGui.textWrapped("Explicit scan limits: 512 eligible files, 8 MB total, 1 MB/file, 4,096 recorded diagnostics and 256 notices. Per-resource checks also cap links. Filtering shows up to 200 matches with 256 search characters. Long labels are shortened to 256 UTF-16 characters plus ellipsis; control characters are escaped for display. Scans run in the background against an applied snapshot. Edits cancel and invalidate the review without rescanning. The snapshot holds up to 100,000 exact file paths / 16 million UTF-16 path characters and excludes object/image payloads. Drafts, disk state and formulas are not inspected. Save/Export remain available; no data is rewritten and no native resource is loaded.");
         ImGui.end();
     }
     private void queueReferenceReviewOpen(String path) {

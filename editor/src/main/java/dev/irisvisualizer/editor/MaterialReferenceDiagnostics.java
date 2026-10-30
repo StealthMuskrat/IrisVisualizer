@@ -36,7 +36,7 @@ final class MaterialReferenceDiagnostics {
     private static boolean emit(Predicate<ReferenceDiagnostics.Link> output,String field,String detail) {
         return output.test(new ReferenceDiagnostics.Link(field,detail,null,ReferenceDiagnostics.State.UNSUPPORTED));
     }
-    static void inspect(PackWorkspace workspace,String base,LosslessJson document,Predicate<ReferenceDiagnostics.Link> output) {
+    static void inspect(PackResourceView workspace,String base,LosslessJson document,Predicate<ReferenceDiagnostics.Link> output) {
         if (!FAMILIES.contains(base)) return;
         var index=document.structure(JsonStructure.MAX_NODES,JsonStructure.MAX_DEPTH);
         var nodes=index.nodes();var paths=new String[nodes.size()];var displays=new String[nodes.size()];var blocks=new boolean[nodes.size()];var depths=new int[nodes.size()];
