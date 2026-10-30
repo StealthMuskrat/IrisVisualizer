@@ -76,6 +76,7 @@ public final class WorkspaceTests {
    ResourceSelectorTests.run(temp);
    ReferenceLinkTests.run(temp);
    NoiseReferenceTests.run(temp);
+   MaterialReferenceTests.run(temp);
    DimensionCarvingTests.run(temp);
    TerrainOverlayTests.run(temp);
    TerrainTransformTests.run(temp);

@@ -62,13 +62,14 @@ public final class ReferenceDiagnostics {
                 structurePlacements(workspace,document,links);
             }
             if (!full(links)) NoiseReferenceDiagnostics.inspect(workspace,base,document,link -> { if (full(links)) return false;return links.add(link); });
+            if (!full(links)) MaterialReferenceDiagnostics.inspect(workspace,base,document,link -> { if (full(links)) return false;return links.add(link); });
         } catch (IllegalArgumentException invalid) { links.add(new Link("JSON", "Invalid/ambiguous JSON", null, State.UNSUPPORTED)); }
         List<Link> result=new ArrayList<>(links);
         if (links.truncated) result.add(new Link("References","Inspection truncated at "+MAX_LINKS+" links",null,State.UNSUPPORTED));
         return List.copyOf(result);
     }
     public static boolean supports(String path) {
-        return Set.of("dimensions","regions","biomes","generators","expressions","image-maps","structures","jigsaw-pools","jigsaw-pieces").contains(Objects.toString(ResourceTypes.base(path),""));
+        return Set.of("dimensions","regions","biomes","generators","expressions","image-maps","structures","jigsaw-pools","jigsaw-pieces","blocks").contains(Objects.toString(ResourceTypes.base(path),""));
     }
     private static void structurePlacements(PackWorkspace workspace,LosslessJson document,List<Link> links) {
         if (full(links) || document.token("structures")==null) return;
