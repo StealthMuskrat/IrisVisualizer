@@ -113,6 +113,7 @@ public final class WorkspaceTests {
    WorkspaceTextSearchTests.run(temp);
    AsyncWorkspaceTextSearchTests.run(temp);
    WorkspaceChangesTests.run(temp);
+   PendingDiskReviewTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);
