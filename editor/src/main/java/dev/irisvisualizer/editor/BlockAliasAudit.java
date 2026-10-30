@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 /** Bounded literal file-reference graph only. Does not load native aliases, resolve states or sample generation. */
 public final class BlockAliasAudit {
@@ -21,14 +23,15 @@ public final class BlockAliasAudit {
         public List<Cycle> cycles(String path) { return cycles.stream().filter(c -> c.members().contains(path)).toList(); }
     }
     private static final class Scan {
-        final PackWorkspace workspace;
+        final PackResourceView workspace;
         final List<Edge> edges=new ArrayList<>();
         final List<Notice> notices=new ArrayList<>();
         boolean incomplete,noticeOverflow;
-        Scan(PackWorkspace workspace) { this.workspace=workspace; }
+        final BooleanSupplier cancelled;
+        Scan(PackResourceView workspace,BooleanSupplier cancelled) { this.workspace=workspace;this.cancelled=cancelled; }
         void notice(String path,String field,String message,boolean partial) { incomplete|=partial;if (notices.size()<MAX_NOTICES) notices.add(new Notice(path,field,message));else noticeOverflow=true; }
         void node(String file,LosslessJson owner,int depth) {
-            String prefix="backup.".repeat(depth);
+            checkCancelled(cancelled);String prefix="backup.".repeat(depth);
             try {
                 String block=BlockDefinitions.block(owner);String target=BlockDefinitions.exactAlias(workspace,block);
                 if (target!=null) { if (edges.size()<MAX_EDGES) edges.add(new Edge(file,prefix+"block",block,target,owner.token("block")==null,depth>0));else notice(file,prefix+"block","Reference limit reached; remaining links are not recorded.",true); }
@@ -41,20 +44,23 @@ public final class BlockAliasAudit {
             catch (IllegalArgumentException bad) { notice(file,prefix+"backup","Backup is not an inline object; references are unknown.",true); }
         }
     }
-    public static Audit inspect(PackWorkspace workspace) {
-        Objects.requireNonNull(workspace);var definitions=workspace.paths().stream().filter(BlockDefinitions::supports).sorted().toList();var scan=new Scan(workspace);var inspected=new ArrayList<String>();int parsed=0;long bytes=0;
+    public static Audit inspect(PackResourceView workspace) { return inspect(workspace,() -> false); }
+    private static void checkCancelled(BooleanSupplier cancelled) { if (cancelled.getAsBoolean()) throw new CancellationException("Definition audit cancelled"); }
+    public static Audit inspect(PackResourceView workspace,BooleanSupplier cancelled) {
+        Objects.requireNonNull(workspace);Objects.requireNonNull(cancelled);checkCancelled(cancelled);var definitions=workspace.paths().stream().filter(BlockDefinitions::supports).sorted().toList();var scan=new Scan(workspace,cancelled);var inspected=new ArrayList<String>();int parsed=0;long bytes=0;
         int candidates=Math.min(definitions.size(),MAX_DEFINITIONS);
         if (definitions.size()>MAX_DEFINITIONS) scan.notice("blocks/","","Definition limit reached; only the first 512 sorted files are considered.",true);
         for (int i=0;i<candidates;i++) {
-            String path=definitions.get(i);int size=workspace.size(path);
+            checkCancelled(cancelled);String path=definitions.get(i);int size=workspace.size(path);
             if (size>ReferenceDiagnostics.MAX_JSON_BYTES) { scan.notice(path,"","Above the 1 MB JSON inspection limit; this definition is skipped.",true);continue; }
             if (bytes+size>MAX_TOTAL_BYTES) { scan.notice("blocks/","","The 8 MB total inspection budget is exhausted; remaining definitions are skipped.",true);break; }
             bytes+=size;inspected.add(path);
-            try { var root=new LosslessJson(workspace.read(path));parsed++;scan.node(path,root,0); }
+            try { var root=new LosslessJson(workspace.read(path));checkCancelled(cancelled);parsed++;scan.node(path,root,0); }
             catch (IllegalArgumentException bad) { scan.notice(path,"","Invalid UTF-8/object JSON or duplicate keys; this definition cannot be inspected.",true); }
         }
-        if (scan.noticeOverflow) { scan.incomplete=true;scan.notices.set(MAX_NOTICES-1,new Notice("blocks/","","Additional notices omitted after the 256-notice limit.")); }
-        return new Audit(definitions.size(),inspected,parsed,bytes,scan.edges,cycles(inspected,scan.edges),scan.notices,scan.incomplete);
+        checkCancelled(cancelled);if (scan.noticeOverflow) { scan.incomplete=true;scan.notices.set(MAX_NOTICES-1,new Notice("blocks/","","Additional notices omitted after the 256-notice limit.")); }
+        var cycles=cycles(inspected,scan.edges);checkCancelled(cancelled);
+        return new Audit(definitions.size(),inspected,parsed,bytes,scan.edges,cycles,scan.notices,scan.incomplete);
     }
     private static List<Cycle> cycles(List<String> files,List<Edge> edges) {
         var links=edges.stream().map(e -> new LiteralReferenceGraph.Link(e.source(),e.target())).toList();

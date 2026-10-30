@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 /** Bounded literal references in expression source styles. Never parses a formula or loads a native source. */
 public final class ExpressionReferenceAudit {
@@ -25,15 +27,17 @@ public final class ExpressionReferenceAudit {
         final List<Edge> edges=new ArrayList<>();
         final List<Notice> notices=new ArrayList<>();
         boolean incomplete,noticeOverflow;
-        Scan(PackWorkspace workspace) { paths=Set.copyOf(workspace.paths()); }
+        final BooleanSupplier cancelled;
+        Scan(PackResourceView workspace,BooleanSupplier cancelled) { paths=Set.copyOf(workspace.paths());this.cancelled=cancelled; }
         void notice(String path,String field,String message,boolean partial) { incomplete|=partial;if (notices.size()<MAX_NOTICES) notices.add(new Notice(path,field,message));else noticeOverflow=true; }
         void definition(String file,LosslessJson root) {
-            var names=new LinkedHashMap<String,String>();
+            checkCancelled(cancelled);var names=new LinkedHashMap<String,String>();
             for (String list : ExpressionDefinitions.LISTS) {
                 List<LosslessJson> rows;
                 try { rows=ExpressionDefinitions.entries(root,list);if (rows==null) continue;if (rows.size()>ExpressionDefinitions.MAX_ENTRIES) throw new IllegalArgumentException(); }
                 catch (IllegalArgumentException bad) { notice(file,list,"Source list is null, mixed, non-inline or above the 64-entry inspection limit; declarations and links are unknown.",true);continue; }
                 for (int i=0;i<rows.size();i++) {
+                    checkCancelled(cancelled);
                     var context=new ExpressionDefinitions.Context(list,i);var row=rows.get(i);String prefix=list+"["+i+"].";
                     try {
                         String name=ExpressionDefinitions.name(row,context);
@@ -58,7 +62,8 @@ public final class ExpressionReferenceAudit {
             }
         }
         void style(String file,LosslessJson style,String prefix,int depth,boolean higherPriority) {
-            for (String field : NoiseStyleSources.REFERENCES) {
+            checkCancelled(cancelled);for (String field : NoiseStyleSources.REFERENCES) {
+                checkCancelled(cancelled);
                 String token=style.token(field);if (token==null || token.equals("null")) continue;
                 try {
                     String key=style.stringToken(field);
@@ -76,20 +81,23 @@ public final class ExpressionReferenceAudit {
             catch (IllegalArgumentException bad) { notice(file,prefix+"fracture","Fracture is not an inline object; references are unknown.",true); }
         }
     }
-    public static Audit inspect(PackWorkspace workspace) {
-        Objects.requireNonNull(workspace);var definitions=workspace.paths().stream().filter(ExpressionDefinitions::supports).sorted().toList();var scan=new Scan(workspace);var inspected=new ArrayList<String>();int parsed=0;long bytes=0;
+    public static Audit inspect(PackResourceView workspace) { return inspect(workspace,() -> false); }
+    private static void checkCancelled(BooleanSupplier cancelled) { if (cancelled.getAsBoolean()) throw new CancellationException("Definition audit cancelled"); }
+    public static Audit inspect(PackResourceView workspace,BooleanSupplier cancelled) {
+        Objects.requireNonNull(workspace);Objects.requireNonNull(cancelled);checkCancelled(cancelled);var definitions=workspace.paths().stream().filter(ExpressionDefinitions::supports).sorted().toList();var scan=new Scan(workspace,cancelled);var inspected=new ArrayList<String>();int parsed=0;long bytes=0;
         if (definitions.size()>MAX_DEFINITIONS) scan.notice("expressions/","","Definition limit reached; only the first 512 sorted files are considered.",true);
         for (int i=0;i<Math.min(definitions.size(),MAX_DEFINITIONS);i++) {
-            String path=definitions.get(i);int size=workspace.size(path);
+            checkCancelled(cancelled);String path=definitions.get(i);int size=workspace.size(path);
             if (size>ReferenceDiagnostics.MAX_JSON_BYTES) { scan.notice(path,"","Above the 1 MB JSON inspection limit; this definition is skipped.",true);continue; }
             if (bytes+size>MAX_TOTAL_BYTES) { scan.notice("expressions/","","The 8 MB total inspection budget is exhausted; remaining definitions are skipped.",true);break; }
             bytes+=size;inspected.add(path);
-            try { var root=new LosslessJson(workspace.read(path));parsed++;scan.definition(path,root); }
+            try { var root=new LosslessJson(workspace.read(path));checkCancelled(cancelled);parsed++;scan.definition(path,root); }
             catch (IllegalArgumentException bad) { scan.notice(path,"","Invalid UTF-8/object JSON or duplicate keys; this definition cannot be inspected.",true); }
         }
-        if (scan.noticeOverflow) { scan.incomplete=true;scan.notices.set(MAX_NOTICES-1,new Notice("expressions/","","Additional notices omitted after the 256-notice limit.")); }
+        checkCancelled(cancelled);if (scan.noticeOverflow) { scan.incomplete=true;scan.notices.set(MAX_NOTICES-1,new Notice("expressions/","","Additional notices omitted after the 256-notice limit.")); }
         var links=scan.edges.stream().filter(Edge::present).map(e -> new LiteralReferenceGraph.Link(e.source(),e.target())).toList();
-        return new Audit(definitions.size(),inspected,parsed,bytes,scan.edges,LiteralReferenceGraph.cycles(inspected,links),scan.notices,scan.incomplete);
+        var cycles=LiteralReferenceGraph.cycles(inspected,links);checkCancelled(cancelled);
+        return new Audit(definitions.size(),inspected,parsed,bytes,scan.edges,cycles,scan.notices,scan.incomplete);
     }
     public static final class Cache {
         private PackWorkspace workspace;
