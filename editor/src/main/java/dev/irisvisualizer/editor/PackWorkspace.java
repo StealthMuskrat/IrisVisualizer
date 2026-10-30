@@ -76,18 +76,51 @@ public final class PackWorkspace implements PackResourceView {
     long assetImportBudget(String target,long bytes,long maximumBytes) throws IOException {
         if (maximumBytes<0 || maximumBytes>MAX_BYTES) throw new IllegalArgumentException("Invalid workspace asset-import budget");
         if (bytes<0 || bytes>AssetImports.MAX_BYTES) throw new IOException("Asset import exceeds the 64 MiB file limit");
+        checkAssetImportPath(target);
+        if (files.size()>=MAX_FILES) throw new IOException("Too many pack files");
+        validatePaths(target);
+        long available=maximumBytes-files.values().stream().mapToLong(data -> data.length).sum();
+        if (available<0 || bytes>available) throw new IOException("Asset exceeds the remaining workspace byte budget");
+        return Math.min(AssetImports.MAX_BYTES,available);
+    }
+    private void checkAssetImportPath(String target) throws IOException {
         target=safe(target);
         for (String component : target.split("/")) if (component.length()>255) throw new IOException("Imported asset path components must be at most 255 characters, including the file extension");
         if (!AssetReplacement.supports(target)) throw new IOException("Import only images/ PNG/JPEG or objects/ .iob assets");
         String family=ResourceTypes.fileFamily(target),extension=ResourceTypes.extension(target);
         String key=target.substring(family.length()+1,target.length()-extension.length());
         if (!extension.equals(extension.toLowerCase(Locale.ROOT)) || !ResourceTypes.target(target,key).equals(target)) throw new IOException("Use a lowercase asset extension and resource key");
-        if (files.size()>=MAX_FILES) throw new IOException("Too many pack files");
         if (foldedFiles.contains(target.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource path: "+target);
-        validatePaths(target);
+    }
+    /** Joint graph/capacity preflight, without source reads or mutation. */
+    long assetImportBatchBudget(Map<String,Long> sizes,long maximumBytes) throws IOException {
+        if (maximumBytes<0 || maximumBytes>MAX_BYTES) throw new IllegalArgumentException("Invalid batch workspace byte budget");
+        if (sizes.isEmpty() || sizes.size()>StagedAssetBatchImport.MAX_FILES) throw new IOException("Choose 1 to 32 asset files per batch");
+        long total=0;var folded=new HashSet<String>();
+        for (var entry : sizes.entrySet()) {
+            checkAssetImportPath(entry.getKey());
+            if (!folded.add(entry.getKey().toLowerCase(Locale.ROOT))) throw new IOException("Conflicting batch destination: "+entry.getKey());
+            if (entry.getValue()==null || entry.getValue()<0 || entry.getValue()>AssetImports.MAX_BYTES) throw new IOException("Each batch source must fit the 64 MiB file limit");
+            total+=entry.getValue();
+        }
+        if (total>StagedAssetBatchImport.MAX_BYTES) throw new IOException("Asset batch exceeds the 128 MiB captured-byte limit");
+        if (files.size()+sizes.size()>MAX_FILES) throw new IOException("Too many pack files");
+        validatePaths(List.copyOf(sizes.keySet()));
         long available=maximumBytes-files.values().stream().mapToLong(data -> data.length).sum();
-        if (available<0 || bytes>available) throw new IOException("Asset exceeds the remaining workspace byte budget");
-        return Math.min(AssetImports.MAX_BYTES,available);
+        if (available<0 || total>available) throw new IOException("Asset batch exceeds the remaining workspace byte budget");
+        return Math.min(StagedAssetBatchImport.MAX_BYTES,available);
+    }
+    private record CapturedInstall(String path,byte[] data,byte[] hash) {}
+    /** All joint preflight, defensive copies and hashing precede installation. One structural operation clears history once. */
+    List<String> installCapturedAssetBatch(List<AssetReplacement.Prepared> captures,long maximumBytes) throws IOException {
+        var sizes=new LinkedHashMap<String,Long>();
+        for (var captured : captures) if (sizes.putIfAbsent(captured.receipt().target(),(long)captured.receipt().bytes())!=null) throw new IOException("Duplicate captured destination");
+        assetImportBatchBudget(sizes,maximumBytes);
+        var installs=new ArrayList<CapturedInstall>();
+        for (var captured : captures) { byte[] owned=captured.copyBytes();installs.add(new CapturedInstall(captured.receipt().target(),owned,hash(owned))); }
+        // Workspace is UI-owned. All path, entry and capacity guards have passed for the whole proposed graph.
+        for (var install : installs) { String path=install.path();files.put(path,install.data());foldedFiles.add(path.toLowerCase(Locale.ROOT));savedHashes.put(path,install.hash());contentRevisions.put(path,++contentSequence);changed.add(path);created.add(path); }
+        resourceRevision++;history.clear("Asset batch imported; earlier applied-edit history was cleared.");return List.copyOf(sizes.keySet());
     }
     /** Installs private captured bytes after complete preflight; no source I/O or baseline adoption. */
     String installCapturedAsset(String target,AssetReplacement.Prepared prepared,long maximumBytes) throws IOException {
@@ -462,10 +495,11 @@ public final class PackWorkspace implements PackResourceView {
         if (!foldedFiles.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource paths: " + key);
         files.put(key, bytes); savedHashes.put(key, hash(bytes));contentRevisions.put(key,++contentSequence);
     }
-    private void validatePaths() throws IOException { validatePaths(null); }
-    private void validatePaths(String additionalFile) throws IOException {
+    private void validatePaths() throws IOException { validatePaths(List.of()); }
+    private void validatePaths(String additionalFile) throws IOException { validatePaths(List.of(additionalFile)); }
+    private void validatePaths(List<String> additionalFiles) throws IOException {
         Map<String, String> spellings = new HashMap<>(); Set<String> folders = new HashSet<>();
-        List<String> plannedFiles=new ArrayList<>(files.keySet());if (additionalFile!=null) plannedFiles.add(additionalFile);
+        List<String> plannedFiles=new ArrayList<>(files.keySet());plannedFiles.addAll(additionalFiles);
         for (String file : plannedFiles) for (String current=file;!current.isEmpty();) {
             if (removedDirectories.contains(current)) throw new IOException("Restore the pending folder removal before adding resources inside it: "+current);
             int slash=current.lastIndexOf('/');current=slash<0 ? "" : current.substring(0,slash);
