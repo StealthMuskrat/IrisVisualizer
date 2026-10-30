@@ -474,6 +474,10 @@ public final class PackWorkspace implements PackResourceView {
         }
         return target;
     }
+    /** Full applied export snapshot; private immutable arrays are shared without another complete pack allocation. */
+    public ZipExportSource captureZipExport() throws IOException {
+        var source=new ZipExportSource(files,directories,revision(),directory);validatePaths();return source;
+    }
     public void exportZip(Path archive) throws IOException { exportZip(archive, false); }
     public void exportZip(Path archive, boolean replaceExisting) throws IOException {
         Path destination = archive.toAbsolutePath().normalize();

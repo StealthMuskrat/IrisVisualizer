@@ -25,6 +25,9 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private final AsyncZipExport zipExport=new AsyncZipExport();
+    private boolean showZipExport;
+    private String zipExportMessage;
     private final AsyncAssetBatchImport assetBatchImport=new AsyncAssetBatchImport();
     private boolean showAssetBatchImport,assetBatchAcknowledge;
     private long assetBatchReviewed=-1;
@@ -80,7 +83,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -250,6 +253,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Review captured asset import")) showAssetImport=true;
                 if (ImGui.menuItem("Import image/object batch")) importAssetBatch();
                 if (ImGui.menuItem("Review captured asset batch")) showAssetBatchImport=true;
+                if (ImGui.menuItem("Review ZIP export progress")) showZipExport=true;
                 ImGui.beginDisabled(!AssetReplacement.supports(selected));if (ImGui.menuItem("Replace selected image/object asset")) chooseAssetReplacement(selected);ImGui.endDisabled();
                 if (ImGui.menuItem("Review captured asset replacement")) showAssetReplacement=true;
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
@@ -455,6 +459,7 @@ public final class EditorApp extends Application {
         if (showReferenceReview) drawPackReferenceReview();
         if (showJigsawReview) drawJigsawDependencyReview();
         if (showStructureThemeReview) drawStructureThemeReview();
+        if (showZipExport) drawZipExport();
         if (showAssetBatchImport) drawAssetBatchImport();
         if (showAssetImport) drawAssetImport();
         if (showAssetReplacement) drawAssetReplacement();
@@ -6752,6 +6757,28 @@ public final class EditorApp extends Application {
         int result = save ? chooser.showSaveDialog(null) : chooser.showOpenDialog(null);
         return result == JFileChooser.APPROVE_OPTION ? chooser.getSelectedFile().toPath() : null;
     }
+    private void drawZipExport() {
+        if (!ImGui.begin("Captured ZIP export")) { ImGui.end();return; }
+        if (ImGui.button("Hide ZIP export progress")) { showZipExport=false;ImGui.end();return; }
+        var state=zipExport.poll();ImGui.textWrapped("Export uses the applied workspace snapshot captured when Export was requested. Later edits, Save, selection changes and New/Open do not change that snapshot. Unapplied inspector drafts are excluded and remain available. Export never marks the workspace saved or adopts a disk baseline.");
+        if (state.source()!=null) { var source=state.source();ImGui.textWrapped("Captured applied revision: "+source.revision()+"; "+source.files()+" files, "+source.directories()+" explicit folders, "+source.bytes()+" uncompressed bytes.");ImGui.textWrapped("Captured pack folder: "+(source.activeDirectory()==null ? "Not saved to a folder" : InspectorText.label(source.activeDirectory().toString(),512))); }
+        if (state.archive()!=null) ImGui.textWrapped("Chosen ZIP: "+InspectorText.label(state.archive().toString(),512)+(state.replace() ? " (confirmed replacement)" : " (new file only)"));
+        if (state.phase()==AsyncZipExport.Phase.EXPORTING || state.phase()==AsyncZipExport.Phase.CANCELLING || state.phase()==AsyncZipExport.Phase.PUBLISHING) {
+            ImGui.textUnformatted("Completed entries: "+state.entries()+"; uncompressed bytes written: "+state.bytes());
+            if (state.phase()==AsyncZipExport.Phase.PUBLISHING) ImGui.textWrapped("Publishing the completed ZIP. Publication has begun and cannot be cancelled.");
+            else if (state.phase()==AsyncZipExport.Phase.CANCELLING) ImGui.textWrapped("Cancellation requested. Waiting for the worker to close and remove its temporary file.");
+            else if (ImGui.button("Cancel export before publication")) zipExportMessage=zipExport.cancel() ? "Cancellation accepted before publication." : "Export cannot be cancelled now; review its result.";
+        } else {
+            if (state.phase()==AsyncZipExport.Phase.SUCCEEDED) { ImGui.textWrapped("ZIP export completed. The receipt describes the captured snapshot, which may differ from current applied edits.");ImGui.textWrapped("Published ZIP: "+InspectorText.label(state.receipt().archive().toString(),512));ImGui.textUnformatted("ZIP bytes: "+state.receipt().bytes());ImGui.textWrapped("ZIP SHA-256: "+state.receipt().sha256()); }
+            else if (state.detail()!=null) ImGui.textWrapped(state.detail());
+            else ImGui.textWrapped("No active export. File > Export captures applied values and starts a background ZIP job.");
+            if (ImGui.button("Export current applied workspace")) perform("Export");
+            if (ImGui.button("Clear completed export receipt")) { zipExport.clear();zipExportMessage=null; }
+        }
+        if (zipExportMessage!=null) ImGui.textWrapped(zipExportMessage);
+        ImGui.textWrapped("One export at a time. Snapshot limits: 512 MiB applied bytes, 100,000 file/folder entries and 16 million UTF-16 path characters. Compression, disk writes, existing-target conflict hashes and ZIP hashing run on the worker. The completed archive is staged beside its destination; existing targets are never truncated. Confirmed replacement requires an unchanged regular file of at most 1 GiB and filesystem support for atomic replacement. New targets never intentionally overwrite occupied files. Source/destination symbolic-link paths and targets inside the captured pack are rejected. Cancellation is accepted only before publication starts; hiding this window keeps the job running. Process termination can leave temporary files if cleanup cannot finish. Unsupported previews stay disabled.");
+        ImGui.end();
+    }
     private void perform(String action) {
         try {
             switch (action) {
@@ -6775,11 +6802,13 @@ public final class EditorApp extends Application {
                     Path path=choose(true,true);if (path==null) return;
                     if (action.equals("Save As")) workspace.saveAs(path);else workspace.saveCopy(path);
                 }
-                case "Export" -> { if (!appliedValuesOnlyAllowed()) return; Path path = choose(false, true); if (path != null) {
-                    boolean exists = java.nio.file.Files.exists(path);
-                    if (exists && JOptionPane.showConfirmDialog(null, "Replace existing ZIP?\n" + path, "Export", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
-                    workspace.exportZip(path, exists);
-                } }
+                case "Export" -> {
+                    if (zipExport.busy()) { showZipExport=true;return; }
+                    if (!appliedValuesOnlyAllowed()) return;Path path=choose(false,true);if (path==null) return;
+                    boolean exists=java.nio.file.Files.exists(path,java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                    if (exists && JOptionPane.showConfirmDialog(null,"Replace existing ZIP after the captured export completes?\n"+path,"Export",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION) return;
+                    zipExport.start(workspace,path,exists);zipExportMessage=null;showZipExport=true;
+                }
             }
             error = null;
         } catch (Exception failure) { error = failure.getMessage(); }
