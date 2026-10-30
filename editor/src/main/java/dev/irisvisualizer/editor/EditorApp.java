@@ -188,6 +188,11 @@ public final class EditorApp extends Application {
     private final AppliedEditReview.Cache editReviews=new AppliedEditReview.Cache();
     private AppliedEditReview.Comparison reviewedComparison;
     private ImString reviewedBefore,reviewedAfter;
+    private final AppliedEditDiff.Cache editDiffs=new AppliedEditDiff.Cache();
+    private AppliedEditDiff.Diff reviewedDiff;
+    private boolean diffShowUnchanged;
+    private int diffPage,diffSelected=-1,diffBufferedRow=-1;
+    private ImString diffLineText;
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
@@ -6115,7 +6120,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6412,12 +6417,16 @@ public final class EditorApp extends Application {
             ImGui.textWrapped("Edit #"+active.id()+": "+active.path());
             ImGui.textWrapped((active.forward() ? "Redo " : "Undo ")+active.steps()+" applied edit(s), including the selected edit. Intervening edits are listed below; the text panes show only this selected edit.");
             if (ImGui.treeNode("Affected edits (next first)")) { for (var step : active.forward() ? redo : undo) if (step.steps()<=active.steps()) ImGui.textWrapped("#"+step.id()+": "+step.path());ImGui.treePop(); }
-            drawAppliedHistoryText("Before applied edit",comparison.before(),reviewedBefore);drawAppliedHistoryText("After applied edit",comparison.after(),reviewedAfter);
+            if (ImGui.beginTabBar("Retained edit source review")) {
+                if (ImGui.beginTabItem("Line changes")) { drawAppliedHistoryDiff(comparison);ImGui.endTabItem(); }
+                if (ImGui.beginTabItem("Before / after source")) { drawAppliedHistoryText("Before applied edit",comparison.before(),reviewedBefore);drawAppliedHistoryText("After applied edit",comparison.after(),reviewedAfter);ImGui.endTabItem(); }
+                ImGui.endTabBar();
+            }
             if (ImGui.button((active.forward() ? "Redo " : "Undo ")+active.steps()+" edit(s) through #"+active.id())) {
                 try { transition(false,() -> { selected=active.forward() ? workspace.redoThrough(active.id()) : workspace.undoThrough(active.id());filter.set("");error=null; }); }
                 catch (Exception failure) { error=failure.getMessage(); }
             }
-        } else ImGui.textWrapped("Choose an available edit to review. Cleared, evicted and discarded Redo entries cannot be restored.");
+        } else { editDiffs.clear();reviewedDiff=null;diffLineText=null;diffSelected=-1;diffBufferedRow=-1;ImGui.textWrapped("Choose an available edit to review. Cleared, evicted and discarded Redo entries cannot be restored."); }
         ImGui.textWrapped("Text display: at most 64 KiB encoded and 16,384 UTF-16 characters per side. Binary/control-byte, invalid UTF-8 and larger snapshots show metadata only. Snapshot bytes remain unchanged; no JSON or native source is parsed or evaluated. Unsupported world previews remain disabled.");
         if (error!=null) ImGui.textWrapped(error);ImGui.end();
     }
@@ -6427,6 +6436,28 @@ public final class EditorApp extends Application {
             for (var step : steps) { ImGui.pushID(Long.toString(step.id()));String path=step.path().length()>128 ? step.path().substring(0,128)+"..." : step.path();if (ImGui.selectable(step.steps()+". #"+step.id()+" "+path+" ("+step.beforeBytes()+" -> "+step.afterBytes()+" bytes)",step.id()==reviewedHistoryId)) reviewedHistoryId=step.id();ImGui.popID(); }
             ImGui.endCombo();
         }ImGui.endDisabled();
+    }
+    private void drawAppliedHistoryDiff(AppliedEditReview.Comparison comparison) {
+        var diff=editDiffs.inspect(comparison);
+        if (diff!=reviewedDiff) { reviewedDiff=diff;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null; }
+        ImGui.textWrapped(diff.detail());
+        if (!diff.compared()) { if (diff.status()==AppliedEditDiff.Status.LIMITED) ImGui.textUnformatted(diff.beforeLines()+" before / "+diff.afterLines()+" after lines; no partial comparison.");return; }
+        ImGui.textUnformatted(diff.added()+" added / "+diff.removed()+" removed / "+diff.unchanged()+" unchanged lines in this edit.");
+        if (ImGui.checkbox("Show unchanged lines",diffShowUnchanged)) { diffShowUnchanged=!diffShowUnchanged;diffPage=0; }
+        var page=AppliedEditDiff.page(diff,diffShowUnchanged,diffPage);diffPage=page.page();
+        ImGui.textUnformatted(page.matches()+" matching lines; page "+(page.page()+1)+"; "+page.rows().size()+" shown.");
+        ImGui.beginDisabled(!page.previous());if (ImGui.smallButton("Previous change lines")) diffPage--;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(!page.next());if (ImGui.smallButton("Next change lines")) diffPage++;ImGui.endDisabled();
+        if (!page.rows().contains(diffSelected)) diffSelected=page.rows().isEmpty() ? -1 : page.rows().getFirst();
+        for (int index : page.rows()) {
+            var row=diff.rows().get(index);ImGui.pushID(index);if (ImGui.smallButton(diffSelected==index ? "Selected line" : "Select line")) diffSelected=index;ImGui.sameLine();
+            ImGui.textUnformatted(row.kind()+"  before "+(row.beforeLine()==0 ? "—" : row.beforeLine())+" / after "+(row.afterLine()==0 ? "—" : row.afterLine())+"  ["+row.ending()+"]  "+InspectorText.label(row.text(),256));ImGui.popID();
+        }
+        if (diffSelected>=0) {
+            var row=diff.rows().get(diffSelected);if (diffBufferedRow!=diffSelected) { diffBufferedRow=diffSelected;diffLineText=jsonReadOnlyBuffer(row.text()); }
+            ImGui.textWrapped("Selected original line: "+row.kind()+"; ending "+row.ending()+" (NONE means no final newline). Tabs, spaces and raw escapes remain literal. Long list labels are shortened; the full retained line is below.");
+            ImGui.inputTextMultiline("Selected retained source line",diffLineText,-1,100,ImGuiInputTextFlags.ReadOnly);
+        } else ImGui.textWrapped("No changed lines in this view. Enable Show unchanged lines to inspect matching text.");
+        ImGui.textWrapped("Line comparison is read-only and limited to complete text up to 64 KiB, 16,384 UTF-16 characters and 512 lines per side; up to 200 rows are shown per page. The Before / after source tab remains available. This compares one retained edit, not a multi-step restore destination; no JSON or native data is interpreted.");
     }
     private void drawAppliedHistoryText(String label,AppliedEditReview.Text text,ImString buffer) {
         ImGui.textWrapped(label+": "+text.bytes()+" bytes"+(text.truncated() ? " (text truncated; full bytes retained)" : ""));

@@ -105,6 +105,7 @@ public final class WorkspaceTests {
    ExpressionReferenceAuditTests.run(temp);
    AppliedEditHistoryTests.run(temp);
    AppliedEditReviewTests.run(temp);
+   AppliedEditDiffTests.run(temp);
    NavigationHistoryTests.run(temp);
    ResourceFinderTests.run(temp);
    WorkspaceCopyTests.run(temp);
