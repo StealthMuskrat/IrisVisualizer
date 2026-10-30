@@ -32,6 +32,7 @@ public final class EditorApp extends Application {
     private boolean showFolderCopy;
     private String folderCopyMessage;
     private Path pendingCopyOpen;
+    private boolean pendingCopyFromSaveAs;
     private final AsyncZipExport zipExport=new AsyncZipExport();
     private boolean showZipExport;
     private String zipExportMessage;
@@ -476,9 +477,9 @@ public final class EditorApp extends Application {
         if (showAssetReplacement) drawAssetReplacement();
         if (showJsonStructure) drawJsonStructure();
         if (pendingCopyOpen!=null) {
-            Path path=pendingCopyOpen;pendingCopyOpen=null;
-            try { transition(true,() -> { PackWorkspace next=PackWorkspace.open(path);workspace=next;selected=null;filter.set("");error=null; }); }
-            catch (Exception failure) { folderCopyMessage=InspectorText.label(failure.getMessage(),512); }
+            Path path=pendingCopyOpen;boolean fromSaveAs=pendingCopyFromSaveAs;pendingCopyOpen=null;pendingCopyFromSaveAs=false;
+            try { if (transition(true,() -> { PackWorkspace next=PackWorkspace.open(path);workspace=next;selected=null;filter.set("");error=null; })) { if (fromSaveAs) saveAsMessage=null;else folderCopyMessage=null; } }
+            catch (Exception failure) { error=InspectorText.label(failure.getMessage(),512);if (fromSaveAs) saveAsMessage=error;else folderCopyMessage=error; }
         }
         applyPendingFolderAction();
         navigationHistory.observe(workspace,selected,filter.get());
@@ -6790,7 +6791,7 @@ public final class EditorApp extends Application {
         } else {
             if (state.phase()==AsyncSaveAs.Phase.ADOPTED) ImGui.textWrapped("Save As completed and its folder became active. Later edits still require Save.");
             else if (state.phase()==AsyncSaveAs.Phase.COPIED) ImGui.textWrapped("Captured copy completed; the current workspace and save baseline were kept.");
-            if (state.receipt()!=null && (state.phase()==AsyncSaveAs.Phase.ADOPTED || state.phase()==AsyncSaveAs.Phase.COPIED)) { ImGui.textWrapped("Published folder: "+InspectorText.label(state.receipt().directory().toString(),512));if (ImGui.button("Open published Save As copy with workspace guards")) { pendingCopyOpen=state.receipt().directory();resourceNavigation.clear(); } }
+            if (state.receipt()!=null && (state.phase()==AsyncSaveAs.Phase.ADOPTED || state.phase()==AsyncSaveAs.Phase.COPIED)) { ImGui.textWrapped("Published folder: "+InspectorText.label(state.receipt().directory().toString(),512));if (ImGui.button("Open published Save As copy with workspace guards")) { pendingCopyOpen=state.receipt().directory();pendingCopyFromSaveAs=true;resourceNavigation.clear(); } }
             if (ImGui.button("Save As current applied workspace")) perform("Save As");
             ImGui.beginDisabled(saveAsTransfer.busy());if (ImGui.button("Clear completed Save As receipt")) { saveAsTransfer.clear();saveAsMessage=null; }ImGui.endDisabled();
         }
@@ -6812,7 +6813,7 @@ public final class EditorApp extends Application {
         } else {
             if (state.phase()==AsyncFolderCopy.Phase.SUCCEEDED) {
                 ImGui.textWrapped("Save Copy completed for the captured revision. The current workspace may contain later edits.");ImGui.textWrapped("Published copy: "+InspectorText.label(state.receipt().directory().toString(),512));
-                if (ImGui.button("Open completed copy with normal workspace guards")) { pendingCopyOpen=state.receipt().directory();resourceNavigation.clear(); }
+                if (ImGui.button("Open completed copy with normal workspace guards")) { pendingCopyOpen=state.receipt().directory();pendingCopyFromSaveAs=false;resourceNavigation.clear(); }
             } else if (state.detail()!=null) ImGui.textWrapped(state.detail());
             else ImGui.textWrapped("No active copy. File > Save Copy chooses a new or empty folder and starts a captured copy.");
             if (ImGui.button("Save Copy of current applied workspace")) perform("Save Copy");
