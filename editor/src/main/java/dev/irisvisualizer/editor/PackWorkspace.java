@@ -68,17 +68,32 @@ public final class PackWorkspace implements PackResourceView {
     }
     private record AssetPlan(AssetImports.Source source,String target,long budget) {}
     private AssetPlan planAssetImport(Path source,String key,long maximumBytes) throws IOException {
-        if (maximumBytes<0 || maximumBytes>MAX_BYTES) throw new IllegalArgumentException("Invalid workspace asset-import budget");
+        if (key==null) throw new IOException("Choose a resource key");
         var asset=AssetImports.describe(source);String target=safe(asset.family()+"/"+key+asset.extension());
+        return new AssetPlan(asset,target,assetImportBudget(target,asset.bytes(),maximumBytes));
+    }
+    /** Source-independent destination preflight, also used immediately before a captured import is installed. */
+    long assetImportBudget(String target,long bytes,long maximumBytes) throws IOException {
+        if (maximumBytes<0 || maximumBytes>MAX_BYTES) throw new IllegalArgumentException("Invalid workspace asset-import budget");
+        if (bytes<0 || bytes>AssetImports.MAX_BYTES) throw new IOException("Asset import exceeds the 64 MiB file limit");
+        target=safe(target);
         for (String component : target.split("/")) if (component.length()>255) throw new IOException("Imported asset path components must be at most 255 characters, including the file extension");
-        // Bound path depth/components before the resource-key regex processes untrusted pasted input.
-        asset.target(key);
+        if (!AssetReplacement.supports(target)) throw new IOException("Import only images/ PNG/JPEG or objects/ .iob assets");
+        String family=ResourceTypes.fileFamily(target),extension=ResourceTypes.extension(target);
+        String key=target.substring(family.length()+1,target.length()-extension.length());
+        if (!extension.equals(extension.toLowerCase(Locale.ROOT)) || !ResourceTypes.target(target,key).equals(target)) throw new IOException("Use a lowercase asset extension and resource key");
         if (files.size()>=MAX_FILES) throw new IOException("Too many pack files");
         if (foldedFiles.contains(target.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource path: "+target);
         validatePaths(target);
-        long available=maximumBytes-files.values().stream().mapToLong(bytes -> bytes.length).sum();
-        if (available<0 || asset.bytes()>available) throw new IOException("Asset exceeds the remaining workspace byte budget");
-        return new AssetPlan(asset,target,Math.min(AssetImports.MAX_BYTES,available));
+        long available=maximumBytes-files.values().stream().mapToLong(data -> data.length).sum();
+        if (available<0 || bytes>available) throw new IOException("Asset exceeds the remaining workspace byte budget");
+        return Math.min(AssetImports.MAX_BYTES,available);
+    }
+    /** Installs private captured bytes after complete preflight; no source I/O or baseline adoption. */
+    String installCapturedAsset(String target,AssetReplacement.Prepared prepared,long maximumBytes) throws IOException {
+        assetImportBudget(target,prepared.receipt().bytes(),maximumBytes);
+        add(target,prepared.copyBytes());changed.add(target);created.add(target);resourceRevision++;
+        history.clear("Asset imported; earlier applied-edit history was cleared.");return target;
     }
     /** Metadata/path/capacity checks only. The source is checked again when the user commits the import. */
     public String checkAssetImport(Path source,String key) throws IOException { return planAssetImport(source,key,MAX_BYTES).target(); }

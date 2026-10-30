@@ -135,6 +135,7 @@ public final class WorkspaceTests {
    StructureThemeReferenceTests.run(temp);
    AsyncStructureThemeReviewTests.run(temp);
    AssetReplacementTests.run(temp);
+   StagedAssetImportTests.run(temp);
    var tree=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json","asset.iob"),List.of("empty"),"");
    check(tree.size()==4 && tree.get(0).folder() && tree.get(3).path().equals("asset.iob"));
    var filtered=ResourceTree.build(List.of("biomes/z.json","dimensions/a.json"),List.of(),"A.JSON");

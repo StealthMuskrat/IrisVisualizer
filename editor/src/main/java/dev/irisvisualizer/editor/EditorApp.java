@@ -25,6 +25,10 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private final AsyncAssetImport assetImport=new AsyncAssetImport();
+    private boolean showAssetImport,assetImportAcknowledge;
+    private long assetImportReviewed=-1;
+    private String assetImportError;
     private final AsyncAssetReplacement assetReplacement=new AsyncAssetReplacement();
     private boolean showAssetReplacement,assetReplacementNoop,assetReplacementAllowUnrecorded;
     private long assetReplacementAssessed=-1;
@@ -72,7 +76,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -212,6 +216,7 @@ public final class EditorApp extends Application {
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
+        assetImport.poll(workspace);
         assetReplacement.poll(workspace);
         var fallbackState=blockFallbackAudits.poll(workspace);if (fallbackReviewedAudit!=null && fallbackState.audit()!=fallbackReviewedAudit) clearFallbackOverlapView();
         var themeState=structureThemeReferences.poll(workspace);if (themeReviewedReview!=null && themeState.review()!=themeReviewedReview) clearThemeReviewView();
@@ -237,6 +242,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New jigsaw pool with empty membership")) createResource("jigsaw-pools");
                 if (ImGui.menuItem("New jigsaw piece")) createResource("jigsaw-pieces");
                 if (ImGui.menuItem("Import image/object asset")) importAsset();
+                if (ImGui.menuItem("Review captured asset import")) showAssetImport=true;
                 ImGui.beginDisabled(!AssetReplacement.supports(selected));if (ImGui.menuItem("Replace selected image/object asset")) chooseAssetReplacement(selected);ImGui.endDisabled();
                 if (ImGui.menuItem("Review captured asset replacement")) showAssetReplacement=true;
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
@@ -442,6 +448,7 @@ public final class EditorApp extends Application {
         if (showReferenceReview) drawPackReferenceReview();
         if (showJigsawReview) drawJigsawDependencyReview();
         if (showStructureThemeReview) drawStructureThemeReview();
+        if (showAssetImport) drawAssetImport();
         if (showAssetReplacement) drawAssetReplacement();
         if (showJsonStructure) drawJsonStructure();
         applyPendingFolderAction();
@@ -6175,15 +6182,41 @@ public final class EditorApp extends Application {
     }
     private void importAsset() {
         try {
-            var chooser=new JFileChooser();chooser.setDialogTitle("Import PNG/JPEG image or Iris object asset");chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);chooser.setAcceptAllFileFilterUsed(false);
+            var chooser=new JFileChooser();chooser.setDialogTitle("Capture new PNG/JPEG image or Iris object asset");chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);chooser.setAcceptAllFileFilterUsed(false);
             chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Images and Iris objects (*.png, *.jpg, *.jpeg, *.iob)","png","jpg","jpeg","iob"));
             if (chooser.showOpenDialog(null)!=JFileChooser.APPROVE_OPTION) return;
             Path source=chooser.getSelectedFile().toPath();var asset=AssetImports.describe(source);
-            String key=JOptionPane.showInputDialog(null,"Copy into "+asset.family()+"/ as a new resource key (omit "+asset.extension()+"):\n"+asset.bytes()+" bytes. The source is copied unchanged; contents are not validated.\nLimit: 64 MiB/file and available workspace capacity. Existing resources are never replaced.\nImport clears applied-edit history.",asset.suggestedKey());
+            String key=JOptionPane.showInputDialog(null,"Capture into "+asset.family()+"/ as a new resource key (omit "+asset.extension()+"):\n"+asset.bytes()+" bytes. Review captured bytes before applying. Existing resources are never replaced.\nLimit: 64 MiB/file and available workspace capacity.",asset.suggestedKey());
             if (key==null) return;
-            workspace.checkAssetImport(source,key);
-            transition(false,() -> { selected=workspace.importAsset(source,key);filter.set("");error=null; });
+            assetImport.request(workspace,source,key);assetImportReviewed=-1;assetImportAcknowledge=false;assetImportError=null;showAssetImport=true;
         } catch (Exception failure) { error=failure.getMessage(); }
+    }
+    private void drawAssetImport() {
+        if (!ImGui.begin("Captured new asset import")) { ImGui.end();return; }
+        if (ImGui.button("Close asset import")) { assetImport.clear();assetImportReviewed=-1;assetImportError=null;showAssetImport=false;ImGui.end();return; }
+        ImGui.textWrapped("Capture a source, review its exact byte count and SHA-256, then Apply to create the new in-memory asset. Selection and unrelated inspector drafts remain available. Import clears applied-edit history; Save is separate.");
+        if (ImGui.button("Choose source and new destination")) importAsset();
+        if (ImGui.button("Cancel / clear captured import")) { assetImport.clear();assetImportReviewed=-1;assetImportAcknowledge=false;assetImportError=null; }
+        var state=assetImport.poll(workspace);
+        if (state.request()!=assetImportReviewed) { assetImportReviewed=state.request();assetImportAcknowledge=false;assetImportError=null; }
+        if (state.target()!=null) ImGui.textWrapped("Pinned new destination: "+InspectorText.label(state.target().path(),512));
+        if (state.source()!=null) ImGui.textWrapped("Chosen source: "+InspectorText.label(state.source().toString(),512));
+        if (state.phase()==AsyncAssetImport.Phase.CAPTURING) ImGui.textWrapped("Capturing bytes in the background... Pack bytes and history stay unchanged until Apply. A new choice replaces the pending request.");
+        else if (state.phase()==AsyncAssetImport.Phase.FAILED || state.phase()==AsyncAssetImport.Phase.STALE) ImGui.textWrapped(state.detail()+". Choose a source and destination again to retry.");
+        else if (state.phase()==AsyncAssetImport.Phase.APPLIED) {
+            ImGui.textWrapped(state.detail());
+            if (ImGui.button("Open imported resource")) { try { resourceNavigation.request(workspace,state.target().path()); } catch (Exception failure) { assetImportError=InspectorText.label(failure.getMessage(),512); } }
+        } else if (state.phase()==AsyncAssetImport.Phase.IDLE) ImGui.textWrapped("No captured import. Choose a PNG/JPEG or .iob file and an unused lowercase resource key.");
+        if (state.receipt()!=null) { ImGui.textWrapped("Captured source: "+InspectorText.label(state.receipt().source().toString(),512));ImGui.textUnformatted("Captured bytes: "+state.receipt().bytes());ImGui.textWrapped("Captured SHA-256: "+state.receipt().sha256()); }
+        if (state.phase()==AsyncAssetImport.Phase.READY) {
+            ImGui.textWrapped("This creates a resource and clears all prior applied-edit Undo/Redo history. The import itself is not retained in that timeline.");
+            if (ImGui.checkbox("Acknowledge creating an asset and clearing applied-edit history",assetImportAcknowledge)) assetImportAcknowledge=!assetImportAcknowledge;
+            ImGui.beginDisabled(!assetImportAcknowledge);boolean apply=ImGui.button("Apply captured new asset");ImGui.endDisabled();
+            if (apply) { try { assetImport.apply(workspace,assetImportAcknowledge);assetImportError=null; } catch (Exception failure) { assetImportError=InspectorText.label(failure.getMessage(),512); } }
+        }
+        if (assetImportError!=null) ImGui.textWrapped(assetImportError);
+        ImGui.textWrapped("Limits: 64 MiB/source and available workspace capacity. Only regular files without symbolic-link source paths are accepted. Bytes are opaque and private; later source edits or deletion do not change the captured import. Apply repeats destination, Windows path, entry-count and capacity checks without reading the source. No decoding, reference rewrite, baseline adoption or disk write occurs. Opening the imported resource uses the normal draft guard. Unsupported previews stay disabled.");
+        ImGui.end();
     }
     private void duplicateResource(String source) {
         try {
@@ -6225,7 +6258,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
