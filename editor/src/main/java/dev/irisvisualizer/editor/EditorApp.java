@@ -6,6 +6,7 @@ import imgui.app.Configuration;
 import imgui.app.WindowGlfw;
 import imgui.flag.ImGuiTreeNodeFlags;
 import imgui.flag.ImGuiKey;
+import imgui.flag.ImGuiPopupFlags;
 import imgui.flag.ImGuiInputTextFlags;
 import imgui.flag.ImGuiWindowFlags;
 import static org.lwjgl.glfw.GLFW.*;
@@ -25,6 +26,8 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private final EditorCommands.Queue editorCommands=new EditorCommands.Queue();
+    private boolean focusQuickOpen,focusTextSearch;
     private final AsyncPackLoad packLoad=new AsyncPackLoad();
     private boolean showPackLoad;
     private String packLoadMessage;
@@ -239,6 +242,7 @@ public final class EditorApp extends Application {
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
+        PackWorkspace frameWorkspace=workspace;boolean frameClose=closeRequested;closeRequested=false;
         assetBatchImport.poll(workspace);
         assetImport.poll(workspace);
         assetReplacement.poll(workspace);
@@ -249,16 +253,11 @@ public final class EditorApp extends Application {
         jigsawReview.poll(workspace,jigsawReviewRoot);
         updateSourceMatchFocus();
 
-        if (closeRequested) {
-            closeRequested = false;
-            try { transition(true, () -> glfwSetWindowShouldClose(((WindowGlfw) getWindow()).getHandle(), true)); }
-            catch (Exception failure) { error = failure.getMessage(); }
-        }
         if (!styled) { ImGui.styleColorsLight(); styled = true; }
         if (ImGui.beginMainMenuBar()) {
             if (ImGui.beginMenu("File")) {
                 for (String action : new String[]{"New", "Open", "Save", "Save As", "Save Copy", "Import", "Export"})
-                    if (ImGui.menuItem(action)) perform(action);
+                    if (ImGui.menuItem(action,EditorCommands.shortcutLabel(EditorCommands.Action.file(action)))) perform(action);
                 if (ImGui.menuItem("New image-map definition")) createResource("image-maps");
                 if (ImGui.menuItem("New block alias definition")) createResource("blocks");
                 if (ImGui.menuItem("New expression definition")) createResource("expressions");
@@ -285,9 +284,9 @@ public final class EditorApp extends Application {
                 ImGui.endMenu();
             }
             if (ImGui.beginMenu("Edit")) {
-                ImGui.beginDisabled(workspace.undoCount()==0);if (ImGui.menuItem("Undo applied edit")) restoreAppliedEdit(false);ImGui.endDisabled();
+                ImGui.beginDisabled(workspace.undoCount()==0);if (ImGui.menuItem("Undo applied edit",EditorCommands.shortcutLabel(EditorCommands.Action.UNDO))) queueEditorCommand(EditorCommands.Action.UNDO);ImGui.endDisabled();
                 if (workspace.undoPath()!=null) ImGui.textWrapped("Undo: "+workspace.undoPath());
-                ImGui.beginDisabled(workspace.redoCount()==0);if (ImGui.menuItem("Redo applied edit")) restoreAppliedEdit(true);ImGui.endDisabled();
+                ImGui.beginDisabled(workspace.redoCount()==0);if (ImGui.menuItem("Redo applied edit",EditorCommands.shortcutLabel(EditorCommands.Action.REDO))) queueEditorCommand(EditorCommands.Action.REDO);ImGui.endDisabled();
                 if (workspace.redoPath()!=null) ImGui.textWrapped("Redo: "+workspace.redoPath());
                 ImGui.textWrapped(workspace.undoCount()+" undo / "+workspace.redoCount()+" redo; "+workspace.historyBytes()+" snapshot bytes.");
                 ImGui.textWrapped("Applied byte edits only, up to 128 edits / 32 MiB. Resource/folder creation, duplication or asset import clears history. Save retains it. History is memory-only and ends when the pack is replaced or the editor closes.");
@@ -297,12 +296,12 @@ public final class EditorApp extends Application {
                 ImGui.endMenu();
             }
             if (ImGui.beginMenu("Navigate")) {
-                if (ImGui.menuItem("Quick Open resource")) showQuickOpen=true;
+                if (ImGui.menuItem("Quick Open resource",EditorCommands.shortcutLabel(EditorCommands.Action.QUICK_OPEN))) queueEditorCommand(EditorCommands.Action.QUICK_OPEN);
                 ImGui.beginDisabled(!JsonStructure.supports(selected));if (ImGui.menuItem("Inspect selected JSON structure")) showJsonStructure=true;ImGui.endDisabled();
-                if (ImGui.menuItem("Search JSON text")) showTextSearch=true;
+                if (ImGui.menuItem("Search JSON text",EditorCommands.shortcutLabel(EditorCommands.Action.SEARCH_TEXT))) queueEditorCommand(EditorCommands.Action.SEARCH_TEXT);
                 var back=navigationHistory.back();var forward=navigationHistory.forward();
-                ImGui.beginDisabled(back.isEmpty());if (ImGui.menuItem("Back")) queueHistoryNavigation(false,1);ImGui.endDisabled();
-                ImGui.beginDisabled(forward.isEmpty());if (ImGui.menuItem("Forward")) queueHistoryNavigation(true,1);ImGui.endDisabled();
+                ImGui.beginDisabled(back.isEmpty());if (ImGui.menuItem("Back",EditorCommands.shortcutLabel(EditorCommands.Action.BACK))) queueEditorCommand(EditorCommands.Action.BACK);ImGui.endDisabled();
+                ImGui.beginDisabled(forward.isEmpty());if (ImGui.menuItem("Forward",EditorCommands.shortcutLabel(EditorCommands.Action.FORWARD))) queueEditorCommand(EditorCommands.Action.FORWARD);ImGui.endDisabled();
                 drawNavigationDestinations("Back history",back,false);drawNavigationDestinations("Forward history",forward,true);
                 if (ImGui.beginMenu("Recent resources")) { int index=0;for (String path : navigationHistory.recent()) { ImGui.pushID(index++);if (ImGui.menuItem(path.length()>128 ? path.substring(0,128)+"..." : path)) selectResource(path);if (ImGui.isItemHovered()) ImGui.setTooltip(path);ImGui.popID(); }ImGui.endMenu(); }
                 if (ImGui.menuItem("Clear navigation history")) navigationHistory.clear();
@@ -523,7 +522,10 @@ public final class EditorApp extends Application {
         changesPendingWorkspace=null;changesPendingPath=null;
         referenceReviewPendingWorkspace=null;referenceReviewPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
-        finishLoadedPackOpen();
+        if (frameClose) { pendingLoadedRequest=-1;pendingLoadedOwner=null;editorCommands.request(workspace,EditorCommands.Action.CLOSE,EditorCommands.Origin.WINDOW_CLOSE); }
+        else finishLoadedPackOpen();
+        captureEditorShortcut(frameWorkspace);
+        if (executeEditorCommand()) return;
         saveAsTransfer.finish(workspace);
         pendingDiskReview.poll(workspace); // All frame edits, history actions and workspace navigation have completed.
     }
@@ -6344,7 +6346,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6631,12 +6633,14 @@ public final class EditorApp extends Application {
         }
     }
     private void drawTextSearch() {
+        if (focusTextSearch) { ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false); }
         if (!ImGui.begin("Search JSON text")) { ImGui.end();return; }
-        if (ImGui.button("Close text search")) { textSearch.clear();activeTextQuery=null;showTextSearch=false;ImGui.end();return; }
-        ImGui.inputText("Literal source text",textQuery);
+        if (ImGui.button("Close text search")) { textSearch.clear();activeTextQuery=null;showTextSearch=false;focusTextSearch=false;ImGui.end();return; }
+        if (focusTextSearch) { ImGui.setKeyboardFocusHere();focusTextSearch=false; }
+        boolean searchRequested=ImGui.inputText("Literal source text",textQuery,ImGuiInputTextFlags.EnterReturnsTrue|ImGuiInputTextFlags.AutoSelectAll);
         if (ImGui.beginCombo("Text search family",textFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==textFamily)) textFamily=family;ImGui.endCombo(); }
         if (ImGui.checkbox("Search applied changes only",textChangedOnly)) textChangedOnly=!textChangedOnly;
-        if (ImGui.button("Search applied JSON text")) {
+        if (ImGui.button("Search applied JSON text") || searchRequested) {
             try { activeTextQuery=new WorkspaceTextSearch.Query(textQuery.get(),textFamily,textChangedOnly);textSearch.retry(workspace,activeTextQuery);textSearchError=null; }
             catch (IllegalArgumentException invalid) { textSearchError=invalid.getMessage(); }
         }
@@ -6671,9 +6675,11 @@ public final class EditorApp extends Application {
         ImGui.end();
     }
     private void drawQuickOpen() {
+        if (focusQuickOpen) { ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false); }
         if (!ImGui.begin("Quick Open resource")) { ImGui.end();return; }
-        if (ImGui.button("Close Quick Open")) { showQuickOpen=false;ImGui.end();return; }
-        ImGui.inputText("Path or filename",quickQuery);
+        if (ImGui.button("Close Quick Open")) { showQuickOpen=false;focusQuickOpen=false;ImGui.end();return; }
+        if (focusQuickOpen) { ImGui.setKeyboardFocusHere();focusQuickOpen=false; }
+        boolean openRequested=ImGui.inputText("Path or filename",quickQuery,ImGuiInputTextFlags.EnterReturnsTrue|ImGuiInputTextFlags.AutoSelectAll);
         if (ImGui.beginCombo("Find family",quickFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==quickFamily)) quickFamily=family;ImGui.endCombo(); }
         if (ImGui.checkbox("Find applied changes only",quickChangedOnly)) quickChangedOnly=!quickChangedOnly;
         if (ImGui.button("Clear finder filters")) { quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false; }
@@ -6687,7 +6693,7 @@ public final class EditorApp extends Application {
             for (var hit : result.hits()) { ImGui.pushID(hit.path());String path=hit.path().length()>128 ? hit.path().substring(0,128)+"..." : hit.path();if (ImGui.selectable(path+(workspace.changed(hit.path()) ? " *" : ""),hit.path().equals(quickSelected))) quickSelected=hit.path();if (ImGui.isItemHovered()) ImGui.setTooltip(hit.path());ImGui.popID(); }
             if (quickSelected!=null) {
                 ImGui.textWrapped(quickSelected+" — "+workspace.size(quickSelected)+" bytes");
-                if (ImGui.button("Open selected resource")) { resourceNavigation.request(workspace,quickSelected);quickPendingPath=quickSelected;quickPendingWorkspace=workspace; }
+                if (ImGui.button("Open selected resource") || openRequested) { resourceNavigation.request(workspace,quickSelected);quickPendingPath=quickSelected;quickPendingWorkspace=workspace; }
             }
             ImGui.textWrapped("Limits: 100 results, eight terms / 256 search characters, 100,000 files and 16 million normalized path characters. Other files includes unsupported families. Applied changes excludes unapplied text and folder-only changes.");
         } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
@@ -6917,7 +6923,34 @@ public final class EditorApp extends Application {
         ImGui.textWrapped("One export at a time. Snapshot limits: 512 MiB applied bytes, 100,000 file/folder entries and 16 million UTF-16 path characters. Compression, disk writes, existing-target conflict hashes and ZIP hashing run on the worker. The completed archive is staged beside its destination; existing targets are never truncated. Confirmed replacement requires an unchanged regular file of at most 1 GiB and filesystem support for atomic replacement. New targets never intentionally overwrite occupied files. Source/destination symbolic-link paths and targets inside the captured pack are rejected. Cancellation is accepted only before publication starts; hiding this window keeps the job running. Process termination can leave temporary files if cleanup cannot finish. Unsupported previews stay disabled.");
         ImGui.end();
     }
-    private void perform(String action) {
+    private void queueEditorCommand(EditorCommands.Action action) { editorCommands.request(workspace,action,EditorCommands.Origin.UI); }
+    private void perform(String action) { queueEditorCommand(EditorCommands.Action.file(action)); }
+    private void captureEditorShortcut(PackWorkspace frameWorkspace) {
+        var pressed=java.util.EnumSet.noneOf(EditorCommands.Key.class);
+        for (var key:EditorCommands.Key.values()) {
+            int nativeKey=switch(key) { case N->ImGuiKey.N;case O->ImGuiKey.O;case S->ImGuiKey.S;case I->ImGuiKey.I;case E->ImGuiKey.E;case Z->ImGuiKey.Z;case Y->ImGuiKey.Y;case P->ImGuiKey.P;case F->ImGuiKey.F;case LEFT->ImGuiKey.LeftArrow;case RIGHT->ImGuiKey.RightArrow; };
+            if (ImGui.isKeyPressed(nativeKey,false)) pressed.add(key);
+        }
+        var io=ImGui.getIO();var action=EditorCommands.shortcut(new EditorCommands.Input(io.getKeyCtrl(),io.getKeyShift(),io.getKeyAlt(),io.getKeySuper(),io.getWantTextInput() || ImGui.isAnyItemActive(),ImGui.isPopupOpen("",ImGuiPopupFlags.AnyPopup),pressed));
+        if (action!=null) editorCommands.request(frameWorkspace,action,EditorCommands.Origin.SHORTCUT);
+    }
+    /** Dispatch only after all frame edits/history/navigation; rejected/failed commands never repeat automatically. */
+    private boolean executeEditorCommand() {
+        var action=editorCommands.take(workspace);if (action==null) return false;
+        if (action.fileAction()!=null) { executeFileAction(action.fileAction());return false; }
+        switch(action) {
+            case UNDO->{ if (workspace.undoCount()>0) restoreAppliedEdit(false); }
+            case REDO->{ if (workspace.redoCount()>0) restoreAppliedEdit(true); }
+            case QUICK_OPEN->{ showQuickOpen=true;focusQuickOpen=true; }
+            case SEARCH_TEXT->{ showTextSearch=true;focusTextSearch=true; }
+            case BACK->{ if (!navigationHistory.back().isEmpty()) queueHistoryNavigation(false,1); }
+            case FORWARD->{ if (!navigationHistory.forward().isEmpty()) queueHistoryNavigation(true,1); }
+            case CLOSE->{ try { return transition(true,()->glfwSetWindowShouldClose(((WindowGlfw)getWindow()).getHandle(),true)); }catch(Exception failure) { error=InspectorText.label(failure.getMessage(),512); } }
+            default->throw new IllegalStateException("Unsupported editor command");
+        }
+        return false;
+    }
+    private void executeFileAction(String action) {
         try {
             switch (action) {
                 case "New" -> {
