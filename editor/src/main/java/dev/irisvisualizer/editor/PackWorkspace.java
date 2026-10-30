@@ -89,6 +89,16 @@ public final class PackWorkspace implements PackResourceView {
         add(plan.target(),data);changed.add(plan.target());created.add(plan.target());resourceRevision++;
         history.clear("Asset imported; earlier applied-edit history was cleared.");return plan.target();
     }
+    /** Capacity only; existing asset paths stay fixed and replacement does not add a resource. */
+    long assetReplacementBudget(String path) throws IOException { return assetReplacementBudget(path,MAX_BYTES); }
+    long assetReplacementBudget(String path,long maximumBytes) throws IOException {
+        if (maximumBytes<0 || maximumBytes>MAX_BYTES) throw new IllegalArgumentException("Invalid replacement workspace budget");
+        if (!AssetReplacement.supports(path) || !files.containsKey(path)) throw new IOException("Choose an existing images/ PNG/JPEG or objects/ .iob asset");
+        long available=maximumBytes-files.values().stream().mapToLong(data -> data.length).sum()+files.get(path).length;
+        if (available<0) throw new IOException("Asset replacement exceeds the remaining workspace byte budget");
+        return Math.min(AssetImports.MAX_BYTES,available);
+    }
+    boolean contentEquals(String path,byte[] data) { return Arrays.equals(files.get(path),data); }
     /** Duplicate bytes under the same supported type. No references or file contents are rewritten. */
     public String duplicate(String source, String key) throws IOException {
         if (!files.containsKey(source)) throw new IOException("Unknown resource");
