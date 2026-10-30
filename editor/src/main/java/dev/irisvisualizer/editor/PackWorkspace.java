@@ -26,28 +26,32 @@ public final class PackWorkspace implements PackResourceView {
     public static final long MAX_BYTES = 512L * 1024 * 1024;
     public static final int MAX_FILES = 100_000;
     public static final int MAX_PATH_SEGMENTS = 64;
-    record LoadLimits(long bytes, int entries, int depth) {
+    public static final int MAX_LOAD_PATH_CHARACTERS=16_000_000;
+    record LoadLimits(long bytes,int entries,int depth,int pathCharacters) {
+        LoadLimits(long bytes,int entries,int depth) { this(bytes,entries,depth,MAX_LOAD_PATH_CHARACTERS); }
         LoadLimits {
-            if (bytes < 0 || bytes > MAX_BYTES || entries < 1 || entries > MAX_FILES || depth < 1 || depth > MAX_PATH_SEGMENTS)
-                throw new IllegalArgumentException("Invalid workspace load limits");
+            if (bytes<0 || bytes>MAX_BYTES || entries<1 || entries>MAX_FILES || depth<1 || depth>MAX_PATH_SEGMENTS || pathCharacters<0 || pathCharacters>MAX_LOAD_PATH_CHARACTERS) throw new IllegalArgumentException("Invalid workspace load limits");
         }
     }
-    private static final LoadLimits LOAD_LIMITS = new LoadLimits(MAX_BYTES, MAX_FILES, MAX_PATH_SEGMENTS);
+    private static final LoadLimits LOAD_LIMITS=new LoadLimits(MAX_BYTES,MAX_FILES,MAX_PATH_SEGMENTS);
     private static final class LoadBudget {
-        final LoadLimits limits; long bytes; final Set<String> nodes = new HashSet<>();
-        LoadBudget(LoadLimits limits) { this.limits = limits; }
+        final LoadLimits limits;final PackLoads.Monitor monitor;long bytes;int characters;final Set<String> nodes=new HashSet<>();
+        LoadBudget(LoadLimits limits,PackLoads.Monitor monitor) { this.limits=Objects.requireNonNull(limits);this.monitor=Objects.requireNonNull(monitor); }
         String entry(String key) throws IOException {
-            key = safe(key); String[] parts = key.split("/");
-            if (parts.length > limits.depth()) throw new IOException("Pack path exceeds nesting limit: " + key);
-            String current = "";
-            for (String part : parts) {
-                current += (current.isEmpty() ? "" : "/") + part;
-                nodes.add(current.toLowerCase(Locale.ROOT));
-                if (nodes.size() > limits.entries()) throw new IOException("Too many pack entries, including folders");
+            monitor.check();key=safe(key);String[] parts=key.split("/");
+            if(parts.length>limits.depth())throw new IOException("Pack path exceeds nesting limit");String current="";
+            for(String part:parts) {
+                monitor.check();current+=(current.isEmpty() ? "" : "/")+part;
+                if(nodes.add(current.toLowerCase(Locale.ROOT))) {
+                    if(nodes.size()>limits.entries())throw new IOException("Too many pack entries, including folders");
+                    if(current.length()>limits.pathCharacters()-characters)throw new IOException("Pack paths exceed the 16 million character metadata budget");characters+=current.length();
+                }
             }
             return key;
         }
-        long remaining() { return limits.bytes() - bytes; }
+        long remaining() { return limits.bytes()-bytes; }
+        void progress(PackWorkspace result,long partial) { monitor.update(result.files.size(),result.directories.size(),bytes+partial,nodes.size(),characters); }
+        byte[] read(InputStream input,PackWorkspace result,long limit) throws IOException { return readBounded(input,limit,monitor,n->progress(result,n)); }
     }
 
     public static PackWorkspace empty() { return new PackWorkspace(); }
@@ -234,58 +238,78 @@ public final class PackWorkspace implements PackResourceView {
     public void deleteEmptyFolder(String path) throws IOException {
         emptyFolder(path);removeDirectory(path);resourceRevision++;history.clear("Empty folder removed; earlier applied-edit history was cleared.");
     }
-    public static PackWorkspace open(Path root) throws IOException { return open(root, LOAD_LIMITS); }
-    static PackWorkspace open(Path root, LoadLimits limits) throws IOException {
-        Path base = root.toRealPath();
-        if (!Files.isDirectory(base)) throw new IOException("Select a pack directory");
-        PackWorkspace result = empty(); result.directory = base; LoadBudget budget = new LoadBudget(limits);
-        Files.walkFileTree(base, new SimpleFileVisitor<>() {
-            private String key(Path path) throws IOException { return budget.entry(base.relativize(path).toString().replace('\\', '/')); }
-            @Override public FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
-                if (!dir.equals(base)) result.directories.add(key(dir));
-                return FileVisitResult.CONTINUE;
+    public static PackWorkspace open(Path root) throws IOException { return open(root,LOAD_LIMITS); }
+    static PackWorkspace open(Path root,LoadLimits limits) throws IOException { return open(root,limits,PackLoads.monitor()); }
+    static PackWorkspace open(Path root,LoadLimits limits,PackLoads.Monitor monitor) throws IOException {
+        monitor.check();rejectLinks(root.toAbsolutePath().normalize());Path base=root.toRealPath();
+        if(!Files.isDirectory(base,LinkOption.NOFOLLOW_LINKS))throw new IOException("Select a pack directory");
+        PackWorkspace result=empty();result.directory=base;LoadBudget budget=new LoadBudget(limits,monitor);
+        Files.walkFileTree(base,new SimpleFileVisitor<>() {
+            final Map<Path,java.nio.file.attribute.BasicFileAttributes> parents=new HashMap<>();
+            private String key(Path path) throws IOException { return budget.entry(base.relativize(path).toString().replace('\\','/')); }
+            @Override public FileVisitResult preVisitDirectory(Path dir,java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
+                monitor.check();rejectLinks(dir);var before=PackLoads.attributes(dir);
+                if(!before.isDirectory())throw new IOException("Pack folder changed before loading: "+dir);
+                parents.put(dir,before);if(!dir.equals(base))result.directories.add(key(dir));budget.progress(result,0);return FileVisitResult.CONTINUE;
             }
-            @Override public FileVisitResult visitFile(Path path, java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
-                String key = key(path);
-                if (attributes.isSymbolicLink() || !attributes.isRegularFile()) throw new IOException("Unsupported or linked pack entry: " + key);
-                if (attributes.size() > budget.remaining()) throw new IOException("Pack exceeds workspace byte limit");
-                byte[] data;
-                try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { data = readBounded(input, budget.remaining()); }
-                budget.bytes += data.length; result.add(key, data); return FileVisitResult.CONTINUE;
+            @Override public FileVisitResult visitFile(Path path,java.nio.file.attribute.BasicFileAttributes attributes) throws IOException {
+                monitor.check();String key=key(path);checkedTarget(base,key);
+                // File-tree enumeration may carry cached Windows attributes. Use matching explicit reads at both ends.
+                attributes=PackLoads.attributes(path);
+                if(attributes.isSymbolicLink() || !attributes.isRegularFile())throw new IOException("Unsupported or linked pack entry: "+key);
+                if(attributes.size()>budget.remaining())throw new IOException("Pack exceeds workspace byte limit");byte[] data;
+                try(var input=Files.newInputStream(path,LinkOption.NOFOLLOW_LINKS)) { data=budget.read(input,result,budget.remaining()); }
+                PackLoads.unchanged(path,attributes);budget.bytes+=data.length;result.add(key,data,monitor);budget.progress(result,0);return FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult postVisitDirectory(Path dir,IOException failure) throws IOException {
+                monitor.check();if(failure!=null)throw failure;PackLoads.unchanged(dir,parents.remove(dir));return FileVisitResult.CONTINUE;
             }
         });
-        result.validatePaths(); result.savedDirectories.addAll(result.directories);return result;
+        monitor.check();result.validatePaths();monitor.check();result.savedDirectories.addAll(result.directories);return result;
     }
-    public static PackWorkspace importZip(Path archive) throws IOException { return importZip(archive, LOAD_LIMITS); }
-    static PackWorkspace importZip(Path archive, LoadLimits limits) throws IOException {
-        PackWorkspace result = empty(); LoadBudget budget = new LoadBudget(limits);
-        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(archive))) {
-            ZipEntry entry; Set<String> names = new HashSet<>();
-            while ((entry = zip.getNextEntry()) != null) {
-                String key = budget.entry(entry.getName().replaceAll("/$", ""));
-                if (!names.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Duplicate ZIP entry: " + key);
-                if (entry.isDirectory()) {
-                    // Do not silently drain an unbounded payload disguised as a directory.
-                    readBounded(zip, 0); result.directories.add(key);
-                } else {
-                    if (entry.getSize() > budget.remaining()) throw new IOException("Expanded ZIP exceeds workspace byte limit");
-                    byte[] data = readBounded(zip, budget.remaining());
-                    budget.bytes += data.length; result.add(key, data);
-                }
+    public static PackWorkspace importZip(Path archive) throws IOException { return importZip(archive,LOAD_LIMITS); }
+    static PackWorkspace importZip(Path archive,LoadLimits limits) throws IOException { return importZip(archive,limits,PackLoads.monitor()); }
+    static PackWorkspace importZip(Path archive,LoadLimits limits,PackLoads.Monitor monitor) throws IOException {
+        monitor.check();Path path=archive.toAbsolutePath().normalize();rejectLinks(path);var before=PackLoads.attributes(path);
+        if(!before.isRegularFile())throw new IOException("Select a regular ZIP archive");
+        PackWorkspace result=empty();LoadBudget budget=new LoadBudget(limits,monitor);var expected=new LinkedHashMap<String,ZipEntry>();var names=new HashSet<String>();
+        // Validate the central directory before streaming. Invalid/truncated archives cannot silently become empty/partial packs.
+        try(var index=new ZipFile(path.toFile())) {
+            if(index.size()>limits.entries())throw new IOException("Too many ZIP entries");var entries=index.entries();
+            while(entries.hasMoreElements()) {
+                monitor.check();ZipEntry entry=entries.nextElement();String key=budget.entry(entry.getName().replaceAll("/$",""));
+                if(!names.add(key.toLowerCase(Locale.ROOT)))throw new IOException("Duplicate ZIP entry: "+key);
+                if(entry.getSize()<0 || entry.getCrc()<0 || entry.getSize()>limits.bytes() || (entry.isDirectory() && entry.getSize()!=0))throw new IOException("Invalid or oversized ZIP entry: "+key);
+                expected.put(entry.getName(),entry);budget.progress(result,0);
             }
         }
-        result.validatePaths(); result.savedDirectories.addAll(result.directories);return result;
+        PackLoads.unchanged(path,before);
+        try(var zip=new ZipInputStream(Files.newInputStream(path,LinkOption.NOFOLLOW_LINKS))) {
+            while(true) {
+                monitor.check();ZipEntry entry=zip.getNextEntry();if(entry==null)break;
+                ZipEntry indexed=expected.remove(entry.getName());
+                if(indexed==null || indexed.isDirectory()!=entry.isDirectory() || indexed.getMethod()!=entry.getMethod())throw new IOException("ZIP local entry differs from its central directory: "+entry.getName());
+                String key=budget.entry(entry.getName().replaceAll("/$",""));
+                if(entry.isDirectory()) { budget.read(zip,result,0);result.directories.add(key); }
+                else {
+                    if(entry.getSize()>budget.remaining())throw new IOException("Expanded ZIP exceeds workspace byte limit");
+                    byte[] data=budget.read(zip,result,budget.remaining());budget.bytes+=data.length;result.add(key,data,monitor);
+                }
+                if(entry.getSize()!=indexed.getSize() || entry.getCrc()!=indexed.getCrc())throw new IOException("ZIP payload differs from its central directory: "+entry.getName());budget.progress(result,0);
+            }
+        }
+        if(!expected.isEmpty())throw new IOException("ZIP is missing entries from its central directory");
+        monitor.check();PackLoads.unchanged(path,before);result.validatePaths();monitor.check();result.savedDirectories.addAll(result.directories);return result;
     }
-    static byte[] readBounded(InputStream input, long limit) throws IOException {
-        if (limit < 0 || limit > MAX_BYTES) throw new IllegalArgumentException("Invalid read budget");
-        ByteArrayOutputStream data = new ByteArrayOutputStream(); byte[] buffer = new byte[8192]; long total = 0;
-        while (true) {
-            int count = input.read(buffer, 0, (int)Math.min(buffer.length, limit - total + 1));
-            if (count < 0) return data.toByteArray();
-            if (count == 0) { int value = input.read(); if (value < 0) return data.toByteArray(); buffer[0] = (byte)value; count = 1; }
-            total += count;
-            if (total > limit) throw new IOException("Pack exceeds workspace byte limit");
-            data.write(buffer, 0, count);
+    static byte[] readBounded(InputStream input,long limit) throws IOException { return readBounded(input,limit,PackLoads.monitor(),n->{}); }
+    static byte[] readBounded(InputStream input,long limit,PackLoads.Monitor monitor,java.util.function.LongConsumer progress) throws IOException {
+        if(limit<0 || limit>MAX_BYTES)throw new IllegalArgumentException("Invalid read budget");
+        ByteArrayOutputStream data=new ByteArrayOutputStream();byte[] buffer=new byte[8192];long total=0;
+        while(true) {
+            monitor.check();int count=input.read(buffer,0,(int)Math.min(buffer.length,limit-total+1));
+            if(count<0) { monitor.check();return data.toByteArray(); }
+            if(count==0) { monitor.check();int value=input.read();if(value<0) { monitor.check();return data.toByteArray(); }buffer[0]=(byte)value;count=1; }
+            total+=count;progress.accept(total);monitor.check();if(total>limit)throw new IOException("Pack exceeds workspace byte limit");data.write(buffer,0,count);
         }
     }
     public Set<String> paths() { return Collections.unmodifiableSet(files.navigableKeySet()); }
@@ -510,10 +534,20 @@ public final class PackWorkspace implements PackResourceView {
             }
         }
     }
-    private void add(String key, byte[] bytes) throws IOException {
-        if (files.size() >= MAX_FILES) throw new IOException("Too many pack files");
-        if (!foldedFiles.add(key.toLowerCase(Locale.ROOT))) throw new IOException("Conflicting resource paths: " + key);
-        files.put(key, bytes); savedHashes.put(key, hash(bytes));contentRevisions.put(key,++contentSequence);
+    private void add(String key,byte[] bytes) throws IOException { add(key,bytes,null); }
+    private void add(String key,byte[] bytes,PackLoads.Monitor monitor) throws IOException {
+        if(files.size()>=MAX_FILES)throw new IOException("Too many pack files");
+        if(!foldedFiles.add(key.toLowerCase(Locale.ROOT)))throw new IOException("Conflicting resource paths: "+key);
+        byte[] fingerprint;
+        if(monitor==null)fingerprint=hash(bytes);
+        else {
+            try {
+                var digest=java.security.MessageDigest.getInstance("SHA-256");
+                for(int offset=0;offset<bytes.length;offset+=8192) { monitor.check();digest.update(bytes,offset,Math.min(8192,bytes.length-offset)); }
+                monitor.check();fingerprint=digest.digest();
+            } catch(java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
+        }
+        files.put(key,bytes);savedHashes.put(key,fingerprint);contentRevisions.put(key,++contentSequence);
     }
     private void validatePaths() throws IOException { validatePaths(List.of()); }
     private void validatePaths(String additionalFile) throws IOException { validatePaths(List.of(additionalFile)); }

@@ -25,6 +25,11 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private final AsyncPackLoad packLoad=new AsyncPackLoad();
+    private boolean showPackLoad;
+    private String packLoadMessage;
+    private long pendingLoadedRequest=-1;
+    private PackWorkspace pendingLoadedOwner;
     private final AsyncSaveAs saveAsTransfer=new AsyncSaveAs();
     private boolean showSaveAsTransfer;
     private String saveAsMessage;
@@ -91,7 +96,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { packLoad.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -267,6 +272,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Review ZIP export progress")) showZipExport=true;
                 if (ImGui.menuItem("Review Save Copy progress")) showFolderCopy=true;
                 if (ImGui.menuItem("Review Save As progress")) showSaveAsTransfer=true;
+                if (ImGui.menuItem("Review Open / Import progress")) showPackLoad=true;
                 ImGui.beginDisabled(!AssetReplacement.supports(selected));if (ImGui.menuItem("Replace selected image/object asset")) chooseAssetReplacement(selected);ImGui.endDisabled();
                 if (ImGui.menuItem("Review captured asset replacement")) showAssetReplacement=true;
                 if (ImGui.menuItem("Review pending changes")) showPendingChanges=true;
@@ -473,6 +479,7 @@ public final class EditorApp extends Application {
         if (showJigsawReview) drawJigsawDependencyReview();
         if (showStructureThemeReview) drawStructureThemeReview();
         if (showSaveAsTransfer) drawSaveAsTransfer();
+        if (showPackLoad) drawPackLoad();
         if (showFolderCopy) drawFolderCopy();
         if (showZipExport) drawZipExport();
         if (showAssetBatchImport) drawAssetBatchImport();
@@ -481,7 +488,7 @@ public final class EditorApp extends Application {
         if (showJsonStructure) drawJsonStructure();
         if (pendingCopyOpen!=null) {
             Path path=pendingCopyOpen;boolean fromSaveAs=pendingCopyFromSaveAs;pendingCopyOpen=null;pendingCopyFromSaveAs=false;
-            try { if (transition(true,() -> { PackWorkspace next=PackWorkspace.open(path);workspace=next;selected=null;filter.set("");error=null; })) { if (fromSaveAs) saveAsMessage=null;else folderCopyMessage=null; } }
+            try { packLoad.start(path,PackLoads.Kind.DIRECTORY);packLoadMessage=null;showPackLoad=true;if (fromSaveAs) saveAsMessage="Loading published folder; review Open / Import progress to open it with workspace guards.";else folderCopyMessage="Loading completed folder; review Open / Import progress to open it with workspace guards."; }
             catch (Exception failure) { error=InspectorText.label(failure.getMessage(),512);if (fromSaveAs) saveAsMessage=error;else folderCopyMessage=error; }
         }
         applyPendingFolderAction();
@@ -515,6 +522,7 @@ public final class EditorApp extends Application {
         changesPendingWorkspace=null;changesPendingPath=null;
         referenceReviewPendingWorkspace=null;referenceReviewPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
+        finishLoadedPackOpen();
         saveAsTransfer.finish(workspace);
         pendingDiskReview.poll(workspace); // All frame edits, history actions and workspace navigation have completed.
     }
@@ -6808,6 +6816,35 @@ public final class EditorApp extends Application {
         int result = save ? chooser.showSaveDialog(null) : chooser.showOpenDialog(null);
         return result == JFileChooser.APPROVE_OPTION ? chooser.getSelectedFile().toPath() : null;
     }
+    private void drawPackLoad() {
+        if (!ImGui.begin("Open / Import pack")) { ImGui.end();return; }
+        if (ImGui.button("Hide pack loading")) { showPackLoad=false;ImGui.end();return; }
+        var state=packLoad.poll();
+        ImGui.textWrapped("Load a folder or ZIP in the background, then open the completed pack with normal draft and unsaved-change guards. Loading keeps the current workspace available.");
+        if (state.source()!=null) ImGui.textWrapped((state.kind()==PackLoads.Kind.ZIP ? "ZIP: " : "Folder: ")+InspectorText.label(state.source().toString(),512));
+        if (state.progress()!=null) { var progress=state.progress();ImGui.textUnformatted(progress.files()+" files; "+progress.directories()+" explicit folders; "+progress.bytes()+" bytes read"); }
+        if (state.phase()==AsyncPackLoad.Phase.LOADING) { ImGui.textWrapped("Loading and preparing saved-file fingerprints...");if (ImGui.button("Cancel pack load")) packLoad.cancel(); }
+        else if (state.phase()==AsyncPackLoad.Phase.READY) {
+            ImGui.textWrapped("Pack loaded in memory. It has not replaced the active workspace.");
+            if (ImGui.button("Open loaded pack with workspace guards")) { pendingLoadedRequest=state.request();pendingLoadedOwner=workspace;resourceNavigation.clear(); }
+        } else if (state.detail()!=null) ImGui.textWrapped(state.detail());
+        if (state.receipt()!=null) { var receipt=state.receipt();ImGui.textWrapped(receipt.files()+" loaded files; "+receipt.directories()+" explicit folders; "+receipt.bytes()+" bytes. "+(receipt.activeDirectory()==null ? "Imported ZIP has no active save folder." : "Active folder after opening: "+InspectorText.label(receipt.activeDirectory().toString(),512))); }
+        if (packLoadMessage!=null) ImGui.textWrapped(packLoadMessage);
+        ImGui.beginDisabled(packLoad.busy());if (ImGui.button("Choose pack folder")) perform("Open");ImGui.sameLine();if (ImGui.button("Choose pack ZIP")) perform("Import");ImGui.endDisabled();
+        if (ImGui.button("Clear loaded pack / cancel loading")) { packLoad.clear();packLoadMessage=null;pendingLoadedRequest=-1;pendingLoadedOwner=null; }
+        if (packLoad.busy() && state.phase()!=AsyncPackLoad.Phase.LOADING) ImGui.textWrapped("The cancelled loader is finishing before another pack can be loaded.");
+        ImGui.textWrapped("Limits: 512 MiB expanded bytes, 100,000 file/folder nodes, 64 path segments and 16 million metadata path characters. One load at a time; hiding retains work. Source links and observable changes during reads are refused. ZIP entries must agree with a valid central directory. This is not a filesystem snapshot or native pack validation. Opening uses the loaded bytes without rereading the source; later disk changes are checked independently by Save. Unsupported previews remain disabled.");
+        ImGui.end();
+    }
+    private void finishLoadedPackOpen() {
+        if (pendingLoadedRequest<0) return;
+        long request=pendingLoadedRequest;PackWorkspace owner=pendingLoadedOwner;pendingLoadedRequest=-1;pendingLoadedOwner=null;
+        var state=packLoad.poll();
+        if (owner!=workspace || state.request()!=request || state.phase()!=AsyncPackLoad.Phase.READY) { packLoadMessage="Workspace or loaded candidate changed after the request. Open the current loaded pack again explicitly.";return; }
+        try {
+            if (transition(true,()->{ PackWorkspace next=packLoad.take(request,owner,workspace);workspace=next;selected=null;filter.set("");error=null; })) packLoadMessage=null;
+        } catch (Exception failure) { error=InspectorText.label(failure.getMessage(),512);packLoadMessage=error; }
+    }
     private void drawSaveAsTransfer() {
         if (!ImGui.begin("Captured Save As")) { ImGui.end();return; }
         if (ImGui.button("Hide Save As progress")) { showSaveAsTransfer=false;ImGui.end();return; }
@@ -6889,11 +6926,9 @@ public final class EditorApp extends Application {
                     transition(true, () -> { workspace = next; selected = dimension;filter.set(""); });
                 }
                 case "Open", "Import" -> {
-                    Path path = choose(action.equals("Open"), false);
-                    if (path != null) transition(true, () -> {
-                        PackWorkspace next = action.equals("Open") ? PackWorkspace.open(path) : PackWorkspace.importZip(path);
-                        workspace = next; selected = null;filter.set("");
-                    });
+                    if (packLoad.busy()) { showPackLoad=true;return; }
+                    Path path=choose(action.equals("Open"),false);if (path==null) return;
+                    packLoad.start(path,action.equals("Open") ? PackLoads.Kind.DIRECTORY : PackLoads.Kind.ZIP);packLoadMessage=null;showPackLoad=true;
                 }
                 case "Save" -> { if (!appliedValuesOnlyAllowed() || !saveWorkspace()) return; }
                 case "Save As" -> {
