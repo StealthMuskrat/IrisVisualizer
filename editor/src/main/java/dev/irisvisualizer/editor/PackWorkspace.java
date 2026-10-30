@@ -425,6 +425,11 @@ public final class PackWorkspace implements PackResourceView {
         installReplacement(path,after);history.record(path,before,after);
     }
     public void save(Path target) throws IOException {
+        save(target,FileSaves::write);
+    }
+    /** Injectable publication boundary for filesystem failure contracts; normal callers use the same staged writer. */
+    void save(Path target,FileSaves.Writer writer) throws IOException {
+        Objects.requireNonNull(writer);
         target = target.toAbsolutePath().normalize();
         rejectLinks(target);
         boolean same = directory != null && Files.exists(target) && target.toRealPath().equals(directory);
@@ -437,26 +442,20 @@ public final class PackWorkspace implements PackResourceView {
         for (String key : relocatedDirectoryTargets) if (Files.exists(target.resolve(key),LinkOption.NOFOLLOW_LINKS)) throw new IOException("Relocated folder destination became occupied outside the workspace: "+key);
         for (String key : files.keySet()) {
             if (same && !changed.contains(key)) continue;
-            Path file = target.resolve(key);
-            if (Files.exists(file)) {
-                if (!same || created.contains(key)) throw new IOException("Destination already contains resource: " + key + ". Choose an empty folder.");
-                if (!Files.isRegularFile(file) || !Arrays.equals(savedHashes.get(key), hashFile(file)))
-                    throw new IOException("Resource changed outside the editor: " + key + ". Reopen the pack to review disk changes before saving.");
-            } else if (same && !created.contains(key)) throw new IOException("Resource was removed outside the editor: " + key);
+            FileSaves.preflight(target.resolve(key),same && !created.contains(key) ? savedHashes.get(key) : null);
         }
         if (same) for (String key : removedDirectories) preflightDirectoryRemoval(target,key);
         Files.createDirectories(target);
         for (String key : directories) {
-            Files.createDirectories(target.resolve(key));
+            rejectLinks(target);checkedTarget(target,key);Files.createDirectories(target.resolve(key));
             if (same && changedDirectories.remove(key)) { savedDirectories.add(key);relocatedDirectoryTargets.remove(key);saveRevision++; }
         }
         for (var entry : files.entrySet()) {
             if (same && !changed.contains(entry.getKey())) continue;
-            Path file = target.resolve(entry.getKey()); Files.createDirectories(file.getParent());
-            if (created.contains(entry.getKey())) Files.write(file, entry.getValue(), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
-            else Files.write(file, entry.getValue(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            rejectLinks(target);Path file=checkedTarget(target,entry.getKey());Files.createDirectories(file.getParent());
+            var receipt=Objects.requireNonNull(writer.write(target,entry.getKey(),entry.getValue(),same && !created.contains(entry.getKey()) ? savedHashes.get(entry.getKey()) : null),"Save writer returned no receipt");
             created.remove(entry.getKey());
-            savedHashes.put(entry.getKey(), hash(entry.getValue()));
+            savedHashes.put(entry.getKey(),receipt.savedHash());
             saveRevision++;
         }
         if (same) {
@@ -472,7 +471,7 @@ public final class PackWorkspace implements PackResourceView {
             }
         }
         directory = target.toRealPath();
-        for (var entry : files.entrySet()) savedHashes.put(entry.getKey(), hash(entry.getValue()));
+        // Published-file receipts already installed exact captured-byte hashes; untouched baselines stay independent.
         changed.clear(); created.clear(); changedDirectories.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);
         saveRevision++;
     }
@@ -594,16 +593,6 @@ public final class PackWorkspace implements PackResourceView {
     private static byte[] hash(byte[] bytes) {
         try { return java.security.MessageDigest.getInstance("SHA-256").digest(bytes); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
-    }
-    private static byte[] hashFile(Path path) throws IOException {
-        try {
-            var digest = java.security.MessageDigest.getInstance("SHA-256");
-            try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
-                byte[] buffer = new byte[8192]; int count;
-                while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
-            }
-            return digest.digest();
-        } catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
     }
     static void rejectLinks(Path path) throws IOException {
         for (Path part = path; part != null; part = part.getParent())
