@@ -6,6 +6,9 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Locale;
+import java.io.FilterInputStream;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 /** Exact opaque file copies for permitted image/object families. No decoding, rewriting or native loading. */
 public final class AssetImports {
@@ -36,11 +39,21 @@ public final class AssetImports {
         // Existing native-key pickers require lowercase .png/.iob suffixes. This renames only the new destination.
         return new Source(path,family,ResourceTypes.extension(name).toLowerCase(Locale.ROOT),suggestedKey(name),attributes.size());
     }
-    static byte[] read(Source source,long budget) throws IOException {
+    static byte[] read(Source source,long budget) throws IOException { return read(source,budget,() -> false); }
+    private static void checkCancelled(BooleanSupplier cancelled) { if (cancelled.getAsBoolean()) throw new CancellationException("Asset copy cancelled"); }
+    static byte[] read(Source source,long budget,BooleanSupplier cancelled) throws IOException {
+        java.util.Objects.requireNonNull(cancelled);checkCancelled(cancelled);
         if (budget<0 || budget>MAX_BYTES) throw new IllegalArgumentException("Invalid asset copy budget");
         if (source.bytes()>budget) throw new IOException("Asset exceeds the remaining workspace/import byte budget");
         rejectLinks(source.path());byte[] data;
-        try (var input=Files.newInputStream(source.path(),LinkOption.NOFOLLOW_LINKS)) { data=PackWorkspace.readBounded(input,budget); }
+        try (var input=Files.newInputStream(source.path(),LinkOption.NOFOLLOW_LINKS)) {
+            var checked=new FilterInputStream(input) {
+                @Override public int read(byte[] data,int offset,int length) throws IOException { checkCancelled(cancelled);return in.read(data,offset,length); }
+                @Override public int read() throws IOException { checkCancelled(cancelled);return in.read(); }
+            };
+            data=PackWorkspace.readBounded(checked,budget);
+        }
+        checkCancelled(cancelled);
         if (data.length!=source.bytes()) throw new IOException("Asset size changed while importing; choose the file again");
         return data;
     }
