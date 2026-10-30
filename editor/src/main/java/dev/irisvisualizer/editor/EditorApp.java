@@ -56,7 +56,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -157,7 +157,7 @@ public final class EditorApp extends Application {
     private String referenceReviewPendingPath;
     private PackWorkspace referenceReviewPendingWorkspace;
     private boolean showJigsawReview,jigsawProblemsOnly;
-    private final JigsawDependencyReview.Cache jigsawReview=new JigsawDependencyReview.Cache();
+    private final AsyncJigsawDependencyReview jigsawReview=new AsyncJigsawDependencyReview();
     private final ImString jigsawReviewQuery=new ImString(1024);
     private String jigsawReviewRoot;
     private JigsawDependencyReview.Scope jigsawReviewScope=JigsawDependencyReview.Scope.ALL;
@@ -197,6 +197,7 @@ public final class EditorApp extends Application {
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
         packReferenceReview.poll(workspace);
+        jigsawReview.poll(workspace,jigsawReviewRoot);
         updateSourceMatchFocus();
 
         if (closeRequested) {
@@ -6206,24 +6207,26 @@ public final class EditorApp extends Application {
     }
     private void drawJigsawDependencyReview() {
         if (!ImGui.begin("Jigsaw dependency review")) { ImGui.end();return; }
-        if (ImGui.button("Close dependency review")) { showJigsawReview=false;ImGui.end();return; }
+        if (ImGui.button("Close dependency review")) { jigsawReview.clear();showJigsawReview=false;ImGui.end();return; }
         ImGui.textWrapped("Authored file paths from one pinned structure, pool or piece. This follows declared start pools, direct fallback fields, physical memberships, connector pools and object-file presence. Repeated paths and cycle groups do not establish runtime execution or invalidity. Native fallback uses a direct fallback only; following its own declarations here is a file review, not fallback execution.");
         ImGui.beginDisabled(!JigsawDependencyReview.supports(selected));
         if (ImGui.button("Scan selected structure / pool / piece")) {
-            try { var next=jigsawReview.refresh(workspace,selected);jigsawReviewRoot=next.root(); }
+            try { jigsawReviewRoot=selected;jigsawReview.refresh(workspace,jigsawReviewRoot); }
             catch (Exception failure) { error=failure.getMessage(); }
         }
         ImGui.endDisabled();
         ImGui.beginDisabled(jigsawReviewRoot==null || !workspace.paths().contains(jigsawReviewRoot));
         if (ImGui.button("Refresh pinned root")) { try { jigsawReview.refresh(workspace,jigsawReviewRoot); } catch (Exception failure) { error=failure.getMessage(); } }
-        ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Clear dependency scan")) jigsawReview.clear();
+        ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Cancel / clear dependency scan")) jigsawReview.clear();
         ImGui.textWrapped("Pinned root: "+InspectorText.label(jigsawReviewRoot,256));
         ImGui.inputText("Dependency path, field or key contains",jigsawReviewQuery);
         if (ImGui.beginCombo("Dependency link scope",jigsawReviewScope.label())) { for (var scope : JigsawDependencyReview.Scope.values()) if (ImGui.selectable(scope.label(),scope==jigsawReviewScope)) jigsawReviewScope=scope;ImGui.endCombo(); }
         if (ImGui.checkbox("Only non-exact diagnostics",jigsawProblemsOnly)) jigsawProblemsOnly=!jigsawProblemsOnly;
         if (ImGui.button("Clear dependency filters")) { jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false; }
-        var review=jigsawReview.current(workspace,jigsawReviewRoot);
-        if (review==null) ImGui.textWrapped("No scan for this root and applied workspace state. Scan explicitly; selecting or opening another resource keeps the pinned root. Applied edits and resource changes require a refresh.");
+        var scan=jigsawReview.poll(workspace,jigsawReviewRoot);var review=scan.review();
+        if (scan.phase()==AsyncJigsawDependencyReview.Phase.SCANNING) ImGui.textWrapped("Scanning jigsaw dependencies in the background... Editing and Save/Export remain available. Refresh replaces the request; Cancel discards it.");
+        else if (scan.phase()==AsyncJigsawDependencyReview.Phase.FAILED) ImGui.textWrapped("Dependency scan failed: "+scan.error()+". Refresh explicitly to retry.");
+        else if (review==null) ImGui.textWrapped("No scan for this root and applied workspace state. Scan explicitly; selecting or opening another resource keeps the pinned root. Applied edits and resource changes require a refresh.");
         else {
             ImGui.textWrapped(review.nodes().size()+" visited resources; "+review.jsonFiles()+" JSON files inspected; "+review.bytes()+" JSON bytes; "+review.edges().size()+" recorded diagnostics; "+review.count(ReferenceDiagnostics.State.EXACT_FILE)+" exact-file links; "+review.cycles().size()+" repeated-path groups; "+review.fallbackCycles().size()+" fallback-only groups.");
             ImGui.textWrapped(review.incomplete() ? "Some outgoing dependencies are unknown because of unsupported data or review limits. See recorded diagnostics and notices." : "No unsupported data or review limits encountered in these known fields. Coverage and native validation remain partial.");
@@ -6255,7 +6258,7 @@ public final class EditorApp extends Application {
             if (ImGui.treeNode("Fallback-only authored groups")) { drawJigsawCycleGroups(review.fallbackCycles());ImGui.textWrapped("These are literal fallback fields, not a claim that the native direct-fallback path recurses.");ImGui.treePop(); }
             if (ImGui.treeNode("Dependency review notices")) { for (var notice : review.notices()) { ImGui.textWrapped(InspectorText.label(notice.path(),256));ImGui.textWrapped(notice.message()); }if (review.omittedNotices()>0) ImGui.textWrapped(review.omittedNotices()+" further notices omitted.");ImGui.treePop(); }
         }
-        ImGui.textWrapped("Limits: 512 visited resources, 256 inspected JSON files, 1 MB/file, 8 MB JSON total, 4,096 edges, 128 notices and 200 displayed matches. Object payloads are never read. Scans inspect applied memory only. Geometry, theme/rule eligibility, binary bounds, priorities, registry/state compatibility, native assembly, noise/material dependencies and package export closure are unchecked. No files are changed; this review cannot authorize rename/move/delete. Save/Export remain available; unsupported previews remain disabled.");
+        ImGui.textWrapped("Limits: 512 visited resources, 256 inspected JSON files, 1 MB/file, 8 MB JSON total, 4,096 edges, 128 notices and 200 displayed matches. Snapshot limits: 4,096 copied JSON files / 16 MB, root first then lexical order, with exact target presence retained (up to 100,000 paths / 16 million UTF-16 characters). Reached targets omitted from the snapshot are marked skipped with unknown outgoing links. Object payloads are never read. Scans inspect applied memory on one background worker; applying edits invalidates results without rescanning. Geometry, theme/rule eligibility, binary bounds, priorities, registry/state compatibility, native assembly, noise/material dependencies and package export closure are unchecked. No files are changed; this review cannot authorize rename/move/delete. Save/Export remain available; unsupported previews remain disabled.");
         ImGui.end();
     }
     private void drawJigsawCycleGroups(List<List<String>> groups) {
