@@ -42,8 +42,9 @@ public final class AsyncPackLoad implements AutoCloseable {
         }
     }
     private void cancelJobs() { if (active!=null) active.cancelled.set(true);if (pending!=null) pending.cancelled.set(true);pending=null;prepared=null;generation++; }
-    public void cancel() {
-        synchronized (lock) { if (closed || snapshot.phase()!=Phase.LOADING) return;var old=poll();cancelJobs();snapshot=new Snapshot(generation,Phase.CANCELLED,old.kind(),old.source(),old.progress(),null,"Pack load cancelled. The current workspace and drafts were retained."); }worker.interrupt();
+    public void cancel() { cancelIfLoading(-1); }
+    boolean cancelIfLoading(long request) {
+        synchronized (lock) { if (closed || snapshot.phase()!=Phase.LOADING || request>=0 && snapshot.request()!=request) return false;var old=poll();cancelJobs();snapshot=new Snapshot(generation,Phase.CANCELLED,old.kind(),old.source(),old.progress(),null,"Pack load cancelled. The current workspace and drafts were retained."); }worker.interrupt();return true;
     }
     public void clear() { synchronized (lock) { if (closed) return;cancelJobs();snapshot=new Snapshot(generation,Phase.IDLE,null,null,null,null,null); }worker.interrupt(); }
     private void run() {

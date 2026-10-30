@@ -24,6 +24,13 @@ public final class PackLoads {
         void update(int files,int directories,long bytes,int nodes,int characters) { check();progress.update(new Progress(files,directories,bytes,nodes,characters));check(); }
     }
     static Monitor monitor() { return new Monitor(()->false,p->{}); }
+    /** UI Save coordination only. A ready candidate remains an explicit earlier read, without a new source scan. */
+    static boolean cancelForSave(AsyncPackLoad loader,Path folder) {
+        var state=loader.poll();if(state.phase()!=AsyncPackLoad.Phase.LOADING)return false;
+        Path source=state.source().toAbsolutePath().normalize(),target=folder.toAbsolutePath().normalize();
+        boolean overlaps=source.startsWith(target) || state.kind()==Kind.DIRECTORY && target.startsWith(source);
+        return overlaps && loader.cancelIfLoading(state.request());
+    }
     static Prepared prepare(Path source,Kind kind,BooleanSupplier cancelled,ProgressSink progress) throws IOException {
         return prepare(source,kind,cancelled,progress,new PackWorkspace.LoadLimits(PackWorkspace.MAX_BYTES,PackWorkspace.MAX_FILES,PackWorkspace.MAX_PATH_SEGMENTS));
     }

@@ -281,6 +281,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Review global piece theme tags")) showStructureThemeReview=true;
                 ImGui.textWrapped("Active folder: "+(workspace.directory()==null ? "Not saved to a folder" : workspace.directory().toString()));
                 ImGui.textWrapped("Save As switches the active folder after a completed, still-current snapshot. Save Copy keeps it. Both write applied in-memory values to a new or empty folder outside the active pack.");
+                ImGui.textWrapped("Save stages and verifies each changed resource before publication. Earlier resources can remain saved if a later resource fails; review the error and pending changes.");
                 ImGui.endMenu();
             }
             if (ImGui.beginMenu("Edit")) {
@@ -6803,6 +6804,7 @@ public final class EditorApp extends Application {
         try {
             Path path = workspace.directory() == null ? choose(true, true) : workspace.directory();
             if (path == null) return false;
+            if (PackLoads.cancelForSave(packLoad,path)) packLoadMessage="Save cancelled an overlapping in-progress load before staging. Choose the source again after Save to reload it.";
             workspace.save(path); error = null; return true;
         } catch (Exception failure) {
             error = failure.getMessage();
