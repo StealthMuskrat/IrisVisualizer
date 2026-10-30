@@ -28,8 +28,8 @@ public final class EditorApp extends Application {
     private String riverCatalogDimension;
     private final RiverIdLists.CatalogCache riverIdCatalogs = new RiverIdLists.CatalogCache();
     private final BlockFallbacks.AuditCache blockFallbackAudits = new BlockFallbacks.AuditCache();
-    private final BlockAliasAudit.Cache blockAliasAudits = new BlockAliasAudit.Cache();
-    private final ExpressionReferenceAudit.Cache expressionAudits = new ExpressionReferenceAudit.Cache();
+    private final AsyncDefinitionAudit<BlockAliasAudit.Audit> blockAliasAudits = new AsyncDefinitionAudit<>(DefinitionAuditSource.Family.BLOCK_ALIASES,BlockAliasAudit::inspect);
+    private final AsyncDefinitionAudit<ExpressionReferenceAudit.Audit> expressionAudits = new AsyncDefinitionAudit<>(DefinitionAuditSource.Family.EXPRESSIONS,ExpressionReferenceAudit::inspect);
     private final ResourceNavigation resourceNavigation = new ResourceNavigation();
     private final NavigationHistory navigationHistory = new NavigationHistory();
     private final StructureDefinitions.PoolCache structurePools=new StructureDefinitions.PoolCache();
@@ -56,7 +56,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
     }
     @Override protected void disposeImGui() {
-        try { textSearch.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { textSearch.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -196,6 +196,7 @@ public final class EditorApp extends Application {
     private final Map<String, ImString> values = new HashMap<>();
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
+        blockAliasAudits.poll(workspace);expressionAudits.poll(workspace);
         packReferenceReview.poll(workspace);
         jigsawReview.poll(workspace,jigsawReviewRoot);
         updateSourceMatchFocus();
@@ -2239,11 +2240,24 @@ public final class EditorApp extends Application {
         ImGui.textWrapped("Exact alias file present; contents, loader aliases and cycles unchecked: "+target);
         if (ImGui.smallButton("Open exact block alias")) { try { resourceNavigation.request(workspace,target); } catch (Exception failure) { error=failure.getMessage(); } }ImGui.popID();
     }
+    private <T> T drawDefinitionAuditControls(String key,AsyncDefinitionAudit<T> audit) {
+        ImGui.pushID(key);
+        try {
+            if (ImGui.button("Scan / refresh audit")) audit.refresh(workspace);
+            ImGui.sameLine();if (ImGui.button("Cancel / clear audit")) audit.clear();
+            var state=audit.poll(workspace);
+            if (state.phase()==AsyncDefinitionAudit.Phase.SCANNING) ImGui.textWrapped("Scanning applied definitions in the background... Editing and Save/Export remain available. Refresh replaces the request; Cancel discards it.");
+            else if (state.phase()==AsyncDefinitionAudit.Phase.FAILED) ImGui.textWrapped("Definition audit failed: "+state.error()+". Refresh explicitly to retry.");
+            else if (state.audit()==null) ImGui.textWrapped("No audit for the applied workspace state. Scan explicitly; applied edits and resource changes invalidate results. Selection, inspector drafts and Save/Export do not rescan.");
+            ImGui.textWrapped("The immutable snapshot copies up to 512 sorted definitions / 8 MB, matching the audit's oversize skips and first byte-budget stop. Exact target presence is retained up to 100,000 paths / 16 million UTF-16 characters. Unrelated and binary payloads are never copied. Collapsing this section retains the request/result; Cancel clears it.");
+            return state.audit();
+        } finally { ImGui.popID(); }
+    }
     private void drawBlockAliasAudit() {
         if (!ImGui.collapsingHeader("Exact block-alias references")) return;
-        var audit=blockAliasAudits.inspect(workspace);
         ImGui.textWrapped("Read-only literal file references in blocks/ definitions and their backup chains. The audit does not run the native loader, inspect material consumers, validate registry states or prove generation safety. Backup links are conditional; reported cycles are potential cycles, including unused definitions. Save/Export remain available.");
         ImGui.textWrapped("Limits: 512 sorted definitions, 1 MB per JSON file, 8 MB total, eight backup levels, 4096 references and 256 notices.");
+        var audit=drawDefinitionAuditControls("blockAliasAudit",blockAliasAudits);if (audit==null) return;
         ImGui.textWrapped(audit.definitions()+" definitions; "+audit.inspected().size()+" inspected; "+audit.parsed()+" parsed; "+audit.edges().size()+" exact references; "+audit.cycles().size()+" potential cycle groups.");
         if (audit.incomplete()) ImGui.textWrapped("Reference coverage is incomplete; see notices below.");
         if (!audit.inspected().contains(selected)) ImGui.textWrapped("The selected definition was not inspected within these limits. Missing links or cycles may remain unknown.");
@@ -2255,9 +2269,9 @@ public final class EditorApp extends Application {
     }
     private void drawExpressionReferenceAudit() {
         if (!ImGui.collapsingHeader("Expression source references and declarations")) return;
-        var audit=expressionAudits.inspect(workspace);
         ImGui.textWrapped("Read-only literal links in expression variable/function styles and their fracture children. No formula is parsed; formula identifiers, other resource consumers, loader aliases, provider compatibility and runtime applicability are unchecked. Potential cycle groups include unused and overridden sources and do not prove execution. Save/Export remain available.");
         ImGui.textWrapped("Limits: 512 sorted expression definitions, 1 MB per JSON, 8 MB total, 64 entries per source list, eight style-fracture levels, 4096 references and 256 notices. Exact file presence does not validate target contents.");
+        var audit=drawDefinitionAuditControls("expressionAudit",expressionAudits);if (audit==null) return;
         ImGui.textWrapped(audit.definitions()+" definitions; "+audit.inspected().size()+" inspected; "+audit.parsed()+" JSON objects parsed; "+audit.edges().size()+" literal links; "+audit.cycles().size()+" potential cycle groups.");
         if (audit.incomplete()) ImGui.textWrapped("Reference/declaration coverage is incomplete; see notices below.");
         if (ExpressionDefinitions.supports(selected) && !audit.inspected().contains(selected)) ImGui.textWrapped("The selected definition was not inspected within these limits; missing links and cycles may remain unknown.");
@@ -6121,7 +6135,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;structureThemeReferences.clear();blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;pendingChanges.clear();showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
