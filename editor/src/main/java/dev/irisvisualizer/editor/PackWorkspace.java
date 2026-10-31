@@ -74,6 +74,11 @@ public final class PackWorkspace implements PackResourceView {
     ByteInspection.Source captureByteInspection(String path) throws IOException {
         if(path==null || !files.containsKey(path))throw new IOException("Choose an existing resource to inspect");byte[] data=files.get(path);return new ByteInspection.Source(path,data);
     }
+    /** Selected JSON bytes are immutable by ownership; only path metadata is copied on the UI thread. */
+    ReferenceInspection.Source captureReferenceInspection(String path) throws IOException {
+        if(path==null || !files.containsKey(path) || !ReferenceDiagnostics.supports(path))throw new IOException("Choose a supported existing JSON resource to inspect links");
+        return new ReferenceInspection.Source(path,files.get(path),paths());
+    }
     /** Private immutable applied bytes and a tiny baseline fingerprint; worker never receives the live workspace. */
     FileComparison.Source captureFileComparison(String path) throws IOException {
         if(path==null || !files.containsKey(path))throw new IOException("Choose an existing resource to compare");
