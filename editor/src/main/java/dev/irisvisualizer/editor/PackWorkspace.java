@@ -151,6 +151,50 @@ public final class PackWorkspace implements PackResourceView {
         return Math.min(AssetImports.MAX_BYTES,available);
     }
     boolean contentEquals(String path,byte[] data) { return Arrays.equals(files.get(path),data); }
+    private String reviewedCreationTarget(String parent,String name,String dependency) throws IOException {
+        String base=ResourceCreation.base(parent);
+        if(name==null || name.length()>250 || !name.matches("[a-z0-9_-]+"))throw new IOException("Use 1-250 lowercase letters, digits, _ or -; omit .json");
+        if(!Set.of("image-maps","blocks","expressions","structures","jigsaw-pools","jigsaw-pieces").contains(base) || !parent.equals(base)) {
+            if(!directories.contains(parent) && files.keySet().stream().noneMatch(path->path.startsWith(parent+"/")))throw new IOException("Parent folder is not in this workspace");
+        }
+        if(ResourceCreation.dependencyType(parent)!=null && !ResourceCreation.choices(this,parent).contains(dependency))throw new IOException("Choose an exact existing "+ResourceCreation.dependencyType(parent)+" key");
+        String key=(parent.equals(base) ? "" : parent.substring(base.length()+1)+"/")+name;
+        return safe(ResourceTypes.target(base+"/template.json",key));
+    }
+    private void reviewedAdditionBudget(String path,int bytes,long maximumBytes) throws IOException {
+        if(maximumBytes<0 || maximumBytes>MAX_BYTES)throw new IllegalArgumentException("Invalid reviewed resource budget");safe(path);
+        for(String component:path.split("/"))if(component.length()>255)throw new IOException("Resource path components must fit 255 characters, including the extension");
+        if(ResourceTypes.fileFamily(path)==null)throw new IOException("Unsupported resource destination");
+        if(bytes<0 || files.values().stream().mapToLong(data->data.length).sum()+bytes>maximumBytes)throw new IOException("Reviewed resource exceeds remaining workspace byte capacity");
+        if(files.size()>=MAX_FILES || foldedFiles.contains(path.toLowerCase(Locale.ROOT)))throw new IOException("Resource destination is already occupied or file limit reached");validatePaths(List.of(path),true);
+    }
+    ReviewedResourceAddition.Target reviewResourceCreation(String parent,String name,String dependency,long maximumBytes) throws IOException {
+        String path=reviewedCreationTarget(parent,name,dependency);byte[] data=ResourceCreation.bytes(this,parent,name,dependency);reviewedAdditionBudget(path,data.length,maximumBytes);
+        var plan=new ReviewedResourceAddition.Plan(ReviewedResourceAddition.Mode.CREATE_JSON,parent,name,dependency,null,path,data.length);
+        return new ReviewedResourceAddition.Target(this,new ReviewedResourceAddition.Source(plan,data),-1);
+    }
+    ReviewedResourceAddition.Target reviewResourceDuplication(String source,String key,long maximumBytes) throws IOException {
+        if(!files.containsKey(source) || ResourceTypes.fileFamily(source)==null)throw new IOException("Choose a supported JSON, image or .iob resource to duplicate");
+        if(key==null || key.length()>16384)throw new IOException("Use a relative resource key of at most 16,384 characters");
+        String proposed=safe(ResourceTypes.fileFamily(source)+"/"+key+ResourceTypes.extension(source));
+        for(String component:proposed.split("/"))if(component.length()>255)throw new IOException("Resource path components must fit 255 characters");
+        String path=safe(ResourceTypes.target(source,key));byte[] data=files.get(source);reviewedAdditionBudget(path,data.length,maximumBytes);
+        var plan=new ReviewedResourceAddition.Plan(ReviewedResourceAddition.Mode.DUPLICATE,null,key,null,source,path,data.length);
+        return new ReviewedResourceAddition.Target(this,new ReviewedResourceAddition.Source(plan,data),contentRevision(source));
+    }
+    boolean reviewedAdditionSourceCurrent(ReviewedResourceAddition.Target target) {
+        return target!=null && target.owner==this && (target.source.plan.mode()!=ReviewedResourceAddition.Mode.DUPLICATE || files.containsKey(target.source.plan.source()) && contentRevision(target.source.plan.source())==target.stamp);
+    }
+    void checkReviewedAddition(ReviewedResourceAddition.Target target,long maximumBytes) throws IOException {
+        if(!reviewedAdditionSourceCurrent(target))throw new IOException("Source resource bytes or workspace changed; prepare the resource again");var plan=target.source.plan;
+        if(plan.mode()==ReviewedResourceAddition.Mode.CREATE_JSON && !reviewedCreationTarget(plan.parent(),plan.name(),plan.dependency()).equals(plan.target()))throw new IOException("Creation destination changed");
+        reviewedAdditionBudget(plan.target(),plan.bytes(),maximumBytes);
+    }
+    String installReviewedAddition(ReviewedResourceAddition.Target target,ReviewedResourceAddition.Prepared prepared,long maximumBytes) throws IOException {
+        checkReviewedAddition(target,maximumBytes);if(prepared==null || prepared.origin!=target.source || !prepared.available())throw new IOException("Prepared resource belongs to another request or was already applied");
+        byte[] fingerprint=prepared.hashCopy();byte[] data=prepared.consume();String path=target.source.plan.target();
+        files.put(path,data);foldedFiles.add(path.toLowerCase(Locale.ROOT));savedHashes.put(path,fingerprint);contentRevisions.put(path,++contentSequence);changed.add(path);created.add(path);resourceRevision++;history.clear("Reviewed resource added; earlier applied-edit history was cleared.");return path;
+    }
     /** Duplicate bytes under the same supported type. No references or file contents are rewritten. */
     public String duplicate(String source, String key) throws IOException {
         if (!files.containsKey(source)) throw new IOException("Unknown resource");
@@ -550,7 +594,9 @@ public final class PackWorkspace implements PackResourceView {
     }
     private void validatePaths() throws IOException { validatePaths(List.of()); }
     private void validatePaths(String additionalFile) throws IOException { validatePaths(List.of(additionalFile)); }
-    private void validatePaths(List<String> additionalFiles) throws IOException {
+    private void validatePaths(List<String> additionalFiles) throws IOException { validatePaths(additionalFiles,false); }
+    private void validatePaths(List<String> additionalFiles,boolean boundCharacters) throws IOException {
+        long pathCharacters=0;
         Map<String, String> spellings = new HashMap<>(); Set<String> folders = new HashSet<>();
         List<String> plannedFiles=new ArrayList<>(files.keySet());plannedFiles.addAll(additionalFiles);
         for (String file : plannedFiles) for (String current=file;!current.isEmpty();) {
@@ -563,6 +609,7 @@ public final class PackWorkspace implements PackResourceView {
             for (int i=0;i<parts.length;i++) {
                 current += (i == 0 ? "" : "/") + parts[i];
                 String folded = current.toLowerCase(Locale.ROOT), prior = spellings.putIfAbsent(folded, current);
+                if(prior==null) { pathCharacters+=current.length();if(boundCharacters && pathCharacters>MAX_LOAD_PATH_CHARACTERS)throw new IOException("Reviewed resource exceeds the 16 million path-character metadata budget"); }
                 if (spellings.size() > MAX_FILES) throw new IOException("Too many pack entries, including folders");
                 if (prior != null && !prior.equals(current)) throw new IOException("Conflicting Windows path spelling: " + current);
                 if (i < parts.length-1 || directories.contains(key)) folders.add(folded);
