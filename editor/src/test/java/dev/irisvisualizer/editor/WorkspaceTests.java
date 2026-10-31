@@ -77,6 +77,7 @@ public final class WorkspaceTests {
    ResourceSelectorTests.run(temp);
    ReferenceChoicesTests.run(temp);
    AuthoringReferencesTests.run(temp);
+   ResourceBrowserTests.run(temp);
    ReferenceLinkTests.run(temp);
    NoiseReferenceTests.run(temp);
    MaterialReferenceTests.run(temp);
