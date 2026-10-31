@@ -8,7 +8,7 @@ import java.util.Set;
 public final class EditorCommands {
     public enum Action {
         NEW("New"),OPEN("Open"),SAVE("Save"),SAVE_AS("Save As"),SAVE_COPY("Save Copy"),IMPORT("Import"),EXPORT("Export"),
-        UNDO(null),REDO(null),QUICK_OPEN(null),SEARCH_TEXT(null),BACK(null),FORWARD(null),PALETTE(null),INSPECT_JSON(null),REVIEW_CHANGES(null),REVIEW_HISTORY(null),REVIEW_LOAD(null),REVIEW_SAVE_AS(null),REVIEW_COPY(null),REVIEW_EXPORT(null),REVIEW_LINKS(null),REVIEW_JIGSAW(null),REVIEW_THEMES(null),REVIEW_ASSET_IMPORT(null),REVIEW_ASSET_BATCH(null),REVIEW_ASSET_REPLACEMENT(null),REVIEW_RESOURCE_ADDITION(null),REVIEW_FOLDER_OPERATION(null),CLOSE(null);
+        UNDO(null),REDO(null),QUICK_OPEN(null),SEARCH_TEXT(null),BACK(null),FORWARD(null),PALETTE(null),INSPECT_JSON(null),INSPECT_BYTES(null),REVIEW_CHANGES(null),REVIEW_HISTORY(null),REVIEW_LOAD(null),REVIEW_SAVE_AS(null),REVIEW_COPY(null),REVIEW_EXPORT(null),REVIEW_LINKS(null),REVIEW_JIGSAW(null),REVIEW_THEMES(null),REVIEW_ASSET_IMPORT(null),REVIEW_ASSET_BATCH(null),REVIEW_ASSET_REPLACEMENT(null),REVIEW_RESOURCE_ADDITION(null),REVIEW_FOLDER_OPERATION(null),CLOSE(null);
         private final String fileAction;
         Action(String fileAction){this.fileAction=fileAction;}
         public String fileAction(){return fileAction;}

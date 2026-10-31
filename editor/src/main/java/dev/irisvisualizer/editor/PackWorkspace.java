@@ -70,6 +70,10 @@ public final class PackWorkspace implements PackResourceView {
     public long contentRevision(String path) {
         Long revision=contentRevisions.get(path);if (revision==null) throw new IllegalArgumentException("Unknown resource");return revision;
     }
+    /** Immutable-by-ownership array capture for the read-only worker; no full payload copy or digest on the UI thread. */
+    ByteInspection.Source captureByteInspection(String path) throws IOException {
+        if(path==null || !files.containsKey(path))throw new IOException("Choose an existing resource to inspect");byte[] data=files.get(path);return new ByteInspection.Source(path,data);
+    }
     private record AssetPlan(AssetImports.Source source,String target,long budget) {}
     private AssetPlan planAssetImport(Path source,String key,long maximumBytes) throws IOException {
         if (key==null) throw new IOException("Choose a resource key");
