@@ -41,20 +41,20 @@ public final class PendingDiskReview {
         public Report { checks=List.copyOf(checks);counts=Map.copyOf(counts); }
         public int count(WorkspaceChanges.Status status) { return counts.getOrDefault(status,0); }
     }
-    public record Page(int matches,List<WorkspaceChanges.Check> checks) {
-        public Page { checks=List.copyOf(checks); }
-        public boolean truncated() { return matches>checks.size(); }
+    public record Page(ReviewPagination.Window window,List<WorkspaceChanges.Check> checks) {
+        public Page(int matches,List<WorkspaceChanges.Check> checks) { this(ReviewPagination.Window.at(matches,0),checks); }
+        public Page { Objects.requireNonNull(window);checks=List.copyOf(checks); }
+        public int matches() { return window.matches(); }
+        public boolean truncated() { return matches()>checks.size(); }
     }
     public static boolean attention(WorkspaceChanges.Status status) {
         return status==WorkspaceChanges.Status.CONFLICT || status==WorkspaceChanges.Status.IO_ERROR || status==WorkspaceChanges.Status.TOO_LARGE || status==WorkspaceChanges.Status.REVIEW_LIMIT || status==WorkspaceChanges.Status.NO_ACTIVE_FOLDER;
     }
-    public static Page filter(Report report,WorkspaceChanges.Query query,boolean attentionOnly) {
-        int matches=0;var shown=new ArrayList<WorkspaceChanges.Check>();
-        for (var check : report.checks()) {
-            var entry=check.entry();if (!query.filter().matches(entry.kind()) || !entry.path().toLowerCase(Locale.ROOT).contains(query.text()) || (attentionOnly && !attention(check.status()))) continue;
-            matches++;if (shown.size()<WorkspaceChanges.MAX_RESULTS) shown.add(check);
-        }
-        return new Page(matches,shown);
+    public static Page filter(Report report,WorkspaceChanges.Query query,boolean attentionOnly) { return filter(report,query,attentionOnly,0); }
+    public static Page filter(Report report,WorkspaceChanges.Query query,boolean attentionOnly,int requested) {
+        Objects.requireNonNull(report);Objects.requireNonNull(query);
+        var selected=ReviewPagination.select(report.checks(),check->{var entry=check.entry();return query.filter().matches(entry.kind()) && entry.path().toLowerCase(Locale.ROOT).contains(query.text()) && (!attentionOnly || attention(check.status()));},requested);
+        return new Page(selected.window(),selected.entries());
     }
     private static final class Budget {
         final Limits limits;final BooleanSupplier cancelled;final Progress progress;long bytes;int children,entries;

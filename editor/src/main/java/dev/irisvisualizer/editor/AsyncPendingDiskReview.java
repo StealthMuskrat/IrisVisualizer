@@ -48,9 +48,11 @@ public final class AsyncPendingDiskReview implements AutoCloseable {
             return snapshot;
         }
     }
-    public PendingDiskReview.Page query(PackWorkspace current,WorkspaceChanges.Query query,boolean attentionOnly) {
+    /** Compatibility entry point: first bounded result page. Paging never starts a disk scan. */
+    public PendingDiskReview.Page query(PackWorkspace current,WorkspaceChanges.Query query,boolean attentionOnly) { return query(current,query,attentionOnly,0); }
+    public PendingDiskReview.Page query(PackWorkspace current,WorkspaceChanges.Query query,boolean attentionOnly,int requested) {
         Objects.requireNonNull(query);var state=poll(current);if (state.phase()!=Phase.READY) return null;
-        if (page==null || !query.equals(previous) || previousAttention!=attentionOnly) { page=PendingDiskReview.filter(state.report(),query,attentionOnly);previous=query;previousAttention=attentionOnly; }return page;
+        if (page==null || !query.equals(previous) || previousAttention!=attentionOnly || page.window().page()!=ReviewPagination.Window.at(page.matches(),requested).page()) { page=PendingDiskReview.filter(state.report(),query,attentionOnly,requested);previous=query;previousAttention=attentionOnly; }return page;
     }
     public void cancel() { synchronized (lock) { if (closed || snapshot.phase()!=Phase.CHECKING) return;var old=snapshot;cancelJobs();snapshot=new Snapshot(generation,Phase.CANCELLED,old.directory(),old.total(),0,0,null,"Disk review cancelled. Review again explicitly to retry."); }worker.interrupt(); }
     public void clear() { synchronized (lock) { if (closed) return;cancelJobs();workspace=null;revision=-1;saveRevision=-1;directory=null;snapshot=new Snapshot(generation,Phase.IDLE,null,0,0,0,null,null); }worker.interrupt(); }

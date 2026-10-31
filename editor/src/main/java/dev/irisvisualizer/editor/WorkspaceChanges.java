@@ -7,7 +7,7 @@ import java.util.Objects;
 
 /** Read-only pending-write inventory and explicit, bounded active-folder checks. */
 public final class WorkspaceChanges {
-    public static final int MAX_RESULTS=200, MAX_QUERY_CHARACTERS=256;
+    public static final int MAX_RESULTS=ReviewPagination.PAGE_SIZE, MAX_QUERY_CHARACTERS=256;
     public static final long MAX_CHECK_BYTES=16L*1024*1024;
     public enum Kind {
         NEW_FILE("New file"), MODIFIED_FILE("Modified file"), NEW_FOLDER("New folder"), REMOVED_FOLDER("Removed empty folder");
@@ -36,6 +36,7 @@ public final class WorkspaceChanges {
         public int total() { return newFiles+modifiedFiles+newFolders+removedFolders; }
         public boolean truncated() { return matches>entries.size(); }
     }
+    public record Page(ReviewPagination.Window window,Result result) {}
     public enum Status { NO_ACTIVE_FOLDER, AVAILABLE, FOLDER_EXISTS, BASELINE_MATCH, REMOVAL_READY, CONFLICT, TOO_LARGE, REVIEW_LIMIT, IO_ERROR }
     /** Point-in-time advisory only. Save always performs its own full preflight. */
     public record Check(Entry entry, Path folder, Status status, long diskBytes, String detail) {}
@@ -44,26 +45,26 @@ public final class WorkspaceChanges {
         private long revision=-1,saveRevision=-1;
         private List<Entry> inventory=List.of();
         private Query previous;
-        private Result result;
+        private Page page;
+        private int added,modified,folders,removed;
+        private long bytes;
         private Check checked;
-        public void clear() { workspace=null;revision=-1;saveRevision=-1;inventory=List.of();previous=null;result=null;checked=null; }
+        public void clear() { workspace=null;revision=-1;saveRevision=-1;inventory=List.of();previous=null;page=null;checked=null; }
         private void ensure(PackWorkspace current) {
             Objects.requireNonNull(current);
             if (workspace!=current || revision!=current.revision() || saveRevision!=current.saveRevision()) {
-                inventory=current.pendingChanges();workspace=current;revision=current.revision();saveRevision=current.saveRevision();previous=null;result=null;checked=null;
+                inventory=current.pendingChanges();workspace=current;revision=current.revision();saveRevision=current.saveRevision();previous=null;page=null;checked=null;
+                added=modified=folders=removed=0;bytes=0;
+                for(var entry:inventory) { switch(entry.kind()) { case NEW_FILE->added++;case MODIFIED_FILE->modified++;case NEW_FOLDER->folders++;case REMOVED_FOLDER->removed++; }bytes+=entry.bytes(); }
             }
         }
-        public Result query(PackWorkspace current, Query query) {
+        /** Compatibility entry point: the first bounded page. */
+        public Result query(PackWorkspace current, Query query) { return page(current,query,0).result(); }
+        public Page page(PackWorkspace current,Query query,int requested) {
             Objects.requireNonNull(query);ensure(current);
-            if (result!=null && query.equals(previous)) return result;
-            int added=0,modified=0,folders=0,removed=0,matches=0;long bytes=0;var entries=new java.util.ArrayList<Entry>();
-            for (var entry : inventory) {
-                switch (entry.kind()) { case NEW_FILE -> added++;case MODIFIED_FILE -> modified++;case NEW_FOLDER -> folders++;case REMOVED_FOLDER -> removed++; }
-                bytes+=entry.bytes();
-                if (!query.filter().matches(entry.kind()) || !entry.path().toLowerCase(Locale.ROOT).contains(query.text())) continue;
-                matches++;if (entries.size()<MAX_RESULTS) entries.add(entry);
-            }
-            previous=query;result=new Result(added,modified,folders,removed,bytes,matches,entries);return result;
+            if(page!=null && query.equals(previous) && page.window().page()==ReviewPagination.Window.at(page.window().matches(),requested).page())return page;
+            var selected=ReviewPagination.select(inventory,entry->query.filter().matches(entry.kind()) && entry.path().toLowerCase(Locale.ROOT).contains(query.text()),requested);
+            previous=query;page=new Page(selected.window(),new Result(added,modified,folders,removed,bytes,selected.window().matches(),selected.entries()));return page;
         }
         public Check check(PackWorkspace current, Entry entry) {
             ensure(current);
