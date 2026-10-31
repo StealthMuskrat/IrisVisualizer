@@ -28,6 +28,7 @@ public final class WorkspaceTextSearch {
         public boolean incomplete() { return tooLarge+invalidText+byteBudgetSkipped+fileBudgetSkipped>0; }
         public boolean truncated() { return matches>hits.size(); }
     }
+    public record Page(ReviewPagination.Window window,Result result) { public Page { Objects.requireNonNull(window);Objects.requireNonNull(result);if(window.matches()!=result.matches() || result.hits().size()>MAX_RESULTS)throw new IllegalArgumentException("Invalid text-search page"); } }
     record Limits(int fileBytes, int totalBytes, int files, int results) {
         Limits {
             if (fileBytes<1 || fileBytes>MAX_FILE_BYTES || totalBytes<1 || totalBytes>MAX_TOTAL_BYTES
@@ -55,6 +56,17 @@ public final class WorkspaceTextSearch {
         return search(current,query,changed,new Limits(MAX_FILE_BYTES,MAX_TOTAL_BYTES,MAX_FILES,MAX_RESULTS),cancelled);
     }
     static Result search(PackResourceView current,Query query,java.util.function.Predicate<String> changed,Limits limits,java.util.function.BooleanSupplier cancelled) {
+        return searchRange(current,query,changed,limits,0,cancelled);
+    }
+    /** Worker-side page preparation over an immutable captured source; counts retain full bounded-search coverage. */
+    static Page searchPage(PackResourceView current,Query query,java.util.function.Predicate<String> changed,int requested,java.util.function.BooleanSupplier cancelled) {
+        var limits=new Limits(MAX_FILE_BYTES,MAX_TOTAL_BYTES,MAX_FILES,MAX_RESULTS);int wanted=Math.max(0,requested);
+        var result=searchRange(current,query,changed,limits,(long)wanted*MAX_RESULTS,cancelled);
+        var window=ReviewPagination.Window.at(result.matches(),wanted);
+        if(window.page()!=wanted)result=searchRange(current,query,changed,limits,window.start(),cancelled);
+        return new Page(window,result);
+    }
+    private static Result searchRange(PackResourceView current,Query query,java.util.function.Predicate<String> changed,Limits limits,long firstMatch,java.util.function.BooleanSupplier cancelled) {
         Objects.requireNonNull(current);Objects.requireNonNull(query);Objects.requireNonNull(changed);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         int eligible=0,considered=0,scanned=0,matches=0,large=0,invalid=0,byteSkipped=0,fileSkipped=0;
         long bytes=0;var hits=new ArrayList<Hit>();
@@ -74,8 +86,8 @@ public final class WorkspaceTextSearch {
             scanned++;int cursor=0,line=1,lineStart=0;
             for (int offset=text.indexOf(query.text());offset>=0;offset=text.indexOf(query.text(),offset+query.text().length())) {
                 if ((matches & 1023)==0 && cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
-                matches++;
-                if (hits.size()>=limits.results()) continue;
+                int match=matches++;
+                if (match<firstMatch || hits.size()>=limits.results()) continue;
                 while (cursor<offset) {
                     char c=text.charAt(cursor++);
                     if (c=='\r') { if (cursor<offset && text.charAt(cursor)=='\n') cursor++;line++;lineStart=cursor; }
