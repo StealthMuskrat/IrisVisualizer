@@ -62,14 +62,14 @@ public final class EditorApp extends Application {
     private boolean showResourceAddition,focusResourceAddition;
     private ReviewedResourceAddition.Mode resourceAdditionMode;
     private String resourceAdditionParent,resourceAdditionSource,resourceAdditionDependency,resourceAdditionError;
-    private final ImString resourceAdditionName=new ImString(32768),resourceAdditionFilter=new ImString(1024);
+    private final ImString resourceAdditionName=new ImString(32768);
     private ReviewedResourceAddition.Acknowledgement resourceAdditionAcknowledgement;
     private long resourceAdditionReviewed=-1,pendingResourceAddition=-1;
     private PackWorkspace pendingResourceAdditionOwner;
     private PackWorkspace resourceAdditionChoicesOwner;
     private long resourceAdditionChoicesRevision=-1;
     private String resourceAdditionChoicesParent;
-    private List<String> resourceAdditionChoices=List.of();
+    private ReferenceChoices.Catalog resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());
     private final AsyncAssetBatchImport assetBatchImport=new AsyncAssetBatchImport();
     private boolean showAssetBatchImport,assetBatchAcknowledge;
     private long assetBatchReviewed=-1;
@@ -108,6 +108,11 @@ public final class EditorApp extends Application {
     private final ImString structurePoolFilter=new ImString(1024);
     private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
+    private final java.util.LinkedHashMap<String,ReferenceChoiceView> referenceChoiceViews=new java.util.LinkedHashMap<>(16,.75f,true);
+    private PackWorkspace referenceChoiceOwner;
+    private String referenceChoicePath;
+    private long referenceChoiceContent=-1,referenceChoiceResources=-1;
+    private final ReferenceChoiceView creationDependencyView=new ReferenceChoiceView();
     private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
     private PackWorkspace referenceWorkspace;
     private String referencePath;
@@ -695,11 +700,8 @@ public final class EditorApp extends Application {
         ImGui.textWrapped("Literal piece settings only. Object bytes, bounds, connector transforms, graph reachability, eligibility, native compatibility and effective placement are not evaluated. Unsupported previews stay disabled.");
         try {
             String current=JigsawPieces.object(root);ImGui.textWrapped(JigsawPieces.help("object"));
-            ImString query=values.computeIfAbsent("jigsawPiece#object.filter",ignored -> new ImString(1025));ImGui.inputText("Object filter",query);
-            try {
-                var matches=jigsawPieceObjects.filter(workspace,query.get());ImGui.textUnformatted(matches.count()+" exact lowercase .iob keys; showing up to 200. Binary contents and loader aliases are unchecked.");
-                if (ImGui.beginCombo("Piece object",current.isEmpty() ? "Choose exact object key" : InspectorText.label(current,128))) { int index=0;for (String key : matches.keys()) { ImGui.pushID(index++);if (ImGui.selectable(InspectorText.label(key,256).replace("#","\\u0023"),key.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.setObject(selected,workspace.read(selected),key,workspace)));ImGui.popID(); }ImGui.endCombo(); }
-            } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+            String key=drawReferenceChoice(referenceChoiceView("jigsawPiece#object"),"Piece object",jigsawPieceObjects.catalog(workspace),current,false);
+            if(key!=null)applyRoutingExtra(() -> workspace.replace(selected,JigsawPieces.setObject(selected,workspace.read(selected),key,workspace)));
             if (!current.isEmpty() && workspace.paths().contains("objects/"+current+".iob") && ImGui.button("Open exact object asset")) resourceNavigation.request(workspace,"objects/"+current+".iob");
         } catch (IllegalArgumentException invalid) { ImGui.textWrapped("Stored object reference has an unsupported type and remains read-only."); }
         for (String name : JigsawPieces.FLAGS) {
@@ -830,12 +832,38 @@ public final class EditorApp extends Application {
         ImGui.treePop();
     }
     private String drawJigsawPoolKey(String label,String prefix,String family,String current) {
-        ImString query=values.computeIfAbsent(prefix+"filter",ignored -> new ImString(1025));ImGui.inputText(label+" filter",query);
-        String chosen=null;try {
-            var matches=jigsawPoolCatalog.filter(workspace,family,query.get());ImGui.textUnformatted(matches.count()+" exact keys; showing up to 200. Target contents and aliases are unchecked.");
-            if (ImGui.beginCombo(label,current.isEmpty() ? "Choose exact key" : InspectorText.label(current,128))) { int row=0;for (String key : matches.keys()) { ImGui.pushID(row++);if (ImGui.selectable(InspectorText.label(key,256).replace("#","\\u0023"),key.equals(current))) chosen=key;ImGui.popID(); }ImGui.endCombo(); }
-        } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
-        return chosen;
+        try{return drawReferenceChoice(referenceChoiceView(prefix+family),label,jigsawPoolCatalog.catalog(workspace,family),current,false);}catch(IllegalArgumentException invalid){ImGui.textWrapped(invalid.getMessage());return null;}
+    }
+    private static final class ReferenceChoiceView {
+        private final ReferenceChoices.View pages=new ReferenceChoices.View();
+        private final ImString filter=new ImString(1025),jump=new ImString("1",32);
+        private ReferenceChoices.Catalog catalog;private String query;private int page;
+        void clear(){pages.clear();filter.set("");jump.set("1");catalog=null;query=null;page=0;}
+    }
+    private void clearReferenceChoiceViews(){referenceChoiceViews.clear();referenceChoiceOwner=null;referenceChoicePath=null;referenceChoiceContent=referenceChoiceResources=-1;}
+    private ReferenceChoiceView referenceChoiceView(String scope) {
+        long content=selected!=null && workspace.paths().contains(selected) ? workspace.contentRevision(selected) : -1;
+        if(referenceChoiceOwner!=workspace || !java.util.Objects.equals(referenceChoicePath,selected) || referenceChoiceContent!=content || referenceChoiceResources!=workspace.resourceRevision()){
+            clearReferenceChoiceViews();referenceChoiceOwner=workspace;referenceChoicePath=selected;referenceChoiceContent=content;referenceChoiceResources=workspace.resourceRevision();
+        }
+        var view=referenceChoiceViews.computeIfAbsent(scope,ignored->new ReferenceChoiceView());if(referenceChoiceViews.size()>256)referenceChoiceViews.remove(referenceChoiceViews.keySet().iterator().next());return view;
+    }
+    private static String drawReferenceChoice(ReferenceChoiceView view,String label,ReferenceChoices.Catalog catalog,String current,boolean none) {
+        ImGui.pushID(label);String chosen=null;ImGui.inputText("Exact key contains",view.filter);
+        try{
+            String query=ReferenceChoices.query(view.filter.get());if(view.catalog!=catalog || !query.equals(view.query)){view.catalog=catalog;view.query=query;view.page=0;view.jump.set("1");view.pages.clear();}
+            var page=view.pages.page(catalog,view.filter.get(),view.page);
+            ImGui.textWrapped(page.window().matches()+" exact matching keys; page "+(page.window().page()+1)+" / "+page.window().pages()+". Every catalog match is reachable; contents and aliases are unchecked.");
+            String caption=current==null || current.isEmpty() ? "Choose exact key" : InspectorText.label(current,128).replace("#","\\u0023");
+            if(ImGui.beginCombo(label,caption)){
+                int requested=drawReviewPager("reference-key-pages",page.window(),view.jump);if(requested!=page.window().page())page=view.pages.page(catalog,view.filter.get(),requested);view.page=page.window().page();
+                ImGui.textUnformatted("Rows "+page.window().firstRow()+"–"+page.window().end()+" of "+page.window().matches()+"; at most 200 keys/page.");
+                if(none){if(ImGui.selectable("None (write empty string)",current==null || current.isBlank()))chosen="";ImGui.separator();}
+                int row=0;for(String key:page.entries()){ImGui.pushID(row++);if(ImGui.selectable(InspectorText.label(key,256).replace("#","\\u0023"),key.equals(current)))chosen=key;if(ImGui.isItemHovered())ImGui.setTooltip(InspectorText.label(key,16384));ImGui.popID();}
+                if(page.entries().isEmpty())ImGui.textWrapped("No exact keys match this filter.");ImGui.endCombo();
+            }
+        }catch(IllegalArgumentException invalid){ImGui.textWrapped(invalid.getMessage());}
+        ImGui.popID();return chosen;
     }
     private void drawJigsawPool(LosslessJson root) {
         if (!ImGui.collapsingHeader("Jigsaw pool")) return;
@@ -2090,8 +2118,8 @@ public final class EditorApp extends Application {
         String newKey=DimensionCarvings.prefix()+"new.id",biomeKey=DimensionCarvings.prefix()+"new.biome";
         ImString newId=values.computeIfAbsent(newKey,ignored -> new ImString("",4096)),biome=values.computeIfAbsent(biomeKey,ignored -> new ImString("",4096));
         ImGui.inputText("New local ID (lowercase letters/digits/_/-)",newId);drafts.update(newKey,"",newId.get());
-        var choices=selectorCatalogs.choices(workspace,"carvingBiome");
-        if (ImGui.beginCombo("New cave biome (exact file)",biome.get().isEmpty() ? "Choose a biome" : biome.get())) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(biome.get()))) biome.set(choice);ImGui.endCombo(); }
+        var catalog=selectorCatalogs.catalog(workspace,"carvingBiome");var choices=catalog.keys();
+        String pickedBiome=drawReferenceChoice(referenceChoiceView("carving#new.biome"),"New cave biome (exact file)",catalog,biome.get(),false);if(pickedBiome!=null)biome.set(pickedBiome);
         ImGui.beginDisabled(newId.get().isEmpty() || biome.get().isEmpty() || entries!=null && entries.size()>=DimensionCarvings.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add carving entry");ImGui.endDisabled();
         if (add) { try { commitProfileChange(DimensionCarvings.prefix(),DimensionCarvings.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,newId.get(),biome.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
         if (entries==null) { ImGui.textWrapped("Absent/null list: no authored dimension carving entries. Add seeds only ID and biome; native defaults supply all other fields.");ImGui.popID();return; }
@@ -2111,7 +2139,7 @@ public final class EditorApp extends Application {
                 try {
                     String current=entry.token("biome")==null ? "" : entry.stringToken("biome");
                     if (!current.isEmpty() && !choices.contains(current)) ImGui.textWrapped("Stored biome has no exact file match; native trimmed aliases and contents are unchecked.");
-                    if (ImGui.beginCombo("Cave biome",current.isEmpty() ? "Choose an exact biome" : current.length()>128 ? "Stored biome key" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionCarvings.setBiome(selected,workspace.read(selected),entryIndex,choice,workspace)));ImGui.endCombo(); }
+                    String choice=drawReferenceChoice(referenceChoiceView(prefix+"biome"),"Cave biome",catalog,current,false);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,DimensionCarvings.setBiome(selected,workspace.read(selected),entryIndex,choice,workspace)));
                 } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored biome is not a string (read-only)."); }
                 String enabled=entry.token("enabled");if (enabled==null || enabled.equals("true") || enabled.equals("false")) { boolean value=enabled==null || enabled.equals("true");if (ImGui.checkbox("Enabled (native default true)",value)) applyRoutingExtra(() -> workspace.replace(selected,DimensionCarvings.setEnabled(selected,workspace.read(selected),entryIndex,!value))); } else ImGui.textWrapped("Stored enabled is not a boolean (read-only).");
                 drawCarvingRange(entry,index);
@@ -2172,13 +2200,9 @@ public final class EditorApp extends Application {
             ImGui.pushID(ResourceSelectors.prefix(selected,field));ImGui.textWrapped(ResourceSelectors.help(field));
             if (!ResourceSelectors.supported(document,field)) ImGui.textWrapped("Stored selector is not a string (read-only).");
             else {
-                String current=ResourceSelectors.stored(document,field);var choices=selectorCatalogs.choices(workspace,field);
+                String current=ResourceSelectors.stored(document,field);var catalog=selectorCatalogs.catalog(workspace,field);var choices=catalog.keys();
                 if (!current.isBlank() && !choices.contains(current)) ImGui.textWrapped("Stored selector has no exact file match; it is preserved and native aliases are unchecked.");
-                if (ImGui.beginCombo(field,current.isBlank() ? "None (absent/blank)" : current.length()>128 ? "Stored selector" : current)) {
-                    if (ImGui.selectable("None (write empty string)",current.isBlank())) applyRoutingExtra(() -> workspace.replace(selected,ResourceSelectors.set(selected,workspace.read(selected),field,null,workspace)));
-                    for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,ResourceSelectors.set(selected,workspace.read(selected),field,choice,workspace)));
-                    ImGui.endCombo();
-                }
+                String choice=drawReferenceChoice(referenceChoiceView(ResourceSelectors.prefix(selected,field)),field,catalog,current,true);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,ResourceSelectors.set(selected,workspace.read(selected),field,choice.isEmpty() ? null : choice,workspace)));
                 if (!current.isEmpty() && ImGui.button("Clear selector (empty string)")) applyRoutingExtra(() -> workspace.replace(selected,ResourceSelectors.set(selected,workspace.read(selected),field,null,workspace)));
                 if (choices.isEmpty()) ImGui.textWrapped("No exact "+ResourceSelectors.family(field)+" files in this pack.");
             }
@@ -6467,9 +6491,9 @@ public final class EditorApp extends Application {
         ImGui.textWrapped("Limits: 32 regular files, 64 MiB/source, 128 MiB captured total and available workspace capacity. Source paths containing symbolic links are rejected. Source names are converted to new lowercase keys; contents stay opaque. Current path spelling, folder/removal, joint entry-count and byte budgets are rechecked before any installation. Later source edits/deletion do not alter captured bytes. Save independently checks external disk collisions. No decoding, reference rewrite, baseline adoption or native loading occurs. Unsupported previews stay disabled.");
         ImGui.end();
     }
-    private List<String> resourceAdditionChoices() throws java.io.IOException {
+    private ReferenceChoices.Catalog resourceAdditionChoices() throws java.io.IOException {
         if(resourceAdditionChoicesOwner!=workspace || resourceAdditionChoicesRevision!=workspace.resourceRevision() || !java.util.Objects.equals(resourceAdditionChoicesParent,resourceAdditionParent)) {
-            resourceAdditionChoices=List.copyOf(ResourceCreation.choices(workspace,resourceAdditionParent));resourceAdditionChoicesOwner=workspace;resourceAdditionChoicesRevision=workspace.resourceRevision();resourceAdditionChoicesParent=resourceAdditionParent;
+            resourceAdditionChoices=new ReferenceChoices.Catalog(ResourceCreation.choices(workspace,resourceAdditionParent));resourceAdditionChoicesOwner=workspace;resourceAdditionChoicesRevision=workspace.resourceRevision();resourceAdditionChoicesParent=resourceAdditionParent;
         }
         return resourceAdditionChoices;
     }
@@ -6481,12 +6505,12 @@ public final class EditorApp extends Application {
             String base=ResourceTypes.fileFamily(source);if(base==null || !workspace.paths().contains(source))throw new java.io.IOException("Choose a supported generation JSON, image or .iob resource");
             String key=source.substring(base.length()+1,source.length()-ResourceTypes.extension(source).length()).toLowerCase(java.util.Locale.ROOT)+"_copy";
             try { String target=ResourceTypes.target(source,key);if(key.length()>16384 || java.util.Arrays.stream(target.split("/")).anyMatch(component->component.length()>255))key="resource_copy"; }catch(java.io.IOException invalid) { key="resource_copy"; }
-            resetResourceAdditionReview();resourceAdditionMode=ReviewedResourceAddition.Mode.DUPLICATE;resourceAdditionSource=source;resourceAdditionParent=null;resourceAdditionDependency=null;resourceAdditionName.set(key);resourceAdditionFilter.set("");showResourceAddition=true;focusResourceAddition=true;
+            resetResourceAdditionReview();resourceAdditionMode=ReviewedResourceAddition.Mode.DUPLICATE;resourceAdditionSource=source;resourceAdditionParent=null;resourceAdditionDependency=null;resourceAdditionName.set(key);creationDependencyView.clear();showResourceAddition=true;focusResourceAddition=true;
         }catch(Exception failure) { error=InspectorText.label(failure.getMessage(),512); }
     }
     private void createResource(String parent) {
         try {
-            ResourceCreation.base(parent);resetResourceAdditionReview();resourceAdditionMode=ReviewedResourceAddition.Mode.CREATE_JSON;resourceAdditionParent=parent;resourceAdditionSource=null;resourceAdditionDependency=null;resourceAdditionName.set("new_resource");resourceAdditionFilter.set("");showResourceAddition=true;focusResourceAddition=true;
+            ResourceCreation.base(parent);resetResourceAdditionReview();resourceAdditionMode=ReviewedResourceAddition.Mode.CREATE_JSON;resourceAdditionParent=parent;resourceAdditionSource=null;resourceAdditionDependency=null;resourceAdditionName.set("new_resource");creationDependencyView.clear();showResourceAddition=true;focusResourceAddition=true;
         }catch(Exception failure) { error=InspectorText.label(failure.getMessage(),512); }
     }
     private void drawResourceAddition() {
@@ -6500,12 +6524,10 @@ public final class EditorApp extends Application {
             if(ImGui.inputText(resourceAdditionMode==ReviewedResourceAddition.Mode.CREATE_JSON ? "New name (omit .json)" : "New relative key (omit extension)",resourceAdditionName))resetResourceAdditionReview();
             try {
                 if(resourceAdditionMode==ReviewedResourceAddition.Mode.CREATE_JSON && ResourceCreation.dependencyType(resourceAdditionParent)!=null) {
-                    var choices=resourceAdditionChoices();if(resourceAdditionDependency==null && !choices.isEmpty())resourceAdditionDependency=choices.getFirst();
-                    ImGui.textWrapped("Exact existing "+ResourceCreation.dependencyType(resourceAdditionParent)+" key: "+InspectorText.label(resourceAdditionDependency,512));ImGui.inputText("Dependency key contains",resourceAdditionFilter);
-                    String query=resourceAdditionFilter.get().strip().toLowerCase(java.util.Locale.ROOT);if(query.length()>256 || query.indexOf(0)>=0)throw new IllegalArgumentException("Use up to 256 dependency filter characters without NUL");
-                    int matches=0,shown=0;for(String key:choices)if(key.toLowerCase(java.util.Locale.ROOT).contains(query)) { matches++;if(shown++<100){ImGui.pushID(key);if(ImGui.selectable(InspectorText.label(key,256),key.equals(resourceAdditionDependency))){resetResourceAdditionReview();resourceAdditionDependency=key;}ImGui.popID();} }
-                    ImGui.textUnformatted(matches+" matching keys; "+Math.min(100,matches)+" shown. Narrow the filter to reach another exact key.");
-                    if(choices.isEmpty())ImGui.textWrapped("Create or import the required dependency first. Target presence does not establish native validity.");
+                    var choices=resourceAdditionChoices();if(resourceAdditionDependency==null && !choices.keys().isEmpty())resourceAdditionDependency=choices.keys().getFirst();
+                    ImGui.textWrapped("Exact existing "+ResourceCreation.dependencyType(resourceAdditionParent)+" key: "+InspectorText.label(resourceAdditionDependency,512));
+                    String chosen=drawReferenceChoice(creationDependencyView,"Creation dependency",choices,resourceAdditionDependency,false);if(chosen!=null){resetResourceAdditionReview();resourceAdditionDependency=chosen;}
+                    if(choices.keys().isEmpty())ImGui.textWrapped("Create or import the required dependency first. Target presence does not establish native validity.");
                 }
                 if(ImGui.button("Prepare / refresh reviewed resource")) {
                     if(resourceAdditionMode==ReviewedResourceAddition.Mode.CREATE_JSON)resourceAddition.create(workspace,resourceAdditionParent,resourceAdditionName.get(),resourceAdditionDependency);
@@ -6542,7 +6564,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=List.of();showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {

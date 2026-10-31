@@ -32,13 +32,13 @@ public final class ResourceSelectors {
         return document.token(field)==null ? document.enableStringPath(field,key) : document.stringValue(field,key);
     }
     public static final class CatalogCache {
-        private PackWorkspace workspace;
-        private long revision=Long.MIN_VALUE;
-        private final Map<String,List<String>> families=new HashMap<>();
-        public List<String> choices(PackWorkspace current,String field) {
-            String family=family(field);
-            if (current!=workspace || current.resourceRevision()!=revision) { workspace=current;revision=current.resourceRevision();families.clear(); }
-            return families.computeIfAbsent(family,ignored -> ResourceTypes.referenceKeys(current,family));
+        private PackWorkspace workspace;private long revision=Long.MIN_VALUE;private final Map<String,ReferenceChoices.Catalog> families=new HashMap<>();
+        public void clear(){workspace=null;revision=Long.MIN_VALUE;families.clear();}
+        public ReferenceChoices.Catalog catalog(PackWorkspace current,String field){
+            java.util.Objects.requireNonNull(current);String family=family(field);if(current!=workspace || current.resourceRevision()!=revision){clear();workspace=current;revision=current.resourceRevision();}
+            return families.computeIfAbsent(family,ignored->new ReferenceChoices.Catalog(ResourceTypes.referenceKeys(current,family)));
         }
+        public List<String> choices(PackWorkspace current,String field){return catalog(current,field).keys();}
+        public ReviewPagination.Page<String> page(PackWorkspace current,String field,String query,int requested){ReferenceChoices.query(query);return catalog(current,field).page(query,requested);}
     }
 }

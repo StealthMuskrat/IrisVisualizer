@@ -35,13 +35,13 @@ public final class JigsawPieces {
     public static byte[] resetFlag(String path,byte[] raw,String name) { authorize(path);var root=new LosslessJson(raw);flag(root,name);return root.token(name)==null ? raw.clone() : root.removeField(name); }
     public record Matches(int count,List<String> keys) { public Matches { keys=List.copyOf(keys); } }
     public static final class Catalog {
-        private PackWorkspace workspace;private long revision=-1;private List<String> keys;
-        public void clear() { workspace=null;revision=-1;keys=null; }
-        public Matches filter(PackWorkspace current,String query) {
-            java.util.Objects.requireNonNull(current);if (query==null || query.length()>MAX_KEY_CHARACTERS || query.chars().anyMatch(Character::isISOControl)) throw new IllegalArgumentException("Use up to 256 object-filter characters without controls");
-            if (workspace!=current || revision!=current.resourceRevision()) { workspace=current;revision=current.resourceRevision();keys=objects(current); }
-            String term=query.strip().toLowerCase(Locale.ROOT);int count=0;var matches=new java.util.ArrayList<String>();for (String key : keys) if (key.toLowerCase(Locale.ROOT).contains(term)) { count++;if (matches.size()<MAX_RESULTS) matches.add(key); }return new Matches(count,matches);
+        private PackWorkspace workspace;private long revision=-1;private ReferenceChoices.Catalog catalog;
+        public void clear(){workspace=null;revision=-1;catalog=null;}
+        public ReferenceChoices.Catalog catalog(PackWorkspace current){
+            java.util.Objects.requireNonNull(current);if(workspace!=current || revision!=current.resourceRevision()){workspace=current;revision=current.resourceRevision();catalog=new ReferenceChoices.Catalog(objects(current));}return catalog;
         }
+        public ReviewPagination.Page<String> page(PackWorkspace current,String query,int requested){ReferenceChoices.query(query);return catalog(current).page(query,requested);}
+        public Matches filter(PackWorkspace current,String query){var page=page(current,query,0);return new Matches(page.window().matches(),page.entries());}
     }
     public static LosslessJson rules(LosslessJson root) { String token=root.token("rules");return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     public static byte[] createRules(String path,byte[] raw) { authorize(path);var root=new LosslessJson(raw);if (rules(root)!=null) throw new IllegalArgumentException("Rule overrides already exist");return root.enableObject("rules"); }
