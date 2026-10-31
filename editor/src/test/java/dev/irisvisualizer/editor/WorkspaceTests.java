@@ -120,6 +120,7 @@ public final class WorkspaceTests {
    EditorCommandsTests.run(temp);
         CommandPaletteTests.run(temp);
         ReviewPaginationTests.run(temp);
+        LinkReviewPaginationTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);

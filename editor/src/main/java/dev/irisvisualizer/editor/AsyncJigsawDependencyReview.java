@@ -24,7 +24,7 @@ public final class AsyncJigsawDependencyReview implements AutoCloseable {
     private Outcome completed;
     private Snapshot snapshot=new Snapshot(0,Phase.IDLE,null,null);
     private JigsawDependencyReview.Query previous;
-    private JigsawDependencyReview.Result result;
+    private JigsawDependencyReview.Page page;
 
     public AsyncJigsawDependencyReview() { this(JigsawDependencyReview::inspect,runnable -> new Thread(runnable,"iris-jigsaw-dependency-review")); }
     AsyncJigsawDependencyReview(Scanner scanner,ThreadFactory threads) {
@@ -34,7 +34,7 @@ public final class AsyncJigsawDependencyReview implements AutoCloseable {
     }
     private void invalidate() {
         generation++;if (active!=null) active.cancelled().set(true);if (pending!=null) pending.cancelled().set(true);
-        pending=null;completed=null;previous=null;result=null;
+        pending=null;completed=null;previous=null;page=null;
     }
     /** Call on the UI thread. Capture copies at most 16 MB of JSON; parsing happens only on the worker. */
     public Snapshot refresh(PackWorkspace current,String selectedRoot) {
@@ -65,10 +65,11 @@ public final class AsyncJigsawDependencyReview implements AutoCloseable {
             return snapshot;
         }
     }
-    public JigsawDependencyReview.Result query(PackWorkspace current,String selectedRoot,JigsawDependencyReview.Query query) {
+    public JigsawDependencyReview.Result query(PackWorkspace current,String selectedRoot,JigsawDependencyReview.Query query) { var selected=page(current,selectedRoot,query,0);return selected==null ? null : selected.result(); }
+    public JigsawDependencyReview.Page page(PackWorkspace current,String selectedRoot,JigsawDependencyReview.Query query,int requested) {
         Objects.requireNonNull(query);var state=poll(current,selectedRoot);if (state.phase()!=Phase.READY) return null;
-        if (result==null || !query.equals(previous)) { result=JigsawDependencyReview.filter(state.review(),query);previous=query; }
-        return result;
+        if (page==null || !query.equals(previous) || page.window().page()!=ReviewPagination.Window.at(page.result().matches(),requested).page()) { page=JigsawDependencyReview.page(state.review(),query,requested);previous=query; }
+        return page;
     }
     public void clear() {
         synchronized (lock) {

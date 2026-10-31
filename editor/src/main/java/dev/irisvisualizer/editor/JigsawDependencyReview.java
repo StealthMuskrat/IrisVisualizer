@@ -12,7 +12,7 @@ import java.util.function.BooleanSupplier;
 
 /** Bounded breadth-first review of authored jigsaw file dependencies, never native assembly or export closure. */
 public final class JigsawDependencyReview {
-    public static final int MAX_NODES=512,MAX_JSON_FILES=256,MAX_EDGES=4096,MAX_NOTICES=128,MAX_RESULTS=200,MAX_QUERY_CHARACTERS=256;
+    public static final int MAX_NODES=512,MAX_JSON_FILES=256,MAX_EDGES=4096,MAX_NOTICES=128,MAX_RESULTS=ReviewPagination.PAGE_SIZE,MAX_QUERY_CHARACTERS=256;
     public static final long MAX_BYTES=8_000_000;
     public enum Status { INSPECTED, UNAVAILABLE, OBJECT_PRESENT, SKIPPED }
     public enum Scope {
@@ -41,6 +41,8 @@ public final class JigsawDependencyReview {
         }
     }
     public record Result(int matches,List<Edge> edges) { public Result { edges=List.copyOf(edges); }public boolean truncated() { return matches>edges.size(); } }
+    public record Page(ReviewPagination.Window window,Result result) {}
+    public record Component(int index,List<String> members) { public Component { members=List.copyOf(members); } }
     record Limits(int nodes,int files,long bytes,int edges,int notices) {
         Limits { if (nodes<1 || nodes>MAX_NODES || files<1 || files>MAX_JSON_FILES || bytes<1 || bytes>MAX_BYTES || edges<1 || edges>MAX_EDGES || notices<1 || notices>MAX_NOTICES) throw new IllegalArgumentException("Invalid jigsaw dependency review limits"); }
     }
@@ -100,21 +102,45 @@ public final class JigsawDependencyReview {
         return new Review(root,nodes,files,bytes,edges,cycles,fallbackCycles,scan.notices,scan.omitted,scan.incomplete);
     }
     private static boolean contains(String value,String query) { return value!=null && value.toLowerCase(Locale.ROOT).contains(query); }
-    public static Result filter(Review review,Query query) {
-        Objects.requireNonNull(review);Objects.requireNonNull(query);var edges=new ArrayList<Edge>();int matches=0;
-        for (var edge : review.edges()) {
-            if (query.scope()==Scope.OUTGOING && !Objects.equals(query.selection(),edge.source()) || query.scope()==Scope.INCOMING && (query.selection()==null || !query.selection().equals(edge.target())) || query.problemsOnly() && edge.state()==ReferenceDiagnostics.State.EXACT_FILE) continue;
-            String text=query.text();if (!text.isEmpty() && !contains(edge.source(),text) && !contains(edge.field(),text) && !contains(edge.key(),text) && !contains(edge.target(),text)) continue;
-            matches++;if (edges.size()<MAX_RESULTS) edges.add(edge);
-        }
-        return new Result(matches,edges);
+    private static boolean matches(Edge edge,Query query) {
+        if (query.scope()==Scope.OUTGOING && !Objects.equals(query.selection(),edge.source()) || query.scope()==Scope.INCOMING && (query.selection()==null || !query.selection().equals(edge.target())) || query.problemsOnly() && edge.state()==ReferenceDiagnostics.State.EXACT_FILE) return false;
+        String text=query.text();return text.isEmpty() || contains(edge.source(),text) || contains(edge.field(),text) || contains(edge.key(),text) || contains(edge.target(),text);
+    }
+    public static Result filter(Review review,Query query) { return page(review,query,0).result(); }
+    public static Page page(Review review,Query query,int requested) {
+        Objects.requireNonNull(review);Objects.requireNonNull(query);
+        var selected=ReviewPagination.select(review.edges(),edge->matches(edge,query),requested);
+        return new Page(selected.window(),new Result(selected.window().matches(),selected.entries()));
+    }
+    /** Node/group search uses only literal path text, independently of edge scope and diagnostics. */
+    public static ReviewPagination.Page<Node> nodes(Review review,String text,int requested) {
+        Objects.requireNonNull(review);var query=new Query(text,Scope.ALL,null,false);
+        return ReviewPagination.select(review.nodes(),node->contains(node.path(),query.text()),requested);
+    }
+    public static ReviewPagination.Page<Node> routePage(Review review,String target,int requested) {
+        Objects.requireNonNull(review);return ReviewPagination.select(review.route(target),node->true,requested);
+    }
+    public static ReviewPagination.Page<Component> components(Review review,boolean fallback,String text,int requested) {
+        Objects.requireNonNull(review);var query=new Query(text,Scope.ALL,null,false);var groups=fallback ? review.fallbackCycles() : review.cycles();
+        var indexed=java.util.stream.IntStream.range(0,groups.size()).mapToObj(index->new Component(index,groups.get(index))).toList();
+        return ReviewPagination.select(indexed,group->group.members().stream().anyMatch(path->contains(path,query.text())),requested);
+    }
+    /** Retain all members of a matching component; group search never conceals its other paths. */
+    public static ReviewPagination.Page<String> members(Review review,boolean fallback,int component,int requested) {
+        Objects.requireNonNull(review);var groups=fallback ? review.fallbackCycles() : review.cycles();
+        if(component<0 || component>=groups.size())throw new IllegalArgumentException("Select a currently recorded component");
+        return ReviewPagination.select(groups.get(component),path->true,requested);
     }
     /** Explicit refresh only; selection changes do not replace the pinned root or trigger scans. */
     public static final class Cache {
-        private PackWorkspace workspace;private long revision=-1;private String root;private Review review;private Query previous;private Result result;
-        public void clear() { workspace=null;revision=-1;root=null;review=null;previous=null;result=null; }
+        private PackWorkspace workspace;private long revision=-1;private String root;private Review review;private Query previous;private Page page;
+        public void clear() { workspace=null;revision=-1;root=null;review=null;previous=null;page=null; }
         public Review current(PackWorkspace current,String selectedRoot) { Objects.requireNonNull(current);if (workspace!=current || revision!=current.revision() || !Objects.equals(root,selectedRoot)) { clear();return null; }return review; }
-        public Review refresh(PackWorkspace current,String selectedRoot) { var next=inspect(current,selectedRoot);workspace=current;revision=current.revision();root=selectedRoot;review=next;previous=null;result=null;return next; }
-        public Result query(PackWorkspace current,String selectedRoot,Query query) { Objects.requireNonNull(query);var active=current(current,selectedRoot);if (active==null) return null;if (result==null || !query.equals(previous)) { result=filter(active,query);previous=query; }return result; }
+        public Review refresh(PackWorkspace current,String selectedRoot) { var next=inspect(current,selectedRoot);workspace=current;revision=current.revision();root=selectedRoot;review=next;previous=null;page=null;return next; }
+        public Result query(PackWorkspace current,String selectedRoot,Query query) { var selected=page(current,selectedRoot,query,0);return selected==null ? null : selected.result(); }
+        public Page page(PackWorkspace current,String selectedRoot,Query query,int requested) {
+            Objects.requireNonNull(query);var active=current(current,selectedRoot);if(active==null)return null;
+            if(page==null || !query.equals(previous) || page.window().page()!=ReviewPagination.Window.at(page.result().matches(),requested).page()) { page=JigsawDependencyReview.page(active,query,requested);previous=query; }return page;
+        }
     }
 }
