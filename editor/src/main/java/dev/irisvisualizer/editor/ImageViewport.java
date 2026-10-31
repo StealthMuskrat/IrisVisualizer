@@ -4,6 +4,7 @@ package dev.irisvisualizer.editor;
 public final class ImageViewport {
     public static final double MIN_SCALE=1.0/4096, MAX_SCALE=32, MAX_CANVAS=1_000_000;
     public record Pixel(int x,int y) {}
+    public record Bounds(double left,double top,double right,double bottom) {}
     /** Visible canvas rectangle and texture UVs; source image rows run from top to bottom. */
     public record Geometry(double left,double top,double right,double bottom,double u0,double v0,double u1,double v1,double scale) {
         public double width() { return right-left; }
@@ -55,6 +56,14 @@ public final class ImageViewport {
         double x=canvasWidth/2-centerX*s,y=canvasHeight/2-centerY*s;
         double left=Math.max(0,x),top=Math.max(0,y),right=Math.min(canvasWidth,x+drawWidth),bottom=Math.min(canvasHeight,y+drawHeight);
         return new Geometry(left,top,right,bottom,clamp((left-x)/drawWidth,0,1),clamp((top-y)/drawHeight,0,1),clamp((right-x)/drawWidth,0,1),clamp((bottom-y)/drawHeight,0,1),s);
+    }
+    /** Project source pixel edges into the clipped canvas; null when the region is entirely off screen. */
+    public Bounds regionBounds(ImageStatistics.Region region) {
+        java.util.Objects.requireNonNull(region);region.validate(width,height);double s=scale();
+        double x=canvasWidth/2-centerX*s,y=canvasHeight/2-centerY*s;
+        double left=Math.max(0,x+region.x()*s),top=Math.max(0,y+region.y()*s);
+        double right=Math.min(canvasWidth,x+((long)region.x()+region.width())*s),bottom=Math.min(canvasHeight,y+((long)region.y()+region.height())*s);
+        return right<=left || bottom<=top ? null : new Bounds(left,top,right,bottom);
     }
     /** Null in letterboxing/outside the canvas; pixels use top-left origin and exclusive right/bottom edges. */
     public Pixel pixelAt(double x,double y) {
