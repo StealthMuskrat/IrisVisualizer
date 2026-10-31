@@ -115,6 +115,11 @@ public final class JsonStructure {
     public static final class Cache {
         private PackWorkspace workspace;private String path;private long revision=-1;private Snapshot snapshot;
         public void clear() { workspace=null;path=null;revision=-1;snapshot=null; }
+        /** Metadata-only identity check; never reads bytes, decodes or builds an index. */
+        public boolean matches(PackWorkspace current,String selected) {
+            Objects.requireNonNull(current);boolean present=selected!=null && current.paths().contains(selected);long stamp=present ? current.contentRevision(selected) : -1;
+            return workspace==current && Objects.equals(path,selected) && revision==stamp && snapshot!=null;
+        }
         public Snapshot inspect(PackWorkspace current,String selected) {
             Objects.requireNonNull(current);
             boolean present=selected!=null && current.paths().contains(selected);
