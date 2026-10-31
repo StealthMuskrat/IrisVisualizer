@@ -106,14 +106,13 @@ public final class EditorApp extends Application {
     private final JigsawPools.Catalog jigsawPoolCatalog=new JigsawPools.Catalog();
     private final JigsawPieces.Catalog jigsawPieceObjects=new JigsawPieces.Catalog();
     private final ImString structurePoolFilter=new ImString(1024);
-    private final ImageMapDefinitions.SourceCache imageMapSources = new ImageMapDefinitions.SourceCache();
+    private final AuthoringReferences.Cache authoringReferences=new AuthoringReferences.Cache();
     private final ResourceSelectors.CatalogCache selectorCatalogs = new ResourceSelectors.CatalogCache();
     private final java.util.LinkedHashMap<String,ReferenceChoiceView> referenceChoiceViews=new java.util.LinkedHashMap<>(16,.75f,true);
     private PackWorkspace referenceChoiceOwner;
     private String referenceChoicePath;
     private long referenceChoiceContent=-1,referenceChoiceResources=-1;
     private final ReferenceChoiceView creationDependencyView=new ReferenceChoiceView();
-    private final NoiseStyleSources.CatalogCache styleSourceCatalogs = new NoiseStyleSources.CatalogCache();
     private PackWorkspace referenceWorkspace;
     private String referencePath;
     private long referenceRevision = -1;
@@ -848,18 +847,24 @@ public final class EditorApp extends Application {
         }
         var view=referenceChoiceViews.computeIfAbsent(scope,ignored->new ReferenceChoiceView());if(referenceChoiceViews.size()>256)referenceChoiceViews.remove(referenceChoiceViews.keySet().iterator().next());return view;
     }
+    private String drawAuthoringReference(String scope,String label,AuthoringReferences.Kind kind,String current,boolean none) {
+        return drawReferenceChoice(referenceChoiceView(scope),label,authoringReferences.catalog(workspace,kind),current,none);
+    }
     private static String drawReferenceChoice(ReferenceChoiceView view,String label,ReferenceChoices.Catalog catalog,String current,boolean none) {
+        return drawReferenceChoice(view,label,catalog,current,none ? "None (write empty string)" : null,key->true);
+    }
+    private static String drawReferenceChoice(ReferenceChoiceView view,String label,ReferenceChoices.Catalog catalog,String current,String emptyLabel,java.util.function.Predicate<String> allowed) {
         ImGui.pushID(label);String chosen=null;ImGui.inputText("Exact key contains",view.filter);
         try{
             String query=ReferenceChoices.query(view.filter.get());if(view.catalog!=catalog || !query.equals(view.query)){view.catalog=catalog;view.query=query;view.page=0;view.jump.set("1");view.pages.clear();}
             var page=view.pages.page(catalog,view.filter.get(),view.page);
             ImGui.textWrapped(page.window().matches()+" exact matching keys; page "+(page.window().page()+1)+" / "+page.window().pages()+". Every catalog match is reachable; contents and aliases are unchecked.");
-            String caption=current==null || current.isEmpty() ? "Choose exact key" : InspectorText.label(current,128).replace("#","\\u0023");
+            String caption=current==null || current.isEmpty() ? emptyLabel==null ? "Choose exact key" : emptyLabel : InspectorText.label(current,128).replace("#","\\u0023");
             if(ImGui.beginCombo(label,caption)){
                 int requested=drawReviewPager("reference-key-pages",page.window(),view.jump);if(requested!=page.window().page())page=view.pages.page(catalog,view.filter.get(),requested);view.page=page.window().page();
                 ImGui.textUnformatted("Rows "+page.window().firstRow()+"–"+page.window().end()+" of "+page.window().matches()+"; at most 200 keys/page.");
-                if(none){if(ImGui.selectable("None (write empty string)",current==null || current.isBlank()))chosen="";ImGui.separator();}
-                int row=0;for(String key:page.entries()){ImGui.pushID(row++);if(ImGui.selectable(InspectorText.label(key,256).replace("#","\\u0023"),key.equals(current)))chosen=key;if(ImGui.isItemHovered())ImGui.setTooltip(InspectorText.label(key,16384));ImGui.popID();}
+                if(emptyLabel!=null){if(ImGui.selectable(emptyLabel,current==null || current.isEmpty()))chosen="";ImGui.separator();}
+                int row=0;for(String key:page.entries()){ImGui.pushID(row++);ImGui.beginDisabled(!allowed.test(key));if(ImGui.selectable(InspectorText.label(key,256).replace("#","\\u0023"),key.equals(current)))chosen=key;ImGui.endDisabled();if(ImGui.isItemHovered())ImGui.setTooltip(InspectorText.label(key,16384));ImGui.popID();}
                 if(page.entries().isEmpty())ImGui.textWrapped("No exact keys match this filter.");ImGui.endCombo();
             }
         }catch(IllegalArgumentException invalid){ImGui.textWrapped(invalid.getMessage());}
@@ -1408,9 +1413,9 @@ public final class EditorApp extends Application {
             ImGui.pushID(field);String token=style.token(field);
             if (!NoiseStyleSources.supported(style,field)) ImGui.textWrapped(field+": stored type mismatch (read-only)");
             else {
-                String current=token==null || token.equals("null") ? null : style.stringToken(field);var choices=styleSourceCatalogs.choices(workspace,field);
+                String current=token==null || token.equals("null") ? null : style.stringToken(field);var kind=field.equals("expression") ? AuthoringReferences.Kind.EXPRESSIONS : AuthoringReferences.Kind.IMAGE_MAPS;var choices=authoringReferences.catalog(workspace,kind).keys();
                 if (current!=null && !choices.contains(current)) ImGui.textWrapped("Stored reference is outside the exact in-pack catalog and is preserved until replaced or cleared.");
-                if (ImGui.beginCombo(field,current==null ? "Absent/null" : current.length()>128 ? "Stored reference" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.setReference(selected,workspace.read(selected),target,field,choice,workspace)));ImGui.endCombo(); }
+                String choice=drawAuthoringReference(target.draftPrefix()+"source."+field,field,kind,current,false);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.setReference(selected,workspace.read(selected),target,field,choice,workspace)));
                 if (current!=null && ImGui.button("Clear reference (null)")) applyRoutingExtra(() -> workspace.replace(selected,NoiseStyleSources.setReference(selected,workspace.read(selected),target,field,null,workspace)));
                 if (current!=null && choices.contains(current) && ImGui.button("Open exact source file")) { try { resourceNavigation.request(workspace,NoiseStyleSources.family(field)+"/"+current+".json"); } catch (Exception failure) { error=failure.getMessage(); } }
                 if (choices.isEmpty()) ImGui.textWrapped("No exact "+NoiseStyleSources.family(field)+" JSON resources in this pack.");
@@ -1499,9 +1504,9 @@ public final class EditorApp extends Application {
         ImGui.textWrapped("Image-map definition authoring. File choices check exact in-pack lowercase .png paths only. PNG format, color mode/bit depth, dimensions, coordinate transforms, legend targets, binding compatibility and native compilation/output are unvalidated. Map sampling and generation previews remain disabled.");
         for (String finding : ImageMapDefinitions.findings(document)) ImGui.textWrapped("Applied authored-data check: "+finding+" (does not block Save/Export)");
         try {
-            String source=ImageMapDefinitions.text(document,"source");var choices=imageMapSources.choices(workspace);
+            String source=ImageMapDefinitions.text(document,"source");var choices=authoringReferences.catalog(workspace,AuthoringReferences.Kind.PNG_SOURCES).keys();
             if (!source.isEmpty() && !choices.contains(source)) ImGui.textWrapped("Stored source has no exact lowercase .png file match; native loader aliases are unchecked.");
-            if (ImGui.beginCombo("PNG source",source.isEmpty() ? "Choose an existing PNG file" : source.length()>128 || source.indexOf(0)>=0 ? "Stored source" : source)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(source))) applyRoutingExtra(() -> workspace.replace(selected,ImageMapDefinitions.setSource(selected,workspace.read(selected),choice,workspace)));ImGui.endCombo(); }
+            String choice=drawAuthoringReference("imageMap#source","PNG source",AuthoringReferences.Kind.PNG_SOURCES,source,false);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,ImageMapDefinitions.setSource(selected,workspace.read(selected),choice,workspace)));
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored source is not a string (read-only)."); }
         for (String field : ImageMapDefinitions.ENUMS) {
             ImGui.pushID("imageMap.choice."+field);ImGui.textWrapped(ImageMapDefinitions.help(field));
@@ -1588,8 +1593,8 @@ public final class EditorApp extends Application {
         for (String finding : ImageMapBindings.findings(document)) ImGui.textWrapped("Applied local check: "+finding+" (does not block Save/Export)");
         String newKey=ImageMapBindings.prefix()+"new.key",mapKey=ImageMapBindings.prefix()+"new.map",applicationKey=ImageMapBindings.prefix()+"new.application";
         ImString name=values.computeIfAbsent(newKey,ignored -> new ImString("",4096)),map=values.computeIfAbsent(mapKey,ignored -> new ImString("",4096)),role=values.computeIfAbsent(applicationKey,ignored -> new ImString("CUSTOM",128));
-        ImGui.inputText("New local binding key",name);drafts.update(newKey,"",name.get());var mapChoices=styleSourceCatalogs.choices(workspace,"imageMap");
-        if (ImGui.beginCombo("New image-map file",map.get().isEmpty() ? "Choose an exact file" : map.get())) { for (String choice : mapChoices) if (ImGui.selectable(choice,choice.equals(map.get()))) map.set(choice);ImGui.endCombo(); }
+        ImGui.inputText("New local binding key",name);drafts.update(newKey,"",name.get());var mapChoices=authoringReferences.catalog(workspace,AuthoringReferences.Kind.IMAGE_MAPS).keys();
+        String pickedMap=drawAuthoringReference(mapKey,"New image-map file",AuthoringReferences.Kind.IMAGE_MAPS,map.get(),false);if(pickedMap!=null)map.set(pickedMap);
         if (ImGui.beginCombo("New binding application",role.get())) { for (String choice : ImageMapBindings.applications()) if (ImGui.selectable(choice,choice.equals(role.get()))) role.set(choice);ImGui.endCombo(); }
         ImGui.beginDisabled(name.get().isBlank() || map.get().isEmpty() || entries!=null && entries.size()>=ImageMapBindings.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add binding");ImGui.endDisabled();
         if (add) { try { commitProfileChange(ImageMapBindings.prefix(),ImageMapBindings.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,name.get(),map.get(),role.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
@@ -1620,7 +1625,8 @@ public final class EditorApp extends Application {
         try {
             String current=node.token("map")==null ? "" : node.stringToken("map");
             if (!current.isBlank() && !(context.mask()<0 ? choices.contains(current) : choices.contains(current.trim()))) ImGui.textWrapped(context.mask()<0 ? "Stored map has no exact file match; native aliases are unchecked." : "Stored mask has no unambiguous local MASK key match.");
-            if (ImGui.beginCombo(context.mask()<0 ? "Image-map resource" : "Named MASK binding",current.isEmpty() ? "Choose a reference" : current.length()>128 || current.indexOf(0)>=0 ? "Stored reference" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.setMap(selected,workspace.read(selected),context,choice,workspace)));ImGui.endCombo(); }
+            if(context.mask()<0){String choice=drawAuthoringReference(context.prefix()+"map","Image-map resource",AuthoringReferences.Kind.IMAGE_MAPS,current,false);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.setMap(selected,workspace.read(selected),context,choice,workspace)));}
+            else if(ImGui.beginCombo("Named MASK binding",current.isEmpty() ? "Choose a reference" : InspectorText.label(current,128).replace("#","\\u0023"))){for(String choice:choices)if(ImGui.selectable(choice,choice.equals(current)))applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.setMap(selected,workspace.read(selected),context,choice,workspace)));ImGui.endCombo();}
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored reference is not a string (read-only)."); }
     }
     private void drawImageMapChoice(LosslessJson node,ImageMapBindings.Context context,String field) {
@@ -1671,7 +1677,7 @@ public final class EditorApp extends Application {
         if (entries!=null && entries.size()>StructurePlacements.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-placement editor limit (read-only).");ImGui.popID();return; }
         String prefix=StructurePlacements.prefix(),formKey=prefix+"new.form";ImString id=values.computeIfAbsent(prefix+"new.id",ignored -> new ImString("",16384)),backend=values.computeIfAbsent(prefix+"new.backend",ignored -> new ImString("IRIS",128)),source=values.computeIfAbsent(prefix+"new.source",ignored -> new ImString("",16384));
         ImGui.inputText("New/copy placement ID",id);if (ImGui.beginCombo("New placement backend",backend.get())) { for (String choice : List.of("IRIS","NATIVE")) if (ImGui.selectable(choice,choice.equals(backend.get()))) { backend.set(choice);source.set(""); }ImGui.endCombo(); }
-        if (backend.get().equals("IRIS")) { if (ImGui.beginCombo("Iris structure source",source.get().isEmpty() ? "Choose file key" : source.get())) { for (String choice : StructurePlacements.references(workspace,"structures")) if (ImGui.selectable(choice,choice.equals(source.get()))) source.set(choice);ImGui.endCombo(); } } else ImGui.inputText("Native namespace:key",source);
+        if (backend.get().equals("IRIS")) { String choice=drawAuthoringReference(prefix+"new.source","Iris structure source",AuthoringReferences.Kind.STRUCTURES,source.get(),false);if(choice!=null)source.set(choice); } else ImGui.inputText("Native namespace:key",source);
         drafts.update(formKey,TerrainTransforms.draftPair("IRIS",TerrainTransforms.draftPair("","")),TerrainTransforms.draftPair(backend.get(),TerrainTransforms.draftPair(id.get(),source.get())));
         ImGui.beginDisabled(id.get().isEmpty() || source.get().isEmpty() || entries!=null && entries.size()>=StructurePlacements.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add placement with native defaults");ImGui.endDisabled();
         if (add) { try { commitProfileChange(prefix,StructurePlacements.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,id.get(),backend.get(),source.get(),workspace),formKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
@@ -1717,8 +1723,8 @@ public final class EditorApp extends Application {
     private void drawStructureReferences(LosslessJson entry,int index,String field) {
         if (!ImGui.treeNode(field+" references")) return;String prefix=StructurePlacements.prefix(index)+field+".";ImGui.pushID(prefix);ImGui.textWrapped(StructurePlacements.help(field));ImGui.textWrapped("Choices check exact file presence only. Existing loader aliases/prefixes and resource contents are unverified. Duplicate choices are rejected; source lists retain at least one entry.");List<String> refs;
         try { refs=StructurePlacements.strings(entry,field); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored references are mixed/non-string (read-only).");ImGui.popID();ImGui.treePop();return; }if (refs!=null && refs.size()>StructurePlacements.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-reference editor limit (read-only).");ImGui.popID();ImGui.treePop();return; }
-        var choices=StructurePlacements.references(workspace,field);String newKey=prefix+"new";ImString next=values.computeIfAbsent(newKey,ignored -> new ImString("",16384));if (ImGui.beginCombo("New file key",next.get().isEmpty() ? "Choose key" : next.get())) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(next.get()))) next.set(choice);ImGui.endCombo(); }drafts.update(newKey,"",next.get());ImGui.beginDisabled(next.get().isEmpty() || refs!=null && refs.size()>=StructurePlacements.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add reference");ImGui.endDisabled();if (add) { try { commitProfileChange(prefix,StructurePlacements.changeReference(selected,workspace.read(selected),index,field,RiverProfiles.Action.ADD,-1,next.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
-        if (refs!=null) for (int row=0;row<refs.size();row++) { int item=row;String current=refs.get(row);ImGui.pushID(row);if (ImGui.beginCombo("File reference",current.length()>128 || current.indexOf(0)>=0 ? "Stored key" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,StructurePlacements.setReference(selected,workspace.read(selected),index,field,item,choice,workspace)));ImGui.endCombo(); }RiverProfiles.Action action=null;ImGui.beginDisabled(row==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(row+1==refs.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(field.equals("structures") && refs.size()==1);if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();if (action!=null) { try { commitProfileChange(prefix,StructurePlacements.changeReference(selected,workspace.read(selected),index,field,action,row,null,workspace),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.popID();ImGui.treePop();return; }ImGui.popID(); }ImGui.popID();ImGui.treePop();
+        var kind=field.equals("structures") ? AuthoringReferences.Kind.STRUCTURES : AuthoringReferences.Kind.BIOMES;String newKey=prefix+"new";ImString next=values.computeIfAbsent(newKey,ignored -> new ImString("",16384));String picked=drawAuthoringReference(newKey,"New file key",kind,next.get(),false);if(picked!=null)next.set(picked);drafts.update(newKey,"",next.get());ImGui.beginDisabled(next.get().isEmpty() || refs!=null && refs.size()>=StructurePlacements.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add reference");ImGui.endDisabled();if (add) { try { commitProfileChange(prefix,StructurePlacements.changeReference(selected,workspace.read(selected),index,field,RiverProfiles.Action.ADD,-1,next.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
+        if (refs!=null) for (int row=0;row<refs.size();row++) { int item=row;String current=refs.get(row);ImGui.pushID(row);String choice=drawAuthoringReference(prefix+row,"File reference",kind,current,false);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,StructurePlacements.setReference(selected,workspace.read(selected),index,field,item,choice,workspace)));RiverProfiles.Action action=null;ImGui.beginDisabled(row==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(row+1==refs.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(field.equals("structures") && refs.size()==1);if (ImGui.button("Remove")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();if (action!=null) { try { commitProfileChange(prefix,StructurePlacements.changeReference(selected,workspace.read(selected),index,field,action,row,null,workspace),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.popID();ImGui.treePop();return; }ImGui.popID(); }ImGui.popID();ImGui.treePop();
     }
     private void drawStructureNativeSources(LosslessJson entry,int index) {
         if (!ImGui.treeNode("Native structure sources")) return;String prefix=StructurePlacements.prefix(index)+"nativeStructures.";ImGui.pushID(prefix);var sources=StructurePlacements.natives(entry);if (sources.size()>StructurePlacements.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-source editor limit (read-only).");ImGui.popID();ImGui.treePop();return; }ImGui.textWrapped("Namespace:key syntax only. Live keys, jigsaw configuration and registry compatibility are unverified. Weights are positive signed 32-bit integers and their total must fit that range. Duplicate native source keys are rejected.");String newKey=prefix+"new";ImString next=values.computeIfAbsent(newKey,ignored -> new ImString("",16384));ImGui.inputText("New native source key",next);drafts.update(newKey,"",next.get());ImGui.beginDisabled(next.get().isEmpty() || sources.size()>=StructurePlacements.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add native source (implicit weight 1)");ImGui.endDisabled();if (add) { try { commitProfileChange(prefix,StructurePlacements.changeNative(selected,workspace.read(selected),index,RiverProfiles.Action.ADD,-1,next.get()),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }
@@ -2044,9 +2050,9 @@ public final class EditorApp extends Application {
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored feature list is null, a snippet or mixed/non-object data (read-only).");ImGui.popID();return; }
         if (entries!=null && entries.size()>SubterrainFeatures.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the native 64-definition limit (read-only).");ImGui.popID();return; }
         for (String finding : SubterrainFeatures.findings(document)) ImGui.textWrapped("Applied feature check: "+finding+" (does not block Save/Export)");
-        List<String> biomes=SubterrainFeatures.choices(workspace,"biomes"),regions=SubterrainFeatures.choices(workspace,"regions");String newKey=SubterrainFeatures.prefix()+"new.id",biomeKey=SubterrainFeatures.prefix()+"new.biome";
+        List<String> biomes=authoringReferences.catalog(workspace,AuthoringReferences.Kind.SUBTERRAIN_BIOMES).keys();String newKey=SubterrainFeatures.prefix()+"new.id",biomeKey=SubterrainFeatures.prefix()+"new.biome";
         ImString id=values.computeIfAbsent(newKey,ignored -> new ImString("",4096)),biome=values.computeIfAbsent(biomeKey,ignored -> new ImString("",4096));ImGui.inputText("New stable feature ID",id);drafts.update(newKey,"",id.get());
-        if (ImGui.beginCombo("New occupied-cell biome",biome.get().isEmpty() ? "Choose an exact biome" : biome.get())) { for (String choice : biomes) if (ImGui.selectable(choice,choice.equals(biome.get()))) biome.set(choice);ImGui.endCombo(); }
+        String pickedBiome=drawAuthoringReference(biomeKey,"New occupied-cell biome",AuthoringReferences.Kind.SUBTERRAIN_BIOMES,biome.get(),false);if(pickedBiome!=null)biome.set(pickedBiome);
         ImGui.textWrapped("Add seeds ID/biome only; CENOTE, enabled=true and all numeric/range/material defaults remain implicit. Final removal restores field absence.");
         ImGui.beginDisabled(id.get().isBlank() || biome.get().isEmpty() || entries!=null && entries.size()>=SubterrainFeatures.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add feature definition");ImGui.endDisabled();
         if (add) { try { commitProfileChange(SubterrainFeatures.prefix(),SubterrainFeatures.change(selected,workspace.read(selected),RiverProfiles.Action.ADD,-1,id.get(),biome.get(),workspace),newKey); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return; }
@@ -2061,7 +2067,7 @@ public final class EditorApp extends Application {
                     try { String stored=SubterrainFeatures.text(entry,field);if (stored.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(16384,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,stored,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,field.equals("id") ? SubterrainFeatures.setId(selected,workspace.read(selected),feature,input.get()) : SubterrainFeatures.setSolid(selected,workspace.read(selected),feature,input.get()))); }
                     catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored text has an unsupported type/value (read-only)."); }ImGui.popID();
                 }
-                try { String current=SubterrainFeatures.text(entry,"biome");if (!current.isBlank() && !biomes.contains(current)) ImGui.textWrapped("Stored biome has no exact authorable file match; native trimming/aliases/content are unchecked.");if (ImGui.beginCombo("Occupied-cell biome",current.isEmpty() ? "No explicit biome" : current.length()>128 || current.indexOf(0)>=0 ? "Stored biome" : current)) { if (ImGui.selectable("No explicit biome (empty)",current.isEmpty())) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setBiome(selected,workspace.read(selected),feature,null,workspace)));for (String choice : biomes) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setBiome(selected,workspace.read(selected),feature,choice,workspace)));ImGui.endCombo(); } }
+                try { String current=SubterrainFeatures.text(entry,"biome");if (!current.isBlank() && !biomes.contains(current)) ImGui.textWrapped("Stored biome has no exact authorable file match; native trimming/aliases/content are unchecked.");String choice=drawReferenceChoice(referenceChoiceView(prefix+"biome"),"Occupied-cell biome",authoringReferences.catalog(workspace,AuthoringReferences.Kind.SUBTERRAIN_BIOMES),current,"No explicit biome (empty)",key->true);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setBiome(selected,workspace.read(selected),feature,choice.isEmpty() ? null : choice,workspace))); }
                 catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored biome reference is unsupported (read-only)."); }
                 String enabled=entry.token("enabled");if (enabled==null || enabled.equals("true") || enabled.equals("false")) { boolean value=enabled==null || enabled.equals("true");if (ImGui.checkbox("Enabled (native default true)",value)) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setEnabled(selected,workspace.read(selected),feature,!value))); } else ImGui.textWrapped("Stored enabled is not boolean (read-only).");
                 try { String current=SubterrainFeatures.family(entry);if (ImGui.beginCombo("Geometry family",current.length()>128 || current.indexOf(0)>=0 ? "Stored family" : current)) { for (String choice : SubterrainFeatures.families()) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setFamily(selected,workspace.read(selected),feature,choice)));ImGui.endCombo(); } }
@@ -2074,7 +2080,7 @@ public final class EditorApp extends Application {
                     else if (!SubterrainFeatures.numericSupported(entry,field)) ImGui.textWrapped("Stored scalar has an unsupported type, width or finite value (read-only).");
                     else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,SubterrainFeatures.setScalar(selected,workspace.read(selected),feature,field,input.get()))); }ImGui.popID();
                 }
-                drawSubterrainRange(entry,index);drawSubterrainRegions(entry,index,regions);
+                drawSubterrainRange(entry,index);drawSubterrainRegions(entry,index);
                 for (String field : entry.fields()) if (!SubterrainFeatures.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
                 ImGui.treePop();
             }
@@ -2092,15 +2098,15 @@ public final class EditorApp extends Application {
             var range=SubterrainFeatures.range(entry);if (range!=null) { for (String field : range.fields()) if (!List.of("min","max").contains(field)) ImGui.textWrapped("worldYRange."+field+" (read-only)");ImGui.textWrapped("Remove discards the entire range object, including advanced data, and restores the absent -48..48 default.");if (ImGui.button("Remove range override")) { try { commitProfileChange(prefix,SubterrainFeatures.removeRange(selected,workspace.read(selected),feature),null); } catch (Exception failure) { error=failure.getMessage(); } } }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored range is null, a snippet or contains unsupported bounds (read-only)."); }ImGui.treePop();
     }
-    private void drawSubterrainRegions(LosslessJson entry,int feature,List<String> choices) {
+    private void drawSubterrainRegions(LosslessJson entry,int feature) {
         if (!ImGui.treeNode("Allowed placement-center regions")) return;
         ImGui.textWrapped("Absent/empty permits all regions. Exact in-pack native key syntax only; contents and center-region selection are unchecked. Raw order/duplicates are preserved here; native membership is a set. Final removal restores absence.");
         List<String> regions;try { regions=SubterrainFeatures.regions(entry); } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored allowedRegions is null/mixed/unsupported (read-only).");ImGui.treePop();return; }
         if (regions!=null && regions.size()>SubterrainFeatures.MAXIMUM_ENTRIES) { ImGui.textWrapped("Above the 64-region editor limit (read-only).");ImGui.treePop();return; }
-        String prefix=SubterrainFeatures.prefix(feature)+"allowedRegions#",key=prefix+"new";ImString next=values.computeIfAbsent(key,ignored -> new ImString("",4096));if (ImGui.beginCombo("New allowed region",next.get().isEmpty() ? "Choose a region" : next.get())) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(next.get()))) next.set(choice);ImGui.endCombo(); }
+        String prefix=SubterrainFeatures.prefix(feature)+"allowedRegions#",key=prefix+"new";ImString next=values.computeIfAbsent(key,ignored -> new ImString("",4096));String picked=drawAuthoringReference(key,"New allowed region",AuthoringReferences.Kind.SUBTERRAIN_REGIONS,next.get(),false);if(picked!=null)next.set(picked);
         ImGui.beginDisabled(next.get().isEmpty() || regions!=null && regions.size()>=SubterrainFeatures.MAXIMUM_ENTRIES);boolean add=ImGui.button("Add region reference");ImGui.endDisabled();if (add) { try { commitProfileChange(prefix,SubterrainFeatures.changeRegion(selected,workspace.read(selected),feature,RiverProfiles.Action.ADD,-1,next.get(),workspace),key); } catch (Exception failure) { error=failure.getMessage(); }ImGui.treePop();return; }
         if (regions!=null) for (int index=0;index<regions.size();index++) { int region=index;String current=regions.get(index);ImGui.pushID(index);
-            if (ImGui.beginCombo("Region",current.length()>128 || current.indexOf(0)>=0 ? "Stored region" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setRegion(selected,workspace.read(selected),feature,region,choice,workspace)));ImGui.endCombo(); }
+            String choice=drawAuthoringReference(prefix+index,"Region",AuthoringReferences.Kind.SUBTERRAIN_REGIONS,current,false);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,SubterrainFeatures.setRegion(selected,workspace.read(selected),feature,region,choice,workspace)));
             RiverProfiles.Action action=null;if (ImGui.button("Duplicate reference")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(index==0);if (ImGui.button("Up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index+1==regions.size());if (ImGui.button("Down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();ImGui.sameLine();if (ImGui.button("Remove reference")) action=RiverProfiles.Action.REMOVE;
             if (action!=null) { try { commitProfileChange(prefix,SubterrainFeatures.changeRegion(selected,workspace.read(selected),feature,action,index,null,workspace),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();ImGui.treePop();return; }ImGui.popID();
         }ImGui.treePop();
@@ -2663,7 +2669,7 @@ public final class EditorApp extends Application {
             if (ImGui.button("Initialize empty static object list")) { try { commitProfileChange(StaticObjects.listPrefix(),StaticObjects.enable(selected,workspace.read(selected)),null); } catch (Exception failure) { error=failure.getMessage(); } }
             ImGui.popID();return;
         }
-        var choices=FloatingObjectPlacements.objectChoices(workspace);String newKey=StaticObjects.listPrefix()+"new",objectKey=newKey+".object";ImString choice=objectChoiceState(objectKey,choices);drawObjectChoice("Object for new fixed placement",choice,choices);
+        var choices=authoringReferences.catalog(workspace,AuthoringReferences.Kind.OBJECTS).keys();String newKey=StaticObjects.listPrefix()+"new",objectKey=newKey+".object";ImString choice=objectChoiceState(objectKey,choices);drawObjectChoice(objectKey,"Object for new fixed placement",choice);
         ImString[] position=new ImString[3];
         for (int axis=0;axis<3;axis++) { String key=newKey+"."+StaticObjects.AXES.get(axis);position[axis]=values.computeIfAbsent(key,ignored -> new ImString("0",128));ImGui.inputText("New world "+StaticObjects.AXES.get(axis),position[axis]); }
         String initial=choices.isEmpty() ? "" : choices.getFirst();drafts.update(newKey,staticDraft(initial,"0","0","0"),staticDraft(choice.get(),position[0].get(),position[1].get(),position[2].get()));
@@ -2681,7 +2687,7 @@ public final class EditorApp extends Application {
                 ImGui.treePop();try { commitProfileChange(StaticObjects.listPrefix(),StaticObjects.change(selected,workspace.read(selected),action,index,null,null,null,null,workspace),null); } catch (Exception failure) { error=failure.getMessage(); }ImGui.popID();return;
             }
             var context=new StaticObjects.Context(index);var entry=entries.get(index);String current;
-            try { current=entry.stringToken("object");if (ImGui.beginCombo("Object key",current==null ? "Required object missing" : current)) { for (String key : choices) if (ImGui.selectable(key,key.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,StaticObjects.setReference(selected,workspace.read(selected),context,key,workspace)));ImGui.endCombo(); } }
+            try { current=entry.stringToken("object");String key=drawAuthoringReference(StaticObjects.listPrefix()+index+".object","Object key",AuthoringReferences.Kind.OBJECTS,current,false);if(key!=null)applyRoutingExtra(() -> workspace.replace(selected,StaticObjects.setReference(selected,workspace.read(selected),context,key,workspace))); }
             catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored object reference has an unsupported type (read-only)."); }
             drawStaticTransform(entry,context,"position");drawStaticTransform(entry,context,"rotation");
             drawStaticScale(entry,context);drawStaticSeed(entry,context);
@@ -2929,9 +2935,9 @@ public final class EditorApp extends Application {
             if (ImGui.button("Initialize empty filter list")) { try { commitProfileChange(context.filterPrefix(field),DepositGenerators.enableFilter(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
             return;
         }
-        var choices=biome ? ResourceTypes.referenceKeys(workspace,"biomes") : List.<String>of();String newKey=context.filterPrefix(field)+"new.value";
-        int capacity=Math.max(4096,choices.stream().mapToInt(value -> value.getBytes(StandardCharsets.UTF_8).length+1).max().orElse(1));ImString input=values.computeIfAbsent(newKey,ignored -> new ImString("",capacity));
-        if (biome && ImGui.beginCombo("In-pack biome","Choose a key")) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(input.get()))) input.set(choice);ImGui.endCombo(); }
+        var choices=biome ? authoringReferences.catalog(workspace,AuthoringReferences.Kind.BIOMES).keys() : List.<String>of();String newKey=context.filterPrefix(field)+"new.value";
+        ImString input=values.computeIfAbsent(newKey,ignored -> new ImString("",Math.max(4096,choices.stream().mapToInt(value -> value.getBytes(StandardCharsets.UTF_8).length+1).max().orElse(1))));
+        if(biome){String choice=drawAuthoringReference(newKey+"#picker","In-pack biome",AuthoringReferences.Kind.BIOMES,input.get(),false);if(choice!=null)input.set(choice);}
         ImGui.inputText("New filter",input);drafts.update(newKey,"",input.get());
         if (ImGui.button("Add filter")) { changeDepositFilter(context,field,RiverProfiles.Action.ADD,-1,input.get(),newKey);return; }
         for (int index=0;index<filters.size();index++) {
@@ -3232,15 +3238,13 @@ public final class EditorApp extends Application {
         ImGui.treePop();
     }
     private ImString objectChoiceState(String key,List<String> choices) {
-        int capacity=Math.max(4096,choices.stream().mapToInt(value -> value.getBytes(StandardCharsets.UTF_8).length+1).max().orElse(1));
-        return values.computeIfAbsent(key,ignored -> new ImString(choices.isEmpty() ? "" : choices.getFirst(),capacity));
+        return values.computeIfAbsent(key,ignored -> {
+            int capacity=Math.max(4096,choices.stream().mapToInt(value -> value.getBytes(StandardCharsets.UTF_8).length+1).max().orElse(1));
+            return new ImString(choices.isEmpty() ? "" : choices.getFirst(),capacity);
+        });
     }
-    private void drawObjectChoice(String label,ImString state,List<String> choices) {
-        String current=state.get();
-        if (ImGui.beginCombo(label,current.isEmpty() ? "Select an object" : current.length()>128 ? "Selected object" : current)) {
-            for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) state.set(choice);
-            ImGui.endCombo();
-        }
+    private void drawObjectChoice(String scope,String label,ImString state) {
+        String choice=drawAuthoringReference(scope,label,AuthoringReferences.Kind.OBJECTS,state.get(),false);if(choice!=null)state.set(choice);
     }
     private void drawFloatingObjectList(LosslessJson entry,int index,String list) {
         ImGui.textWrapped(FloatingObjectPlacements.listHelp(index,list));List<LosslessJson> placements;
@@ -3253,9 +3257,9 @@ public final class EditorApp extends Application {
             }
             return;
         }
-        var choices=FloatingObjectPlacements.objectChoices(workspace);String prefix=FloatingObjectPlacements.listPrefix(index,list);
+        var choices=authoringReferences.catalog(workspace,AuthoringReferences.Kind.OBJECTS).keys();String prefix=FloatingObjectPlacements.listPrefix(index,list);
         ImString object=objectChoiceState(prefix+"new.object",choices),mode=values.computeIfAbsent(prefix+"new.mode",ignored -> new ImString(FloatingObjectPlacements.creationMode(list),128));
-        drawObjectChoice("Object for new placement",object,choices);
+        drawObjectChoice(prefix+"new.object","Object for new placement",object);
         if (ImGui.beginCombo("Mode for new placement",mode.get())) {
             for (String choice : FloatingObjectPlacements.modes()) { if (ImGui.selectable(choice,choice.equals(mode.get()))) mode.set(choice);if (ImGui.isItemHovered()) ImGui.setTooltip(FloatingObjectPlacements.modeHelp(choice)); }
             ImGui.endCombo();
@@ -3745,7 +3749,7 @@ public final class EditorApp extends Application {
             }
             return;
         }
-        ImString object=objectChoiceState(FloatingObjectPlacements.poolPrefix(entry,list,index,pool)+"new.object",choices);drawObjectChoice("New object reference",object,choices);
+        ImString object=objectChoiceState(FloatingObjectPlacements.poolPrefix(entry,list,index,pool)+"new.object",choices);drawObjectChoice(FloatingObjectPlacements.poolPrefix(entry,list,index,pool)+"new.object","New object reference",object);
         ImGui.beginDisabled(!choices.contains(object.get()));
         if (ImGui.button("Add reference")) { ImGui.endDisabled();changeFloatingObjectPool(entry,list,index,pool,RiverProfiles.Action.ADD,-1,object.get());return; }
         ImGui.endDisabled();
@@ -3753,10 +3757,7 @@ public final class EditorApp extends Application {
         for (int referenceIndex=0;referenceIndex<references.size();referenceIndex++) {
             ImGui.pushID(referenceIndex);int selectedReference=referenceIndex;String current=references.get(referenceIndex);
             if (!choices.contains(current)) ImGui.textWrapped("Stored reference is missing from the exact .iob catalog and is preserved until replaced.");
-            if (ImGui.beginCombo("Object reference",current.length()>128 ? "Stored object reference" : current)) {
-                for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.setReference(selected,workspace.read(selected),entry,list,index,pool,selectedReference,choice,workspace)));
-                ImGui.endCombo();
-            }
+            String choice=drawAuthoringReference(FloatingObjectPlacements.poolPrefix(entry,list,index,pool)+referenceIndex,"Object reference",AuthoringReferences.Kind.OBJECTS,current,false);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,FloatingObjectPlacements.setReference(selected,workspace.read(selected),entry,list,index,pool,selectedReference,choice,workspace)));
             RiverProfiles.Action action=null;
             if (ImGui.button("Duplicate reference")) action=RiverProfiles.Action.DUPLICATE;
             ImGui.sameLine();ImGui.beginDisabled(pool.equals("place") && references.size()<=1);if (ImGui.button("Remove reference")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
@@ -3941,13 +3942,9 @@ public final class EditorApp extends Application {
         ImGui.textWrapped(FloatingBiomes.help("biome"));String current;
         try { current=entry.token("biome")==null || entry.token("biome").equals("null") ? "" : entry.stringToken("biome"); }
         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored target biome is not a string or null (read-only).");return; }
-        var choices=FloatingBiomes.biomeChoices(workspace);
+        var choices=authoringReferences.catalog(workspace,AuthoringReferences.Kind.BIOMES).keys();
         if (!current.isEmpty() && !choices.contains(current)) ImGui.textWrapped("Stored target is missing from this pack; it is retained until you choose Self or an exact pack key.");
-        if (ImGui.beginCombo("Target biome",current.isEmpty() ? "Self (parent biome)" : current.length()>128 ? "Stored target" : current)) {
-            if (ImGui.selectable("Self (parent biome)",current.isEmpty())) applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.setBiome(selected,workspace.read(selected),index,"",workspace)));
-            for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.setBiome(selected,workspace.read(selected),index,choice,workspace)));
-            ImGui.endCombo();
-        }
+        String choice=drawReferenceChoice(referenceChoiceView(FloatingBiomes.entryPrefix(index)+"biome"),"Target biome",authoringReferences.catalog(workspace,AuthoringReferences.Kind.BIOMES),current,"Self (parent biome)",key->true);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,FloatingBiomes.setBiome(selected,workspace.read(selected),index,choice,workspace)));
     }
     private void drawFloatingScalar(LosslessJson entry,int index,String field) {
         ImGui.pushID(field);ImGui.textWrapped(FloatingBiomes.help(field));ImGui.textWrapped(FloatingBiomes.constraints(field));
@@ -4296,18 +4293,13 @@ public final class EditorApp extends Application {
     }
     private void drawDimensionStack(LosslessJson document) {
         if (!ImGui.collapsingHeader("Dimension stack and upper terrain")) return;
-        ImGui.pushID("dimensionStack");var choices=DimensionStacks.choices(workspace);
+        ImGui.pushID("dimensionStack");var choices=authoringReferences.catalog(workspace,AuthoringReferences.Kind.DIMENSIONS).keys();
         ImGui.textWrapped("Dimension keys are exact files in this pack. Target contents, loader aliases, height/layout compatibility and native generation are unvalidated. These controls do not sample or preview terrain.");
         ImGui.textWrapped(DimensionStacks.help("upperDimension"));
         try {
             String token=document.token("upperDimension"),current=token==null || token.equals("null") ? "none" : document.stringToken("upperDimension");
             if (DimensionStacks.upperActive(document) && !choices.contains(current)) ImGui.textWrapped("Stored upper dimension is missing from the exact in-pack catalog; it is preserved until replaced or cleared.");
-            if (ImGui.beginCombo("Upper dimension",DimensionStacks.upperActive(document) ? current.length()>128 ? "Stored upper dimension" : current : "None")) {
-                if (ImGui.selectable("None (native disable)",!DimensionStacks.upperActive(document))) applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.setUpper(selected,workspace.read(selected),null,workspace)));
-                ImGui.beginDisabled(document.token("dimensionStack")!=null);
-                for (String choice : choices) if (!choice.equalsIgnoreCase("none") && ImGui.selectable(choice,choice.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.setUpper(selected,workspace.read(selected),choice,workspace)));
-                ImGui.endDisabled();ImGui.endCombo();
-            }
+            String choice=drawReferenceChoice(referenceChoiceView(DimensionStacks.prefix()+"upper"),"Upper dimension",authoringReferences.catalog(workspace,AuthoringReferences.Kind.DIMENSIONS),DimensionStacks.upperActive(document) ? current : "","None (native disable)",key->document.token("dimensionStack")==null && !key.equalsIgnoreCase("none"));if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.setUpper(selected,workspace.read(selected),choice.isEmpty() ? null : choice,workspace)));
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored upperDimension has an unsupported type (read-only)."); }
         ImGui.textWrapped("Upper terrain and dimensionStack are mutually exclusive. Remove the stack member before selecting an active upper dimension. Upper gap/carving/object settings remain separate controls.");
         for (String finding : DimensionStacks.findings(selected,document,workspace)) ImGui.textWrapped("Applied stack check: "+finding+" (does not block Save/Export)");
@@ -4317,10 +4309,7 @@ public final class EditorApp extends Application {
         ImGui.textWrapped(DimensionStacks.help("dimensionStack"));
         if (stack==null) {
             String key=DimensionStacks.prefix()+"new.top";ImString top=values.computeIfAbsent(key,ignored -> new ImString("",4096));
-            if (ImGui.beginCombo("Initial top dimension",top.get().isEmpty() ? "Choose a dimension" : top.get())) {
-                for (String choice : choices) if (!choice.equals(DimensionStacks.host(selected)) && ImGui.selectable(choice,choice.equals(top.get()))) { top.set(choice);drafts.update(key,"",choice); }
-                ImGui.endCombo();
-            }
+            String chosen=drawReferenceChoice(referenceChoiceView(key),"Initial top dimension",authoringReferences.catalog(workspace,AuthoringReferences.Kind.DIMENSIONS),top.get(),null,choice->!choice.equals(DimensionStacks.host(selected)));if(chosen!=null){top.set(chosen);drafts.update(key,"",chosen);}
             ImGui.textWrapped("Create writes [chosen top, host] in top-to-bottom order. Spacer stays at 32 and blending stays absent until explicitly enabled.");
             ImGui.beginDisabled(top.get().isEmpty());boolean create=ImGui.button("Create dimension stack");ImGui.endDisabled();
             if (create) { try { commitProfileChange(DimensionStacks.prefix(),DimensionStacks.create(selected,workspace.read(selected),top.get(),workspace),key); } catch (Exception failure) { error=failure.getMessage(); } }
@@ -4372,10 +4361,7 @@ public final class EditorApp extends Application {
         if (add) { rows.add(Math.max(0,rows.size()-1),"");stageStackLayers(key,stored,rows);return; }
         for (int index=0;index<rows.size();index++) {
             ImGui.pushID("stackLayer"+index);String current=rows.get(index),replacement=null;ImGui.text("Layer "+index+(index==rows.size()-1 ? " (bottom)" : ""));
-            if (ImGui.beginCombo("Dimension",current.isEmpty() ? "Choose a dimension" : current.length()>128 ? "Stored dimension key" : current)) {
-                for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) replacement=choice;
-                ImGui.endCombo();
-            }
+            replacement=drawAuthoringReference(key+"#"+index,"Dimension",AuthoringReferences.Kind.DIMENSIONS,current,false);
             if (replacement!=null) { rows.set(index,replacement);stageStackLayers(key,stored,rows);ImGui.popID();return; }
             if (!current.isEmpty() && !choices.contains(current)) ImGui.textWrapped("Stored key is missing; it stays preserved until the whole draft order is successfully applied.");
             if (ImGui.button("Stage removal")) { rows.remove(index);stageStackLayers(key,stored,rows);ImGui.popID();return; }
@@ -4736,12 +4722,8 @@ public final class EditorApp extends Application {
             drawSurfacePoolRadii(pool,index);
             try {
                 String current=pool.token("biome")==null ? "" : pool.stringToken("biome");
-                if (ImGui.beginCombo("Pool bed/rim biome",current.isEmpty() ? "Keep surrounding biome" : current.length()>128 ? "Stored biome" : current)) {
-                    if (ImGui.selectable("Keep surrounding biome",current.isEmpty())) applyRoutingExtra(() -> workspace.replace(selected,SurfacePools.setBiome(selected,workspace.read(selected),poolIndex,"",workspace)));
-                    for (String key : ResourceTypes.referenceKeys(workspace,"biomes")) if (ImGui.selectable(key,key.equals(current))) applyRoutingExtra(() -> workspace.replace(selected,SurfacePools.setBiome(selected,workspace.read(selected),poolIndex,key,workspace)));
-                    ImGui.endCombo();
-                }
-                if (!current.isEmpty() && !ResourceTypes.referenceKeys(workspace,"biomes").contains(current)) ImGui.textWrapped("Stored biome is not an exact in-pack resource; it stays unchanged until you choose a replacement.");
+                var catalog=authoringReferences.catalog(workspace,AuthoringReferences.Kind.BIOMES);String choice=drawReferenceChoice(referenceChoiceView(SurfacePools.poolPrefix(poolIndex)+"biome"),"Pool bed/rim biome",catalog,current,"Keep surrounding biome",key->true);if(choice!=null)applyRoutingExtra(() -> workspace.replace(selected,SurfacePools.setBiome(selected,workspace.read(selected),poolIndex,choice,workspace)));
+                if (!current.isEmpty() && !catalog.keys().contains(current)) ImGui.textWrapped("Stored biome is not an exact in-pack resource; it stays unchanged until you choose a replacement.");
             } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored biome is not a string (read-only)."); }
             if (ImGui.treeNode("Pool fluid palette")) { drawHydrologyFluids(pool,new HydrologyFluidPalettes.Target(true,index));ImGui.treePop(); }
             for (String field : pool.fields()) if (!SurfacePools.EDITABLE.contains(field)) ImGui.textWrapped(field+" (read-only)");
@@ -5735,10 +5717,7 @@ public final class EditorApp extends Application {
     }
     private void drawRiverCatalogDimension() {
         if (DimensionFields.dimension(selected)) ImGui.textWrapped("ID catalog: " + selected);
-        else if (ImGui.beginCombo("Catalog dimension",riverCatalogDimension==null ? "Choose dimension" : riverCatalogDimension)) {
-            for (String dimension : RiverIdLists.dimensions(workspace)) if (ImGui.selectable(dimension,dimension.equals(riverCatalogDimension))) riverCatalogDimension=dimension;
-            ImGui.endCombo();
-        }
+        else {String choice=drawAuthoringReference("riverPolicy#catalogDimension","Catalog dimension",AuthoringReferences.Kind.DIMENSION_PATHS,riverCatalogDimension,false);if(choice!=null)riverCatalogDimension=choice;}
         ImGui.textWrapped("The lookup dimension supplies available ID strings. Policy inheritance remains unresolved.");
     }
     private void drawRiverLists(LosslessJson policy, List<String> fields, boolean dimensionIds) {
@@ -5801,10 +5780,8 @@ public final class EditorApp extends Application {
         }
     }
     private void riverReferencePicker(String label, ImString input, String key, String stored, RiverIdLists.Catalog catalog) {
-        if (ImGui.beginCombo(label,"Choose resource")) {
-            for (String choice : catalog==null ? RiverBiomeLists.choices(workspace) : catalog.ids()) if (ImGui.selectable(choice)) { input.set(choice); drafts.update(key,stored,choice); }
-            ImGui.endCombo();
-        }
+        if(catalog==null){String choice=drawAuthoringReference(key+"#picker",label,AuthoringReferences.Kind.BIOMES,input.get(),false);if(choice!=null){input.set(choice);drafts.update(key,stored,choice);}}
+        else if(ImGui.beginCombo(label,"Choose resource")){for(String choice:catalog.ids())if(ImGui.selectable(choice)){input.set(choice);drafts.update(key,stored,choice);}ImGui.endCombo();}
     }
     private void setRiverListState(String field, boolean inherit) {
         try { commitRiverList(field,RiverIdLists.EDITABLE.contains(field) ? RiverIdLists.setInherited(selected,workspace.read(selected),field,inherit) : RiverBiomeLists.setInherited(selected,workspace.read(selected),field,inherit),true,null); }
@@ -6159,16 +6136,8 @@ public final class EditorApp extends Application {
             }
             try {
                 String current = link.stringToken("generator");
-                String preview = current == null ? "Absent (default: " + BiomeGeneratorLinks.defaultGenerator() + ")" : current.length()>128 ? "Long stored reference" : current;
-                if (ImGui.beginCombo("Generator", preview)) {
-                    for (String choice : BiomeGeneratorLinks.choices(workspace)) {
-                        if (ImGui.selectable(choice, choice.equals(current))) {
-                            try { workspace.replace(selected, BiomeGeneratorLinks.assign(selected, workspace.read(selected), index, workspace, choice)); error = null; }
-                            catch (Exception failure) { error = failure.getMessage(); }
-                        }
-                    }
-                    ImGui.endCombo();
-                }
+                if(current==null)ImGui.textWrapped("Absent (default: "+BiomeGeneratorLinks.defaultGenerator()+")");
+                String choice=drawAuthoringReference(key+".ref","Generator",AuthoringReferences.Kind.GENERATORS,current,false);if(choice!=null){try{workspace.replace(selected,BiomeGeneratorLinks.assign(selected,workspace.read(selected),index,workspace,choice));error=null;}catch(Exception failure){error=failure.getMessage();}}
             } catch (IllegalArgumentException mismatch) { ImGui.textWrapped("Stored generator reference is not a string (read-only)."); }
             String minimumToken = link.token("min"), maximumToken = link.token("max");
             String storedMin = minimumToken == null ? BiomeFields.generatorDefault("min") : minimumToken;
@@ -6196,10 +6165,7 @@ public final class EditorApp extends Application {
         ImString reference = values.computeIfAbsent(prefix+"ref", ignored -> new ImString(16_384));
         ImString minimum = values.computeIfAbsent(prefix+"min", ignored -> new ImString(BiomeFields.generatorDefault("min"),128));
         ImString maximum = values.computeIfAbsent(prefix+"max", ignored -> new ImString(BiomeFields.generatorDefault("max"),128));
-        if (ImGui.beginCombo("New generator", reference.get().isEmpty() ? "Choose resource" : reference.get())) {
-            for (String choice : BiomeGeneratorLinks.choices(workspace)) if (ImGui.selectable(choice,choice.equals(reference.get()))) reference.set(choice);
-            ImGui.endCombo();
-        }
+        String choice=drawAuthoringReference(prefix+"ref","New generator",AuthoringReferences.Kind.GENERATORS,reference.get(),false);if(choice!=null)reference.set(choice);
         ImGui.inputText("New minimum",minimum); ImGui.inputText("New maximum",maximum);
         drafts.update(prefix+"ref","",reference.get());
         drafts.update(prefix+"min",BiomeFields.generatorDefault("min"),minimum.get());
@@ -6255,11 +6221,7 @@ public final class EditorApp extends Application {
         ImString input = values.computeIfAbsent(key, ignored -> new ImString(16_384));
         ImGui.inputText("New key", input);
         drafts.update(key, "", input.get());
-        if ((region || children || dimensionRegions) && ImGui.beginCombo(region || children ? "Available biomes" : "Available regions", "Choose resource")) {
-            for (String reference : region || children ? RegionFields.biomeKeys(workspace) : DimensionFields.regionKeys(workspace))
-                if (ImGui.selectable(reference)) { input.set(reference); drafts.update(key, "", reference); }
-            ImGui.endCombo();
-        }
+        if(region || children || dimensionRegions){String choice=drawAuthoringReference(key+"#picker",region || children ? "Available biomes" : "Available regions",region || children ? AuthoringReferences.Kind.BIOMES : AuthoringReferences.Kind.REGIONS,input.get(),false);if(choice!=null){input.set(choice);drafts.update(key,"",choice);}}
         if (ImGui.button("Add")) applyArray(field, entries.size(), input.get());
         ImGui.popID();
     }
@@ -6564,7 +6526,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();authoringReferences.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {

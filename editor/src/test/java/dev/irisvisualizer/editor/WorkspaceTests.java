@@ -76,6 +76,7 @@ public final class WorkspaceTests {
    CustomBiomeTests.run(temp);
    ResourceSelectorTests.run(temp);
    ReferenceChoicesTests.run(temp);
+   AuthoringReferencesTests.run(temp);
    ReferenceLinkTests.run(temp);
    NoiseReferenceTests.run(temp);
    MaterialReferenceTests.run(temp);
