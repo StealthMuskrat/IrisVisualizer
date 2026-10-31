@@ -11,10 +11,12 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
     public enum Phase { IDLE, SCANNING, READY, FAILED, CLOSED }
     public record Snapshot(long request,Phase phase,PackReferenceAudit.Audit audit,String error) {}
     @FunctionalInterface interface Scanner { PackReferenceAudit.Audit inspect(PackResourceView source,BooleanSupplier cancelled); }
+    @FunctionalInterface interface Capture { ReferenceScanSource capture(PackWorkspace workspace); }
     private record Job(long request,ReferenceScanSource source,AtomicBoolean cancelled) {}
     private record Outcome(long request,PackReferenceAudit.Audit audit,String error) {}
     private final Object lock=new Object();
     private final Scanner scanner;
+    private final Capture capture;
     private final Thread worker;
     private PackWorkspace workspace;
     private long revision=-1,generation;
@@ -27,7 +29,10 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
 
     public AsyncPackReferenceReview() { this(PackReferenceAudit::inspect,runnable -> new Thread(runnable,"iris-resource-link-review")); }
     AsyncPackReferenceReview(Scanner scanner,ThreadFactory threads) {
-        this.scanner=Objects.requireNonNull(scanner);worker=Objects.requireNonNull(threads).newThread(this::run);
+        this(scanner,threads,PackWorkspace::capturePackReferences);
+    }
+    AsyncPackReferenceReview(Scanner scanner,ThreadFactory threads,Capture capture) {
+        this.scanner=Objects.requireNonNull(scanner);this.capture=Objects.requireNonNull(capture);worker=Objects.requireNonNull(threads).newThread(this::run);
         if (worker==null) throw new IllegalArgumentException("Reference worker factory returned no thread");
         worker.setDaemon(true);worker.start();
     }
@@ -35,7 +40,7 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
         generation++;if (active!=null) active.cancelled().set(true);if (pending!=null) pending.cancelled().set(true);
         pending=null;completed=null;previous=null;page=null;
     }
-    /** Call on the UI thread. Capture copies at most 8 MB of JSON; parsing happens only on the worker. */
+    /** Call on the UI thread. Capture pins at most 8 MB of owned JSON; copying/parsing happen only on the worker. */
     public Snapshot refresh(PackWorkspace current) {
         Objects.requireNonNull(current);
         long request;
@@ -44,11 +49,13 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
             invalidate();workspace=current;revision=current.revision();request=generation;snapshot=new Snapshot(generation,Phase.SCANNING,null,null);
         }
         ReferenceScanSource source;
-        try { source=ReferenceScanSource.capture(current); }
-        catch (Exception failure) {
-            synchronized (lock) { if (!closed && request==generation) snapshot=new Snapshot(generation,Phase.FAILED,null,error(failure));return snapshot; }
-        }
+        try { source=Objects.requireNonNull(capture.capture(current),"Pack reference review capture returned no source"); }
+        catch (OutOfMemoryError exhausted) { return captureFailed(request,"Not enough memory to capture pack reference review metadata; clear the review and refresh explicitly."); }
+        catch (Exception failure) { return captureFailed(request,error(failure)); }
         synchronized (lock) { if (!closed && request==generation) { pending=new Job(request,source,new AtomicBoolean());lock.notifyAll(); }return snapshot; }
+    }
+    private Snapshot captureFailed(long request,String detail) {
+        synchronized(lock){if(!closed && request==generation)snapshot=new Snapshot(generation,Phase.FAILED,null,detail);return snapshot;}
     }
     /** Edits invalidate without scheduling another scan. Save and filter/navigation changes retain results. */
     public Snapshot poll(PackWorkspace current) {
@@ -84,19 +91,22 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
         while (true) {
             Job job;
             synchronized (lock) {
+                Thread.interrupted();
                 while (!closed && pending==null) {
                     try { lock.wait(); } catch (InterruptedException interrupted) { if (closed) return; }
                 }
                 if (closed) return;active=job=pending;pending=null;
             }
             Outcome outcome=null;
-            try { outcome=new Outcome(job.request(),Objects.requireNonNull(scanner.inspect(job.source(),job.cancelled()::get),"Reference scanner returned no audit"),null); }
+            try { outcome=new Outcome(job.request(),Objects.requireNonNull(scanner.inspect(job.source().view(job.cancelled()::get),job.cancelled()::get),"Reference scanner returned no audit"),null); }
             catch (CancellationException cancelled) { outcome=new Outcome(job.request(),null,"Resource link scan cancelled; refresh to retry"); }
+            catch (OutOfMemoryError exhausted) { outcome=new Outcome(job.request(),null,"Not enough memory to inspect pack reference review; clear the review and refresh explicitly."); }
             catch (Exception failure) { outcome=new Outcome(job.request(),null,error(failure)); }
             synchronized (lock) {
                 active=null;
                 if (!closed && !job.cancelled().get() && job.request()==generation) completed=outcome;
             }
+            job=null;outcome=null;
         }
     }
     /** Never join a scanner on the UI thread; an interruption-ignoring scan cannot publish after close. */

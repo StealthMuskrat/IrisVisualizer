@@ -1,0 +1,102 @@
+package dev.irisvisualizer.editor;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import java.util.function.BooleanSupplier;
+
+final class PinnedLinkReviewTests {
+    private static final String ROOT="structures/z_root.json",POOL="jigsaw-pools/z_target.json",BIOME="biomes/source.json";
+    private static byte[] bytes(String text){return text.getBytes(StandardCharsets.UTF_8);}
+    private static void check(boolean valid,String message){if(!valid)throw new AssertionError("Pinned link reviews: "+message);}
+    private static void rejects(Runnable action){try{action.run();}catch(IllegalArgumentException|NullPointerException expected){return;}throw new AssertionError("Expected rejected capture/read");}
+    private static void cancelled(Runnable action){try{action.run();}catch(CancellationException expected){return;}throw new AssertionError("Expected cancelled read");}
+    private static void await(CountDownLatch gate)throws Exception{check(gate.await(10,TimeUnit.SECONDS),"worker gate reached");}
+    private static void uninterruptible(CountDownLatch gate){boolean done=false;while(!done)try{done=gate.await(10,TimeUnit.SECONDS);check(done,"gate released");}catch(InterruptedException ignored){}}
+    private static Object inspect(boolean jigsaw,PackResourceView view,BooleanSupplier cancel){return jigsaw?JigsawDependencyReview.inspect(view,ROOT,cancel):PackReferenceAudit.inspect(view,cancel);}
+    private record State(Object identity,String phase,Object result,String error,long request){}
+    private interface Worker extends AutoCloseable {
+        State refresh(PackWorkspace pack);State poll(PackWorkspace pack);void clear();void close();
+    }
+    @FunctionalInterface private interface Scan { Object inspect(PackResourceView source,BooleanSupplier cancelled); }
+    @FunctionalInterface private interface Capture { Object capture(PackWorkspace pack); }
+    private static Worker worker(boolean jigsaw,Scan scan,Capture capture,AtomicReference<Thread> thread){
+        java.util.concurrent.ThreadFactory factory=r->{var t=new Thread(r,"pinned-link-test");thread.set(t);return t;};
+        if(jigsaw){
+            var review=new AsyncJigsawDependencyReview((source,root,cancel)->(JigsawDependencyReview.Review)scan.inspect(source,cancel),factory,(pack,root)->(JigsawScanSource)capture.capture(pack));
+            return new Worker(){
+                private State state(AsyncJigsawDependencyReview.Snapshot s){return new State(s,s.phase().name(),s.review(),s.error(),s.request());}
+                public State refresh(PackWorkspace pack){return state(review.refresh(pack,ROOT));}public State poll(PackWorkspace pack){return state(review.poll(pack,ROOT));}public void clear(){review.clear();}public void close(){review.close();}
+            };
+        }
+        var review=new AsyncPackReferenceReview((source,cancel)->(PackReferenceAudit.Audit)scan.inspect(source,cancel),factory,pack->(ReferenceScanSource)capture.capture(pack));
+        return new Worker(){
+            private State state(AsyncPackReferenceReview.Snapshot s){return new State(s,s.phase().name(),s.audit(),s.error(),s.request());}
+            public State refresh(PackWorkspace pack){return state(review.refresh(pack));}public State poll(PackWorkspace pack){return state(review.poll(pack));}public void clear(){review.clear();}public void close(){review.close();}
+        };
+    }
+    private static Object capture(boolean jigsaw,PackWorkspace pack){return jigsaw?pack.captureJigsawReview(ROOT):pack.capturePackReferences();}
+    private static State terminal(Worker worker,PackWorkspace pack)throws Exception{
+        long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);State state;
+        while((state=worker.poll(pack)).phase().equals("SCANNING") && System.nanoTime()<until)Thread.sleep(1);return state;
+    }
+    private static void stopped(Thread thread)throws Exception{thread.join(10000);check(!thread.isAlive(),"worker terminates on close");}
+    private static void ownership(PackWorkspace pack,Object snapshot,Object copied,Set<String> eligible)throws Exception{
+        var ownedField=PackWorkspace.class.getDeclaredField("files");ownedField.setAccessible(true);var owned=(Map<?,?>)ownedField.get(pack);var field=snapshot.getClass().getDeclaredField("content");field.setAccessible(true);var content=(Map<?,?>)field.get(snapshot);var privateCopies=(Map<?,?>)field.get(copied);
+        check(content!=owned && content.keySet().equals(eligible),"detached bounded payload map");for(String path:eligible)check(content.get(path)==owned.get(path) && privateCopies.get(path)!=owned.get(path),"immutable owner arrays pinned, legacy API privately copies");
+        for(var f:snapshot.getClass().getDeclaredFields())check(f.getType()!=PackWorkspace.class && !java.util.function.Function.class.isAssignableFrom(f.getType()),"no live workspace/capture callback retained");
+    }
+    static void run(Path temp)throws Exception{
+        var files=new LinkedHashMap<String,byte[]>();files.put(ROOT,bytes("{\"startPool\":\"z_target\",\"future\":9007199254740993}"));files.put(POOL,bytes("{\"fallback\":\"z_target\",\"pieces\":[{\"piece\":\"part\"}]}"));files.put("jigsaw-pieces/part.json",bytes("{\"object\":\"opaque\",\"connectors\":[{\"pool\":\"missing\"}]}"));files.put(BIOME,bytes("{\"children\":[\"target\",\"missing\"],\"future\":9007199254740993}"));files.put("biomes/target.json",bytes("{}"));files.put("objects/opaque.iob",new byte[]{0,-1,2});files.put("images/opaque.png",new byte[]{0,-1});files.put("future/unknown.json",bytes("unknown malformed"));
+        var pack=PackWorkspace.newPack(files);var jigsaw=pack.captureJigsawReview(ROOT);var jigsawCopied=JigsawScanSource.capture(pack,ROOT);var references=pack.capturePackReferences();var referencesCopied=ReferenceScanSource.capture(pack);
+        ownership(pack,jigsaw,jigsawCopied,Set.of(ROOT,POOL,"jigsaw-pieces/part.json"));ownership(pack,references,referencesCopied,Set.of(ROOT,POOL,"jigsaw-pieces/part.json",BIOME,"biomes/target.json"));
+        check(jigsaw.copiedFiles()==0 && jigsaw.copiedBytes()==0 && jigsaw.retainedFiles()==jigsawCopied.copiedFiles() && jigsaw.retainedBytes()==jigsawCopied.copiedBytes(),"jigsaw zero UI payload copies");check(references.copiedFiles()==0 && references.copiedBytes()==0 && references.retainedFiles()==referencesCopied.copiedFiles() && references.retainedBytes()==referencesCopied.copiedBytes(),"reference zero UI payload copies");
+        for(boolean graph:new boolean[]{true,false}){
+            PackResourceView pinned=graph?jigsaw.view(()->false):references.view(()->false),copied=graph?jigsawCopied:referencesCopied;String path=graph?ROOT:BIOME;
+            check(inspect(graph,pinned,()->false).equals(inspect(graph,pack,()->false)) && inspect(graph,copied,()->false).equals(inspect(graph,pack,()->false)),"direct/pinned/legacy exact report parity including cycles and missing targets");
+            byte[] read=pinned.read(path);read[0]=0;check(Arrays.equals(pinned.read(path),files.get(path)),"worker reads defensive");rejects(()->pinned.read("objects/opaque.iob"));rejects(()->pinned.size("images/opaque.png"));check(pinned.paths().contains("objects/opaque.iob") && pinned.paths().contains("future/unknown.json"),"complete exact target presence without unrelated payloads");try{pinned.paths().clear();throw new AssertionError();}catch(UnsupportedOperationException expected){}
+            Class<?> snapshot=graph?AsyncJigsawDependencyReview.Snapshot.class:AsyncPackReferenceReview.Snapshot.class;for(var component:snapshot.getRecordComponents())check(component.getType()!=PackWorkspace.class && component.getType()!=byte[].class && component.getType()!=JigsawScanSource.class && component.getType()!=ReferenceScanSource.class,"published DTO has no source or payload");
+        }
+        pack.replace(ROOT,bytes("{\"startPool\":\"new\"}"));pack.replace(BIOME,bytes("{\"children\":[\"new\"]}"));pack.duplicate("objects/opaque.iob","later");check(Arrays.equals(jigsaw.read(ROOT),files.get(ROOT)) && Arrays.equals(references.read(BIOME),files.get(BIOME)) && !references.paths().contains("objects/later.iob") && !jigsaw.paths().contains("objects/later.iob"),"live byte/structure edits cannot change snapshots");
+        // A borrowed jigsaw worker view must retain the special omitted-source signal.
+        var limited=JigsawScanSource.pin(files,ROOT,new JigsawScanSource.Limits(1,1000,16_000_000));var omitted=JigsawDependencyReview.inspect(limited.view(()->false),ROOT);check(omitted.equals(JigsawDependencyReview.inspect(JigsawScanSource.capture(PackWorkspace.newPack(files),ROOT,new JigsawScanSource.Limits(1,1000,16_000_000)),ROOT)) && omitted.incomplete() && omitted.jsonFiles()==1 && omitted.nodes().getLast().status()==JigsawDependencyReview.Status.SKIPPED && omitted.notices().getFirst().message().contains("snapshot"),"uncaptured present target explicitly skipped, never read or treated as missing");check(limited.view(()->false).captured(ROOT) && !limited.view(()->false).captured(POOL),"coverage marker preserved by detached view");cancelled(()->limited.view(()->true).captured(ROOT));
+        var many=new LinkedHashMap<String,byte[]>();many.put(ROOT,files.get(ROOT));many.put(POOL,files.get(POOL));for(int i=0;i<4096;i++)many.put("jigsaw-pieces/p"+String.format(Locale.ROOT,"%04d",i)+".json",bytes("{}"));var rootFirst=PackWorkspace.newPack(many).captureJigsawReview(ROOT);check(rootFirst.retainedFiles()==4096 && rootFirst.captured(ROOT) && !rootFirst.captured(POOL) && rootFirst.size(POOL)==files.get(POOL).length,"4096 retained-file cap prioritizes lexically-last root and retains omitted sizes");check(JigsawDependencyReview.inspect(rootFirst.view(()->false),ROOT).nodes().getLast().status()==JigsawDependencyReview.Status.SKIPPED,"real default file-limit omission preserved through worker view");
+        byte[] large=new byte[1_000_000];Arrays.fill(large,(byte)' ');large[0]='{';large[1]='}';
+        for(boolean graph:new boolean[]{true,false}){
+            String base=graph?"jigsaw-pieces/":"biomes/",path=graph?ROOT:BIOME;var budget=new LinkedHashMap<String,byte[]>();budget.put(path,files.get(path));budget.put(base+"00_oversize.json",new byte[1_000_001]);int megabytes=graph?15:7;for(int i=0;i<megabytes;i++)budget.put(base+String.format(Locale.ROOT,"a%02d.json",i),large);budget.put(base+"b_partial.json",bytes(" ".repeat(499998)+"{}"));budget.put(base+"c_overflow.json",large);budget.put(base+"z_late.json",bytes("{}"));var p=PackWorkspace.newPack(budget);var pinned=graph?p.captureJigsawReview(ROOT).view(()->false):p.capturePackReferences().view(()->false);
+            // Snapshot selection order differs: jigsaw is root-first; references are fully lexical.
+            if(graph){var s=p.captureJigsawReview(ROOT);check(s.retainedBytes()==15_500_002+files.get(path).length && s.size(base+"c_overflow.json")==1_000_000,"16 MB retention and later-small continuation");rejects(()->s.read(base+"c_overflow.json"));check(s.read(base+"z_late.json").length==2,"late small jigsaw captured");}
+            else{var s=p.capturePackReferences();check(s.retainedBytes()==7_500_002+files.get(path).length && s.size(base+"c_overflow.json")==1_000_000,"8 MB retention and later-small continuation");rejects(()->s.read(base+"c_overflow.json"));check(s.read(base+"z_late.json").length==2,"late small reference source captured");check(PackReferenceAudit.inspect(s.view(()->false)).equals(PackReferenceAudit.inspect(p)),"reference skipped/notice/byte counters preserve direct parity");}
+            var cancelledCalls=new AtomicInteger();cancelled(()->(graph?p.captureJigsawReview(ROOT).view(()->cancelledCalls.incrementAndGet()>=4):p.capturePackReferences().view(()->cancelledCalls.incrementAndGet()>=4)).read(base+"a00.json"));check(cancelledCalls.get()==4,"defensive copy cancels between 64-KiB chunks");cancelled(()->(graph?p.captureJigsawReview(ROOT).view(()->true):p.capturePackReferences().view(()->true)).size(path));Thread.currentThread().interrupt();try{cancelled(pinned::paths);}finally{Thread.interrupted();}
+            var exact=new LinkedHashMap<String,byte[]>();int n=graph?16:8;for(int i=0;i<n+1;i++)exact.put(base+String.format(Locale.ROOT,"p%02d.json",i),large);if(graph){exact.put(ROOT,large);var s=PackWorkspace.newPack(exact).captureJigsawReview(ROOT);check(s.retainedBytes()==16_000_000 && s.retainedFiles()==16 && s.captured(ROOT),"exact root-first 16 MB boundary");}else{var s=PackWorkspace.newPack(exact).capturePackReferences();check(s.retainedBytes()==8_000_000 && s.retainedFiles()==8,"exact reference 8 MB boundary");}
+        }
+        var candidates=new LinkedHashMap<String,byte[]>();candidates.put("biomes/a_oversize.json",new byte[1_000_001]);for(int i=0;i<512;i++)candidates.put("biomes/b"+String.format(Locale.ROOT,"%03d",i)+".json",bytes("{}"));var counted=PackWorkspace.newPack(candidates).capturePackReferences();check(counted.retainedFiles()==511 && counted.size("biomes/a_oversize.json")==1_000_001 && counted.paths().contains("biomes/b511.json"),"oversize consumes reference 512 considered candidates");rejects(()->counted.size("biomes/b511.json"));
+        long chars=files.keySet().stream().mapToLong(String::length).sum();check(JigsawScanSource.pin(files,ROOT,new JigsawScanSource.Limits(1,1000,chars)).paths().equals(files.keySet()) && ReferenceScanSource.pin(files,new ReferenceScanSource.Limits(1,1000,chars)).paths().equals(files.keySet()),"full catalog exact character boundary");rejects(()->JigsawScanSource.pin(files,ROOT,new JigsawScanSource.Limits(1,1000,chars-1)));rejects(()->ReferenceScanSource.pin(files,new ReferenceScanSource.Limits(1,1000,chars-1)));rejects(()->JigsawScanSource.pin(files,"structures/missing.json"));
+        for(boolean graph:new boolean[]{true,false}){
+            var thread=new AtomicReference<Thread>();var captures=new AtomicInteger();var scans=new AtomicInteger();var caller=Thread.currentThread();
+            try(var review=worker(graph,(view,cancel)->{check(Thread.currentThread()!=caller && Thread.currentThread().isDaemon() && !(view instanceof PackWorkspace),"worker copies/parses detached source");scans.incrementAndGet();return inspect(graph,view,cancel);},current->{check(Thread.currentThread()==caller,"UI metadata capture");return switch(captures.incrementAndGet()){case 1->throw new OutOfMemoryError("injected capture");case 2->null;default->capture(graph,current);};},thread)){
+                for(int n=1;n<=2;n++){var failed=review.refresh(pack);check(failed.phase().equals("FAILED") && failed.result()==null && failed.error().length()<600 && scans.get()==0,"capture OOM/null fail before scan");for(int i=0;i<10;i++)check(review.poll(pack).identity()==failed.identity() && captures.get()==n,"capture failure stable without retry");}
+                review.refresh(pack);check(terminal(review,pack).result().equals(inspect(graph,pack,()->false)) && scans.get()==1 && thread.get().isAlive(),"explicit capture retry same worker");
+            }stopped(thread.get());
+            var attempts=new AtomicInteger();try(var review=worker(graph,(view,cancel)->{if(attempts.incrementAndGet()==1)throw new OutOfMemoryError("injected scanner");return inspect(graph,view,cancel);},current->capture(graph,current),thread)){
+                review.refresh(pack);var failed=terminal(review,pack);check(failed.phase().equals("FAILED") && failed.error().length()<600 && thread.get().isAlive(),"scanner OOM visible, worker survives");for(int i=0;i<10;i++)check(review.poll(pack).identity()==failed.identity() && attempts.get()==1,"scanner never auto retries");review.refresh(pack);check(terminal(review,pack).result().equals(inspect(graph,pack,()->false)) && attempts.get()==2,"explicit scanner retry same worker");
+            }stopped(thread.get());
+            var entered=new CountDownLatch(1);var release=new CountDownLatch(1);attempts.set(0);try(var review=worker(graph,(view,cancel)->{var result=inspect(graph,view,cancel);if(attempts.incrementAndGet()==1){entered.countDown();uninterruptible(release);Thread.currentThread().interrupt();}return result;},current->capture(graph,current),thread)){
+                review.refresh(pack);await(entered);pack.replace(graph?ROOT:BIOME,bytes(graph?"{\"startPool\":\"z_target\"}":"{\"children\":[\"target\"]}"));var latest=review.refresh(pack);release.countDown();var ready=terminal(review,pack);check(ready.phase().equals("READY") && ready.request()==latest.request() && ready.result().equals(inspect(graph,pack,()->false)) && attempts.get()==2,"obsolete interrupt cannot poison newest pending defensive read");
+            }finally{release.countDown();}stopped(thread.get());
+            for(boolean close:new boolean[]{false,true}){
+                var blocked=new CountDownLatch(1);var unlock=new CountDownLatch(1);var flag=new AtomicReference<BooleanSupplier>();var review=worker(graph,(view,cancel)->{var result=inspect(graph,view,cancel);flag.set(cancel);blocked.countDown();uninterruptible(unlock);return result;},current->capture(graph,current),thread);
+                try{review.refresh(pack);await(blocked);review.refresh(pack);long start=System.nanoTime();if(close)review.close();else review.clear();check(System.nanoTime()-start<TimeUnit.SECONDS.toNanos(1) && flag.get().getAsBoolean(),"Clear/close cancel active and pending without joining");check(review.poll(pack).phase().equals(close?"CLOSED":"IDLE"),"no obsolete published result");unlock.countDown();review.close();stopped(thread.get());}finally{unlock.countDown();review.close();}
+            }
+        }
+        var foreignAttempts=new AtomicInteger();var foreignThread=new AtomicReference<Thread>();try(var review=new AsyncJigsawDependencyReview((view,root,cancel)->JigsawDependencyReview.inspect(view,foreignAttempts.incrementAndGet()==1?POOL:root,cancel),r->{var t=new Thread(r);foreignThread.set(t);return t;})){
+            review.refresh(pack,ROOT);long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(review.poll(pack,ROOT).phase()==AsyncJigsawDependencyReview.Phase.SCANNING && System.nanoTime()<until)Thread.sleep(1);check(review.poll(pack,ROOT).phase()==AsyncJigsawDependencyReview.Phase.FAILED && review.poll(pack,ROOT).error().contains("different root"),"foreign root result rejected");
+        }stopped(foreignThread.get());
+        var drafts=new InspectorDrafts();drafts.update("unrelated","saved","typing");pack.save(temp.resolve("pinned-link-save"));var jThread=new AtomicReference<Thread>();var rThread=new AtomicReference<Thread>();try(var graph=worker(true,(v,c)->inspect(true,v,c),p->capture(true,p),jThread);var refs=worker(false,(v,c)->inspect(false,v,c),p->capture(false,p),rThread)){
+            graph.refresh(pack);refs.refresh(pack);var graphReady=terminal(graph,pack);var refsReady=terminal(refs,pack);check(graphReady.phase().equals("READY") && refsReady.phase().equals("READY"),"both reviews ready");long revision=pack.revision();int history=pack.undoCount();pack.save(pack.directory());pack.saveCopy(temp.resolve("pinned-link-copy"));pack.saveAs(temp.resolve("pinned-link-as"));pack.exportZip(temp.resolve("pinned-link.zip"));check(graph.poll(pack).identity()==graphReady.identity() && refs.poll(pack).identity()==refsReady.identity() && pack.revision()==revision && pack.undoCount()==history && drafts.any(),"all Save modes retain reports/drafts/history");for(var reopened:List.of(PackWorkspace.open(temp.resolve("pinned-link-copy")),PackWorkspace.open(temp.resolve("pinned-link-as")),PackWorkspace.importZip(temp.resolve("pinned-link.zip"))))for(String path:pack.paths())check(Arrays.equals(pack.read(path),reopened.read(path)),"exact raw-long/unknown/opaque persistence");
+        }stopped(jThread.get());stopped(rThread.get());
+        System.out.println("PASS: UI-copy-free pinned jigsaw and pack-reference review sources, detached immutable ownership and original direct/legacy report parity, root-first 4096-file/16-MB jigsaw coverage and explicit omitted-source worker markers, reference 512-candidate/8-MB skip-and-continue budgets, 1-MB/file and exact target presence without binary reads, cancellable defensive worker copies, stable capture/scanner OOM/null/foreign-root failures with explicit retry, stale-interrupt/latest-pending rejection and nonblocking Clear/close, retained drafts/history and byte-exact Save/Copy/As/ZIP; unsupported previews remain disabled");
+    }
+}

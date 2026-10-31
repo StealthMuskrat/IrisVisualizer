@@ -14,6 +14,8 @@ import java.util.function.BooleanSupplier;
 public final class JigsawDependencyReview {
     public static final int MAX_NODES=512,MAX_JSON_FILES=256,MAX_EDGES=4096,MAX_NOTICES=128,MAX_RESULTS=ReviewPagination.PAGE_SIZE,MAX_QUERY_CHARACTERS=256;
     public static final long MAX_BYTES=8_000_000;
+    /** Bounded snapshots distinguish present targets whose outgoing JSON was not retained. */
+    interface CapturedSource extends PackResourceView { boolean captured(String path); }
     public enum Status { INSPECTED, UNAVAILABLE, OBJECT_PRESENT, SKIPPED }
     public enum Scope {
         ALL("All recorded links"), OUTGOING("From current selection"), INCOMING("To current selection");
@@ -77,7 +79,7 @@ public final class JigsawDependencyReview {
             else if (files>=limits.files()) { status=Status.SKIPPED;scan.notice(path,"JSON file budget reached; outgoing dependencies are unknown."); }
             else if (workspace.size(path)>ReferenceDiagnostics.MAX_JSON_BYTES) { status=Status.SKIPPED;scan.notice(path,"Above the 1 MB JSON limit; outgoing dependencies are unknown."); }
             else if (workspace.size(path)>limits.bytes()-bytes) { status=Status.SKIPPED;scan.notice(path,"Total JSON byte budget reached; outgoing dependencies are unknown."); }
-            else if (workspace instanceof JigsawScanSource source && !source.captured(path)) { status=Status.SKIPPED;scan.notice(path,"JSON was not copied within the snapshot limits (4,096 files / 16 MB; root first, then lexical order); outgoing dependencies are unknown."); }
+            else if (workspace instanceof CapturedSource source && !source.captured(path)) { status=Status.SKIPPED;scan.notice(path,"JSON was not retained within the snapshot limits (4,096 files / 16 MB; root first, then lexical order); outgoing dependencies are unknown."); }
             else {
                 files++;bytes+=workspace.size(path);status=Status.INSPECTED;
                 String base=ResourceTypes.base(path);

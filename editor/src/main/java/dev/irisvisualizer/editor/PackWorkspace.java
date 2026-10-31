@@ -76,6 +76,9 @@ public final class PackWorkspace implements PackResourceView {
     }
     /** Bounded definition snapshots pin owned arrays; metadata only is copied on the UI thread. */
     DefinitionAuditSource captureDefinitionAudit(DefinitionAuditSource.Family family) { return DefinitionAuditSource.pin(files,family); }
+    /** Bounded worker sources borrow only private immutable applied arrays; UI capture copies metadata. */
+    JigsawScanSource captureJigsawReview(String root) { return JigsawScanSource.pin(files,root); }
+    ReferenceScanSource capturePackReferences() { return ReferenceScanSource.pin(files); }
     /** Piece-theme snapshots pin only eligible owned JSON arrays within the original scan budgets. */
     ThemeReferenceSource captureThemeReferences() { return ThemeReferenceSource.pin(files); }
     /** Selected JSON bytes are immutable by ownership; only path metadata is copied on the UI thread. */

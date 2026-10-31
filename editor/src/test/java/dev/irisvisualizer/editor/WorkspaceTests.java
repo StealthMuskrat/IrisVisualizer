@@ -137,6 +137,7 @@ public final class WorkspaceTests {
    AsyncPackReferenceReviewTests.run(temp);
    JigsawDependencyReviewTests.run(temp);
    AsyncJigsawDependencyReviewTests.run(temp);
+   PinnedLinkReviewTests.run(temp);
    AsyncDefinitionAuditTests.run(temp);
    PinnedDefinitionAuditTests.run(temp);
    DefinitionAuditReviewTests.run(temp);
