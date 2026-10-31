@@ -76,6 +76,8 @@ public final class PackWorkspace implements PackResourceView {
     }
     /** Bounded definition snapshots pin owned arrays; metadata only is copied on the UI thread. */
     DefinitionAuditSource captureDefinitionAudit(DefinitionAuditSource.Family family) { return DefinitionAuditSource.pin(files,family); }
+    /** Search membership is frozen from the current changed set; the source retains neither it nor this workspace. */
+    TextSearchSource captureTextSearch(WorkspaceTextSearch.Query query) { return TextSearchSource.pin(files,query,changed::contains); }
     /** Bounded worker sources borrow only private immutable applied arrays; UI capture copies metadata. */
     JigsawScanSource captureJigsawReview(String root) { return JigsawScanSource.pin(files,root); }
     ReferenceScanSource capturePackReferences() { return ReferenceScanSource.pin(files); }

@@ -7072,7 +7072,7 @@ public final class EditorApp extends Application {
                 }
             }
         }
-        ImGui.textWrapped("Limits: 1 MiB/file, 16 MiB captured JSON, 4,096 considered files, 200 excerpts per result page, 256 query characters and 160-character excerpts. The private capture is retained while the search is open; page changes decode/match it on the worker without recapturing the live pack. The search snapshot records up to 100,000 eligible paths / 16 million UTF-16 path characters; narrow the family or changed-files filter if that limit is reached. Cancel/close discards pending work and results. Columns count decoded UTF-16 units. Open selects the resource using the draft guard. Show source match opens read-only context and its containing indexed JSON token when available; it never edits text.");
+        ImGui.textWrapped("Limits: 1 MiB/file, 16 MiB captured JSON, 4,096 considered files, 200 excerpts per result page, 256 query characters and 160-character excerpts. The capture pins immutable applied arrays; defensive copying, decoding and matching run on the worker. Result pages reuse this capture without recapturing the live pack. Failed searches release it and require an explicit retry. The search snapshot records up to 100,000 eligible paths / 16 million UTF-16 path characters; narrow the family or changed-files filter if that limit is reached. Cancel/close discards pending work and results. Columns count decoded UTF-16 units. Open selects the resource using the draft guard. Show source match opens read-only context and its containing indexed JSON token when available; it never edits text.");
         ImGui.end();
     }
     private static int pickerStep() {

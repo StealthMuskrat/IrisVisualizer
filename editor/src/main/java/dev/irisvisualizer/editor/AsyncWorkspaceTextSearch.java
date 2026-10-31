@@ -14,10 +14,12 @@ public final class AsyncWorkspaceTextSearch implements AutoCloseable {
     }
     @FunctionalInterface interface Searcher { WorkspaceTextSearch.Result search(PackResourceView source,WorkspaceTextSearch.Query query,BooleanSupplier cancelled); }
     @FunctionalInterface interface PagedSearcher { WorkspaceTextSearch.Page search(PackResourceView source,WorkspaceTextSearch.Query query,int page,BooleanSupplier cancelled); }
+    @FunctionalInterface interface Capture { TextSearchSource capture(PackWorkspace workspace,WorkspaceTextSearch.Query query); }
     private record Job(long request,WorkspaceTextSearch.Query query,TextSearchSource source,int page,AtomicBoolean cancelled) {}
     private record Outcome(long request,WorkspaceTextSearch.Page page,String error) {}
     private final Object lock=new Object();
     private final PagedSearcher searcher;
+    private final Capture capture;
     private TextSearchSource captured;
     private final Thread worker;
     private PackWorkspace workspace;
@@ -40,7 +42,10 @@ public final class AsyncWorkspaceTextSearch implements AutoCloseable {
         };
     }
     AsyncWorkspaceTextSearch(PagedSearcher searcher,ThreadFactory threads) {
-        this.searcher=Objects.requireNonNull(searcher);worker=Objects.requireNonNull(threads).newThread(this::run);
+        this(searcher,threads,PackWorkspace::captureTextSearch);
+    }
+    AsyncWorkspaceTextSearch(PagedSearcher searcher,ThreadFactory threads,Capture capture) {
+        this.searcher=Objects.requireNonNull(searcher);this.capture=Objects.requireNonNull(capture);worker=Objects.requireNonNull(threads).newThread(this::run);
         if (worker==null) throw new IllegalArgumentException("Text search worker factory returned no thread");worker.setDaemon(true);worker.start();
     }
     private void invalidate() {
@@ -48,7 +53,7 @@ public final class AsyncWorkspaceTextSearch implements AutoCloseable {
     }
     public Snapshot select(PackWorkspace current,WorkspaceTextSearch.Query selected) { return select(current,selected,false); }
     public Snapshot retry(PackWorkspace current,WorkspaceTextSearch.Query selected) { return select(current,selected,true); }
-    /** Capture is bounded UI-thread copying; decoding/matching runs only on the worker. */
+    /** UI capture pins bounded immutable arrays; defensive copying/decoding/matching run only on the worker. */
     private Snapshot select(PackWorkspace current,WorkspaceTextSearch.Query selected,boolean force) {
         Objects.requireNonNull(current);Objects.requireNonNull(selected);long request;
         synchronized (lock) {
@@ -57,11 +62,13 @@ public final class AsyncWorkspaceTextSearch implements AutoCloseable {
             invalidate();workspace=current;query=selected;revision=current.revision();saveRevision=current.saveRevision();request=generation;snapshot=new Snapshot(request,selected,Phase.SEARCHING,null,null);
         }
         TextSearchSource source;
-        try { source=TextSearchSource.capture(current,selected); }
-        catch (Exception failure) {
-            synchronized (lock) { if (!closed && request==generation) snapshot=new Snapshot(request,selected,Phase.FAILED,null,error(failure));return snapshot; }
-        }
+        try { source=Objects.requireNonNull(capture.capture(current,selected),"Text search capture returned no source"); }
+        catch (OutOfMemoryError exhausted) { return captureFailed(request,selected,"Not enough memory to capture text-search metadata; clear the search and retry explicitly."); }
+        catch (Exception failure) { return captureFailed(request,selected,error(failure)); }
         synchronized (lock) { if (!closed && request==generation) { captured=source;pending=new Job(request,selected,source,0,new AtomicBoolean());lock.notifyAll(); }return snapshot; }
+    }
+    private Snapshot captureFailed(long request,WorkspaceTextSearch.Query selected,String detail) {
+        synchronized(lock){if(!closed && request==generation)snapshot=new Snapshot(request,selected,Phase.FAILED,null,detail);return snapshot;}
     }
     /** Page changes reuse the private capture; only matching/decoding runs again, on the same daemon worker. */
     public Snapshot page(PackWorkspace current,WorkspaceTextSearch.Query selected,int requested) {
@@ -89,7 +96,7 @@ public final class AsyncWorkspaceTextSearch implements AutoCloseable {
     public Snapshot poll() { synchronized (lock) { return pollLocked(); } }
     private Snapshot pollLocked() {
         if (completed!=null && completed.request()==generation && snapshot.phase()==Phase.SEARCHING) {
-            var result=completed.page();snapshot=new Snapshot(generation,query,completed.error()==null ? Phase.READY : Phase.FAILED,result==null ? null : result.result(),completed.error(),result==null ? null : result.window());completed=null;
+            var result=completed.page();if(completed.error()!=null)captured=null;snapshot=new Snapshot(generation,query,completed.error()==null ? Phase.READY : Phase.FAILED,result==null ? null : result.result(),completed.error(),result==null ? null : result.window());completed=null;
         }
         return snapshot;
     }
@@ -103,14 +110,17 @@ public final class AsyncWorkspaceTextSearch implements AutoCloseable {
         while (true) {
             Job job;
             synchronized (lock) {
+                Thread.interrupted();
                 while (!closed && pending==null) try { lock.wait(); } catch (InterruptedException interrupted) { if (closed) return; }
                 if (closed) return;active=job=pending;pending=null;
             }
             Outcome outcome;
-            try { outcome=new Outcome(job.request(),Objects.requireNonNull(searcher.search(job.source(),job.query(),job.page(),job.cancelled()::get),"Text searcher returned no result"),null); }
+            try { outcome=new Outcome(job.request(),Objects.requireNonNull(searcher.search(job.source().view(job.cancelled()::get),job.query(),job.page(),job.cancelled()::get),"Text searcher returned no result"),null); }
             catch (CancellationException cancelled) { outcome=new Outcome(job.request(),null,"Text search cancelled; search again to retry"); }
+            catch (OutOfMemoryError exhausted) { outcome=new Outcome(job.request(),null,"Not enough memory to search JSON source; clear the search and retry explicitly."); }
             catch (Exception failure) { outcome=new Outcome(job.request(),null,error(failure)); }
             synchronized (lock) { active=null;if (!closed && !job.cancelled().get() && job.request()==generation) completed=outcome; }
+            job=null;outcome=null;
         }
     }
     @Override public void close() {
