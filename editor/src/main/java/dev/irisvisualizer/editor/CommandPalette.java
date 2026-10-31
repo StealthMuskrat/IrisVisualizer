@@ -50,7 +50,8 @@ public final class CommandPalette {
         entry(EditorCommands.Action.REVIEW_ASSET_IMPORT,"Review: Captured asset import","Review an existing captured single-asset import.","image object"),
         entry(EditorCommands.Action.REVIEW_ASSET_BATCH,"Review: Captured asset batch","Review an existing captured batch import.","image object"),
         entry(EditorCommands.Action.REVIEW_ASSET_REPLACEMENT,"Review: Captured asset replacement","Review an existing captured asset replacement.","image object"),
-        entry(EditorCommands.Action.REVIEW_RESOURCE_ADDITION,"Review: Create / duplicate resource","Review a new definition or byte-exact duplicate before applying it in memory.","new template copy history")
+        entry(EditorCommands.Action.REVIEW_RESOURCE_ADDITION,"Review: Create / duplicate resource","Review a new definition or byte-exact duplicate before applying it in memory.","new template copy history"),
+        entry(EditorCommands.Action.REVIEW_FOLDER_OPERATION,"Review: Empty-folder operation","Review folder creation, rename, move or deletion before applying it in memory.","directory history")
     );
     public static List<Entry> entries() { return ENTRIES; }
     public static List<Entry> search(String query) {
