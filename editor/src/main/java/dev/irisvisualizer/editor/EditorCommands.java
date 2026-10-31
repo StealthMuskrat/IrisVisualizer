@@ -8,7 +8,7 @@ import java.util.Set;
 public final class EditorCommands {
     public enum Action {
         NEW("New"),OPEN("Open"),SAVE("Save"),SAVE_AS("Save As"),SAVE_COPY("Save Copy"),IMPORT("Import"),EXPORT("Export"),
-        UNDO(null),REDO(null),QUICK_OPEN(null),SEARCH_TEXT(null),BACK(null),FORWARD(null),CLOSE(null);
+        UNDO(null),REDO(null),QUICK_OPEN(null),SEARCH_TEXT(null),BACK(null),FORWARD(null),PALETTE(null),INSPECT_JSON(null),REVIEW_CHANGES(null),REVIEW_HISTORY(null),REVIEW_LOAD(null),REVIEW_SAVE_AS(null),REVIEW_COPY(null),REVIEW_EXPORT(null),REVIEW_LINKS(null),REVIEW_JIGSAW(null),REVIEW_THEMES(null),REVIEW_ASSET_IMPORT(null),REVIEW_ASSET_BATCH(null),REVIEW_ASSET_REPLACEMENT(null),CLOSE(null);
         private final String fileAction;
         Action(String fileAction){this.fileAction=fileAction;}
         public String fileAction(){return fileAction;}
@@ -28,6 +28,7 @@ public final class EditorCommands {
             new Binding(Action.IMPORT,Key.I,true,true,false,true,"Ctrl+Shift+I"),
             new Binding(Action.EXPORT,Key.E,true,true,false,true,"Ctrl+Shift+E"),
             new Binding(Action.QUICK_OPEN,Key.P,true,false,false,true,"Ctrl+P"),
+            new Binding(Action.PALETTE,Key.P,true,true,false,true,"Ctrl+Shift+P"),
             new Binding(Action.SEARCH_TEXT,Key.F,true,true,false,true,"Ctrl+Shift+F"),
             new Binding(Action.UNDO,Key.Z,true,false,false,false,"Ctrl+Z"),
             new Binding(Action.REDO,Key.Y,true,false,false,false,"Ctrl+Y"),
@@ -41,6 +42,10 @@ public final class EditorCommands {
         for(var binding:BINDINGS)if(input.ctrl()==binding.ctrl() && input.shift()==binding.shift() && input.alt()==binding.alt()
                 && (!input.editing() || binding.editingAllowed()) && input.pressed().contains(binding.key()))return binding.action();
         return null;
+    }
+    /** An open palette owns global shortcuts through its dismissal/dispatch frame. */
+    public static Action shortcut(Input input,boolean paletteOpen) {
+        Action action=shortcut(input);return paletteOpen && action!=Action.PALETTE ? null : action;
     }
     public static final class Queue {
         private record Pending(PackWorkspace owner,Action action,Origin origin) {}
