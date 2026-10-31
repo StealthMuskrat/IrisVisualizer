@@ -121,6 +121,7 @@ public final class WorkspaceTests {
         CommandPaletteTests.run(temp);
         ReviewPaginationTests.run(temp);
         LinkReviewPaginationTests.run(temp);
+        PagedTextSearchTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);
