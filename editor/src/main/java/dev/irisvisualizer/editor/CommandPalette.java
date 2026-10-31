@@ -20,7 +20,7 @@ public final class CommandPalette {
                 case BACK->context.back() ? null : "No earlier resource location";
                 case FORWARD->context.forward() ? null : "No later resource location";
                 case INSPECT_JSON->context.json() ? null : "Select a supported JSON resource";
-                case INSPECT_BYTES->context.file() ? null : "Select an existing resource";
+                case INSPECT_BYTES,COMPARE_DISK_FILE->context.file() ? null : "Select an existing resource";
                 default->null;
             };
         }
@@ -42,6 +42,7 @@ public final class CommandPalette {
         entry(EditorCommands.Action.FORWARD,"Navigate: Forward","Visit the next resource using the draft guard.","history next"),
         entry(EditorCommands.Action.INSPECT_JSON,"Inspect: Selected JSON structure","Inspect read-only JSON tokens in the selected resource.","source tree"),
         entry(EditorCommands.Action.INSPECT_BYTES,"Inspect: Applied file bytes","Inspect read-only hexadecimal and ASCII pages with a background SHA-256 digest.","binary object image raw encoded"),
+        entry(EditorCommands.Action.COMPARE_DISK_FILE,"Review: Disk / applied file comparison","Compare a captured disk source with applied bytes; Save remains independent.","diff external conflict source"),
         entry(EditorCommands.Action.REVIEW_CHANGES,"Review: Pending changes","Review applied file and folder changes and advisory disk checks.","dirty save disk"),
         entry(EditorCommands.Action.REVIEW_HISTORY,"Review: Applied edits","Review retained in-memory Undo/Redo history.","timeline"),
         entry(EditorCommands.Action.REVIEW_LOAD,"Review: Open / Import progress","Review the background pack load and guarded candidate opening.","folder zip"),

@@ -74,6 +74,11 @@ public final class PackWorkspace implements PackResourceView {
     ByteInspection.Source captureByteInspection(String path) throws IOException {
         if(path==null || !files.containsKey(path))throw new IOException("Choose an existing resource to inspect");byte[] data=files.get(path);return new ByteInspection.Source(path,data);
     }
+    /** Private immutable applied bytes and a tiny baseline fingerprint; worker never receives the live workspace. */
+    FileComparison.Source captureFileComparison(String path) throws IOException {
+        if(path==null || !files.containsKey(path))throw new IOException("Choose an existing resource to compare");
+        return new FileComparison.Source(directory,path,files.get(path),savedHashes.get(path),created.contains(path));
+    }
     private record AssetPlan(AssetImports.Source source,String target,long budget) {}
     private AssetPlan planAssetImport(Path source,String key,long maximumBytes) throws IOException {
         if (key==null) throw new IOException("Choose a resource key");
