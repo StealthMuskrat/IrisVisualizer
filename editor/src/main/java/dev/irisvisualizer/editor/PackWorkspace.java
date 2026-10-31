@@ -76,6 +76,8 @@ public final class PackWorkspace implements PackResourceView {
     }
     /** Bounded definition snapshots pin owned arrays; metadata only is copied on the UI thread. */
     DefinitionAuditSource captureDefinitionAudit(DefinitionAuditSource.Family family) { return DefinitionAuditSource.pin(files,family); }
+    /** Piece-theme snapshots pin only eligible owned JSON arrays within the original scan budgets. */
+    ThemeReferenceSource captureThemeReferences() { return ThemeReferenceSource.pin(files); }
     /** Selected JSON bytes are immutable by ownership; only path metadata is copied on the UI thread. */
     ReferenceInspection.Source captureReferenceInspection(String path) throws IOException {
         if(path==null || !files.containsKey(path) || !ReferenceDiagnostics.supports(path))throw new IOException("Choose a supported existing JSON resource to inspect links");

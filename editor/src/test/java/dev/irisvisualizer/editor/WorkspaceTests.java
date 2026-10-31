@@ -156,6 +156,7 @@ public final class WorkspaceTests {
    JigsawConnectorTests.run(temp);
    StructureThemeReferenceTests.run(temp);
    AsyncStructureThemeReviewTests.run(temp);
+   PinnedThemeReferenceTests.run(temp);
    AssetReplacementTests.run(temp);
    StagedAssetImportTests.run(temp);
    AssetBatchImportTests.run(temp);
