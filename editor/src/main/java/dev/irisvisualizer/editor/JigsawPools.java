@@ -49,14 +49,16 @@ public final class JigsawPools {
     private static void reference(PackWorkspace workspace,String family,String key) { if (!referenceKey(key) || !workspace.paths().contains(family+"/"+key+".json")) throw new IllegalArgumentException("Choose an exact existing "+family+" JSON key; file contents are unchecked"); }
     public record Matches(int count,List<String> keys) { public Matches { keys=List.copyOf(keys); } }
     public static final class Catalog {
-        private PackWorkspace workspace;private long revision=-1;private final HashMap<String,List<String>> catalogs=new HashMap<>();
-        public void clear() { workspace=null;revision=-1;catalogs.clear(); }
-        public Matches filter(PackWorkspace current,String family,String query) {
-            if (!("jigsaw-pools".equals(family) || "jigsaw-pieces".equals(family))) throw new IllegalArgumentException("Select a pool or piece catalog");
-            java.util.Objects.requireNonNull(current);if (query==null || query.length()>MAX_KEY_CHARACTERS || query.chars().anyMatch(Character::isISOControl)) throw new IllegalArgumentException("Use up to 256 filter characters without controls");
-            if (workspace!=current || revision!=current.resourceRevision()) { clear();workspace=current;revision=current.resourceRevision(); }
-            var keys=catalogs.computeIfAbsent(family,f -> references(current,f));String term=query.strip().toLowerCase(Locale.ROOT);int count=0;var found=new ArrayList<String>();for (String key : keys) if (key.toLowerCase(Locale.ROOT).contains(term)) { count++;if (found.size()<MAX_RESULTS) found.add(key); }return new Matches(count,found);
+        private PackWorkspace workspace;private long revision=-1;private final HashMap<String,ReferenceChoices.Catalog> catalogs=new HashMap<>();
+        public void clear(){workspace=null;revision=-1;catalogs.clear();}
+        public ReferenceChoices.Catalog catalog(PackWorkspace current,String family){
+            if(!("jigsaw-pools".equals(family) || "jigsaw-pieces".equals(family)))throw new IllegalArgumentException("Select a pool or piece catalog");java.util.Objects.requireNonNull(current);
+            if(workspace!=current || revision!=current.resourceRevision()){clear();workspace=current;revision=current.resourceRevision();}
+            return catalogs.computeIfAbsent(family,f->new ReferenceChoices.Catalog(references(current,f)));
         }
+        public ReviewPagination.Page<String> page(PackWorkspace current,String family,String query,int requested){ReferenceChoices.query(query);return catalog(current,family).page(query,requested);}
+        /** Compatibility first-page view; exact keys and original ordering are unchanged. */
+        public Matches filter(PackWorkspace current,String family,String query){var page=page(current,family,query,0);return new Matches(page.window().matches(),page.entries());}
     }
     public static byte[] setFallback(String path,byte[] raw,String key,PackWorkspace workspace) {
         authorize(path);if (key==null) throw new IllegalArgumentException("Choose a fallback key or explicit empty fallback");if (!key.isEmpty()) reference(workspace,"jigsaw-pools",key);var root=new LosslessJson(raw);String old=fallback(root);return old.equals(key) && root.token("fallback")!=null && !root.token("fallback").equals("null") ? raw.clone() : root.token("fallback")==null ? root.enableStringPath("fallback",key) : root.nullableString("fallback",key);
