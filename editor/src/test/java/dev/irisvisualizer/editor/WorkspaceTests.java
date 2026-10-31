@@ -123,6 +123,7 @@ public final class WorkspaceTests {
         LinkReviewPaginationTests.run(temp);
         PagedTextSearchTests.run(temp);
         ImageStatisticsTests.run(temp);
+        ReviewedResourceAdditionTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);
