@@ -1,0 +1,68 @@
+package dev.irisvisualizer.editor;
+
+import java.nio.file.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+
+final class ImageStatisticsTests {
+    private static void check(boolean value,String reason) { if(!value)throw new AssertionError("Image statistics: "+reason); }
+    private static void near(double actual,double expected) { check(Math.abs(actual-expected)<0.000001,"exact projection/mean: "+actual+" / "+expected); }
+    private static void rejected(Runnable action) { try { action.run(); }catch(IllegalArgumentException|IllegalStateException|NullPointerException expected) { return; }throw new AssertionError("Expected invalid image statistics input"); }
+    private static ImageStatistics.Result analyze(AssetImage.Decoded image,ImageStatistics.Region region) { return ImageStatistics.analyze(image,region,()->false,pixels->{}); }
+    private static AsyncImageStatistics.Snapshot ready(AsyncImageStatistics worker,AssetImage.Decoded image)throws Exception {
+        long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);AsyncImageStatistics.Snapshot state;
+        while((state=worker.poll(image)).phase()==AsyncImageStatistics.Phase.ANALYZING && System.nanoTime()<end)Thread.sleep(1);
+        check(state.phase()==AsyncImageStatistics.Phase.READY,"worker completes: "+state.phase()+" / "+state.error());return state;
+    }
+    private static void await(CountDownLatch latch)throws Exception { check(latch.await(10,TimeUnit.SECONDS),"gate reached"); }
+    private static void uninterruptible(CountDownLatch latch) { boolean done=false;while(!done)try { done=latch.await(10,TimeUnit.SECONDS);if(!done)throw new AssertionError("Gate timed out"); }catch(InterruptedException ignored) {} }
+    static void run(Path temp)throws Exception {
+        byte[] pixels={10,20,30,0, 40,50,60,-128, 70,80,90,-1, 100,110,120,-1};
+        var image=new AssetImage.Decoded(2,2,pixels);pixels[0]=0;var whole=ImageStatistics.Region.whole(image);var result=analyze(image,whole);
+        check(result.region().equals(new ImageStatistics.Region(0,0,2,2)) && result.transparent()==1 && result.partial()==1 && result.opaque()==2,"alpha population includes transparent RGB values");
+        for(int channel=0;channel<3;channel++) { var stats=result.channels().get(channel);check(stats.minimum()==10+channel*10 && stats.maximum()==100+channel*10 && stats.sum()==220+channel*40 && stats.samples()==4,"exact RGB ranges and sums");near(stats.mean(),55+channel*10);for(int value=0;value<256;value++)check(stats.count(value)==((value>=10+channel*10 && value<=100+channel*10 && (value-(10+channel*10))%30==0) ? 1 : 0),"all 256 bin counts"); }
+        var alpha=result.channels().get(3);check(alpha.count(0)==1 && alpha.count(128)==1 && alpha.count(255)==2 && alpha.sum()==638,"alpha histogram and exact sum");near(alpha.mean(),159.5);
+        var bins=alpha.bins();bins[0]=99;var plot=alpha.plot();plot[0]=99;check(alpha.count(0)==1 && alpha.plot()[0]==1,"histogram and display arrays are defensive");
+        try { result.channels().clear();throw new AssertionError(); }catch(UnsupportedOperationException expected) {}
+        var row=analyze(image,new ImageStatistics.Region(0,1,2,1));check(row.transparent()==0 && row.opaque()==2 && row.channels().get(0).sum()==170,"subregion excludes other rows");
+        var one=analyze(image,new ImageStatistics.Region(1,0,1,1));check(one.partial()==1 && one.channels().get(0).minimum()==40 && one.channels().get(0).maximum()==40,"single-pixel exact statistics");
+        var reversed=ImageStatistics.Region.between(new ImageViewport.Pixel(1,1),new ImageViewport.Pixel(0,0),2,2);check(reversed.equals(whole) && ImageStatistics.Region.between(new ImageViewport.Pixel(0,1),new ImageViewport.Pixel(0,1),2,2).pixels()==1,"drag endpoints are inclusive and direction-independent");
+        rejected(()->new ImageStatistics.Region(-1,0,1,1));rejected(()->new ImageStatistics.Region(0,0,0,1));rejected(()->analyze(image,new ImageStatistics.Region(Integer.MAX_VALUE,0,Integer.MAX_VALUE,1)));rejected(()->analyze(image,new ImageStatistics.Region(1,1,2,2)));
+        rejected(()->ImageStatistics.Region.between(new ImageViewport.Pixel(2,1),new ImageViewport.Pixel(0,0),2,2));rejected(()->ImageStatistics.Region.between(null,new ImageViewport.Pixel(0,0),2,2));rejected(()->alpha.count(256));rejected(()->alpha.count(-1));
+        var badBins=new long[256];badBins[0]=1;rejected(()->new ImageStatistics.Channel(0,0,1,1,badBins));badBins[0]=-1;rejected(()->new ImageStatistics.Channel(0,0,0,1,badBins));
+        rejected(()->new ImageStatistics.Result(whole,result.channels(),Long.MAX_VALUE,1,0));rejected(()->new ImageStatistics.Result(new ImageStatistics.Region(0,0,1,1),result.channels(),0,0,1));
+        // Projection uses pixel edges, respects letterboxing and clips exactly when zoom/pan hides the selection.
+        var viewport=new ImageViewport(2,2);viewport.resize(100,100);var bounds=viewport.regionBounds(whole);near(bounds.left(),49);near(bounds.top(),49);near(bounds.right(),51);near(bounds.bottom(),51);
+        viewport.zoom(32);bounds=viewport.regionBounds(new ImageStatistics.Region(1,0,1,1));near(bounds.left(),50);near(bounds.top(),18);near(bounds.right(),82);near(bounds.bottom(),50);
+        var clipped=new ImageViewport(100,100);clipped.resize(10,10);clipped.actualSize();check(clipped.regionBounds(new ImageStatistics.Region(0,0,1,1))==null,"off-screen source region has no visible overlay");
+        bounds=clipped.regionBounds(new ImageStatistics.Region(40,40,20,20));near(bounds.left(),0);near(bounds.top(),0);near(bounds.right(),10);near(bounds.bottom(),10);rejected(()->clipped.regionBounds(new ImageStatistics.Region(99,99,2,1)));
+        // Full supported raster bounds use exact long accounting and bounded 4x256 bins, not pixel-sized outputs.
+        byte[] full=new byte[2048*2048*4];Arrays.fill(full,(byte)255);var maximum=new AssetImage.Decoded(2048,2048,full);var progress=new AtomicLong();var max=ImageStatistics.analyze(maximum,ImageStatistics.Region.whole(maximum),()->false,value->{check(value>progress.get(),"monotonic row progress");progress.set(value);});
+        check(max.opaque()==AssetImage.MAX_PIXELS && max.channels().get(0).sum()==255*AssetImage.MAX_PIXELS && max.channels().get(3).count(255)==AssetImage.MAX_PIXELS && progress.get()==AssetImage.MAX_PIXELS,"four-megapixel exact sums/counts");
+        var cancel=new AtomicBoolean();try { ImageStatistics.analyze(maximum,ImageStatistics.Region.whole(maximum),cancel::get,value->cancel.set(true));throw new AssertionError(); }catch(CancellationException expected) {}
+        try { ImageStatistics.analyze(image,whole,()->true,value->{});throw new AssertionError(); }catch(CancellationException expected) {}
+        // Active region A + waiting B + latest C: A,C only; no workspace, pixel copies or GPU enter the worker.
+        var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var active=new AtomicInteger();var high=new AtomicInteger();var calls=Collections.synchronizedList(new ArrayList<ImageStatistics.Region>());var caller=Thread.currentThread();var first=whole;var skipped=new ImageStatistics.Region(0,0,1,1);var latest=new ImageStatistics.Region(1,1,1,1);
+        try(var worker=new AsyncImageStatistics((source,region,cancelled,update)->{check(Thread.currentThread()!=caller && Thread.currentThread().isDaemon() && source==image,"immutable decoded object shared off-UI without copying or workspace access");calls.add(region);high.accumulateAndGet(active.incrementAndGet(),Math::max);try{if(region.equals(first)){entered.countDown();uninterruptible(release);}return ImageStatistics.analyze(source,region,()->false,update);}finally{active.decrementAndGet();}},r->new Thread(r,"image-statistics-latest-test"))) {
+            worker.start(image,first);await(entered);worker.start(image,skipped);var pending=worker.start(image,latest);rejected(()->worker.start(image,new ImageStatistics.Region(2,0,1,1)));check(worker.poll(image).request()==pending.request(),"invalid region retains accepted pending work");
+            release.countDown();var completed=ready(worker,image);check(completed.result().region().equals(latest) && calls.equals(List.of(first,latest)) && high.get()==1,"latest pending region and stale result rejection");check(worker.poll(image)==completed,"unchanged image/selection retains receipt without analysis");
+            var foreign=new AssetImage.Decoded(2,2,image.rgba());check(worker.poll(foreign).phase()==AsyncImageStatistics.Phase.IDLE && worker.poll(image).result()==null,"equal-pixel foreign decoded identity cannot reuse receipt");worker.start(image,skipped);ready(worker,image);worker.clear();check(worker.poll(image).phase()==AsyncImageStatistics.Phase.IDLE,"clear does not auto-analyze");
+        }finally{release.countDown();}
+        for(int mode=0;mode<3;mode++) {
+            var started=new CountDownLatch(1);var finish=new CountDownLatch(1);var thread=new AtomicReference<Thread>();var cancelled=new AtomicReference<java.util.function.BooleanSupplier>();
+            var worker=new AsyncImageStatistics((source,region,stop,update)->{cancelled.set(stop);started.countDown();uninterruptible(finish);return analyze(source,region);},r->{var t=new Thread(r,"image-statistics-stale-test");thread.set(t);return t;});
+            try { worker.start(image,whole);await(started);long before=System.nanoTime();if(mode==0)worker.poll(null);else if(mode==1)worker.clear();else worker.close();check(System.nanoTime()-before<TimeUnit.SECONDS.toNanos(1) && cancelled.get().getAsBoolean(),"identity/clear/close never waits for noncooperative analysis");finish.countDown();worker.close();thread.get().join(10_000);check(!thread.get().isAlive() && worker.poll(image).phase()==AsyncImageStatistics.Phase.CLOSED && worker.poll(image).result()==null,"noncooperative work cannot publish after invalidation/shutdown"); }
+            finally {finish.countDown();worker.close();}
+        }
+        var attempts=new AtomicInteger();try(var worker=new AsyncImageStatistics((source,region,stop,update)->{if(attempts.incrementAndGet()==1)throw new IllegalArgumentException("bad\n"+"x".repeat(1000));return analyze(source,region);},r->new Thread(r,"image-statistics-error-test"))) {
+            worker.start(image,whole);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(worker.poll(image).phase()==AsyncImageStatistics.Phase.ANALYZING && System.nanoTime()<end)Thread.sleep(1);var failed=worker.poll(image);check(failed.phase()==AsyncImageStatistics.Phase.FAILED && failed.result()==null && !failed.error().contains("\n") && failed.error().length()<=515 && worker.poll(image)==failed && attempts.get()==1,"stable bounded failure without automatic retry");worker.start(image,whole);check(ready(worker,image).result().channels().get(0).sum()==220 && attempts.get()==2,"explicit retry succeeds");
+        }
+        // A real PNG uses the same decoded pixels as hover inspection and survives Save/Copy/As/ZIP byte-exactly.
+        var raster=new java.awt.image.BufferedImage(2,2,java.awt.image.BufferedImage.TYPE_INT_ARGB);raster.setRGB(0,0,0x000a141e);raster.setRGB(1,0,0x8028323c);raster.setRGB(0,1,0xff46505a);raster.setRGB(1,1,0xff646e78);var encoded=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(raster,"png",encoded);var png=AssetImage.decode(encoded.toByteArray());var pngStats=analyze(png,ImageStatistics.Region.whole(png));check(pngStats.channels().get(0).sum()==220 && pngStats.transparent()==1,"PNG decoded hidden color and alpha statistics");
+        var pack=PackWorkspace.newPack(Map.of("images/exact.png",encoded.toByteArray(),"objects/exact.iob",new byte[]{0,-1,5},"future/unknown.json",new byte[]{'{'}));Path root=temp.resolve("image-statistics-save");pack.save(root);var drafts=new InspectorDrafts();drafts.update("late","stored","typing");long revision=pack.revision(),resources=pack.resourceRevision(),saved=pack.saveRevision();var history=pack.historySteps(false);
+        try(var worker=new AsyncImageStatistics()) { worker.start(png,ImageStatistics.Region.whole(png));var receipt=ready(worker,png);pack.saveCopy(temp.resolve("image-statistics-copy"));check(worker.poll(png)==receipt,"Save Copy/unrelated workspace operations retain unchanged decoded-image receipt"); }
+        check(pack.revision()==revision && pack.resourceRevision()==resources && pack.saveRevision()==saved && pack.historySteps(false).equals(history) && drafts.any() && !pack.dirty(),"analysis never changes drafts/history/applied/save state");pack.saveAs(temp.resolve("image-statistics-as"));pack.exportZip(temp.resolve("image-statistics.zip"));for(var reopened:List.of(PackWorkspace.open(root),PackWorkspace.open(temp.resolve("image-statistics-copy")),PackWorkspace.open(temp.resolve("image-statistics-as")),PackWorkspace.importZip(temp.resolve("image-statistics.zip"))))for(String path:pack.paths())check(Arrays.equals(pack.read(path),reopened.read(path)),"exact encoded/opaque/unknown bytes survive analysis and persistence");
+        System.out.println("PASS: read-only decoded-image region statistics with exact immutable RGBA8 256-bin/range/sum/mean and transparent/partial/opaque accounting, inclusive reversed/single-pixel and overflow/bounds guards, clipped fit/zoom/pan region projection, four-megapixel totals and cooperative cancellation, off-UI immutable-image identity with one-active/latest-pending and stale noncooperative rejection, stable errors/explicit retry/nonblocking clear/close, unchanged drafts/history/baselines and exact PNG/opaque/unknown Save/Copy/As/ZIP; no image rewrite, native sampling or generation");
+    }
+}

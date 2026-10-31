@@ -93,6 +93,14 @@ public final class EditorApp extends Application {
     private long referenceRevision = -1;
     private List<ReferenceDiagnostics.Link> referenceLinks = List.of();
     private final AsyncAssetImage imageLoader=new AsyncAssetImage();
+    private final AsyncImageStatistics imageStatistics=new AsyncImageStatistics();
+    private boolean showImageStatistics,focusImageStatistics;
+    private ImageStatistics.Region imageRegion;
+    private ImageViewport.Pixel imageRegionStart;
+    private final ImString imageRegionX=new ImString("0",32),imageRegionY=new ImString("0",32),imageRegionWidth=new ImString("1",32),imageRegionHeight=new ImString("1",32);
+    private String imageStatisticsError,imageSourcePath;
+    private PackWorkspace imageOwner;
+    private long imageContentRevision=-1;
     private String imageError;
     private int imageTexture, imageWidth, imageHeight;
     private long imageRequest=-1;
@@ -101,10 +109,10 @@ public final class EditorApp extends Application {
     private ImageViewport imageViewport;
     private void clearImage() {
         if (imageTexture != 0) glDeleteTextures(imageTexture);
-        imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;
+        imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;imageOwner=null;imageSourcePath=null;imageContentRevision=-1;imageRegion=null;imageRegionStart=null;imageStatisticsError=null;imageStatistics.clear();
     }
     @Override protected void disposeImGui() {
-        try { packLoad.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();clearImage(); }
+        try { packLoad.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -117,7 +125,7 @@ public final class EditorApp extends Application {
             glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
             glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,image.width(),image.height(),0,GL_RGBA,GL_UNSIGNED_BYTE,buffer);
             if (glGetTexLevelParameteri(GL_TEXTURE_2D,0,GL_TEXTURE_WIDTH)!=image.width()) throw new IllegalStateException("GPU image allocation failed");
-            imageWidth=image.width();imageHeight=image.height();imageData=image;imageViewport=new ImageViewport(imageWidth,imageHeight);
+            imageWidth=image.width();imageHeight=image.height();imageData=image;imageViewport=new ImageViewport(imageWidth,imageHeight);imageOwner=workspace;imageSourcePath=selected;imageContentRevision=workspace.contentRevision(selected);setImageRegion(ImageStatistics.Region.whole(image));
         } finally {
             glBindTexture(GL_TEXTURE_2D,previous);glPixelStorei(GL_UNPACK_ALIGNMENT,alignment);MemoryUtil.memFree(buffer);
         }
@@ -142,7 +150,8 @@ public final class EditorApp extends Application {
             ImGui.text(imageWidth + " × " + imageHeight + " decoded pixels");
             if (ImGui.button("Fit image")) imageViewport.fit();ImGui.sameLine();if (ImGui.button("1:1 image")) imageViewport.actualSize();
             ImGui.sameLine();if (ImGui.button("Zoom -")) imageViewport.zoom(1/1.25);ImGui.sameLine();if (ImGui.button("Zoom +")) imageViewport.zoom(1.25);
-            ImGui.textWrapped("Wheel: zoom at pointer. Left-drag: pan. Hover: decoded pixel RGBA. Fit never enlarges; 1:1 uses one logical display unit per source pixel.");
+            if(ImGui.button("Inspect decoded pixels")) { showImageStatistics=true;focusImageStatistics=true; }
+            ImGui.textWrapped("Wheel: zoom at pointer. Left-drag: pan. Shift-left-drag: select pixels for statistics. Hover: decoded pixel RGBA. Fit never enlarges; 1:1 uses one logical display unit per source pixel.");
             float availableWidth=Math.max(1,ImGui.getContentRegionAvailX()),availableHeight=Math.max(1,ImGui.getContentRegionAvailY()-ImGui.getTextLineHeightWithSpacing());
             if (ImGui.beginChild("Read-only image canvas",availableWidth,availableHeight,false,ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse)) {
                 float canvasWidth=Math.max(1,ImGui.getContentRegionAvailX()),canvasHeight=Math.max(1,ImGui.getContentRegionAvailY());
@@ -151,8 +160,14 @@ public final class EditorApp extends Application {
                 ImGui.invisibleButton("Image pointer navigation",canvasWidth,canvasHeight);
                 boolean hovered=ImGui.isItemHovered(),active=ImGui.isItemActive();
                 double mouseX=ImGui.getMousePosX()-originX,mouseY=ImGui.getMousePosY()-originY;
-                if (active && ImGui.isMouseDragging(0)) imageViewport.pan(ImGui.getIO().getMouseDeltaX(),ImGui.getIO().getMouseDeltaY());
-                if (hovered && ImGui.getIO().getMouseWheel()!=0) imageViewport.zoom(Math.pow(1.25,Math.max(-8,Math.min(8,ImGui.getIO().getMouseWheel()))),Math.max(0,Math.min(canvasWidth,mouseX)),Math.max(0,Math.min(canvasHeight,mouseY)));
+                if(hovered && ImGui.isMouseClicked(0,false) && ImGui.getIO().getKeyShift()) {
+                    var pixel=imageViewport.pixelAt(mouseX,mouseY);if(pixel!=null) { imageRegionStart=pixel;setImageRegion(ImageStatistics.Region.between(pixel,pixel,imageWidth,imageHeight)); }
+                }
+                if(imageRegionStart!=null) {
+                    if(ImGui.isMouseDown(0)) { var pixel=imageViewport.pixelAt(mouseX,mouseY);if(pixel!=null)setImageRegion(ImageStatistics.Region.between(imageRegionStart,pixel,imageWidth,imageHeight)); }
+                    else { imageRegionStart=null;showImageStatistics=true;focusImageStatistics=true; }
+                } else if (active && ImGui.isMouseDragging(0)) imageViewport.pan(ImGui.getIO().getMouseDeltaX(),ImGui.getIO().getMouseDeltaY());
+                if (imageRegionStart==null && hovered && ImGui.getIO().getMouseWheel()!=0) imageViewport.zoom(Math.pow(1.25,Math.max(-8,Math.min(8,ImGui.getIO().getMouseWheel()))),Math.max(0,Math.min(canvasWidth,mouseX)),Math.max(0,Math.min(canvasHeight,mouseY)));
                 var draw=ImGui.getWindowDrawList();float cell=Math.max(16,(float)Math.ceil(Math.max(canvasWidth,canvasHeight)/32));
                 for (int row=0;row<32 && row*cell<canvasHeight;row++) for (int column=0;column<32 && column*cell<canvasWidth;column++) {
                     int color=(row+column)%2==0 ? 0xffeeeeee : 0xffcccccc;
@@ -160,6 +175,7 @@ public final class EditorApp extends Application {
                 }
                 var view=imageViewport.geometry();
                 draw.addImage((long)imageTexture,originX+(float)view.left(),originY+(float)view.top(),originX+(float)view.right(),originY+(float)view.bottom(),(float)view.u0(),(float)view.v0(),(float)view.u1(),(float)view.v1());
+                if(imageRegion!=null) { var bounds=imageViewport.regionBounds(imageRegion);if(bounds!=null)draw.addRect(originX+(float)bounds.left(),originY+(float)bounds.top(),originX+(float)bounds.right(),originY+(float)bounds.bottom(),0xff00aaff,0,0,2); }
                 if (hovered) {
                     var pixel=imageViewport.pixelAt(mouseX,mouseY);
                     if (pixel!=null) { int argb=imageData.argbAt(pixel.x(),pixel.y());ImGui.setTooltip("Pixel ("+pixel.x()+", "+pixel.y()+")  R "+((argb>>>16)&255)+"  G "+((argb>>>8)&255)+"  B "+(argb&255)+"  A "+(argb>>>24)); }
@@ -168,6 +184,46 @@ public final class EditorApp extends Application {
             ImGui.endChild();
             ImGui.textUnformatted(String.format(java.util.Locale.ROOT,"%.2f%% (%s)",100*imageViewport.scale(),imageViewport.fitting() ? "fit" : "manual"));
         }
+    }
+    private void setImageRegion(ImageStatistics.Region region) {
+        region.validate(imageWidth,imageHeight);if(region.equals(imageRegion))return;imageRegion=region;
+        imageRegionX.set(Integer.toString(region.x()));imageRegionY.set(Integer.toString(region.y()));imageRegionWidth.set(Integer.toString(region.width()));imageRegionHeight.set(Integer.toString(region.height()));imageStatisticsError=null;imageStatistics.clear();
+    }
+    private AssetImage.Decoded currentStatisticsImage() {
+        return imageData!=null && imageOwner==workspace && java.util.Objects.equals(imageSourcePath,selected) && workspace.paths().contains(imageSourcePath) && workspace.contentRevision(imageSourcePath)==imageContentRevision ? imageData : null;
+    }
+    private void drawImageStatistics(AssetImage.Decoded image) {
+        if(focusImageStatistics) { ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusImageStatistics=false; }
+        ImGui.setNextWindowSize(620,680,ImGuiCond.FirstUseEver);
+        if(!ImGui.begin("Decoded image pixel statistics")) { ImGui.end();return; }
+        if(ImGui.button("Hide pixel statistics")) { showImageStatistics=false;ImGui.end();return; }
+        if(image==null) { ImGui.textWrapped("Select a supported image and wait for its decoded view before choosing a pixel region. Previous analysis is invalidated when the selected image changes.");ImGui.end();return; }
+        ImGui.textWrapped(InspectorText.label(imageSourcePath,512));ImGui.textUnformatted(image.width()+" × "+image.height()+" decoded pixels");
+        ImGui.textWrapped("Choose exact zero-based source pixels or Shift-left-drag on the image. Region edges include both drag endpoints. Analyze runs only on request. Counts include RGB values under full transparency and describe decoded RGBA8 bytes before display blending.");
+        ImGui.inputText("Region X",imageRegionX);ImGui.inputText("Region Y",imageRegionY);ImGui.inputText("Region width",imageRegionWidth);ImGui.inputText("Region height",imageRegionHeight);
+        if(ImGui.button("Whole image region"))setImageRegion(ImageStatistics.Region.whole(image));ImGui.sameLine();
+        if(ImGui.button("Analyze entered region")) {
+            try { var region=new ImageStatistics.Region(Integer.parseInt(imageRegionX.get().strip()),Integer.parseInt(imageRegionY.get().strip()),Integer.parseInt(imageRegionWidth.get().strip()),Integer.parseInt(imageRegionHeight.get().strip()));region.validate(image.width(),image.height());setImageRegion(region);imageStatistics.start(image,region);imageStatisticsError=null; }
+            catch(Exception invalid) { imageStatisticsError=InspectorText.label(java.util.Objects.toString(invalid.getMessage(),"Invalid image region"),512); }
+        }
+        ImGui.sameLine();if(ImGui.button("Cancel / clear pixel analysis")) { imageStatistics.clear();imageStatisticsError=null; }
+        if(imageStatisticsError!=null)ImGui.textWrapped(imageStatisticsError);
+        if(imageRegion!=null)ImGui.textUnformatted("Selected: X "+imageRegion.x()+", Y "+imageRegion.y()+", width "+imageRegion.width()+", height "+imageRegion.height()+" ("+imageRegion.pixels()+" pixels)");
+        var state=imageStatistics.poll(image);
+        if(state.phase()==AsyncImageStatistics.Phase.ANALYZING)ImGui.textWrapped("Analyzing decoded pixels in the background: "+state.processed()+" / "+state.region().pixels()+". A new request replaces the waiting region.");
+        else if(state.error()!=null)ImGui.textWrapped(state.error());
+        else if(state.result()==null)ImGui.textWrapped("No current analysis. Analyze the selected region explicitly.");
+        else {
+            var result=state.result();ImGui.textWrapped(result.region().pixels()+" analyzed pixels: "+result.transparent()+" fully transparent; "+result.partial()+" partially transparent; "+result.opaque()+" opaque.");
+            String[] names={"Red","Green","Blue","Alpha"};for(int channel=0;channel<4;channel++) {
+                var stats=result.channels().get(channel);ImGui.pushID(channel);ImGui.textUnformatted(String.format(java.util.Locale.ROOT,"%s: min %d, max %d, mean %.4f",names[channel],stats.minimum(),stats.maximum(),stats.mean()));
+                ImGui.plotHistogram(names[channel]+" value counts",stats.plot(),256,0,"Values 0–255",0,(float)result.region().pixels(),0,80);
+                if(ImGui.treeNode("Exact 256-bin counts")) { for(int bin=0;bin<256;bin++)if(stats.count(bin)>0)ImGui.textUnformatted(bin+": "+stats.count(bin));ImGui.treePop(); }
+                ImGui.popID();
+            }
+        }
+        ImGui.textWrapped("Read-only first-frame image data only. The existing 16 MiB encoded / 4-megapixel image limits apply. No image is rewritten, and no native image-map sampling, terrain or object preview is calculated. Hiding retains unchanged work; Cancel/clear and image changes discard it.");
+        ImGui.end();
     }
     private boolean styled, closeRequested;
     private final ImString filter = new ImString(256);
@@ -545,6 +601,8 @@ public final class EditorApp extends Application {
         if (executeEditorCommand()) return;
         saveAsTransfer.finish(workspace);
         textSearch.poll(workspace); // Release stale captures even while the search window is collapsed.
+        var statisticsImage=currentStatisticsImage();imageStatistics.poll(statisticsImage);
+        if(showImageStatistics)drawImageStatistics(statisticsImage);
         pendingDiskReview.poll(workspace); // All frame edits, history actions and workspace navigation have completed.
     }
     private void drawReferences() {
