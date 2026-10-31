@@ -205,6 +205,9 @@ public final class EditorApp extends Application {
     private WorkspaceChanges.Filter changesFilter=WorkspaceChanges.Filter.ALL;
     private String changesSelected,changesPendingPath;
     private PackWorkspace changesPendingWorkspace;
+    private final ReviewPager referencePages=new ReviewPager(),dependencyPages=new ReviewPager(),visitedPages=new ReviewPager(),routePages=new ReviewPager();
+    private final ReviewPager componentPages=new ReviewPager(),fallbackComponentPages=new ReviewPager(),memberPages=new ReviewPager(),fallbackMemberPages=new ReviewPager();
+    private int selectedComponent=-1,selectedFallbackComponent=-1;
     private boolean showReferenceReview,reviewIncomingOnly;
     private final AsyncPackReferenceReview packReferenceReview=new AsyncPackReferenceReview();
     private final ImString referenceReviewQuery=new ImString(1024);
@@ -6358,7 +6361,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6505,16 +6508,18 @@ public final class EditorApp extends Application {
             ImGui.textWrapped(review.nodes().size()+" visited resources; "+review.jsonFiles()+" JSON files inspected; "+review.bytes()+" JSON bytes; "+review.edges().size()+" recorded diagnostics; "+review.count(ReferenceDiagnostics.State.EXACT_FILE)+" exact-file links; "+review.cycles().size()+" repeated-path groups; "+review.fallbackCycles().size()+" fallback-only groups.");
             ImGui.textWrapped(review.incomplete() ? "Some outgoing dependencies are unknown because of unsupported data or review limits. See recorded diagnostics and notices." : "No unsupported data or review limits encountered in these known fields. Coverage and native validation remain partial.");
             if (ImGui.treeNode("Recorded route to current selection")) {
-                var route=review.route(selected);
-                if (route.isEmpty()) ImGui.textWrapped("The current selection has no recorded visited path from this root.");
-                for (int i=0;i<Math.min(64,route.size());i++) { var node=route.get(i);ImGui.textWrapped(node.distance()+": "+InspectorText.label(node.path(),256)+(node.via()==null ? "" : " via "+InspectorText.label(node.via(),256))); }
-                if (route.size()>64) ImGui.textWrapped("Only the first 64 route resources are displayed.");
+                routePages.select(scan.request(),selected);var route=JigsawDependencyReview.routePage(review,selected,routePages.page);
+                int requested=routePages.draw("dependency-route",route.window());if(requested!=route.window().page())route=JigsawDependencyReview.routePage(review,selected,requested);
+                drawReviewRange("Recorded route",route.window());
+                if (route.entries().isEmpty()) ImGui.textWrapped("The current selection has no recorded visited path from this root.");
+                int routeIndex=0;for(var node:route.entries()) { ImGui.pushID(routeIndex++);ImGui.textWrapped(node.distance()+": "+InspectorText.label(node.path(),256)+(node.via()==null ? "" : " via "+InspectorText.label(node.via(),256)));if(ImGui.smallButton("Open route resource"))queueReferenceReviewOpen(node.path());ImGui.popID(); }
                 ImGui.textWrapped("This is one shortest authored-link path. It does not establish generation reachability or connector eligibility.");ImGui.treePop();
             }
             try {
-                var query=new JigsawDependencyReview.Query(jigsawReviewQuery.get(),jigsawReviewScope,selected,jigsawProblemsOnly);
-                var result=jigsawReview.query(workspace,jigsawReviewRoot,query);ImGui.textWrapped(result.matches()+" matching link diagnostics; "+result.edges().size()+" shown.");
-                if (result.truncated()) ImGui.textWrapped("The first 200 matching diagnostics are shown. Narrow the filters for later links.");
+                var query=new JigsawDependencyReview.Query(jigsawReviewQuery.get(),jigsawReviewScope,jigsawReviewScope==JigsawDependencyReview.Scope.ALL ? null : selected,jigsawProblemsOnly);
+                dependencyPages.select(scan.request(),query);var page=jigsawReview.page(workspace,jigsawReviewRoot,query,dependencyPages.page);
+                int requested=dependencyPages.draw("dependency-links",page.window());if(requested!=page.window().page())page=jigsawReview.page(workspace,jigsawReviewRoot,query,requested);
+                var result=page.result();drawReviewRange("Dependency link diagnostics",page.window());
                 int index=0;for (var edge : result.edges()) {
                     ImGui.pushID(index++);ImGui.textUnformatted(edge.state()+": "+InspectorText.label(edge.field(),256));ImGui.textWrapped(InspectorText.label(edge.source(),256));ImGui.textWrapped("Stored key / diagnostic: "+InspectorText.label(edge.key(),256));
                     if (edge.target()!=null) ImGui.textWrapped("Exact target: "+InspectorText.label(edge.target(),256));
@@ -6523,21 +6528,40 @@ public final class EditorApp extends Application {
                     ImGui.popID();
                 }
                 if (ImGui.treeNode("Visited resource paths")) {
-                    var matches=review.nodes().stream().filter(node -> query.text().isEmpty() || node.path().toLowerCase(java.util.Locale.ROOT).contains(query.text())).toList();
-                    ImGui.textWrapped(matches.size()+" matching visited resources; showing up to 200. Link scope/diagnostic filters apply to links only.");
-                    int nodeIndex=0;for (var node : matches.stream().limit(200).toList()) { ImGui.pushID(nodeIndex++);ImGui.textWrapped(node.distance()+" / "+node.status()+": "+InspectorText.label(node.path(),256));if (ImGui.smallButton("Open visited resource")) queueReferenceReviewOpen(node.path());ImGui.popID(); }ImGui.treePop();
+                    visitedPages.select(scan.request(),query.text());var nodes=JigsawDependencyReview.nodes(review,query.text(),visitedPages.page);
+                    int nodePage=visitedPages.draw("dependency-nodes",nodes.window());if(nodePage!=nodes.window().page())nodes=JigsawDependencyReview.nodes(review,query.text(),nodePage);
+                    drawReviewRange("Visited resources",nodes.window());ImGui.textWrapped("Literal path search applies here. Link scope and diagnostic filters apply to links only.");
+                    int nodeIndex=0;for (var node : nodes.entries()) { ImGui.pushID(nodeIndex++);ImGui.textWrapped(node.distance()+" / "+node.status()+": "+InspectorText.label(node.path(),256));if (ImGui.smallButton("Open visited resource")) queueReferenceReviewOpen(node.path());ImGui.popID(); }ImGui.treePop();
                 }
             } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
-            if (ImGui.treeNode("Repeated authored-path groups")) { drawJigsawCycleGroups(review.cycles());ImGui.textWrapped("Sorted component members are not an ordered cycle witness. Recursive pool/piece declarations can be intentional; matching, rules and termination are unchecked.");ImGui.treePop(); }
-            if (ImGui.treeNode("Fallback-only authored groups")) { drawJigsawCycleGroups(review.fallbackCycles());ImGui.textWrapped("These are literal fallback fields, not a claim that the native direct-fallback path recurses.");ImGui.treePop(); }
+            if (ImGui.treeNode("Repeated authored-path groups")) { drawJigsawCycleGroups(review,false,scan.request());ImGui.textWrapped("Sorted component members are not an ordered cycle witness. Recursive pool/piece declarations can be intentional; matching, rules and termination are unchecked.");ImGui.treePop(); }
+            if (ImGui.treeNode("Fallback-only authored groups")) { drawJigsawCycleGroups(review,true,scan.request());ImGui.textWrapped("These are literal fallback fields, not a claim that the native direct-fallback path recurses.");ImGui.treePop(); }
             if (ImGui.treeNode("Dependency review notices")) { for (var notice : review.notices()) { ImGui.textWrapped(InspectorText.label(notice.path(),256));ImGui.textWrapped(notice.message()); }if (review.omittedNotices()>0) ImGui.textWrapped(review.omittedNotices()+" further notices omitted.");ImGui.treePop(); }
         }
-        ImGui.textWrapped("Limits: 512 visited resources, 256 inspected JSON files, 1 MB/file, 8 MB JSON total, 4,096 edges, 128 notices and 200 displayed matches. Snapshot limits: 4,096 copied JSON files / 16 MB, root first then lexical order, with exact target presence retained (up to 100,000 paths / 16 million UTF-16 characters). Reached targets omitted from the snapshot are marked skipped with unknown outgoing links. Object payloads are never read. Scans inspect applied memory on one background worker; applying edits invalidates results without rescanning. Geometry, theme/rule eligibility, binary bounds, priorities, registry/state compatibility, native assembly, noise/material dependencies and package export closure are unchecked. No files are changed; this review cannot authorize rename/move/delete. Save/Export remain available; unsupported previews remain disabled.");
+        ImGui.textWrapped("Limits: 512 visited resources, 256 inspected JSON files, 1 MB/file, 8 MB JSON total, 4,096 edges, 128 notices and 200 displayed rows per independent view page. Paging exposes recorded diagnostics, visited nodes, routes, components and members without extending scan coverage. Snapshot limits: 4,096 copied JSON files / 16 MB, root first then lexical order, with exact target presence retained (up to 100,000 paths / 16 million UTF-16 characters). Reached targets omitted from the snapshot are marked skipped with unknown outgoing links. Object payloads are never read. Scans inspect applied memory on one background worker; applying edits invalidates results without rescanning. Geometry, theme/rule eligibility, binary bounds, priorities, registry/state compatibility, native assembly, noise/material dependencies and package export closure are unchecked. No files are changed; this review cannot authorize rename/move/delete. Save/Export remain available; unsupported previews remain disabled.");
         ImGui.end();
     }
-    private void drawJigsawCycleGroups(List<List<String>> groups) {
-        ImGui.textWrapped(groups.size()+" groups; showing up to 20 groups and 20 members per group.");
-        int index=0;for (var group : groups.stream().limit(20).toList()) { ImGui.pushID(index++);if (ImGui.treeNode(group.size()+" component members")) { for (String path : group.stream().limit(20).toList()) { ImGui.textWrapped(InspectorText.label(path,256));if (ImGui.smallButton("Open component member##"+group.indexOf(path))) queueReferenceReviewOpen(path); }if (group.size()>20) ImGui.textWrapped("Additional members omitted from display.");ImGui.treePop(); }ImGui.popID(); }
+    private void drawJigsawCycleGroups(JigsawDependencyReview.Review review,boolean fallback,long request) {
+        ImGui.pushID(fallback ? "fallback-components" : "authored-components");
+        var pager=fallback ? fallbackComponentPages : componentPages;var membersPager=fallback ? fallbackMemberPages : memberPages;
+        try {
+            String text=new JigsawDependencyReview.Query(jigsawReviewQuery.get(),JigsawDependencyReview.Scope.ALL,null,false).text();
+            pager.select(request,text);var groups=JigsawDependencyReview.components(review,fallback,text,pager.page);
+            int requested=pager.draw("component-groups",groups.window());if(requested!=groups.window().page())groups=JigsawDependencyReview.components(review,fallback,text,requested);
+            drawReviewRange("Recorded components",groups.window());ImGui.textWrapped("Path search matches any member of a component. Its full membership remains available; link scope/diagnostic filters do not apply here.");
+            int selectedGroup=fallback ? selectedFallbackComponent : selectedComponent;
+            boolean present=false;for(var group:groups.entries())if(group.index()==selectedGroup)present=true;
+            if(!present)selectedGroup=groups.entries().isEmpty() ? -1 : groups.entries().getFirst().index();
+            for(var group:groups.entries()) { ImGui.pushID(group.index());if(ImGui.selectable("Component "+(group.index()+1)+" — "+group.members().size()+" members",group.index()==selectedGroup))selectedGroup=group.index();if(ImGui.isItemHovered())ImGui.setTooltip(InspectorText.label(group.members().getFirst(),256));ImGui.popID(); }
+            if(fallback)selectedFallbackComponent=selectedGroup;else selectedComponent=selectedGroup;
+            if(selectedGroup>=0) {
+                membersPager.select(request,selectedGroup);var members=JigsawDependencyReview.members(review,fallback,selectedGroup,membersPager.page);
+                int memberPage=membersPager.draw("component-members",members.window());if(memberPage!=members.window().page())members=JigsawDependencyReview.members(review,fallback,selectedGroup,memberPage);
+                drawReviewRange("All members of component "+(selectedGroup+1),members.window());
+                int index=0;for(String path:members.entries()) { ImGui.pushID(index++);ImGui.textWrapped(InspectorText.label(path,256));if(ImGui.smallButton("Open component member"))queueReferenceReviewOpen(path);ImGui.popID(); }
+            } else { membersPager.reset();ImGui.textWrapped("No recorded components match this path search."); }
+        } catch(IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
+        ImGui.popID();
     }
     private void drawPackReferenceReview() {
         if (!ImGui.begin("Pack resource links (partial)")) { ImGui.end();return; }
@@ -6561,10 +6585,12 @@ public final class EditorApp extends Application {
             if (audit.omittedNotices()>0) ImGui.textWrapped(audit.omittedNotices()+" additional inspection notices omitted.");
             if (reviewIncomingOnly && selected==null) ImGui.textWrapped("Select a resource to filter its known incoming references.");
             else try {
-                var result=packReferenceReview.query(workspace,new PackReferenceAudit.Query(referenceReviewQuery.get(),referenceReviewView,reviewIncomingOnly ? selected : null));
+                var query=new PackReferenceAudit.Query(referenceReviewQuery.get(),referenceReviewView,reviewIncomingOnly ? selected : null);
+                referencePages.select(scan.request(),query);var page=packReferenceReview.page(workspace,query,referencePages.page);
+                int requested=referencePages.draw("resource-link-diagnostics",page.window());
+                if(requested!=page.window().page())page=packReferenceReview.page(workspace,query,requested);
+                var result=page.result();drawReviewRange("Link diagnostics (source/field traversal order)",page.window());
                 if (reviewIncomingOnly) ImGui.textWrapped("Exact incoming target: "+PackReferenceAudit.display(selected));
-                ImGui.textWrapped(result.matches()+" matching diagnostics; "+result.findings().size()+" shown.");
-                if (result.truncated()) ImGui.textWrapped("Only the first 200 matches in source/field traversal order are shown. Narrow the filters to reach later findings.");
                 int index=0;for (var finding : result.findings()) {
                     ImGui.pushID(index++);ImGui.textUnformatted(finding.state()+": "+PackReferenceAudit.display(finding.field()));ImGui.textWrapped(PackReferenceAudit.display(finding.source()));ImGui.textWrapped("Stored key / diagnostic: "+PackReferenceAudit.display(finding.key()));
                     if (finding.target()!=null) ImGui.textWrapped("Exact target: "+PackReferenceAudit.display(finding.target()));
@@ -6574,11 +6600,28 @@ public final class EditorApp extends Application {
                 }
             } catch (IllegalArgumentException invalid) { ImGui.textWrapped(invalid.getMessage()); }
         }
-        ImGui.textWrapped("Explicit scan limits: 512 eligible files, 8 MB total, 1 MB/file, 4,096 recorded diagnostics and 256 notices. Per-resource checks also cap links. Filtering shows up to 200 matches with 256 search characters. Long labels are shortened to 256 UTF-16 characters plus ellipsis; control characters are escaped for display. Scans run in the background against an applied snapshot. Edits cancel and invalidate the review without rescanning. The snapshot holds up to 100,000 exact file paths / 16 million UTF-16 path characters and excludes object/image payloads. Drafts, disk state and formulas are not inspected. Save/Export remain available; no data is rewritten and no native resource is loaded.");
+        ImGui.textWrapped("Explicit scan limits: 512 eligible files, 8 MB total, 1 MB/file, 4,096 recorded diagnostics and 256 notices. Per-resource checks also cap links. Pages show up to 200 recorded matches with 256 search characters; paging and filters do not rescan. Long labels are shortened to 256 UTF-16 characters plus ellipsis; control characters are escaped for display. Scans run in the background against an applied snapshot. Edits cancel and invalidate the review without rescanning. The snapshot holds up to 100,000 exact file paths / 16 million UTF-16 path characters and excludes object/image payloads. Drafts, disk state and formulas are not inspected. Save/Export remain available; no data is rewritten and no native resource is loaded.");
         ImGui.end();
     }
     private void queueReferenceReviewOpen(String path) {
         resourceNavigation.request(workspace,path);referenceReviewPendingPath=path;referenceReviewPendingWorkspace=workspace;
+    }
+    /** UI metadata only; no retained audit, payload, workspace or worker input. */
+    private static final class ReviewPager {
+        private int page;
+        private long request=-1;
+        private Object query;
+        private final ImString jump=new ImString("1",32);
+        void reset() { page=0;request=-1;query=null;jump.set("1"); }
+        void select(long nextRequest,Object nextQuery) { if(request!=nextRequest || !java.util.Objects.equals(query,nextQuery)) { reset();request=nextRequest;query=nextQuery; } }
+        int draw(String scope,ReviewPagination.Window window) { if(page!=window.page())jump.set(Integer.toString(window.page()+1));return page=drawReviewPager(scope,window,jump); }
+    }
+    private void clearLinkReviewPages() {
+        for(var pager:List.of(referencePages,dependencyPages,visitedPages,routePages,componentPages,fallbackComponentPages,memberPages,fallbackMemberPages))pager.reset();
+        selectedComponent=selectedFallbackComponent=-1;
+    }
+    private static void drawReviewRange(String title,ReviewPagination.Window window) {
+        ImGui.textWrapped(title+": page "+(window.page()+1)+" / "+window.pages()+"; rows "+window.firstRow()+"–"+window.end()+" of "+window.matches()+" recorded matches.");
     }
     private static int drawReviewPager(String scope,ReviewPagination.Window window,ImString jump) {
         ImGui.pushID(scope);int requested=window.page();boolean navigated=false;

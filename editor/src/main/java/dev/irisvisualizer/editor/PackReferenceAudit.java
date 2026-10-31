@@ -7,7 +7,7 @@ import java.util.Objects;
 
 /** Bounded aggregation of existing typed link diagnostics; never authorizes rename, move or deletion. */
 public final class PackReferenceAudit {
-    public static final int MAX_FILES=512, MAX_FINDINGS=4096, MAX_NOTICES=256, MAX_RESULTS=200, MAX_QUERY_CHARACTERS=256;
+    public static final int MAX_FILES=512, MAX_FINDINGS=4096, MAX_NOTICES=256, MAX_RESULTS=ReviewPagination.PAGE_SIZE, MAX_QUERY_CHARACTERS=256;
     public static final long MAX_BYTES=8_000_000;
     public static final int MAX_DISPLAY_CHARACTERS=256;
     public record Finding(String source,String field,String key,String target,ReferenceDiagnostics.State state) {}
@@ -39,6 +39,7 @@ public final class PackReferenceAudit {
         public Result { findings=List.copyOf(findings); }
         public boolean truncated() { return matches>findings.size(); }
     }
+    public record Page(ReviewPagination.Window window,Result result) {}
     record Limits(int files,long bytes,int findings,int notices) {
         Limits { if (files<1 || files>MAX_FILES || bytes<1 || bytes>MAX_BYTES || findings<1 || findings>MAX_FINDINGS || notices<1 || notices>MAX_NOTICES) throw new IllegalArgumentException("Invalid reference-review limits"); }
     }
@@ -84,14 +85,16 @@ public final class PackReferenceAudit {
     public static String display(String value) {
         return InspectorText.label(value,MAX_DISPLAY_CHARACTERS);
     }
-    public static Result filter(Audit audit,Query query) {
-        Objects.requireNonNull(audit);Objects.requireNonNull(query);int matches=0;var findings=new ArrayList<Finding>();
-        for (var finding : audit.findings()) {
-            if (!query.view().matches(finding.state()) || query.incomingTarget()!=null && !query.incomingTarget().equals(finding.target())) continue;
-            String text=query.text();if (!text.isEmpty() && !contains(finding.source(),text) && !contains(finding.field(),text) && !contains(finding.key(),text) && !contains(finding.target(),text)) continue;
-            matches++;if (findings.size()<MAX_RESULTS) findings.add(finding);
-        }
-        return new Result(matches,findings);
+    private static boolean matches(Finding finding,Query query) {
+        if (!query.view().matches(finding.state()) || query.incomingTarget()!=null && !query.incomingTarget().equals(finding.target())) return false;
+        String text=query.text();return text.isEmpty() || contains(finding.source(),text) || contains(finding.field(),text) || contains(finding.key(),text) || contains(finding.target(),text);
+    }
+    /** Compatibility entry point: first bounded page of the recorded audit. */
+    public static Result filter(Audit audit,Query query) { return page(audit,query,0).result(); }
+    public static Page page(Audit audit,Query query,int requested) {
+        Objects.requireNonNull(audit);Objects.requireNonNull(query);
+        var selected=ReviewPagination.select(audit.findings(),finding->matches(finding,query),requested);
+        return new Page(selected.window(),new Result(selected.window().matches(),selected.entries()));
     }
     /** Scan only on explicit refresh. Applied edits invalidate the result without automatic parsing/disk work. */
     public static final class Cache {
@@ -99,18 +102,19 @@ public final class PackReferenceAudit {
         private long revision=-1;
         private Audit audit;
         private Query previous;
-        private Result result;
-        public void clear() { workspace=null;revision=-1;audit=null;previous=null;result=null; }
+        private Page page;
+        public void clear() { workspace=null;revision=-1;audit=null;previous=null;page=null; }
         public Audit current(PackWorkspace current) {
             Objects.requireNonNull(current);
             if (workspace!=current || revision!=current.revision()) { clear();return null; }
             return audit;
         }
-        public Audit refresh(PackWorkspace current) { var next=inspect(current);workspace=current;revision=current.revision();audit=next;previous=null;result=null;return next; }
-        public Result query(PackWorkspace current,Query query) {
+        public Audit refresh(PackWorkspace current) { var next=inspect(current);workspace=current;revision=current.revision();audit=next;previous=null;page=null;return next; }
+        public Result query(PackWorkspace current,Query query) { var selected=page(current,query,0);return selected==null ? null : selected.result(); }
+        public Page page(PackWorkspace current,Query query,int requested) {
             Objects.requireNonNull(query);var active=current(current);if (active==null) return null;
-            if (result==null || !query.equals(previous)) { result=filter(active,query);previous=query; }
-            return result;
+            if (page==null || !query.equals(previous) || page.window().page()!=ReviewPagination.Window.at(page.result().matches(),requested).page()) { page=PackReferenceAudit.page(active,query,requested);previous=query; }
+            return page;
         }
     }
 }

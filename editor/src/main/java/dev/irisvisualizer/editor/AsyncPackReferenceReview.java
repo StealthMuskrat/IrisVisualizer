@@ -23,7 +23,7 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
     private Outcome completed;
     private Snapshot snapshot=new Snapshot(0,Phase.IDLE,null,null);
     private PackReferenceAudit.Query previous;
-    private PackReferenceAudit.Result result;
+    private PackReferenceAudit.Page page;
 
     public AsyncPackReferenceReview() { this(PackReferenceAudit::inspect,runnable -> new Thread(runnable,"iris-resource-link-review")); }
     AsyncPackReferenceReview(Scanner scanner,ThreadFactory threads) {
@@ -33,7 +33,7 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
     }
     private void invalidate() {
         generation++;if (active!=null) active.cancelled().set(true);if (pending!=null) pending.cancelled().set(true);
-        pending=null;completed=null;previous=null;result=null;
+        pending=null;completed=null;previous=null;page=null;
     }
     /** Call on the UI thread. Capture copies at most 8 MB of JSON; parsing happens only on the worker. */
     public Snapshot refresh(PackWorkspace current) {
@@ -64,10 +64,12 @@ public final class AsyncPackReferenceReview implements AutoCloseable {
             return snapshot;
         }
     }
-    public PackReferenceAudit.Result query(PackWorkspace current,PackReferenceAudit.Query query) {
+    /** Paging recorded diagnostics never schedules work or rereads source payloads. */
+    public PackReferenceAudit.Result query(PackWorkspace current,PackReferenceAudit.Query query) { var selected=page(current,query,0);return selected==null ? null : selected.result(); }
+    public PackReferenceAudit.Page page(PackWorkspace current,PackReferenceAudit.Query query,int requested) {
         Objects.requireNonNull(query);var state=poll(current);if (state.phase()!=Phase.READY) return null;
-        if (result==null || !query.equals(previous)) { result=PackReferenceAudit.filter(state.audit(),query);previous=query; }
-        return result;
+        if (page==null || !query.equals(previous) || page.window().page()!=ReviewPagination.Window.at(page.result().matches(),requested).page()) { page=PackReferenceAudit.page(state.audit(),query,requested);previous=query; }
+        return page;
     }
     public void clear() {
         synchronized (lock) {
