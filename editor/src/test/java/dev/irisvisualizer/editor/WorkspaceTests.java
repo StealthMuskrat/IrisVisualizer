@@ -109,6 +109,7 @@ public final class WorkspaceTests {
    AppliedEditDiffTests.run(temp);
    NavigationHistoryTests.run(temp);
    ResourceFinderTests.run(temp);
+   PagedResourceFinderTests.run(temp);
    WorkspaceCopyTests.run(temp);
    WorkspaceTextSearchTests.run(temp);
    AsyncWorkspaceTextSearchTests.run(temp);
