@@ -115,6 +115,12 @@ public final class EditorApp extends Application {
     private List<ReferenceDiagnostics.Link> referenceLinks = List.of();
     private final AsyncAssetImage imageLoader=new AsyncAssetImage();
     private final AsyncImageStatistics imageStatistics=new AsyncImageStatistics();
+    private final AsyncFileComparison fileComparison=new AsyncFileComparison();
+    private boolean showFileComparison,focusFileComparison,comparisonShowUnchanged;
+    private String fileComparisonError;
+    private FileComparison.Report displayedFileComparison;
+    private ImString comparisonBefore,comparisonAfter,comparisonLine;
+    private int comparisonPage,comparisonSelected=-1,comparisonBuffered=-1;
     private final AsyncByteInspection byteInspection=new AsyncByteInspection();
     private boolean showByteInspection,focusByteInspection;
     private String byteInspectionError;
@@ -137,7 +143,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;imageOwner=null;imageSourcePath=null;imageContentRevision=-1;imageRegion=null;imageRegionStart=null;imageStatisticsError=null;imageStatistics.clear();
     }
     @Override protected void disposeImGui() {
-        try { packLoad.close();byteInspection.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
+        try { packLoad.close();fileComparison.close();byteInspection.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -341,6 +347,7 @@ public final class EditorApp extends Application {
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
         PackWorkspace frameWorkspace=workspace;boolean frameClose=closeRequested;closeRequested=false;
+        fileComparison.poll(workspace);
         byteInspection.poll(workspace,selected);
         resourceAddition.poll(workspace);
         folderOperation.poll(workspace);
@@ -402,6 +409,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Command palette",EditorCommands.shortcutLabel(EditorCommands.Action.PALETTE))) queueEditorCommand(EditorCommands.Action.PALETTE);
                 if (ImGui.menuItem("Quick Open resource",EditorCommands.shortcutLabel(EditorCommands.Action.QUICK_OPEN))) queueEditorCommand(EditorCommands.Action.QUICK_OPEN);
                 ImGui.beginDisabled(!JsonStructure.supports(selected));if (ImGui.menuItem("Inspect selected JSON structure")) queueEditorCommand(EditorCommands.Action.INSPECT_JSON);ImGui.endDisabled();
+                ImGui.beginDisabled(selected==null);if(ImGui.menuItem("Compare selected file with disk"))queueEditorCommand(EditorCommands.Action.COMPARE_DISK_FILE);ImGui.endDisabled();
                 ImGui.beginDisabled(selected==null);if(ImGui.menuItem("Inspect selected file bytes"))queueEditorCommand(EditorCommands.Action.INSPECT_BYTES);ImGui.endDisabled();
                 if (ImGui.menuItem("Search JSON text",EditorCommands.shortcutLabel(EditorCommands.Action.SEARCH_TEXT))) queueEditorCommand(EditorCommands.Action.SEARCH_TEXT);
                 var back=navigationHistory.back();var forward=navigationHistory.forward();
@@ -451,6 +459,7 @@ public final class EditorApp extends Application {
         if (selected != null) {
             ImGui.text(selected);
             if(ImGui.button("Inspect applied file bytes"))queueEditorCommand(EditorCommands.Action.INSPECT_BYTES);
+            if(ImGui.button("Compare applied file with disk"))queueEditorCommand(EditorCommands.Action.COMPARE_DISK_FILE);
             ImGui.textWrapped("Unknown and unclassified fields are read-only.");
             int byteCount = workspace.size(selected);
             byte[] bytes = selected.endsWith(".json") && byteCount <= 1_000_000 ? workspace.read(selected) : null;
@@ -578,6 +587,7 @@ public final class EditorApp extends Application {
         if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+        if(showFileComparison)drawFileComparison();
         if (showByteInspection) drawByteInspection();
         if (showQuickOpen) drawQuickOpen();
         if (showTextSearch) drawTextSearch();
@@ -642,6 +652,7 @@ public final class EditorApp extends Application {
         textSearch.poll(workspace); // Release stale captures even while the search window is collapsed.
         var statisticsImage=currentStatisticsImage();imageStatistics.poll(statisticsImage);
         if(showImageStatistics)drawImageStatistics(statisticsImage);
+        fileComparison.poll(workspace); // Saved-baseline and source changes invalidate hidden comparisons without rereading disk.
         byteInspection.poll(workspace,selected); // Release stale captures even when byte inspection is hidden.
         resourceAddition.poll(workspace); // Structural/source edits also invalidate hidden reviews.
         folderOperation.poll(workspace); // Hidden folder reviews never retain stale structural authority.
@@ -6528,7 +6539,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=List.of();showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=List.of();showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6836,6 +6847,7 @@ public final class EditorApp extends Application {
                 ImGui.separator();ImGui.textWrapped(entry.kind().label()+": "+entry.path());
                 if (entry.kind()==WorkspaceChanges.Kind.NEW_FILE || entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE) {
                     ImGui.textUnformatted(entry.bytes()+" applied bytes");
+                    if(ImGui.button("Compare disk / applied file"))startFileComparison(entry.path());
                     if (ImGui.button("Open changed resource")) { resourceNavigation.request(workspace,entry.path());changesPendingPath=entry.path();changesPendingWorkspace=workspace; }
                 }
                 ImGui.beginDisabled(pendingDiskReview.busy());
@@ -6983,6 +6995,51 @@ public final class EditorApp extends Application {
         try {target=ReviewPagination.requestedPage(jump.get());}catch(IllegalArgumentException invalid){problem=invalid.getMessage();}
         ImGui.sameLine();ImGui.beginDisabled(target==null);boolean clicked=ImGui.smallButton("Go to page");ImGui.endDisabled();if(target!=null && (submitted || clicked)){requested=ResourceFinder.Window.at(window.matches(),target,window.pageSize()).page();navigated=true;}
         if(problem!=null)ImGui.textWrapped(problem);if(navigated)jump.set(Integer.toString(requested+1));ImGui.popID();return requested;
+    }
+    private void startFileComparison(String path) {
+        showFileComparison=true;focusFileComparison=true;
+        try{fileComparison.start(workspace,path);fileComparisonError=null;}catch(Exception failure){fileComparisonError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"File comparison failed"),512);}
+    }
+    private void drawFileComparison() {
+        if(focusFileComparison){ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusFileComparison=false;}
+        ImGui.setNextWindowSize(780,650,ImGuiCond.FirstUseEver);if(!ImGui.begin("Disk / applied file comparison")){ImGui.end();return;}
+        if(ImGui.button("Hide file comparison")){showFileComparison=false;ImGui.end();return;}
+        ImGui.textWrapped("Read-only, point-in-time disk bytes versus applied in-memory bytes. This review never writes, merges, restores or authorizes Save. External changes require explicit Refresh; Save repeats its independent checks.");
+        var state=fileComparison.poll(workspace);
+        ImGui.beginDisabled(selected==null);if(ImGui.button("Compare selected resource"))startFileComparison(selected);ImGui.endDisabled();
+        if(state.path()!=null){ImGui.sameLine();if(ImGui.button("Refresh compared resource"))startFileComparison(state.path());}
+        ImGui.sameLine();if(ImGui.button("Cancel / clear comparison")){fileComparison.clear();fileComparisonError=null;}
+        state=fileComparison.poll(workspace);var report=state.report();
+        if(report!=displayedFileComparison){displayedFileComparison=report;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;comparisonLine=null;comparisonBefore=report==null || report.before()==null ? null : jsonReadOnlyBuffer(report.before().text());comparisonAfter=report==null ? null : jsonReadOnlyBuffer(report.applied().text());}
+        if(state.path()!=null)ImGui.textWrapped("Compared resource: "+InspectorText.label(state.path(),16384));
+        if(state.phase()==AsyncFileComparison.Phase.IDLE)ImGui.textWrapped("Choose a resource and Compare. Source edits/Undo, Save/Save As and workspace replacement clear stale results without rereading disk.");
+        else if(state.phase()==AsyncFileComparison.Phase.COMPARING)ImGui.textWrapped("Comparing in the background: "+state.applied()+" applied bytes hashed; "+state.disk()+" disk bytes read.");
+        else if(state.phase()==AsyncFileComparison.Phase.FAILED)ImGui.textWrapped(state.error());
+        if(report!=null){
+            ImGui.textWrapped("Captured folder: "+(report.directory()==null ? "None" : InspectorText.label(report.directory().toString(),1024)));ImGui.textWrapped("Disk: "+report.disk()+" / saved baseline: "+report.baseline());
+            ImGui.textWrapped(switch(report.baseline()){case MATCH->"Disk bytes matched the saved baseline at this read. This does not guarantee Save will succeed.";case CHANGED->"Disk bytes differ from the saved baseline. Save will recheck and can refuse this conflict; review by reopening or use a fresh destination.";case NEW_OCCUPIED->"The new-file destination is occupied. Save refuses this collision even when bytes are identical.";case MISSING->"A previously saved resource is missing from disk. Save keeps its missing-source checks.";case NEW_AVAILABLE->"The new-file destination was absent at this check.";case UNBOUND->"No active disk folder is bound to this workspace.";case NOT_CHECKED->"Disk bytes exceed the review budget; baseline equality was not checked.";});
+            ImGui.textWrapped(report.detail());ImGui.textWrapped("Applied: "+report.appliedBytes()+" bytes; SHA-256 "+report.appliedSha256());
+            if(report.diskBytes()>=0)ImGui.textWrapped("Disk: "+report.diskBytes()+" bytes"+(report.diskSha256()==null ? "; digest not captured" : "; SHA-256 "+report.diskSha256()));
+            if(report.expectedSha256()!=null)ImGui.textWrapped("Saved-baseline SHA-256: "+report.expectedSha256());
+            if(ImGui.button("Open compared resource with draft guard"))resourceNavigation.request(workspace,report.path());
+            if(ImGui.beginTabBar("Captured file comparison")){
+                if(ImGui.beginTabItem("Line differences")){drawFileComparisonLines(report.diff());ImGui.endTabItem();}
+                if(ImGui.beginTabItem("Captured sources")){if(report.before()!=null)drawAppliedHistoryText(report.disk()==FileComparison.Disk.ABSENT ? "Absent disk destination (empty comparison side)" : "Captured disk source",report.before(),comparisonBefore);else ImGui.textWrapped("No complete disk source text was captured.");drawAppliedHistoryText("Captured applied source",report.applied(),comparisonAfter);ImGui.endTabItem();}
+                ImGui.endTabBar();
+            }
+        }
+        if(fileComparisonError!=null)ImGui.textWrapped(fileComparisonError);
+        ImGui.textWrapped("Review limits: 16 MiB streamed disk bytes, 64 KiB per text source, 16,384 displayed UTF-16 characters per side, 512 lines per side and 263,169 comparison cells. Larger, binary/control or invalid UTF-8 sources keep hash/size metadata without partial change counts. No backup, recovery copy or temporary file is created. Drafts, history and unsupported previews remain unchanged.");ImGui.end();
+    }
+    private void drawFileComparisonLines(AppliedEditDiff.Diff diff) {
+        if(diff==null){ImGui.textWrapped("Line differences require an available disk source or an explicitly absent destination.");return;}
+        ImGui.textWrapped(diff.detail());if(!diff.compared())return;
+        ImGui.textWrapped(diff.added()+" added; "+diff.removed()+" removed; "+diff.unchanged()+" unchanged lines between these captured sources.");
+        if(ImGui.checkbox("Show unchanged comparison lines",comparisonShowUnchanged)){comparisonShowUnchanged=!comparisonShowUnchanged;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;}
+        var page=AppliedEditDiff.page(diff,comparisonShowUnchanged,comparisonPage);ImGui.beginDisabled(!page.previous());if(ImGui.smallButton("Previous comparison lines"))comparisonPage=page.page()-1;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(!page.next());if(ImGui.smallButton("Next comparison lines"))comparisonPage=page.page()+1;ImGui.endDisabled();page=AppliedEditDiff.page(diff,comparisonShowUnchanged,comparisonPage);comparisonPage=page.page();ImGui.textUnformatted("Page "+(page.page()+1)+"; "+page.rows().size()+" / "+page.matches()+" line rows shown.");
+        if(!page.rows().contains(comparisonSelected))comparisonSelected=page.rows().isEmpty() ? -1 : page.rows().getFirst();
+        for(int index:page.rows()){var row=diff.rows().get(index);ImGui.pushID(index);if(ImGui.selectable("Select comparison line",index==comparisonSelected))comparisonSelected=index;ImGui.sameLine();ImGui.textUnformatted(row.kind()+" disk "+row.beforeLine()+" / applied "+row.afterLine()+" ["+row.ending()+"] "+InspectorText.label(row.text(),256));ImGui.popID();}
+        if(comparisonSelected>=0){var row=diff.rows().get(comparisonSelected);if(comparisonBuffered!=comparisonSelected){comparisonBuffered=comparisonSelected;comparisonLine=jsonReadOnlyBuffer(row.text());}ImGui.inputTextMultiline("Selected captured line",comparisonLine,-1,100,ImGuiInputTextFlags.ReadOnly);}
     }
     private void inspectSelectedBytes() {
         showByteInspection=true;focusByteInspection=true;
@@ -7293,6 +7350,7 @@ public final class EditorApp extends Application {
             case PALETTE->{ showCommandPalette=true;focusCommandPalette=true; }
             case INSPECT_JSON->{ if (JsonStructure.supports(selected)) showJsonStructure=true; }
             case INSPECT_BYTES->inspectSelectedBytes();
+            case COMPARE_DISK_FILE->startFileComparison(selected);
             case REVIEW_CHANGES->showPendingChanges=true;
             case REVIEW_HISTORY->showAppliedHistory=true;
             case REVIEW_LOAD->showPackLoad=true;
