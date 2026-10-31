@@ -2511,7 +2511,7 @@ public final class EditorApp extends Application {
             if (state.phase()==AsyncDefinitionAudit.Phase.SCANNING) ImGui.textWrapped("Scanning applied definitions in the background... Editing and Save/Export remain available. Refresh replaces the request; Cancel discards it.");
             else if (state.phase()==AsyncDefinitionAudit.Phase.FAILED) ImGui.textWrapped("Definition audit failed: "+state.error()+". Refresh explicitly to retry.");
             else if (state.audit()==null) ImGui.textWrapped("No audit for the applied workspace state. Scan explicitly; applied edits and resource changes invalidate results. Selection, inspector drafts and Save/Export do not rescan.");
-            ImGui.textWrapped("The immutable snapshot copies up to 512 sorted definitions / 8 MB, matching the audit's oversize skips and first byte-budget stop. Exact target presence is retained up to 100,000 paths / 16 million UTF-16 characters. Unrelated and binary payloads are never copied. Collapsing this section retains the request/result; Cancel clears it.");
+            ImGui.textWrapped("The audit covers up to 512 sorted definitions / 8 MB, matching its oversize skips and first byte-budget stop. Exact target presence is retained up to 100,000 paths / 16 million UTF-16 characters. Unrelated and binary payloads are never read. Collapsing this section retains the request/result; Cancel clears it.");
             return state.audit();
         } finally { ImGui.popID(); }
     }

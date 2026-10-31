@@ -138,6 +138,7 @@ public final class WorkspaceTests {
    JigsawDependencyReviewTests.run(temp);
    AsyncJigsawDependencyReviewTests.run(temp);
    AsyncDefinitionAuditTests.run(temp);
+   PinnedDefinitionAuditTests.run(temp);
    ImageViewportTests.run(temp);
    AsyncAssetImageTests.run(temp);
    AssetImportTests.run(temp);
