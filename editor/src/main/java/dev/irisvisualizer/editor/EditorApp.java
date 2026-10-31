@@ -115,10 +115,14 @@ public final class EditorApp extends Application {
     private String referenceChoicePath;
     private long referenceChoiceContent=-1,referenceChoiceResources=-1;
     private final ReferenceChoiceView creationDependencyView=new ReferenceChoiceView();
-    private PackWorkspace referenceWorkspace;
-    private String referencePath;
-    private long referenceRevision = -1;
-    private List<ReferenceDiagnostics.Link> referenceLinks = List.of();
+    private final AsyncReferenceInspection referenceInspection=new AsyncReferenceInspection();
+    private final ReferenceInspection.PageCache referenceInspectionPages=new ReferenceInspection.PageCache();
+    private final ImString referenceInspectionQuery=new ImString(1025),referenceInspectionJump=new ImString("1",32);
+    private ReferenceInspection.StateFilter referenceInspectionState=ReferenceInspection.StateFilter.ALL;
+    private ReferenceInspection.Query referenceInspectionAccepted;
+    private ReferenceInspection.Report referenceInspectionReport;
+    private int referenceInspectionPage;
+    private String referenceInspectionError;
     private final AsyncAssetImage imageLoader=new AsyncAssetImage();
     private final AsyncImageStatistics imageStatistics=new AsyncImageStatistics();
     private final AsyncFileComparison fileComparison=new AsyncFileComparison();
@@ -149,7 +153,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;imageOwner=null;imageSourcePath=null;imageContentRevision=-1;imageRegion=null;imageRegionStart=null;imageStatisticsError=null;imageStatistics.clear();
     }
     @Override protected void disposeImGui() {
-        try { packLoad.close();fileComparison.close();byteInspection.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
+        try { packLoad.close();referenceInspection.close();fileComparison.close();byteInspection.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -672,21 +676,40 @@ public final class EditorApp extends Application {
         if(jsonActiveSnapshot!=null && !jsonSourceCache.matches(workspace,selected))clearJsonSourcePages();
         fileComparison.poll(workspace); // Saved-baseline and source changes invalidate hidden comparisons without rereading disk.
         byteInspection.poll(workspace,selected); // Release stale captures even when byte inspection is hidden.
+        if(referenceInspection.poll(workspace,selected).phase()!=AsyncReferenceInspection.Phase.READY)clearReferenceInspectionResult();
         resourceAddition.poll(workspace); // Structural/source edits also invalidate hidden reviews.
         folderOperation.poll(workspace); // Hidden folder reviews never retain stale structural authority.
         pendingDiskReview.poll(workspace); // All frame edits, history actions and workspace navigation have completed.
     }
+    private void clearReferenceInspectionResult(){referenceInspectionPages.clear();referenceInspectionReport=null;referenceInspectionAccepted=null;referenceInspectionPage=0;referenceInspectionJump.set("1");}
     private void drawReferences() {
         if (!ReferenceDiagnostics.supports(selected) || !ImGui.collapsingHeader("Resource links (partial)")) return;
-        if (referenceWorkspace != workspace || referenceRevision != workspace.revision() || !java.util.Objects.equals(referencePath, selected)) {
-            referenceWorkspace = workspace; referenceRevision = workspace.revision(); referencePath = selected;
-            referenceLinks = ReferenceDiagnostics.inspect(workspace, selected);
-        }
+        ImGui.pushID("local-resource-links");try{drawReferenceInspection();}finally{ImGui.popID();}
+    }
+    private void drawReferenceInspection() {
         ImGui.textWrapped("Checks authored exact block-alias files in known material palettes, deposit palettes, replacement find lists, decorator block lists/forced blocks and standalone block definitions (including eight backup levels), authored expression/image-map sources in known noise styles and nested fractures, exact structure start-pool files, pool fallback and physical membership files, piece object assets and connector pool targets, image-map PNG sources and a bounded subset of dimension selectors/stacks/carving biomes/subterrain references/image-map bindings, region/biome lists, placement Iris-structure selections/cave-biome restrictions, floating biome references and authored object asset pools. Exact file contents, native aliases, compatibility and other references are unchecked. Save/Export remain available.");
-        if (referenceLinks.isEmpty()) ImGui.textWrapped("No explicit links in this inspected subset; omitted defaults and unknown contexts are not resolved.");
-        int referenceIndex=0;for (var link : referenceLinks) {
-            ImGui.pushID(referenceIndex++);
-            ImGui.textWrapped(InspectorText.label(link.field(),256) + ": " + InspectorText.label(link.key(),256));
+        if(ImGui.button("Inspect / refresh applied links")){
+            try{referenceInspection.start(workspace,selected);clearReferenceInspectionResult();referenceInspectionError=null;}catch(Exception failure){referenceInspectionError=InspectorText.label(failure.getMessage(),512);}
+        }
+        ImGui.sameLine();if(ImGui.button("Clear links")){referenceInspection.clear();clearReferenceInspectionResult();referenceInspectionQuery.set("");referenceInspectionState=ReferenceInspection.StateFilter.ALL;referenceInspectionError=null;}
+        if(referenceInspectionError!=null)ImGui.textWrapped(referenceInspectionError);
+        var scan=referenceInspection.poll(workspace,selected);
+        ImGui.textWrapped("Partial applied-memory check only: at most 1 MB selected JSON and 1,024 links plus a truncation notice. Target contents, aliases and other references stay unchecked; this does not authorize rename, move or delete.");
+        if(scan.phase()==AsyncReferenceInspection.Phase.IDLE){ImGui.textWrapped("Inspect the selected resource to review its applied links. Edits or target-path changes require a fresh inspection.");return;}
+        if(scan.phase()==AsyncReferenceInspection.Phase.SCANNING){ImGui.textWrapped("Inspecting applied links… Clear links cancels this request.");return;}
+        if(scan.phase()==AsyncReferenceInspection.Phase.FAILED){ImGui.textWrapped(scan.error());return;}
+        if(scan.phase()!=AsyncReferenceInspection.Phase.READY)return;
+        var report=scan.report();if(referenceInspectionReport!=report){clearReferenceInspectionResult();referenceInspectionReport=report;}
+        ImGui.inputText("Link field / key / target contains",referenceInspectionQuery);
+        if(ImGui.beginCombo("Recorded link state",referenceInspectionState.label())){for(var state:ReferenceInspection.StateFilter.values())if(ImGui.selectable(state.label(),state==referenceInspectionState))referenceInspectionState=state;ImGui.endCombo();}
+        try{
+            var query=new ReferenceInspection.Query(referenceInspectionQuery.get(),referenceInspectionState);if(!query.equals(referenceInspectionAccepted)){referenceInspectionAccepted=query;referenceInspectionPage=0;referenceInspectionJump.set("1");}
+            var page=referenceInspectionPages.page(report,query,referenceInspectionPage);int requested=drawReviewPager("local-reference-pages",page.window(),referenceInspectionJump,true);page=referenceInspectionPages.page(report,query,requested);referenceInspectionPage=page.window().page();
+            ImGui.textWrapped(page.window().matches()+" matching recorded rows / "+report.links().size()+" recorded total; page "+(page.window().page()+1)+" / "+page.window().pages()+". At most 200 rows per page; filters and pages do not extend inspection coverage.");
+            if(report.links().isEmpty())ImGui.textWrapped("No explicit links in this inspected subset; omitted defaults and unknown contexts are not resolved.");else if(page.entries().isEmpty())ImGui.textWrapped("No recorded rows match these filters.");
+            int referenceIndex=page.window().start();for(var link:page.entries()){
+                ImGui.pushID(referenceIndex++);ImGui.textWrapped(InspectorText.label(link.field(),256)+": "+InspectorText.label(link.key(),256));
+                if(ImGui.isItemHovered())ImGui.setTooltip(InspectorText.label(link.field(),16384)+"\n"+InspectorText.label(link.key(),16384));
             String status = switch (link.state()) {
                 case EXACT_FILE -> "Exact file present (contents unchecked)";
                 case NO_EXACT_FILE -> "No exact file match (aliases unchecked)";
@@ -695,14 +718,12 @@ public final class EditorApp extends Application {
                 case UNSUPPORTED -> "Reference inspection unavailable";
                 case INVALID_KEY -> "Unsupported or unsafe resource key";
             };
-            ImGui.textWrapped(status);
-            if (link.state() == ReferenceDiagnostics.State.EXACT_FILE && ImGui.smallButton("Open linked resource")) {
-                try { resourceNavigation.request(workspace,link.target()); }
-                catch (Exception failure) { error = failure.getMessage(); }
+                ImGui.textWrapped(status);
+                if(link.state()==ReferenceDiagnostics.State.EXACT_FILE && ImGui.smallButton("Open linked resource")){try{resourceNavigation.request(workspace,link.target());}catch(Exception failure){error=failure.getMessage();}}
+                ImGui.popID();
             }
-            ImGui.popID();
-        }
-        ImGui.textWrapped("Noise and material inspection each use at most 4,096 JSON nodes and 32 levels per source; labels show up to 256 characters. Material links list authored exact alias files only; omitted defaults, missing alias files, Minecraft registry names, string block filters and native fallback mappings are not resolved. Declared links do not establish active source selection, formula validity or cycle safety.");
+        }catch(IllegalArgumentException invalid){ImGui.textWrapped(invalid.getMessage());}
+        ImGui.textWrapped("Noise and material inspection each use at most 4,096 JSON nodes and 32 levels per source. Material links list authored exact alias files only; defaults, missing aliases, registry names and native fallback mappings are unresolved. Declared links do not establish active selection, formula validity or cycle safety. Save/Export remain available; unsupported previews remain disabled.");
     }
     private void drawJigsawPiece(LosslessJson root) {
         if (!ImGui.collapsingHeader("Jigsaw piece")) return;
@@ -6540,7 +6561,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();authoringReferences.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false;resourceBrowser.clear();browserOwner=null;browserQuery=null;browserPage=0;browserPageJump.set("1");browserReveal=true;browserScroll=false;browserResetScroll=true; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;referenceInspection.clear();clearReferenceInspectionResult();referenceInspectionQuery.set("");referenceInspectionState=ReferenceInspection.StateFilter.ALL;referenceInspectionError=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();authoringReferences.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false;resourceBrowser.clear();browserOwner=null;browserQuery=null;browserPage=0;browserPageJump.set("1");browserReveal=true;browserScroll=false;browserResetScroll=true; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
