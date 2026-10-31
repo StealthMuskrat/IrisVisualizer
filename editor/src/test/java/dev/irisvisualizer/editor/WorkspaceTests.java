@@ -124,6 +124,7 @@ public final class WorkspaceTests {
         LinkReviewPaginationTests.run(temp);
         PagedTextSearchTests.run(temp);
         ImageStatisticsTests.run(temp);
+        ByteInspectionTests.run(temp);
         ReviewedResourceAdditionTests.run(temp);
         ReviewedFolderOperationTests.run(temp);
    EmptyFolderTests.run(temp);

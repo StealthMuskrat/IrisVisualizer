@@ -8,6 +8,7 @@ import imgui.flag.ImGuiTreeNodeFlags;
 import imgui.flag.ImGuiKey;
 import imgui.flag.ImGuiPopupFlags;
 import imgui.flag.ImGuiCond;
+import imgui.flag.ImGuiTableFlags;
 import imgui.flag.ImGuiInputTextFlags;
 import imgui.flag.ImGuiWindowFlags;
 import static org.lwjgl.glfw.GLFW.*;
@@ -114,6 +115,10 @@ public final class EditorApp extends Application {
     private List<ReferenceDiagnostics.Link> referenceLinks = List.of();
     private final AsyncAssetImage imageLoader=new AsyncAssetImage();
     private final AsyncImageStatistics imageStatistics=new AsyncImageStatistics();
+    private final AsyncByteInspection byteInspection=new AsyncByteInspection();
+    private boolean showByteInspection,focusByteInspection;
+    private String byteInspectionError;
+    private final ImString byteInspectionOffset=new ImString("0",64);
     private boolean showImageStatistics,focusImageStatistics;
     private ImageStatistics.Region imageRegion;
     private ImageViewport.Pixel imageRegionStart;
@@ -132,7 +137,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;imageOwner=null;imageSourcePath=null;imageContentRevision=-1;imageRegion=null;imageRegionStart=null;imageStatisticsError=null;imageStatistics.clear();
     }
     @Override protected void disposeImGui() {
-        try { packLoad.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
+        try { packLoad.close();byteInspection.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -336,6 +341,7 @@ public final class EditorApp extends Application {
     @Override protected void configure(Configuration config) { config.setTitle("Iris Visualizer"); }
     @Override public void process() {
         PackWorkspace frameWorkspace=workspace;boolean frameClose=closeRequested;closeRequested=false;
+        byteInspection.poll(workspace,selected);
         resourceAddition.poll(workspace);
         folderOperation.poll(workspace);
         assetBatchImport.poll(workspace);
@@ -396,6 +402,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("Command palette",EditorCommands.shortcutLabel(EditorCommands.Action.PALETTE))) queueEditorCommand(EditorCommands.Action.PALETTE);
                 if (ImGui.menuItem("Quick Open resource",EditorCommands.shortcutLabel(EditorCommands.Action.QUICK_OPEN))) queueEditorCommand(EditorCommands.Action.QUICK_OPEN);
                 ImGui.beginDisabled(!JsonStructure.supports(selected));if (ImGui.menuItem("Inspect selected JSON structure")) queueEditorCommand(EditorCommands.Action.INSPECT_JSON);ImGui.endDisabled();
+                ImGui.beginDisabled(selected==null);if(ImGui.menuItem("Inspect selected file bytes"))queueEditorCommand(EditorCommands.Action.INSPECT_BYTES);ImGui.endDisabled();
                 if (ImGui.menuItem("Search JSON text",EditorCommands.shortcutLabel(EditorCommands.Action.SEARCH_TEXT))) queueEditorCommand(EditorCommands.Action.SEARCH_TEXT);
                 var back=navigationHistory.back();var forward=navigationHistory.forward();
                 ImGui.beginDisabled(back.isEmpty());if (ImGui.menuItem("Back",EditorCommands.shortcutLabel(EditorCommands.Action.BACK))) queueEditorCommand(EditorCommands.Action.BACK);ImGui.endDisabled();
@@ -443,6 +450,7 @@ public final class EditorApp extends Application {
         ImGui.begin("Resource inspector");
         if (selected != null) {
             ImGui.text(selected);
+            if(ImGui.button("Inspect applied file bytes"))queueEditorCommand(EditorCommands.Action.INSPECT_BYTES);
             ImGui.textWrapped("Unknown and unclassified fields are read-only.");
             int byteCount = workspace.size(selected);
             byte[] bytes = selected.endsWith(".json") && byteCount <= 1_000_000 ? workspace.read(selected) : null;
@@ -570,6 +578,7 @@ public final class EditorApp extends Application {
         if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+        if (showByteInspection) drawByteInspection();
         if (showQuickOpen) drawQuickOpen();
         if (showTextSearch) drawTextSearch();
         if (showPendingChanges) drawPendingChanges();
@@ -633,6 +642,7 @@ public final class EditorApp extends Application {
         textSearch.poll(workspace); // Release stale captures even while the search window is collapsed.
         var statisticsImage=currentStatisticsImage();imageStatistics.poll(statisticsImage);
         if(showImageStatistics)drawImageStatistics(statisticsImage);
+        byteInspection.poll(workspace,selected); // Release stale captures even when byte inspection is hidden.
         resourceAddition.poll(workspace); // Structural/source edits also invalidate hidden reviews.
         folderOperation.poll(workspace); // Hidden folder reviews never retain stale structural authority.
         pendingDiskReview.poll(workspace); // All frame edits, history actions and workspace navigation have completed.
@@ -6518,7 +6528,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=List.of();showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=List.of();showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6928,7 +6938,7 @@ public final class EditorApp extends Application {
         return up==down ? 0 : up ? -1 : 1;
     }
     private CommandPalette.Context commandContext() {
-        return new CommandPalette.Context(workspace.undoCount()>0,workspace.redoCount()>0,!navigationHistory.back().isEmpty(),!navigationHistory.forward().isEmpty(),JsonStructure.supports(selected));
+        return new CommandPalette.Context(workspace.undoCount()>0,workspace.redoCount()>0,!navigationHistory.back().isEmpty(),!navigationHistory.forward().isEmpty(),JsonStructure.supports(selected),selected!=null && workspace.paths().contains(selected));
     }
     private void drawCommandPalette() {
         if (focusCommandPalette) { ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false); }
@@ -6973,6 +6983,39 @@ public final class EditorApp extends Application {
         try {target=ReviewPagination.requestedPage(jump.get());}catch(IllegalArgumentException invalid){problem=invalid.getMessage();}
         ImGui.sameLine();ImGui.beginDisabled(target==null);boolean clicked=ImGui.smallButton("Go to page");ImGui.endDisabled();if(target!=null && (submitted || clicked)){requested=ResourceFinder.Window.at(window.matches(),target,window.pageSize()).page();navigated=true;}
         if(problem!=null)ImGui.textWrapped(problem);if(navigated)jump.set(Integer.toString(requested+1));ImGui.popID();return requested;
+    }
+    private void inspectSelectedBytes() {
+        showByteInspection=true;focusByteInspection=true;
+        try{byteInspection.start(workspace,selected);byteInspectionOffset.set("0");byteInspectionError=null;}catch(Exception failure){byteInspectionError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"Byte inspection failed"),512);}
+    }
+    private void requestBytePage(int page) {
+        try{byteInspection.page(workspace,selected,page);byteInspectionError=null;}catch(Exception failure){byteInspectionError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"Byte page failed"),512);}
+    }
+    private void drawByteInspection() {
+        if(focusByteInspection){ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusByteInspection=false;}
+        ImGui.setNextWindowSize(780,620,ImGuiCond.FirstUseEver);if(!ImGui.begin("Read-only applied file bytes")){ImGui.end();return;}
+        if(ImGui.button("Hide byte inspection")){showByteInspection=false;ImGui.end();return;}
+        ImGui.textWrapped("Inspect applied in-memory file bytes without interpreting their format. Hex offsets are zero-based; ASCII shows 20–7E and uses . for other bytes. This does not load external disk changes or enable native previews.");
+        ImGui.beginDisabled(selected==null);if(ImGui.button("Inspect / refresh selected file"))inspectSelectedBytes();ImGui.endDisabled();ImGui.sameLine();if(ImGui.button("Cancel / clear byte inspection")){byteInspection.clear();byteInspectionError=null;}
+        var state=byteInspection.poll(workspace,selected);
+        if(state.window()!=null){
+            var window=state.window();ImGui.beginDisabled(!window.previous());if(ImGui.smallButton("First byte page"))requestBytePage(0);ImGui.sameLine();if(ImGui.smallButton("Previous byte page"))requestBytePage(window.page()-1);ImGui.endDisabled();ImGui.sameLine();
+            ImGui.beginDisabled(!window.next());if(ImGui.smallButton("Next byte page"))requestBytePage(window.page()+1);ImGui.sameLine();if(ImGui.smallButton("Last byte page"))requestBytePage(window.pages()-1);ImGui.endDisabled();
+            boolean submitted=ImGui.inputText("Go to byte offset (decimal or 0x hex)",byteInspectionOffset,ImGuiInputTextFlags.EnterReturnsTrue|ImGuiInputTextFlags.AutoSelectAll);ImGui.sameLine();boolean clicked=ImGui.smallButton("Go to byte");if(submitted || clicked)try{int page=ByteInspection.offsetPage(byteInspectionOffset.get(),window.bytes());requestBytePage(page);}catch(Exception invalid){byteInspectionError=InspectorText.label(invalid.getMessage(),512);}
+        }
+        state=byteInspection.poll(workspace,selected);
+        if(state.path()!=null)ImGui.textWrapped(InspectorText.label(state.path(),16384));
+        if(state.window()!=null){var window=state.window();ImGui.textWrapped("Page "+(window.page()+1)+" / "+window.pages()+"; byte range ["+window.start()+", "+window.end()+") of "+window.bytes()+" bytes.");}
+        if(state.phase()==AsyncByteInspection.Phase.IDLE)ImGui.textWrapped("Choose a resource and Inspect. Selection, source-byte edits/Undo and workspace changes clear stale inspection; no scan starts automatically.");
+        else if(state.phase()==AsyncByteInspection.Phase.READING)ImGui.textWrapped("Reading the captured page in the background; digest progress "+state.hashed()+" bytes. The full digest is computed once for this capture and reused by later pages.");
+        else if(state.phase()==AsyncByteInspection.Phase.FAILED)ImGui.textWrapped(state.error());
+        if(state.result()!=null){
+            ImGui.textWrapped("SHA-256 of applied encoded bytes: "+state.result().sha256());
+            if(state.result().rows().isEmpty())ImGui.textWrapped("Empty file; no addressable bytes.");
+            if(ImGui.beginTable("Encoded byte rows",3,ImGuiTableFlags.Borders|ImGuiTableFlags.RowBg|ImGuiTableFlags.SizingFixedFit)){ImGui.tableSetupColumn("Offset (hex)");ImGui.tableSetupColumn("Hex bytes");ImGui.tableSetupColumn("ASCII 20–7E");ImGui.tableHeadersRow();for(var row:state.result().rows()){ImGui.tableNextRow();ImGui.tableNextColumn();ImGui.textUnformatted(String.format(java.util.Locale.ROOT,"%08X",row.offset()));ImGui.tableNextColumn();ImGui.textUnformatted(row.hex());ImGui.tableNextColumn();ImGui.textUnformatted(row.ascii());}ImGui.endTable();}
+        }
+        if(byteInspectionError!=null)ImGui.textWrapped(byteInspectionError);
+        ImGui.textWrapped("At most 1,024 bytes / 64 rows per page. The worker hashes existing immutable applied bytes in cancellable chunks without another full-file copy. Hiding retains a valid capture; Clear releases it. Source, selection and workspace changes invalidate hidden work. Resource bytes, inspector drafts, Undo/Redo and Save remain unchanged. Unsupported previews stay disabled.");ImGui.end();
     }
     private void drawQuickOpen() {
         if(focusQuickOpen){ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);}
@@ -7249,6 +7292,7 @@ public final class EditorApp extends Application {
             case REDO->{ if (workspace.redoCount()>0) restoreAppliedEdit(true); }
             case PALETTE->{ showCommandPalette=true;focusCommandPalette=true; }
             case INSPECT_JSON->{ if (JsonStructure.supports(selected)) showJsonStructure=true; }
+            case INSPECT_BYTES->inspectSelectedBytes();
             case REVIEW_CHANGES->showPendingChanges=true;
             case REVIEW_HISTORY->showAppliedHistory=true;
             case REVIEW_LOAD->showPackLoad=true;
