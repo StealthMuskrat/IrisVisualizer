@@ -9,7 +9,7 @@ final class CommandPaletteTests {
     private static boolean has(String query,EditorCommands.Action action) { return CommandPalette.search(query).stream().anyMatch(e->e.action()==action); }
     static void run(Path temp)throws Exception {
         var entries=CommandPalette.entries();var all=EnumSet.allOf(EditorCommands.Action.class);all.remove(EditorCommands.Action.PALETTE);all.remove(EditorCommands.Action.CLOSE);
-        check(entries.size()==27 && entries.stream().map(CommandPalette.Entry::action).distinct().count()==entries.size() && new HashSet<>(entries.stream().map(CommandPalette.Entry::action).toList()).equals(all),"each supported UI action appears exactly once, without recursive palette or native close");
+        check(entries.size()==28 && entries.stream().map(CommandPalette.Entry::action).distinct().count()==entries.size() && new HashSet<>(entries.stream().map(CommandPalette.Entry::action).toList()).equals(all),"each supported UI action appears exactly once, without recursive palette or native close");
         check(CommandPalette.search(" ").equals(entries),"empty query retains stable catalog order");
         check(has("sAvE cOpY",EditorCommands.Action.SAVE_COPY) && has("Ctrl+Shift+S",EditorCommands.Action.SAVE_AS) && has("references",EditorCommands.Action.REVIEW_LINKS),"case-insensitive title/shortcut/task matching");
         check(CommandPalette.search("File: Save Copy").size()==1 && has("File: Save Copy",EditorCommands.Action.SAVE_COPY),"every term must match the same command");
@@ -48,6 +48,6 @@ final class CommandPaletteTests {
         var drafts=new InspectorDrafts();drafts.update("typing","stored","unapplied");long revision=pack.revision(),resourceRevision=pack.resourceRevision();int redo=pack.redoCount();var queue=new EditorCommands.Queue();
         for(var entry:entries) { queue.request(pack,entry.action(),EditorCommands.Origin.UI);check(queue.take(pack)==entry.action() && queue.take(pack)==null,"each palette action uses existing one-shot dispatch"); }
         check(pack.revision()==revision && pack.resourceRevision()==resourceRevision && pack.redoCount()==redo && drafts.any() && Arrays.equals(pack.read("future/opaque.bin"),new byte[]{0,-1,4}),"catalog/search/selection/queue do not edit resources, history or drafts");
-        System.out.println("PASS: bounded immutable 27-command palette catalog with exact supported-action coverage, literal all-term title/task/shared-shortcut search, query/control/token boundaries and disabled reasons from current metadata, palette chord ownership, clamped visible-identity keyboard selection with empty/stale/reordered results, one-shot guarded dispatch identity and retained drafts/history/opaque bytes; unsupported previews absent and no resource payload capture or file/native operations");
+        System.out.println("PASS: bounded immutable 28-command palette catalog with exact supported-action coverage, literal all-term title/task/shared-shortcut search, query/control/token boundaries and disabled reasons from current metadata, palette chord ownership, clamped visible-identity keyboard selection with empty/stale/reordered results, one-shot guarded dispatch identity and retained drafts/history/opaque bytes; unsupported previews absent and no resource payload capture or file/native operations");
     }
 }

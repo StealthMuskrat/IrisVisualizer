@@ -225,6 +225,42 @@ public final class PackWorkspace implements PackResourceView {
         }
         changed.add(target); created.add(target); resourceRevision++; history.clear("Resource created; earlier applied-edit history was cleared."); return target;
     }
+    /** Pure proposed-folder graph preflight for the reviewed UI; legacy synchronous APIs remain compatible. */
+    ReviewedFolderOperation.Plan reviewFolderOperation(ReviewedFolderOperation.Mode mode,String path,String value) throws IOException {
+        Objects.requireNonNull(mode);if(path==null || path.length()>16384)throw new IOException("Choose a resource folder of at most 16,384 characters");safe(path);
+        String target=null;
+        if(mode==ReviewedFolderOperation.Mode.CREATE || mode==ReviewedFolderOperation.Mode.RENAME) {
+            if(value==null || value.length()>255 || !value.matches("[a-z0-9_-]+"))throw new IOException("Use 1-255 lowercase letters, digits, _ or - for the folder name");
+        }
+        if(mode==ReviewedFolderOperation.Mode.CREATE) {
+            if(!ResourceTypes.folderFamily(path))throw new IOException("Choose a supported resource folder; dimensions must stay flat");
+            if(!directories.contains(path) && files.keySet().stream().noneMatch(p->p.startsWith(path+"/")))throw new IOException("Parent folder is not in this workspace");
+            target=path+"/"+value;
+        }else {
+            emptyFolder(path);
+            if(mode==ReviewedFolderOperation.Mode.RENAME)target=path.substring(0,path.lastIndexOf('/'))+"/"+value;
+            else if(mode==ReviewedFolderOperation.Mode.MOVE) {
+                if(value==null || value.length()>16384)throw new IOException("Choose an existing destination folder of at most 16,384 characters");safe(value);
+                if(!ResourceTypes.folderFamily(value) || !path.substring(0,path.indexOf('/')).equals(value.split("/",-1)[0]))throw new IOException("Move folders only within their existing resource family");
+                if(!directories.contains(value) && files.keySet().stream().noneMatch(p->p.startsWith(value+"/")))throw new IOException("Choose an existing destination folder");
+                if(value.equals(path) || value.startsWith(path+"/"))throw new IOException("A folder cannot be moved into itself");target=value+path.substring(path.lastIndexOf('/'));
+            }
+        }
+        var proposed=new TreeSet<>(directories);if(mode!=ReviewedFolderOperation.Mode.CREATE)proposed.remove(path);
+        if(target!=null) {
+            safe(target);for(String component:target.split("/"))if(component.length()>255)throw new IOException("Folder path components must fit 255 characters");
+            if(mode==ReviewedFolderOperation.Mode.CREATE || !target.equals(path)) {
+                if(target.equalsIgnoreCase(path))throw new IOException("Case-only folder renames are not supported on Windows");final String destination=target;
+                if(directories.contains(target) || files.containsKey(target) || files.keySet().stream().anyMatch(p->p.startsWith(destination+"/")))throw new IOException("Destination folder is already occupied: "+target);
+            }
+            for(String ancestor=target.substring(0,target.lastIndexOf('/'));!ancestor.isEmpty();) {
+                if(removedDirectories.contains(ancestor))throw new IOException("Restore the pending parent-folder removal first: "+ancestor);
+                int slash=ancestor.lastIndexOf('/');ancestor=slash<0 ? "" : ancestor.substring(0,slash);
+            }
+            proposed.add(target);
+        }
+        validatePaths(List.of(),proposed,true);return new ReviewedFolderOperation.Plan(mode,path,value,target);
+    }
     public String createSubfolder(String parent, String name) throws IOException {
         if (!ResourceTypes.folderFamily(parent)) throw new IOException("Subfolders are supported only inside regions, biomes, generators, image-maps, blocks, expressions, structures, jigsaw-pools, jigsaw-pieces, objects and images; dimensions must stay flat");
         if (name == null || !name.matches("[a-z0-9_-]+")) throw new IOException("Use lowercase letters, digits, _ or - for a subfolder name");
@@ -596,6 +632,9 @@ public final class PackWorkspace implements PackResourceView {
     private void validatePaths(String additionalFile) throws IOException { validatePaths(List.of(additionalFile)); }
     private void validatePaths(List<String> additionalFiles) throws IOException { validatePaths(additionalFiles,false); }
     private void validatePaths(List<String> additionalFiles,boolean boundCharacters) throws IOException {
+        validatePaths(additionalFiles,directories,boundCharacters);
+    }
+    private void validatePaths(List<String> additionalFiles,Set<String> proposedDirectories,boolean boundCharacters) throws IOException {
         long pathCharacters=0;
         Map<String, String> spellings = new HashMap<>(); Set<String> folders = new HashSet<>();
         List<String> plannedFiles=new ArrayList<>(files.keySet());plannedFiles.addAll(additionalFiles);
@@ -603,7 +642,7 @@ public final class PackWorkspace implements PackResourceView {
             if (removedDirectories.contains(current)) throw new IOException("Restore the pending folder removal before adding resources inside it: "+current);
             int slash=current.lastIndexOf('/');current=slash<0 ? "" : current.substring(0,slash);
         }
-        List<String> all = new ArrayList<>(plannedFiles); all.addAll(directories);
+        List<String> all = new ArrayList<>(plannedFiles); all.addAll(proposedDirectories);
         for (String key : all) {
             String[] parts = key.split("/"); String current = "";
             for (int i=0;i<parts.length;i++) {
@@ -612,7 +651,7 @@ public final class PackWorkspace implements PackResourceView {
                 if(prior==null) { pathCharacters+=current.length();if(boundCharacters && pathCharacters>MAX_LOAD_PATH_CHARACTERS)throw new IOException("Reviewed resource exceeds the 16 million path-character metadata budget"); }
                 if (spellings.size() > MAX_FILES) throw new IOException("Too many pack entries, including folders");
                 if (prior != null && !prior.equals(current)) throw new IOException("Conflicting Windows path spelling: " + current);
-                if (i < parts.length-1 || directories.contains(key)) folders.add(folded);
+                if (i < parts.length-1 || proposedDirectories.contains(key)) folders.add(folded);
             }
         }
         for (String file : plannedFiles) if (folders.contains(file.toLowerCase(Locale.ROOT)))

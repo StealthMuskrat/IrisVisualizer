@@ -49,6 +49,14 @@ public final class EditorApp extends Application {
     private final AsyncZipExport zipExport=new AsyncZipExport();
     private boolean showZipExport;
     private String zipExportMessage;
+    private final ReviewedFolderOperation folderOperation=new ReviewedFolderOperation();
+    private boolean showFolderOperation,focusFolderOperation;
+    private ReviewedFolderOperation.Mode folderOperationMode;
+    private String folderOperationPath,folderOperationError;
+    private final ImString folderOperationValue=new ImString(32768);
+    private ReviewedFolderOperation.Acknowledgement folderOperationAcknowledgement;
+    private long folderOperationReviewed=-1,pendingFolderOperation=-1;
+    private PackWorkspace pendingFolderOperationOwner;
     private final ReviewedResourceAddition resourceAddition=new ReviewedResourceAddition();
     private boolean showResourceAddition,focusResourceAddition;
     private ReviewedResourceAddition.Mode resourceAdditionMode;
@@ -326,6 +334,7 @@ public final class EditorApp extends Application {
     @Override public void process() {
         PackWorkspace frameWorkspace=workspace;boolean frameClose=closeRequested;closeRequested=false;
         resourceAddition.poll(workspace);
+        folderOperation.poll(workspace);
         assetBatchImport.poll(workspace);
         assetImport.poll(workspace);
         assetReplacement.poll(workspace);
@@ -348,6 +357,7 @@ public final class EditorApp extends Application {
                 if (ImGui.menuItem("New jigsaw pool with empty membership")) createResource("jigsaw-pools");
                 if (ImGui.menuItem("New jigsaw piece")) createResource("jigsaw-pieces");
                 if (ImGui.menuItem("Import image/object asset")) importAsset();
+                if (ImGui.menuItem("Review empty-folder operation")) queueEditorCommand(EditorCommands.Action.REVIEW_FOLDER_OPERATION);
                 if (ImGui.menuItem("Review resource creation / duplication")) queueEditorCommand(EditorCommands.Action.REVIEW_RESOURCE_ADDITION);
                 if (ImGui.menuItem("Review captured asset import")) queueEditorCommand(EditorCommands.Action.REVIEW_ASSET_IMPORT);
                 if (ImGui.menuItem("Import image/object batch")) importAssetBatch();
@@ -568,6 +578,7 @@ public final class EditorApp extends Application {
         if (showFolderCopy) drawFolderCopy();
         if (showZipExport) drawZipExport();
         if (showResourceAddition) drawResourceAddition();
+        if (showFolderOperation) drawFolderOperation();
         if (showAssetBatchImport) drawAssetBatchImport();
         if (showAssetImport) drawAssetImport();
         if (showAssetReplacement) drawAssetReplacement();
@@ -577,7 +588,7 @@ public final class EditorApp extends Application {
             try { packLoad.start(path,PackLoads.Kind.DIRECTORY);packLoadMessage=null;showPackLoad=true;if (fromSaveAs) saveAsMessage="Loading published folder; review Open / Import progress to open it with workspace guards.";else folderCopyMessage="Loading completed folder; review Open / Import progress to open it with workspace guards."; }
             catch (Exception failure) { error=InspectorText.label(failure.getMessage(),512);if (fromSaveAs) saveAsMessage=error;else folderCopyMessage=error; }
         }
-        applyPendingFolderAction();
+        preparePendingFolderAction();
         navigationHistory.observe(workspace,selected,filter.get());
         var navigationRequest=resourceNavigation.takeRequest(workspace);
         if (navigationRequest!=null) {
@@ -608,7 +619,7 @@ public final class EditorApp extends Application {
         changesPendingWorkspace=null;changesPendingPath=null;
         referenceReviewPendingWorkspace=null;referenceReviewPendingPath=null;
         if (showAppliedHistory) drawAppliedHistory();
-        if(frameClose) { pendingResourceAddition=-1;pendingResourceAdditionOwner=null; }else finishResourceAddition();
+        if(frameClose) { pendingResourceAddition=-1;pendingResourceAdditionOwner=null;pendingFolderOperation=-1;pendingFolderOperationOwner=null; }else { finishResourceAddition();finishFolderOperation(); }
         boolean paletteOwnedFrame=showCommandPalette;
         if (showCommandPalette) drawCommandPalette();
         if (frameClose) { pendingLoadedRequest=-1;pendingLoadedOwner=null;editorCommands.request(workspace,EditorCommands.Action.CLOSE,EditorCommands.Origin.WINDOW_CLOSE); }
@@ -620,6 +631,7 @@ public final class EditorApp extends Application {
         var statisticsImage=currentStatisticsImage();imageStatistics.poll(statisticsImage);
         if(showImageStatistics)drawImageStatistics(statisticsImage);
         resourceAddition.poll(workspace); // Structural/source edits also invalidate hidden reviews.
+        folderOperation.poll(workspace); // Hidden folder reviews never retain stale structural authority.
         pendingDiskReview.poll(workspace); // All frame edits, history actions and workspace navigation have completed.
     }
     private void drawReferences() {
@@ -6249,25 +6261,54 @@ public final class EditorApp extends Application {
         }
     }
     private void queueFolderAction(String path,String action) { pendingFolderPath=path;pendingFolderAction=action; }
-    private void applyPendingFolderAction() {
+    private void preparePendingFolderAction() {
         String path=pendingFolderPath,action=pendingFolderAction;pendingFolderPath=null;pendingFolderAction=null;
-        if (path==null || action==null) return;
-        try {
-            if (!workspace.editableEmptyFolder(path)) throw new java.io.IOException("Choose an empty leaf resource subfolder. Base folders and folders containing any files or subfolders are unchanged.");
-            String next;
-            if (action.equals("Rename")) {
-                String name=JOptionPane.showInputDialog(null,"New empty folder name (lowercase letters, digits, _ or -):",path.substring(path.lastIndexOf('/')+1));if (name==null) return;
-                next=workspace.renameEmptyFolder(path,name);
-            } else if (action.equals("Move")) {
-                String parent=JOptionPane.showInputDialog(null,"Existing destination folder within "+path.substring(0,path.indexOf('/'))+"/:\nThe folder keeps its name.",path.substring(0,path.lastIndexOf('/')));if (parent==null) return;
-                next=workspace.moveEmptyFolder(path,parent);
-            } else if (action.equals("Delete")) {
-                if (JOptionPane.showConfirmDialog(null,"Remove empty folder from the workspace?\n"+path+"\nSave applies the removal to the active pack. This clears applied-edit history.","Remove empty folder",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION) return;
-                workspace.deleteEmptyFolder(path);next=null;
-            } else return;
-            selectedFolder=next;filter.set("");error=null;
-            // No resource bytes or inspector selection changed: all unapplied inspector text remains available.
-        } catch (Exception failure) { error=failure.getMessage(); }
+        if(path==null || action==null)return;
+        try { beginFolderOperation(switch(action) {case "Rename"->ReviewedFolderOperation.Mode.RENAME;case "Move"->ReviewedFolderOperation.Mode.MOVE;case "Delete"->ReviewedFolderOperation.Mode.DELETE;default->throw new java.io.IOException("Unknown folder operation");},path); }
+        catch(Exception failure) {error=InspectorText.label(failure.getMessage(),512);}
+    }
+    private void resetFolderOperationReview() {
+        folderOperation.clear();folderOperationAcknowledgement=null;folderOperationReviewed=-1;folderOperationError=null;pendingFolderOperation=-1;pendingFolderOperationOwner=null;
+    }
+    private void beginFolderOperation(ReviewedFolderOperation.Mode mode,String path) throws java.io.IOException {
+        if(mode==ReviewedFolderOperation.Mode.CREATE) {if(!ResourceTypes.folderFamily(path))throw new java.io.IOException("Choose a supported resource folder; dimensions stay flat");}
+        else if(!workspace.editableEmptyFolder(path))throw new java.io.IOException("Choose an empty leaf resource subfolder");
+        resetFolderOperationReview();folderOperationMode=mode;folderOperationPath=path;
+        folderOperationValue.set(switch(mode) {case CREATE->"new_folder";case RENAME->path.substring(path.lastIndexOf('/')+1);case MOVE->path.substring(0,path.lastIndexOf('/'));case DELETE->"";});showFolderOperation=true;focusFolderOperation=true;
+    }
+    private void drawFolderOperation() {
+        if(focusFolderOperation) {ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusFolderOperation=false;}
+        ImGui.setNextWindowSize(640,440,ImGuiCond.FirstUseEver);if(!ImGui.begin("Review empty-folder operation")) {ImGui.end();return;}
+        if(ImGui.button("Hide folder review")) {showFolderOperation=false;ImGui.end();return;}
+        ImGui.textWrapped("Review one empty-folder change, then Apply in memory. Resource selection, inspector drafts and bytes stay intact. Save applies folder changes to disk separately.");
+        if(folderOperationMode==null)ImGui.textWrapped("Ctrl-middle-click a supported folder to create a subfolder, or use an empty leaf folder's context menu, F2 or Delete.");
+        else {
+            ImGui.textWrapped(folderOperationMode+": "+InspectorText.label(folderOperationPath,512));
+            if(folderOperationMode!=ReviewedFolderOperation.Mode.DELETE && ImGui.inputText(folderOperationMode==ReviewedFolderOperation.Mode.MOVE ? "Existing destination folder" : "Folder name",folderOperationValue))resetFolderOperationReview();
+            if(ImGui.button("Prepare / refresh folder review"))try {folderOperation.prepare(workspace,folderOperationMode,folderOperationPath,folderOperationMode==ReviewedFolderOperation.Mode.DELETE ? null : folderOperationValue.get());folderOperationError=null;folderOperationAcknowledgement=null;}catch(Exception failure) {folderOperationError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"Folder review failed"),512);}
+        }
+        ImGui.sameLine();if(ImGui.button("Cancel / clear folder review"))resetFolderOperationReview();
+        var state=folderOperation.poll(workspace);if(folderOperationReviewed!=state.request()) {folderOperationReviewed=state.request();folderOperationAcknowledgement=null;}
+        if(state.plan()!=null) {
+            ImGui.separator();ImGui.textWrapped("Reviewed action: "+state.plan().mode()+" "+InspectorText.label(state.plan().path(),512));
+            if(state.plan().target()!=null)ImGui.textWrapped("Exact destination: "+InspectorText.label(state.plan().target(),512));
+            else ImGui.textWrapped("Remove only this empty leaf folder. Save never recursively deletes unexpected files.");
+        }
+        if(state.detail()!=null)ImGui.textWrapped(state.detail());
+        if(state.phase()==ReviewedFolderOperation.Phase.READY) {
+            boolean changes=state.plan().changes(),history=changes && workspace.undoCount()+workspace.redoCount()>0;
+            ImGui.textWrapped(changes ? "Apply clears retained applied-edit history and is not an Undo step." : "This folder already has that name/location. Apply confirms a no-op and preserves history.");
+            boolean acknowledged=folderOperation.acknowledged(workspace,state.request(),folderOperationAcknowledgement);
+            if(history && ImGui.checkbox("Acknowledge clearing current applied-edit history for this folder operation",acknowledged))try {folderOperationAcknowledgement=acknowledged ? null : folderOperation.acknowledge(workspace,state.request());}catch(Exception failure){folderOperationError=InspectorText.label(failure.getMessage(),512);}
+            ImGui.beginDisabled(history && !folderOperation.acknowledged(workspace,state.request(),folderOperationAcknowledgement));boolean apply=ImGui.button("Apply reviewed folder operation");ImGui.endDisabled();if(apply){pendingFolderOperation=state.request();pendingFolderOperationOwner=workspace;}
+        }
+        if(folderOperationError!=null)ImGui.textWrapped(folderOperationError);
+        ImGui.textWrapped("Folder review uses metadata only. A resource-path or folder change requires a fresh review; unrelated byte edits only invalidate the history acknowledgement. Apply repeats exact parent, empty-leaf, same-family, Windows spelling, pending-removal, entry/depth and metadata-budget checks. Disk conflicts remain Save's responsibility. Unsupported previews remain disabled.");ImGui.end();
+    }
+    private void finishFolderOperation() {
+        long request=pendingFolderOperation;var owner=pendingFolderOperationOwner;pendingFolderOperation=-1;pendingFolderOperationOwner=null;if(request<0)return;
+        try {if(owner!=workspace)throw new java.io.IOException("Workspace changed after folder Apply was requested");var state=folderOperation.poll(workspace);String next=folderOperation.apply(workspace,request,folderOperationAcknowledgement);if(state.plan().mode()!=ReviewedFolderOperation.Mode.CREATE && state.plan().path().equals(selectedFolder))selectedFolder=next;folderOperationAcknowledgement=null;folderOperationError=null;}
+        catch(Exception failure) {folderOperationError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"Folder operation failed"),512);}
     }
     private void chooseAssetReplacement(String target) {
         try {
@@ -6469,17 +6510,12 @@ public final class EditorApp extends Application {
         catch(Exception failure) { resourceAdditionError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"Resource addition failed"),512); }
     }
     private void createSubfolder(String parent) {
-        try {
-            if (!ResourceTypes.folderFamily(parent)) throw new IllegalArgumentException("This folder is read-only for subfolder creation; dimensions must stay flat");
-            String name = JOptionPane.showInputDialog(null, "New subfolder name:", "new_folder");
-            if (name == null) return;
-            workspace.createSubfolder(parent, name); filter.set(""); error = null;
-        } catch (Exception failure) { error = failure.getMessage(); }
+        try {beginFolderOperation(ReviewedFolderOperation.Mode.CREATE,parent);}catch(Exception failure) {error=InspectorText.label(failure.getMessage(),512);}
     }
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=List.of();showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=List.of();showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonWholeSnapshot=null;jsonTokenSnapshot=null;jsonWholePreview=null;jsonTokenPreview=null;jsonCurrentPointer=null;jsonPages.clear();jsonWholeText=null;jsonTokenText=null;jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -7211,6 +7247,7 @@ public final class EditorApp extends Application {
             case REVIEW_ASSET_BATCH->showAssetBatchImport=true;
             case REVIEW_ASSET_REPLACEMENT->showAssetReplacement=true;
             case REVIEW_RESOURCE_ADDITION->showResourceAddition=true;
+            case REVIEW_FOLDER_OPERATION->{showFolderOperation=true;focusFolderOperation=true;}
             case QUICK_OPEN->{ showQuickOpen=true;focusQuickOpen=true; }
             case SEARCH_TEXT->{ showTextSearch=true;focusTextSearch=true; }
             case BACK->{ if (!navigationHistory.back().isEmpty()) queueHistoryNavigation(false,1); }
