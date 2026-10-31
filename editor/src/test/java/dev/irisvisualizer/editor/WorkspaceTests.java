@@ -119,6 +119,7 @@ public final class WorkspaceTests {
    SaveMetadataTests.run(temp);
    EditorCommandsTests.run(temp);
         CommandPaletteTests.run(temp);
+        ReviewPaginationTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);
