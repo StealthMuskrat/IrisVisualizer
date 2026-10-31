@@ -6263,7 +6263,7 @@ public final class EditorApp extends Application {
     private void drawResources(ResourceBrowser.Page page,ResourceBrowser.Query query) {
         String toggle=null;
         for (var row : page.rows()) {
-            ImGui.pushID(row.path());float indent=Math.min(row.depth(),8)*12f;if(indent>0)ImGui.indent(indent);
+            ImGui.pushID(row.path().replace("#","\\u0023"));float indent=Math.min(row.depth(),8)*12f;if(indent>0)ImGui.indent(indent);
             if(row.folder()){
                 ImGui.beginDisabled(query.searching());if(ImGui.arrowButton("expand-folder",row.expanded() ? ImGuiDir.Down : ImGuiDir.Right)){toggle=row.path();selectedFolder=row.path();}ImGui.endDisabled();ImGui.sameLine();
             }
