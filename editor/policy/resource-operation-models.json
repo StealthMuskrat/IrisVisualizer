@@ -1,0 +1,1064 @@
+{
+  "description": "Closed serialized declaration graph for ten JSON owners, with audited reference/default rules in resource_operation_schema.py. Presence in this inventory does not make a field editable or authorize a renderer. Unknown owners/fields/types remain blocking.",
+  "classes": {
+    "CarvingMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "FloatingBottomPaletteMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "InterpolationMethod": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "InventorySlotType": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisAttributeModifier": {
+      "kind": "class",
+      "declarationSha256": "0d914ff0a7966376e9f5964c75090dec54fdd94b94465ca9a27a1158df010e49"
+    },
+    "IrisAxisRotationClamp": {
+      "kind": "class",
+      "declarationSha256": "f4182986191b83accfd9f2c363a730276a6af7ac8d85937173652a767c2144d2"
+    },
+    "IrisBiome": {
+      "kind": "class",
+      "declarationSha256": "a185357e482d28a64e9c473fc33105e31102a744043e38736ef297fd5dc1d7f7"
+    },
+    "IrisBiomeCustom": {
+      "kind": "class",
+      "declarationSha256": "8a85a00c577f30e7343a751610ad2930f40931340fcfc5004656f80679405d0f"
+    },
+    "IrisBiomeCustomCategory": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisBiomeCustomParticle": {
+      "kind": "class",
+      "declarationSha256": "3dba203dd303fd9defcd708bcc9460b5d12f457b76d86e8dcd707247c84057c3"
+    },
+    "IrisBiomeCustomPrecipType": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisBiomeCustomSpawn": {
+      "kind": "class",
+      "declarationSha256": "5ece3261debc337fc5507efae5e29bf56b64bf033ba1782ffe4c2c2c462c043a"
+    },
+    "IrisBiomeCustomSpawnType": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisBiomeGeneratorLink": {
+      "kind": "class",
+      "declarationSha256": "3750e895e802210e0b8b0763f40d39648cdf85431788571411cb493d8c7aeb7a"
+    },
+    "IrisBiomePaletteLayer": {
+      "kind": "class",
+      "declarationSha256": "b6d3fc7ffb7133e9579b3350dcdcf0bf6d1f05612ea0c1b2d8d969a97dff6e6b"
+    },
+    "IrisBlockData": {
+      "kind": "class",
+      "declarationSha256": "64e530e7b3496cf6d09277731a9bdbdee200111433714eb6ad967a778a5a224f"
+    },
+    "IrisBlockDrops": {
+      "kind": "class",
+      "declarationSha256": "65e36ea883299f9dd68faa808b3047c571cfc9145f2a16c72e59d3bb3cb3cdf5"
+    },
+    "IrisCaveAnchorMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisCaveFieldModule": {
+      "kind": "class",
+      "declarationSha256": "b91ffaaf1086438611a99d69205b1f7f9631ced07df9c989521ab04293551518"
+    },
+    "IrisCaveProfile": {
+      "kind": "class",
+      "declarationSha256": "d4ee69e704a7df485006000e67f41918efe8de206dd7a49bbcf3e0a3144ab10c"
+    },
+    "IrisCoastalRiverGrottoConfig": {
+      "kind": "class",
+      "declarationSha256": "748798eec8ce370cbe758c6c69726172410a2a80bb6096799db081b59f49ebca"
+    },
+    "IrisCommand": {
+      "kind": "class",
+      "declarationSha256": "b8a19f0eb476c8eee2e5e41954ccd49031bfaf6c1290f7fc2dbdabe06457272e"
+    },
+    "IrisCommandRegistry": {
+      "kind": "class",
+      "declarationSha256": "f4f7099a4748b17ed2ac68ce0f2c3d4132a17c15eec438924c1c69606861a935"
+    },
+    "IrisCoral": {
+      "kind": "class",
+      "declarationSha256": "bb2bc3a5bacc09e9de67beb3a515a1f476fbd98266b851757231d8d0a09eb645"
+    },
+    "IrisCoralBranchAzimuth": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisCoralForm": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisCrystal": {
+      "kind": "class",
+      "declarationSha256": "d392e1d201b15131b7110843dbf6b61773c94b478db31d0cef9eea1c01d67024"
+    },
+    "IrisCrystalDistribution": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisCrystalSurface": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDecorationPart": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDecorationStep": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDecorator": {
+      "kind": "class",
+      "declarationSha256": "1a5b36153b59eee16d0ddc2420605f225bac8bf2d543ec9443b39faeaa46d9fc"
+    },
+    "IrisDeepFluidConfig": {
+      "kind": "class",
+      "declarationSha256": "de3e6591901081fe5b8306acd5a8f8b19389f62b2cadd21ad16b5b9ca365adfc"
+    },
+    "IrisDepositBiomeScope": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDepositGenerator": {
+      "kind": "class",
+      "declarationSha256": "eddf08198788f9e4c99462cd8f96d965f81634b8c3c51f68da40f58af7cfd73e"
+    },
+    "IrisDepositHeightDistribution": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDepositPlacementScope": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDepositShape": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDepositVariant": {
+      "kind": "class",
+      "declarationSha256": "a93075b8d78592d99356e965f058c1ff20c606bddda7b7371180f4e338661ad9"
+    },
+    "IrisDimension": {
+      "kind": "class",
+      "declarationSha256": "3004def9a24aa9c35eadd11b73cb811209b45883a382f9aadbed696b0cc30e02"
+    },
+    "IrisDimensionCarvingEntry": {
+      "kind": "class",
+      "declarationSha256": "a42bd488f4203e1e846ac6f95e9010dbf6be8a59af723c843c136092e4654b9e"
+    },
+    "IrisDimensionMode": {
+      "kind": "class",
+      "declarationSha256": "2cf59e8eaa2bebe47bdfd4170710085091f3fad7ee2534c58db979146a811f8e"
+    },
+    "IrisDimensionModeType": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisDimensionStack": {
+      "kind": "class",
+      "declarationSha256": "c19b0059ded844b549d3a3c01e6a0c60770619d8ce24fbdfeabee1101be4bd77"
+    },
+    "IrisDimensionStackBlend": {
+      "kind": "class",
+      "declarationSha256": "e6633ad61de03c9672c1707a381ec2585d7c1929beab9d4116bd431053843544"
+    },
+    "IrisDimensionTypeOptions": {
+      "kind": "class",
+      "declarationSha256": "6bb57ea0036d21dd8daf72eb747be133727a1cde38f5224f8ca2bfa2bd21ca13"
+    },
+    "IrisDirection": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisEffect": {
+      "kind": "class",
+      "declarationSha256": "8632c7db36c149903dffa8038c9de467c4acfae6a17cfa011f4d48733d2c123c"
+    },
+    "IrisEnchantment": {
+      "kind": "class",
+      "declarationSha256": "99d8bbc3ab1608931e4e21fd8f68439cbb8c61f6bddc54ee24dced24364feff8"
+    },
+    "IrisEngineStreamType": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisEngineValueType": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisEnvironment": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisExpression": {
+      "kind": "class",
+      "declarationSha256": "efa14377139fc1f6097d3954a1cfdd91399be39b9069aec84d5d50f1af2d04e4"
+    },
+    "IrisExpressionFunction": {
+      "kind": "class",
+      "declarationSha256": "c9a187c19bc7cec915e48dd8fe40722fe9f60d218a05d39c1a68807ce073e1ee"
+    },
+    "IrisExpressionLoad": {
+      "kind": "class",
+      "declarationSha256": "74e52f5316195c210c26e1484236a49b2ba5bae13faf2d41555bd0c3f876fb50"
+    },
+    "IrisFloatingChildBiomes": {
+      "kind": "class",
+      "declarationSha256": "97b7812dcd8660dc74106343b8f39d6c461ada35d25d26ca921f77840b38f249"
+    },
+    "IrisFormation": {
+      "kind": "class",
+      "declarationSha256": "297d5b3e6f559e88b95015c6a90428d18e0cd4e99e0d5b1a15a3f2b1a6af02c5"
+    },
+    "IrisFormationForm": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisFormationProfile": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisFungus": {
+      "kind": "class",
+      "declarationSha256": "a50bb1b1ef70e4150e65894cf4422754d4676038736c18fc48073a0e6a196e9d"
+    },
+    "IrisFungusCapShape": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisGenerator": {
+      "kind": "class",
+      "declarationSha256": "b7486ebb09fbcccbe170cc9dcf44070676f99807021462b05ae87cf0da89611d"
+    },
+    "IrisGeneratorStyle": {
+      "kind": "class",
+      "declarationSha256": "4aee0c67c66dfabf1a13affa628cf47d7f3df0847bb2411117459dc72a5d495f"
+    },
+    "IrisGrottoPoolLevel": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisHydrology": {
+      "kind": "class",
+      "declarationSha256": "e1162c047fd83f929dc9af944ea8a58e4da1a92a0f6bc30037034f0b5e9136d1"
+    },
+    "IrisImageMap": {
+      "kind": "class",
+      "declarationSha256": "8f97dde73dda47174c5e78e9f50021823d458019087e6713bcfb3bf9a6ed9f32"
+    },
+    "IrisImageMapAlpha": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImageMapApplication": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImageMapBinding": {
+      "kind": "class",
+      "declarationSha256": "8d1d236911c7881edec4d11077a087fb4eb63ba918f224ec82305641e7fa67e0"
+    },
+    "IrisImageMapMask": {
+      "kind": "class",
+      "declarationSha256": "afa09ce9799054287faad43166b3d40b2a815ec8979363d038e6aceab12fef4e"
+    },
+    "IrisImageMapMaskOperation": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImageMapOrigin": {
+      "kind": "class",
+      "declarationSha256": "38c2fa855ac49e5656796cdf7a02a8ca36104202fecfdfee0da4597db11b0c4a"
+    },
+    "IrisImageMapOutOfBounds": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImageMapRotation": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImageMapSampling": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImageMapType": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImageMapUnknownColor": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisImportedFeatureBiomeRule": {
+      "kind": "class",
+      "declarationSha256": "5c36c1e202869c61c99ec83a882fcb33cb2289bce6971ff1df5a3567808bed05"
+    },
+    "IrisImportedFeatureControl": {
+      "kind": "class",
+      "declarationSha256": "5586475f6c02e2a3468853df95c986c893e8a9daec2bbb78988244594c25376c"
+    },
+    "IrisImportedStructureControl": {
+      "kind": "class",
+      "declarationSha256": "614a5f6cdaa7acc742b32e66946e921d15ea3bb356fdb5dbe5fcb5909720a6b6"
+    },
+    "IrisInlandRiverGrottoConfig": {
+      "kind": "class",
+      "declarationSha256": "ca6ab95acc9c433876004ee879915b25f1eb720d5ee82f573b46a05a93e1d515"
+    },
+    "IrisInterpolator": {
+      "kind": "class",
+      "declarationSha256": "74d1621a4334007a267a146a2e585f3d1ea7eba26cbea5f085625ec536926ca6"
+    },
+    "IrisJigsawBranchFailurePolicy": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisJigsawCompatibility": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisJigsawConfiguration": {
+      "kind": "class",
+      "declarationSha256": "bae011faba15bf27ca0e4a248a2bcdce92bf161cb58742a73fdaa06da9dabb00"
+    },
+    "IrisJigsawConnector": {
+      "kind": "class",
+      "declarationSha256": "c2b6805ee6a1b44fabfd09c0cbc8ddb4960ad44910b5042f2fcfb21d301f5ae5"
+    },
+    "IrisJigsawHeightmap": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisJigsawLiquidSettings": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisJigsawMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisJigsawPiece": {
+      "kind": "class",
+      "declarationSha256": "1094b7c26811731b2e67aed6b1509fee1351db95ea4f27593defe1cfc8226697"
+    },
+    "IrisJigsawPieceEntry": {
+      "kind": "class",
+      "declarationSha256": "d03541c879dec939596573401e010136a438667e222fbd9582401c9f557ec634"
+    },
+    "IrisJigsawPieceRules": {
+      "kind": "class",
+      "declarationSha256": "4d2208edb33a1e91e080be35f9eee618109c249378a8f64e2714d06ae13f433f"
+    },
+    "IrisJigsawPool": {
+      "kind": "class",
+      "declarationSha256": "54f9cd4d4b3ff51dfc361141da8163b12d1d36ad15bff628367b3e1d4ca385b9"
+    },
+    "IrisJigsawThemeSet": {
+      "kind": "class",
+      "declarationSha256": "1ad88b5413de1194e0b93f2321f2f88963fb9505c7175587291203f9a6c4bc61"
+    },
+    "IrisJigsawWorkcell": {
+      "kind": "class",
+      "declarationSha256": "e19001a0e7a3bf10558dd20085864135523a95b8346c7d79ae6f7550328e70d1"
+    },
+    "IrisJigsawWorkcellArchetype": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisLoot": {
+      "kind": "class",
+      "declarationSha256": "fa060e028c6aae2198d31595ca9fa16c3e28f5f3037c8a925ffa45abfff0bd0a"
+    },
+    "IrisLootMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisLootReference": {
+      "kind": "class",
+      "declarationSha256": "c3e83a89cce4d84e152e87c38deebbf51f0ae546f8ec1410be8f624232da3f22"
+    },
+    "IrisMaterialPalette": {
+      "kind": "class",
+      "declarationSha256": "134cf96527ba0c0deee28d36f682fa1de07a738e0749e9c8dff253eb90931ead"
+    },
+    "IrisNativeStructure": {
+      "kind": "class",
+      "declarationSha256": "1a7d984ad9101ea51f31b4944d33e35c2160851f453585075befc149fa55d993"
+    },
+    "IrisNoiseGenerator": {
+      "kind": "class",
+      "declarationSha256": "77277faef95879ea318875a8c468cccc4b19fce5ccc90ffe5380743efb98a418"
+    },
+    "IrisObjectLimit": {
+      "kind": "class",
+      "declarationSha256": "b9e0d65f441523ab7cebdd5b1037d802fad7c4c60e021721ed7aeeee91e587a4"
+    },
+    "IrisObjectLoot": {
+      "kind": "class",
+      "declarationSha256": "2696ddc36c4ce8a0db8a45567329d9b7bf9e22617115ff4d42f8f27c24182784"
+    },
+    "IrisObjectMarker": {
+      "kind": "class",
+      "declarationSha256": "60c3e75449054cc66f7bec7dbdd5ba92657a1f68cdcbfe0706297c0e99d4e7fd"
+    },
+    "IrisObjectPlacement": {
+      "kind": "class",
+      "declarationSha256": "bdb652a6537f5811058c959f56c3fe23bc48fd666cee0155020ac18315643745"
+    },
+    "IrisObjectPlacementScaleInterpolator": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisObjectReplace": {
+      "kind": "class",
+      "declarationSha256": "9480274d288bbb525039798f56d29388094c464d643c6e88df10af9a6488d69d"
+    },
+    "IrisObjectRotation": {
+      "kind": "class",
+      "declarationSha256": "37325d3197a9172b663b45163017223128436e00d12f3f67149348e920b36015"
+    },
+    "IrisObjectScale": {
+      "kind": "class",
+      "declarationSha256": "8a0f632460d5a58c55c0f82f73482e8d184471899e7c685d7e0f40286274708b"
+    },
+    "IrisObjectTranslate": {
+      "kind": "class",
+      "declarationSha256": "1d612bbbb30579f89ff746da8aff91079638cbb22e63c8aa2211c41c519f2d33"
+    },
+    "IrisObjectVanillaLoot": {
+      "kind": "class",
+      "declarationSha256": "501b32ed45f7e7bdec91da4e6a0079582ec6a49b8e07c5b7bad3fab6c0e2af9d"
+    },
+    "IrisOreGenerator": {
+      "kind": "class",
+      "declarationSha256": "885a1eec80d927e12607e3d92be268c3ca15ef23a6dbdeeb06f1a6c52467fda0"
+    },
+    "IrisPosition": {
+      "kind": "class",
+      "declarationSha256": "dcb16f7a7938a661bc0e360ace494f41134f1a0fbc65721389e2459fb427a049"
+    },
+    "IrisProceduralObjects": {
+      "kind": "class",
+      "declarationSha256": "eb607d84900adf90b59c2d8f9e7e8170af17fd42b764c5d51fa32d003021f769"
+    },
+    "IrisProceduralTree": {
+      "kind": "class",
+      "declarationSha256": "8af21534250f7de775b0881a9bdf6329e6de73e4b4414c7c4b551476398ef299"
+    },
+    "IrisRange": {
+      "kind": "class",
+      "declarationSha256": "1a86c2fe205f11bae72fa65da69aa41c5cff44cc1c23297d8250548180265dac"
+    },
+    "IrisRegion": {
+      "kind": "class",
+      "declarationSha256": "b33279db95f4ec9f51c7b8d1cadfe0d5c72414ba430233f60282a1ca5214d82a"
+    },
+    "IrisRegistrant": {
+      "kind": "class",
+      "declarationSha256": "d339fdb50a1fa4701984241b89ef9a60b2d5100125ffa61fa6a330569da50e40"
+    },
+    "IrisRiverBank3DConfig": {
+      "kind": "class",
+      "declarationSha256": "57b51dd7134616f9adeb624524590d18a5f4d03b68e4ddd3060b3d51c8da7a25"
+    },
+    "IrisRiverBedProfile": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisRiverBlendStyle": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisRiverChannelShapeConfig": {
+      "kind": "class",
+      "declarationSha256": "cac5de131ff30420d1362bcb3feaf1b4bd010a1f5b3e61c8a20d44af8d1dec28"
+    },
+    "IrisRiverDropShapeConfig": {
+      "kind": "class",
+      "declarationSha256": "9caca9dba2603bc930e882ba2d2eb04fc1cd8879d35008d7ef7d8b90b562634d"
+    },
+    "IrisRiverExcavationConfig": {
+      "kind": "class",
+      "declarationSha256": "dc44435a7e9b2a12105bbc35629759312277d7c99c0b36d57780e54c94b29c95"
+    },
+    "IrisRiverGeometryConfig": {
+      "kind": "class",
+      "declarationSha256": "3c8cd237388dafca4bc499a53ea7db6aabbefd08c7adcac16372b03f04436844"
+    },
+    "IrisRiverGrottoConfig": {
+      "kind": "class",
+      "declarationSha256": "eece6524de413962472d5005c8fb8a6b53009be0c9f26fa2410730716bb25788"
+    },
+    "IrisRiverHydrology": {
+      "kind": "class",
+      "declarationSha256": "77243a8ea4618aba476e12c3279afd80f38dafd0bee7ce00349e54e091bf903e"
+    },
+    "IrisRiverInlandOutlet": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisRiverMaterialConfig": {
+      "kind": "class",
+      "declarationSha256": "2bf16ad6390da4c6ed790a28d261800cb0f049203a92b2efdcdb4dcae9787043"
+    },
+    "IrisRiverMeanderConfig": {
+      "kind": "class",
+      "declarationSha256": "3dae3501c4773cd085ececfe7f83a3774f73407c7e118f3fa54a12c7cdc45f66"
+    },
+    "IrisRiverMouthConfig": {
+      "kind": "class",
+      "declarationSha256": "07c7814c1aba1f64209b7e2539b72bc3ba9d542288f8bbeccc0f4fc6724a6e64"
+    },
+    "IrisRiverPlacementMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisRiverPolicy": {
+      "kind": "class",
+      "declarationSha256": "dd45cfc8b43238c80000f5800d4edfca8b082184fd81afb50a4876230e685e60"
+    },
+    "IrisRiverProfile": {
+      "kind": "class",
+      "declarationSha256": "189da73aa7422ae61b416f76726a1dbcca1c63e791b464bcb2d4b0a98ca72596"
+    },
+    "IrisRiverRegionalConfig": {
+      "kind": "class",
+      "declarationSha256": "b98596db40bcb34475139fd2c57e4d26b4b7e0068022b3f6f215878556737510"
+    },
+    "IrisRiverRoutingConfig": {
+      "kind": "class",
+      "declarationSha256": "ad48fcc954b0fbaf51e06850b45f9a5bd00b49d458967ed64fec39804fb06913"
+    },
+    "IrisRiverRoutingMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisRuin": {
+      "kind": "class",
+      "declarationSha256": "52eff4a95457a7cb459460c87b31d450205ae4993dabab2528c1d9d011d8c12c"
+    },
+    "IrisRuinDecorator": {
+      "kind": "class",
+      "declarationSha256": "482c00fe1144d2a73678055f43f276aba12b7d1f7c145c13f946cb1c4aa7ab0a"
+    },
+    "IrisRuinDecoratorTarget": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisRuinForm": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisSeaCaveConfig": {
+      "kind": "class",
+      "declarationSha256": "8531139a2ca1aabdd56ec607784f276152e81804d8f3e32b578c0e7cdc8feefb"
+    },
+    "IrisShapedGeneratorStyle": {
+      "kind": "class",
+      "declarationSha256": "e92a0e43f73556c78bec12c615df4826cc18f5117d903b01c0516ed82224de9d"
+    },
+    "IrisSlopeClip": {
+      "kind": "class",
+      "declarationSha256": "187a73165161f54ae7d112917fb2f387d807c6d56c0eb30963bc9d8298d10c95"
+    },
+    "IrisStaticObject": {
+      "kind": "class",
+      "declarationSha256": "c541836a7300c7af72626cac448e46aad83a4feadff53c37a3f9d404c57e900b"
+    },
+    "IrisStaticObjectRotation": {
+      "kind": "class",
+      "declarationSha256": "cb12e582faa310d1ec1da7d721c3aaf81c7cd5c5b67e59d034096bf45c9bb22c"
+    },
+    "IrisStiltSettings": {
+      "kind": "class",
+      "declarationSha256": "1f868bf0bdd22f187ec6939812b0dc785d5034a25107dab816b07d7ecd36840b"
+    },
+    "IrisStructure": {
+      "kind": "class",
+      "declarationSha256": "988d2bd38c1badfd1c593f38b92626250e77378062fad5a6699662df0c28ff98"
+    },
+    "IrisStructureAnchorMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisStructurePlacement": {
+      "kind": "class",
+      "declarationSha256": "cf7e04948ca98ff2eb6228faaae9a78d180bda609771e5d151f42b987b4e6f23"
+    },
+    "IrisStructureSetFrequencyOverride": {
+      "kind": "class",
+      "declarationSha256": "cab3a1d917d30f1744f5f0e24ade0e10c4ac1f1c67d3cda662d998294b60cb5a"
+    },
+    "IrisStructureStiltSettings": {
+      "kind": "class",
+      "declarationSha256": "ef8f69e5b24cd285cf73ddda27cec05f6560a25f697dfbfbf1d41feb26bc02be"
+    },
+    "IrisStructureTerrain": {
+      "kind": "class",
+      "declarationSha256": "ea87d106673f16f45c2b80cd4f2220e67f6b03dc36ccbb658712ba9eca01848d"
+    },
+    "IrisStructureYBand": {
+      "kind": "class",
+      "declarationSha256": "09529b34236b6f35e80c2880965bd9e6eadf0be7f16282268942007b748a9379"
+    },
+    "IrisStyledRange": {
+      "kind": "class",
+      "declarationSha256": "4673b66f59a0dfe4fbbaf2f3d7b55b8001ac6ea6038400068a42b149315d8b9a"
+    },
+    "IrisSubterrainFamily": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisSubterrainFeature": {
+      "kind": "class",
+      "declarationSha256": "5c39952ef50600808212dfdef5995aee9b63020c69e36c810a8a13939a42f0d2"
+    },
+    "IrisSubterrainFluid": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisSurfaceLayerFallback": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisSurfacePoolConfig": {
+      "kind": "class",
+      "declarationSha256": "da6bbe332444d431e9bbf1fa3467b7acfc598eed2689c473bc509a647afb31cf"
+    },
+    "IrisSurfaceRiverBankConfig": {
+      "kind": "class",
+      "declarationSha256": "ff89b928087b635ca54769e96fde15d14065340ea7ec3f06c67e17ba41ba3c6a"
+    },
+    "IrisSurfaceRiverBedConfig": {
+      "kind": "class",
+      "declarationSha256": "1ce0ac576dbbb73a246006c8677ef46f68774b88f39c3842d014ae3c111e928e"
+    },
+    "IrisSurfaceRiverChannelConfig": {
+      "kind": "class",
+      "declarationSha256": "8f5b75952ea158525ae1599a2085445de5e681016d8d8e50d3139b228133c4d5"
+    },
+    "IrisSurfaceRiverConfig": {
+      "kind": "class",
+      "declarationSha256": "18a5d126bc85e52bb4095059fceaf669fb5ce246d8c43af21818353526432fb8"
+    },
+    "IrisSurfaceRiverErosionConfig": {
+      "kind": "class",
+      "declarationSha256": "cbbcc912903c2dae80461137d429bc9688b52d309bc7ac149cde8995ef6fa310"
+    },
+    "IrisSurfaceRiverFlowConfig": {
+      "kind": "class",
+      "declarationSha256": "4af188fafa17424d174e9a343c794d6606f3c15b3ca161224b8d72ebbfcffca4"
+    },
+    "IrisSurfaceRiverPondConfig": {
+      "kind": "class",
+      "declarationSha256": "2113138188563fec7f258fd34649cebbc3e5bda073a7be8306a6f9490caf1d09"
+    },
+    "IrisSurfaceRiverPondsConfig": {
+      "kind": "class",
+      "declarationSha256": "e622449fe8840155bbdddd32db3f23a0836cd83b932a7f30960b4faa92ed6d97"
+    },
+    "IrisSurfaceRiverShapeConfig": {
+      "kind": "class",
+      "declarationSha256": "065150f919e8a5bd132985c8a9b2c1881232376c8a87a6144690cf74117146df"
+    },
+    "IrisSurfaceRiverSourceConfig": {
+      "kind": "class",
+      "declarationSha256": "157dabbeb055e2c095af2aed3a7718f69b5250ab9b5cb7d1514d31b1073d3dd0"
+    },
+    "IrisTerrain3D": {
+      "kind": "class",
+      "declarationSha256": "c93f0691b2dd037a06517293827503ee8056e8502f519f73c2dc6ef12241224f"
+    },
+    "IrisTerrainTransform": {
+      "kind": "class",
+      "declarationSha256": "07a8b7a29164218270f2470f6ae477e179081e02f311a813e6a97124a29bbce6"
+    },
+    "IrisTimeBlock": {
+      "kind": "class",
+      "declarationSha256": "e3a64ca52d33381bad53b932753a73fb4b5459acf8ed303faca1793bb7fadce6"
+    },
+    "IrisTree": {
+      "kind": "class",
+      "declarationSha256": "fa93692d4363e5055457681ad519e416e61f00203cfd232436520c3c1b0eb0db"
+    },
+    "IrisTreeAzimuthMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeBranchProbability": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeBranches": {
+      "kind": "class",
+      "declarationSha256": "0040e9aa509b120fac62cc6eb37a527bcd82318c340ae612b7719f0cce662368"
+    },
+    "IrisTreeCanopy": {
+      "kind": "class",
+      "declarationSha256": "26630484805989f6e3d4394bb8c5c323ebd2faca963501d021b9653e8b4a0daa"
+    },
+    "IrisTreeDecorator": {
+      "kind": "class",
+      "declarationSha256": "eebf8fc14c8631346245c53849b052d1380942dd0bdfbd4cbf81545263bb8260"
+    },
+    "IrisTreeDecoratorTarget": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeFunction": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeLayer": {
+      "kind": "class",
+      "declarationSha256": "30be7029e276adb8b1672858f07aa7db9f1e2a5c594a13a25a531d5fedae5e45"
+    },
+    "IrisTreeLeafMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeModes": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeProfile": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeRootStyle": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisTreeSecondaryLeaf": {
+      "kind": "class",
+      "declarationSha256": "a882549f10b7539acd5e3bb4d54debd150194808d18c684e285408cf8a600c5c"
+    },
+    "IrisTreeSettings": {
+      "kind": "class",
+      "declarationSha256": "a6d77117dec5513b040dffe1fea445b9c0fce7476ec411fc6778c79ea9645221"
+    },
+    "IrisTreeSize": {
+      "kind": "class",
+      "declarationSha256": "dfc6197c433125d8911894fc9cdbabe30f5ccc932846e7d141d8e159e3e566c1"
+    },
+    "IrisTreeSubBranches": {
+      "kind": "class",
+      "declarationSha256": "d23422ab4dc8614fc7d6879d03f86d9d291c47fbaa42832ad7d36f8c75a72508"
+    },
+    "IrisUndergroundRiverConfig": {
+      "kind": "class",
+      "declarationSha256": "88e22c8fc73e41473759ccbf98fe3b65a0c5328386f7437c2506c31bbd9a1598"
+    },
+    "IrisUndergroundRiverSourceConfig": {
+      "kind": "class",
+      "declarationSha256": "05a20f46e5036f2af55313f3bd1cf3dedbbe55eb5e8af8e2eced6954124d2952"
+    },
+    "IrisVacuumSettings": {
+      "kind": "class",
+      "declarationSha256": "5e133652f97df9ae0c6f40295765812ac1fb97d8dac460fc07274473ad04d509"
+    },
+    "IrisVanillaStructureAdjustment": {
+      "kind": "class",
+      "declarationSha256": "8421d4c820727b468a743722fa13d0a3c030cb5c72e5222cbac0a577bf10af5b"
+    },
+    "IrisWeather": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "IrisWorldBoundary": {
+      "kind": "class",
+      "declarationSha256": "232472951b94632d2b1787b8a4549ae4f7dd6ee8506317c1121ed25d15a9c914"
+    },
+    "IrisWorldBoundaryCenter": {
+      "kind": "class",
+      "declarationSha256": "cfeb7002385cb329db35e42d6590551fbf424fb324089f203513b779181f7739"
+    },
+    "JigsawJoint": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "MantleFlag": {
+      "kind": "interface",
+      "declarationSha256": "03d632f55560262f6bf9b389affe6bcb527f7c2db8f2e190598ad224fbcff9f2"
+    },
+    "NativeStructureSuppression": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "NoiseStyle": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "ObjectPlaceMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "OverrideMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "StructureCarveShape": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "StructureDistribution": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "StructureTerrainMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "StudioMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    },
+    "TopShapeMode": {
+      "kind": "enum",
+      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+    }
+  },
+  "files": {
+    "CarvingMode": "generation/cave/CarvingMode.java",
+    "FloatingBottomPaletteMode": "generation/biome/FloatingBottomPaletteMode.java",
+    "ImageResourceLoader": "pack/loading/ImageResourceLoader.java",
+    "InterpolationMethod": "@volmlib/util/interpolation/InterpolationMethod.java",
+    "InventorySlotType": "world/loot/InventorySlotType.java",
+    "IrisAttributeModifier": "world/entity/IrisAttributeModifier.java",
+    "IrisAxisRotationClamp": "structure/object/IrisAxisRotationClamp.java",
+    "IrisBiome": "generation/biome/IrisBiome.java",
+    "IrisBiomeCustom": "generation/biome/IrisBiomeCustom.java",
+    "IrisBiomeCustomCategory": "generation/biome/IrisBiomeCustomCategory.java",
+    "IrisBiomeCustomParticle": "generation/biome/IrisBiomeCustomParticle.java",
+    "IrisBiomeCustomPrecipType": "generation/biome/IrisBiomeCustomPrecipType.java",
+    "IrisBiomeCustomSpawn": "generation/biome/IrisBiomeCustomSpawn.java",
+    "IrisBiomeCustomSpawnType": "generation/biome/IrisBiomeCustomSpawnType.java",
+    "IrisBiomeGeneratorLink": "generation/biome/IrisBiomeGeneratorLink.java",
+    "IrisBiomePaletteLayer": "generation/biome/IrisBiomePaletteLayer.java",
+    "IrisBlockData": "generation/block/IrisBlockData.java",
+    "IrisBlockDrops": "world/loot/IrisBlockDrops.java",
+    "IrisCaveAnchorMode": "generation/cave/IrisCaveAnchorMode.java",
+    "IrisCaveFieldModule": "generation/cave/IrisCaveFieldModule.java",
+    "IrisCaveProfile": "generation/cave/IrisCaveProfile.java",
+    "IrisCoastalRiverGrottoConfig": "generation/hydrology/IrisCoastalRiverGrottoConfig.java",
+    "IrisCommand": "command/IrisCommand.java",
+    "IrisCommandRegistry": "command/IrisCommandRegistry.java",
+    "IrisCoral": "generation/decoration/coral/IrisCoral.java",
+    "IrisCoralBranchAzimuth": "generation/decoration/coral/IrisCoralBranchAzimuth.java",
+    "IrisCoralForm": "generation/decoration/coral/IrisCoralForm.java",
+    "IrisCrystal": "generation/decoration/crystal/IrisCrystal.java",
+    "IrisCrystalDistribution": "generation/decoration/crystal/IrisCrystalDistribution.java",
+    "IrisCrystalSurface": "generation/decoration/crystal/IrisCrystalSurface.java",
+    "IrisData": "pack/loading/IrisData.java",
+    "IrisDecorationPart": "generation/decoration/IrisDecorationPart.java",
+    "IrisDecorationStep": "generation/decoration/IrisDecorationStep.java",
+    "IrisDecorator": "generation/decoration/IrisDecorator.java",
+    "IrisDeepFluidConfig": "generation/hydrology/IrisDeepFluidConfig.java",
+    "IrisDepositBiomeScope": "generation/decoration/IrisDepositBiomeScope.java",
+    "IrisDepositGenerator": "generation/decoration/IrisDepositGenerator.java",
+    "IrisDepositHeightDistribution": "generation/decoration/IrisDepositHeightDistribution.java",
+    "IrisDepositPlacementScope": "generation/decoration/IrisDepositPlacementScope.java",
+    "IrisDepositShape": "generation/decoration/IrisDepositShape.java",
+    "IrisDepositVariant": "generation/decoration/IrisDepositVariant.java",
+    "IrisDimension": "generation/terrain/IrisDimension.java",
+    "IrisDimensionCarvingEntry": "generation/terrain/IrisDimensionCarvingEntry.java",
+    "IrisDimensionCarvingResolver": "generation/terrain/IrisDimensionCarvingResolver.java",
+    "IrisDimensionMode": "generation/terrain/IrisDimensionMode.java",
+    "IrisDimensionModeType": "generation/terrain/IrisDimensionModeType.java",
+    "IrisDimensionStack": "generation/terrain/IrisDimensionStack.java",
+    "IrisDimensionStackBlend": "generation/terrain/IrisDimensionStackBlend.java",
+    "IrisDimensionTypeOptions": "generation/terrain/IrisDimensionTypeOptions.java",
+    "IrisDirection": "pack/value/IrisDirection.java",
+    "IrisEffect": "world/entity/IrisEffect.java",
+    "IrisEnchantment": "world/entity/IrisEnchantment.java",
+    "IrisEngineStreamType": "generation/runtime/IrisEngineStreamType.java",
+    "IrisEngineValueType": "generation/runtime/IrisEngineValueType.java",
+    "IrisEnvironment": "world/IrisEnvironment.java",
+    "IrisExpression": "generation/noise/IrisExpression.java",
+    "IrisExpressionFunction": "generation/noise/IrisExpressionFunction.java",
+    "IrisExpressionLoad": "generation/noise/IrisExpressionLoad.java",
+    "IrisFloatingChildBiomes": "generation/biome/IrisFloatingChildBiomes.java",
+    "IrisFormation": "generation/decoration/formation/IrisFormation.java",
+    "IrisFormationForm": "generation/decoration/formation/IrisFormationForm.java",
+    "IrisFormationProfile": "generation/decoration/formation/IrisFormationProfile.java",
+    "IrisFungus": "generation/decoration/fungus/IrisFungus.java",
+    "IrisFungusCapShape": "generation/decoration/fungus/IrisFungusCapShape.java",
+    "IrisGenerator": "generation/noise/IrisGenerator.java",
+    "IrisGeneratorStyle": "generation/noise/IrisGeneratorStyle.java",
+    "IrisGrottoPoolLevel": "generation/hydrology/IrisGrottoPoolLevel.java",
+    "IrisHydrology": "generation/hydrology/IrisHydrology.java",
+    "IrisImageMap": "generation/image/IrisImageMap.java",
+    "IrisImageMapAlpha": "generation/image/IrisImageMapAlpha.java",
+    "IrisImageMapApplication": "generation/image/IrisImageMapApplication.java",
+    "IrisImageMapBinding": "generation/image/IrisImageMapBinding.java",
+    "IrisImageMapCompiler": "generation/image/IrisImageMapCompiler.java",
+    "IrisImageMapMask": "generation/image/IrisImageMapMask.java",
+    "IrisImageMapMaskOperation": "generation/image/IrisImageMapMaskOperation.java",
+    "IrisImageMapOrigin": "generation/image/IrisImageMapOrigin.java",
+    "IrisImageMapOutOfBounds": "generation/image/IrisImageMapOutOfBounds.java",
+    "IrisImageMapRotation": "generation/image/IrisImageMapRotation.java",
+    "IrisImageMapRuntime": "generation/image/IrisImageMapRuntime.java",
+    "IrisImageMapSampling": "generation/image/IrisImageMapSampling.java",
+    "IrisImageMapType": "generation/image/IrisImageMapType.java",
+    "IrisImageMapUnknownColor": "generation/image/IrisImageMapUnknownColor.java",
+    "IrisImportedFeatureBiomeRule": "structure/nativegen/IrisImportedFeatureBiomeRule.java",
+    "IrisImportedFeatureControl": "structure/nativegen/IrisImportedFeatureControl.java",
+    "IrisImportedStructureControl": "structure/nativegen/IrisImportedStructureControl.java",
+    "IrisInlandRiverGrottoConfig": "generation/hydrology/IrisInlandRiverGrottoConfig.java",
+    "IrisInterpolator": "generation/noise/IrisInterpolator.java",
+    "IrisJigsawBranchFailurePolicy": "structure/jigsaw/IrisJigsawBranchFailurePolicy.java",
+    "IrisJigsawCompatibility": "structure/jigsaw/IrisJigsawCompatibility.java",
+    "IrisJigsawConfiguration": "structure/jigsaw/IrisJigsawConfiguration.java",
+    "IrisJigsawConnector": "structure/jigsaw/IrisJigsawConnector.java",
+    "IrisJigsawHeightmap": "structure/jigsaw/IrisJigsawHeightmap.java",
+    "IrisJigsawLiquidSettings": "structure/jigsaw/IrisJigsawLiquidSettings.java",
+    "IrisJigsawMode": "structure/jigsaw/IrisJigsawMode.java",
+    "IrisJigsawPiece": "structure/jigsaw/IrisJigsawPiece.java",
+    "IrisJigsawPieceEntry": "structure/jigsaw/IrisJigsawPieceEntry.java",
+    "IrisJigsawPieceRules": "structure/jigsaw/IrisJigsawPieceRules.java",
+    "IrisJigsawPool": "structure/jigsaw/IrisJigsawPool.java",
+    "IrisJigsawThemeSet": "structure/jigsaw/IrisJigsawThemeSet.java",
+    "IrisJigsawWorkcell": "structure/jigsaw/IrisJigsawWorkcell.java",
+    "IrisJigsawWorkcellArchetype": "structure/jigsaw/IrisJigsawWorkcellArchetype.java",
+    "IrisLoot": "world/loot/IrisLoot.java",
+    "IrisLootMode": "world/loot/IrisLootMode.java",
+    "IrisLootReference": "world/loot/IrisLootReference.java",
+    "IrisMaterialPalette": "generation/terrain/IrisMaterialPalette.java",
+    "IrisNativeStructure": "structure/nativegen/IrisNativeStructure.java",
+    "IrisNoiseGenerator": "generation/noise/IrisNoiseGenerator.java",
+    "IrisObjectLimit": "structure/object/IrisObjectLimit.java",
+    "IrisObjectLoot": "structure/object/IrisObjectLoot.java",
+    "IrisObjectMarker": "structure/object/IrisObjectMarker.java",
+    "IrisObjectPlacement": "structure/object/IrisObjectPlacement.java",
+    "IrisObjectPlacementRunner": "structure/object/IrisObjectPlacementRunner.java",
+    "IrisObjectPlacementScaleInterpolator": "structure/object/IrisObjectPlacementScaleInterpolator.java",
+    "IrisObjectReplace": "structure/object/IrisObjectReplace.java",
+    "IrisObjectRotation": "structure/object/IrisObjectRotation.java",
+    "IrisObjectScale": "structure/object/IrisObjectScale.java",
+    "IrisObjectTranslate": "structure/object/IrisObjectTranslate.java",
+    "IrisObjectVanillaLoot": "structure/object/IrisObjectVanillaLoot.java",
+    "IrisOreGenerator": "generation/decoration/IrisOreGenerator.java",
+    "IrisPosition": "pack/value/IrisPosition.java",
+    "IrisProceduralBlocks": "generation/decoration/IrisProceduralBlocks.java",
+    "IrisProceduralObjects": "generation/decoration/IrisProceduralObjects.java",
+    "IrisProceduralTree": "generation/decoration/tree/IrisProceduralTree.java",
+    "IrisRange": "pack/value/IrisRange.java",
+    "IrisRegion": "generation/terrain/IrisRegion.java",
+    "IrisRegistrant": "pack/loading/IrisRegistrant.java",
+    "IrisRiverBank3DConfig": "generation/hydrology/IrisRiverBank3DConfig.java",
+    "IrisRiverBedProfile": "generation/hydrology/IrisRiverBedProfile.java",
+    "IrisRiverBlendStyle": "generation/hydrology/IrisRiverBlendStyle.java",
+    "IrisRiverChannelShapeConfig": "generation/hydrology/IrisRiverChannelShapeConfig.java",
+    "IrisRiverDropShapeConfig": "generation/hydrology/IrisRiverDropShapeConfig.java",
+    "IrisRiverExcavationConfig": "generation/hydrology/IrisRiverExcavationConfig.java",
+    "IrisRiverGeometryConfig": "generation/hydrology/IrisRiverGeometryConfig.java",
+    "IrisRiverGrottoConfig": "generation/hydrology/IrisRiverGrottoConfig.java",
+    "IrisRiverHydrology": "generation/hydrology/IrisRiverHydrology.java",
+    "IrisRiverInlandOutlet": "generation/hydrology/IrisRiverInlandOutlet.java",
+    "IrisRiverMaterialConfig": "generation/hydrology/IrisRiverMaterialConfig.java",
+    "IrisRiverMeanderConfig": "generation/hydrology/IrisRiverMeanderConfig.java",
+    "IrisRiverMouthConfig": "generation/hydrology/IrisRiverMouthConfig.java",
+    "IrisRiverPlacementMode": "generation/hydrology/IrisRiverPlacementMode.java",
+    "IrisRiverPolicy": "generation/hydrology/IrisRiverPolicy.java",
+    "IrisRiverProfile": "generation/hydrology/IrisRiverProfile.java",
+    "IrisRiverRegionalConfig": "generation/hydrology/IrisRiverRegionalConfig.java",
+    "IrisRiverRoutingConfig": "generation/hydrology/IrisRiverRoutingConfig.java",
+    "IrisRiverRoutingMode": "generation/hydrology/IrisRiverRoutingMode.java",
+    "IrisRuin": "generation/decoration/ruin/IrisRuin.java",
+    "IrisRuinDecorator": "generation/decoration/ruin/IrisRuinDecorator.java",
+    "IrisRuinDecoratorTarget": "generation/decoration/ruin/IrisRuinDecoratorTarget.java",
+    "IrisRuinForm": "generation/decoration/ruin/IrisRuinForm.java",
+    "IrisSeaCaveConfig": "generation/hydrology/IrisSeaCaveConfig.java",
+    "IrisShapedGeneratorStyle": "generation/noise/IrisShapedGeneratorStyle.java",
+    "IrisSlopeClip": "generation/terrain/IrisSlopeClip.java",
+    "IrisStaticObject": "structure/object/IrisStaticObject.java",
+    "IrisStaticObjectRotation": "structure/object/IrisStaticObjectRotation.java",
+    "IrisStiltSettings": "generation/decoration/IrisStiltSettings.java",
+    "IrisStructure": "structure/placement/IrisStructure.java",
+    "IrisStructureAnchorMode": "structure/placement/IrisStructureAnchorMode.java",
+    "IrisStructurePlacement": "structure/placement/IrisStructurePlacement.java",
+    "IrisStructureSetFrequencyOverride": "structure/placement/IrisStructureSetFrequencyOverride.java",
+    "IrisStructureStiltSettings": "structure/placement/IrisStructureStiltSettings.java",
+    "IrisStructureTerrain": "structure/placement/IrisStructureTerrain.java",
+    "IrisStructureYBand": "structure/placement/IrisStructureYBand.java",
+    "IrisStyledRange": "generation/noise/IrisStyledRange.java",
+    "IrisSubterrainFamily": "generation/subterrain/IrisSubterrainFamily.java",
+    "IrisSubterrainFeature": "generation/subterrain/IrisSubterrainFeature.java",
+    "IrisSubterrainFluid": "generation/subterrain/IrisSubterrainFluid.java",
+    "IrisSurfaceLayerFallback": "generation/biome/IrisSurfaceLayerFallback.java",
+    "IrisSurfacePoolConfig": "generation/hydrology/IrisSurfacePoolConfig.java",
+    "IrisSurfaceRiverBankConfig": "generation/hydrology/IrisSurfaceRiverBankConfig.java",
+    "IrisSurfaceRiverBedConfig": "generation/hydrology/IrisSurfaceRiverBedConfig.java",
+    "IrisSurfaceRiverChannelConfig": "generation/hydrology/IrisSurfaceRiverChannelConfig.java",
+    "IrisSurfaceRiverConfig": "generation/hydrology/IrisSurfaceRiverConfig.java",
+    "IrisSurfaceRiverErosionConfig": "generation/hydrology/IrisSurfaceRiverErosionConfig.java",
+    "IrisSurfaceRiverFlowConfig": "generation/hydrology/IrisSurfaceRiverFlowConfig.java",
+    "IrisSurfaceRiverPondConfig": "generation/hydrology/IrisSurfaceRiverPondConfig.java",
+    "IrisSurfaceRiverPondsConfig": "generation/hydrology/IrisSurfaceRiverPondsConfig.java",
+    "IrisSurfaceRiverShapeConfig": "generation/hydrology/IrisSurfaceRiverShapeConfig.java",
+    "IrisSurfaceRiverSourceConfig": "generation/hydrology/IrisSurfaceRiverSourceConfig.java",
+    "IrisTerrain3D": "generation/terrain/IrisTerrain3D.java",
+    "IrisTerrainTransform": "generation/terrain/transform/IrisTerrainTransform.java",
+    "IrisTimeBlock": "world/IrisTimeBlock.java",
+    "IrisTree": "generation/decoration/tree/IrisTree.java",
+    "IrisTreeAzimuthMode": "generation/decoration/tree/IrisTreeAzimuthMode.java",
+    "IrisTreeBranchProbability": "generation/decoration/tree/IrisTreeBranchProbability.java",
+    "IrisTreeBranches": "generation/decoration/tree/IrisTreeBranches.java",
+    "IrisTreeCanopy": "generation/decoration/tree/IrisTreeCanopy.java",
+    "IrisTreeDecorator": "generation/decoration/tree/IrisTreeDecorator.java",
+    "IrisTreeDecoratorTarget": "generation/decoration/tree/IrisTreeDecoratorTarget.java",
+    "IrisTreeFunction": "generation/decoration/tree/IrisTreeFunction.java",
+    "IrisTreeLayer": "generation/decoration/tree/IrisTreeLayer.java",
+    "IrisTreeLeafMode": "generation/decoration/tree/IrisTreeLeafMode.java",
+    "IrisTreeModes": "generation/decoration/tree/IrisTreeModes.java",
+    "IrisTreeProfile": "generation/decoration/tree/IrisTreeProfile.java",
+    "IrisTreeRootStyle": "generation/decoration/tree/IrisTreeRootStyle.java",
+    "IrisTreeSecondaryLeaf": "generation/decoration/tree/IrisTreeSecondaryLeaf.java",
+    "IrisTreeSettings": "generation/decoration/tree/IrisTreeSettings.java",
+    "IrisTreeSize": "generation/decoration/tree/IrisTreeSize.java",
+    "IrisTreeSubBranches": "generation/decoration/tree/IrisTreeSubBranches.java",
+    "IrisUndergroundRiverConfig": "generation/hydrology/IrisUndergroundRiverConfig.java",
+    "IrisUndergroundRiverSourceConfig": "generation/hydrology/IrisUndergroundRiverSourceConfig.java",
+    "IrisVacuumSettings": "generation/decoration/IrisVacuumSettings.java",
+    "IrisVanillaStructureAdjustment": "structure/nativegen/IrisVanillaStructureAdjustment.java",
+    "IrisWeather": "world/IrisWeather.java",
+    "IrisWorldBoundary": "world/IrisWorldBoundary.java",
+    "IrisWorldBoundaryCenter": "world/IrisWorldBoundaryCenter.java",
+    "JigsawJoint": "structure/jigsaw/JigsawJoint.java",
+    "MantleFlag": "@volmlib/util/mantle/flag/MantleFlag.java",
+    "MantleFlagAdapter": "@volmlib/util/mantle/flag/MantleFlagAdapter.java",
+    "NativeStructureSuppression": "structure/nativegen/NativeStructureSuppression.java",
+    "NoiseStyle": "generation/noise/NoiseStyle.java",
+    "ObjectPlaceMode": "structure/object/ObjectPlaceMode.java",
+    "ObjectResourceLoader": "pack/loading/ObjectResourceLoader.java",
+    "OverrideMode": "pack/value/OverrideMode.java",
+    "ReservedFlag": "@volmlib/util/mantle/flag/ReservedFlag.java",
+    "ResourceLoader": "pack/loading/ResourceLoader.java",
+    "StructureCarveShape": "@volmlib/util/structure/StructureCarveShape.java",
+    "StructureDistribution": "structure/placement/StructureDistribution.java",
+    "StructureTerrainMode": "@volmlib/util/structure/StructureTerrainMode.java",
+    "StudioMode": "studio/StudioMode.java",
+    "SubterrainPlanner": "generation/subterrain/SubterrainPlanner.java",
+    "TopShapeMode": "generation/biome/TopShapeMode.java"
+  }
+}

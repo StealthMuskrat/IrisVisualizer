@@ -136,6 +136,7 @@ public final class WorkspaceTests {
         ResourceOperationTests.run(temp);
         ResourceRemovalSaveTests.run(temp);
         ResourceOperationCoverageTests.run(temp);
+        ResourceOperationCoreOwnersTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);

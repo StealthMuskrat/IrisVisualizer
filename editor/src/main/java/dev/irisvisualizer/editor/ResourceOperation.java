@@ -50,12 +50,16 @@ final class ResourceOperation {
     static boolean targetFamily(String family){return family!=null && (SCHEMA.getProperty("root."+family)!=null || Set.of("objects","images").contains(family));}
     static void check(BooleanSupplier cancelled){if(cancelled.getAsBoolean() || Thread.currentThread().isInterrupted())throw new CancellationException("Resource operation review cancelled");}
     private static byte[] copy(byte[] owned,BooleanSupplier cancelled){var bytes=new byte[owned.length];for(int i=0;i<bytes.length;i+=65536){check(cancelled);System.arraycopy(owned,i,bytes,i,Math.min(65536,bytes.length-i));}check(cancelled);return bytes;}
+    private record Rewrite(JsonStructure.Node node,String value){}
     private static final class Scan {
-        final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<JsonStructure.Node>> rewrites=new TreeMap<>();int omitted,inspected;
+        final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<Rewrite>> rewrites=new TreeMap<>();final Map<String,Set<String>> imageMapUses=new TreeMap<>();final List<Reference> categoricalBiomes=new ArrayList<>();int omitted,inspected;
         Scan(Source source,BooleanSupplier cancelled){this.source=source;this.cancelled=cancelled;resolver=new Resolver(source.paths,cancelled);issues.addAll(source.issues);}
         void issue(String path,String pointer,String detail){if(issues.size()<MAX_ISSUES)issues.add(new Issue(path,pointer,detail));else omitted++;}
         String string(JsonStructure.Snapshot snapshot,JsonStructure.Node node){return new LosslessJson(("{\"x\":"+snapshot.source().substring(node.start(),node.end())+"}").getBytes(StandardCharsets.UTF_8)).stringToken("x");}
         void reference(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String family,String key,boolean implicit){
+            reference(path,document,node,pointer,family,key,implicit,"","");
+        }
+        void reference(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String family,String key,boolean implicit,String prefix,String suffix){
             if(key.isEmpty() || key.equals("null"))return;
             boolean block=family.equals("blocks");
             // Iris consults the custom-block loader before the vanilla registry for bare block strings.
@@ -73,23 +77,93 @@ final class ResourceOperation {
             if(incoming){
                 if(implicit)issue(path,pointer,"An omitted setting implicitly references this resource. Set an explicit value before this operation; absent defaults are never materialized by resource maintenance.");
                 else if(source.plan.mode()==Mode.DELETE)issue(path,pointer,"Resource is referenced here; remove or redirect this reference before deleting.");
-                else rewrites.computeIfAbsent(path,p->new ArrayList<>()).add(node);
+                else rewrites.computeIfAbsent(path,p->new ArrayList<>()).add(new Rewrite(node,prefix+replacement+suffix));
             }
         }
+        boolean affected(String families){return Arrays.asList(families.split(",")).contains(ResourceTypes.fileFamily(source.plan.source()));}
         void defaults(String path,String model,Set<String> present,String pointer){
             for(String field:SCHEMA.getProperty(model+".fields").split(",")){
                 if(present.contains(field))continue;
-                String implicit=SCHEMA.getProperty(model+"."+field+".implicit");if(implicit==null)continue;
-                String[] parts=implicit.split("\\|",-1);
-                String next=pointer+"/"+field+(parts[1].isEmpty()?"":"/"+parts[1]);
-                reference(path,null,null,next,parts[0],parts[2],true);
+                String qualified=model+"."+field,blocked=SCHEMA.getProperty(qualified+".defaultBlock");
+                if(blocked!=null && affected(blocked))issue(path,pointer+"/"+field,"Omitted default has an uncertified resource-bearing initializer: "+SCHEMA.getProperty(qualified+".defaultReason")+". Set an explicit supported value before this operation.");
+                int count=Integer.parseInt(SCHEMA.getProperty(qualified+".implicit.count","0"));
+                for(int i=0;i<count;i++){
+                    String[] parts=SCHEMA.getProperty(qualified+".implicit."+i).split("\\|",-1);
+                    String next=pointer+"/"+field+(parts[1].isEmpty()?"":"/"+parts[1]);
+                    reference(path,null,null,next,parts[0],parts[2],true);
+                }
+            }
+        }
+        JsonStructure.Node member(JsonStructure.Snapshot document,JsonStructure.Node object,String field){
+            if(object.kind()!=JsonStructure.Kind.OBJECT)return null;
+            for(int id:object.children())if(document.node(id).segment().equals(field))return document.node(id);
+            return null;
+        }
+        void mapUse(String map,String application){if(!Set.of("BIOME","REGION","SURFACE_BLOCK","TERRAIN_HEIGHT","MASK","CUSTOM","SCALAR").contains(application))application="UNKNOWN";String resolved=resolver.resolve("image-maps",map);if(resolved!=null)imageMapUses.computeIfAbsent(resolved,p->new TreeSet<>()).add(application);}
+        // Every frozen owner is parsed before this pass. Binding roles and scalar consumers are collected before labels.
+        void collectImageMapUses(JsonStructure.Snapshot document,int id,String type){
+            check(cancelled);var current=document.node(id);
+            if(current.kind()==JsonStructure.Kind.NULL)return;
+            if(type.startsWith("list:") && current.kind()==JsonStructure.Kind.ARRAY){for(int child:current.children())collectImageMapUses(document,child,type.substring(5));return;}
+            if(!type.startsWith("object:") || current.kind()!=JsonStructure.Kind.OBJECT)return;
+            String model=type.substring(7);
+            if(model.equals("IrisImageMapBinding")){
+                var map=member(document,current,"map");var application=member(document,current,"application");
+                if(map!=null && map.kind()==JsonStructure.Kind.STRING)mapUse(string(document,map).trim(),application==null?"CUSTOM":application.kind()==JsonStructure.Kind.STRING?string(document,application):"UNKNOWN");
+            }else if(model.equals("IrisGeneratorStyle")){
+                var map=member(document,current,"imageMap");if(map!=null && map.kind()==JsonStructure.Kind.STRING)mapUse(string(document,map),"SCALAR");
+            }
+            for(int child:current.children()){
+                String childType=SCHEMA.getProperty(model+"."+document.node(child).segment());
+                if(childType!=null)collectImageMapUses(document,child,childType);
+            }
+        }
+        void categorical(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String families){
+            if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Image-map categorical target is not a plain string.");return;}
+            String value=string(document,node);if(value.isBlank())return;
+            Set<String> uses=imageMapUses.getOrDefault(path,Set.of());
+            String family=uses.equals(Set.of("BIOME"))?"biomes":uses.equals(Set.of("REGION"))?"regions":null;
+            if(family==null){
+                // Surface-block labels go straight to the native registry, never to blocks/. Pure scalar roles ignore labels.
+                if(!uses.isEmpty() && Set.of("SURFACE_BLOCK","TERRAIN_HEIGHT","MASK","CUSTOM","SCALAR").containsAll(uses))return;
+                if(affected(families))issue(path,pointer,"Unbound, mixed or unsupported image-map applications leave the categorical target family unresolved.");
+                return;
+            }
+            int first=0,last=value.length();while(first<last && value.charAt(first)<=32)first++;while(last>first && value.charAt(last-1)<=32)last--;
+            String normalized=value.substring(first,last),prefix=value.substring(0,first);
+            if(normalized.contains(":")){
+                if(!normalized.startsWith("iris:") || normalized.length()==5){issue(path,pointer,"Categorical biome/region targets require a bare key or the exact iris: namespace.");return;}
+                prefix+="iris:";normalized=normalized.substring(5);
+            }
+            int before=refs.size();reference(path,document,node,pointer,family,normalized,false,prefix,value.substring(last));
+            if(family.equals("biomes") && refs.size()>before)categoricalBiomes.add(refs.getLast());
+        }
+        void checkCategoricalComparisons(){
+            if(!"biomes".equals(ResourceTypes.fileFamily(source.plan.source())) || source.plan.mode()==Mode.DELETE)return;
+            var poolKeys=new HashSet<String>();
+            for(var ref:refs){check(cancelled);if(source.plan.source().equals(ref.resolved()) && "regions".equals(ResourceTypes.base(ref.path())) && ref.pointer().matches("/(landBiomes|seaBiomes|shoreBiomes)/[0-9]+"))poolKeys.add(ref.key());}
+            for(var ref:categoricalBiomes){
+                check(cancelled);if(!source.plan.source().equals(ref.resolved()) || poolKeys.isEmpty())continue;
+                if(poolKeys.size()!=1 || !poolKeys.contains(ref.key()))issue(ref.path(),ref.pointer(),"Categorical biome role uses exact region-pool spelling. Collapsing distinct loader aliases could change its inferred role; operation blocked.");
             }
         }
         void node(String path,JsonStructure.Snapshot document,int id,String type,String pointer){
-            check(cancelled);var node=document.node(id);if(node.kind()==JsonStructure.Kind.NULL)return;
+            check(cancelled);var node=document.node(id);
+            if(type.startsWith("fallback-ref:")){
+                String[] policy=type.substring(13).split("\\|",-1);
+                if(node.kind()==JsonStructure.Kind.NULL || (node.kind()==JsonStructure.Kind.STRING && string(document,node).isBlank())){
+                    reference(path,null,null,pointer,policy[0],policy[1],true);return;
+                }
+                type="ref:"+policy[0];
+            }
+            if(node.kind()==JsonStructure.Kind.NULL)return;
             if(type.startsWith("list:")){
                 if(node.kind()!=JsonStructure.Kind.ARRAY){issue(path,pointer,"Typed array is a snippet or unsupported value; reference coverage is unresolved.");return;}
                 for(int child:node.children())node(path,document,child,type.substring(5),pointer+"/"+document.node(child).segment());return;
+            }
+            if(type.startsWith("map:")){
+                if(node.kind()!=JsonStructure.Kind.OBJECT){issue(path,pointer,"Typed map is not an object; reference coverage is unresolved.");return;}
+                for(int child:node.children())node(path,document,child,type.substring(4),pointer+"/"+document.node(child).segment().replace("~","~0").replace("/","~1"));return;
             }
             if(type.startsWith("object:")){
                 if(node.kind()!=JsonStructure.Kind.OBJECT){issue(path,pointer,"Typed object is a snippet or unsupported value; reference coverage is unresolved.");return;}
@@ -113,10 +187,28 @@ final class ResourceOperation {
                 if(map){
                     if(node.kind()!=JsonStructure.Kind.OBJECT){issue(path,pointer,"Image-map color legend is not an object.");return;}
                     for(int child:node.children())node(path,document,child,"context-string:"+families,pointer+"/"+document.node(child).segment().replace("~","~0").replace("/","~1"));
-                }else if(node.kind()!=JsonStructure.Kind.STRING)issue(path,pointer,"Image-map categorical target is not a plain string.");
-                else if(Arrays.asList(families.split(",")).contains(ResourceTypes.fileFamily(source.plan.source())) && !string(document,node).isBlank())
-                    issue(path,pointer,"Image-map categorical reference requires its owning region/biome binding; operation blocked until that context is certified.");
+                }else categorical(path,document,node,pointer,families);
                 return;
+            }
+            if(type.startsWith("guard:")){
+                if(node.kind()!=JsonStructure.Kind.STRING)issue(path,pointer,"Runtime-comparison reference is not a plain string.");
+                else if(affected(type.substring(6)) && !string(document,node).isBlank())issue(path,pointer,"Runtime comparison, prefix or dual-domain reference is not certified for this resource family; operation blocked.");
+                return;
+            }
+            if(type.startsWith("sentinel-ref:") || type.startsWith("reserved-ref:")){
+                if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Resource reference is not a plain string.");return;}
+                String[] policy=type.substring(type.indexOf(':')+1).split("\\|",-1);String value=string(document,node);
+                if(value.equalsIgnoreCase(policy[1])){
+                    if(type.startsWith("reserved-ref:") && affected(policy[0]))issue(path,pointer,"Reserved dimension sentinel is not a loadable stack reference.");
+                    return;
+                }
+                if(source.plan.mode()!=Mode.DELETE && source.plan.source().equals(resolver.resolve(policy[0],value)) && key(source.plan.target()).equalsIgnoreCase(policy[1]))issue(path,pointer,"Replacement would become an inactive or reserved dimension sentinel.");
+                reference(path,document,node,pointer,policy[0],value,false);return;
+            }
+            if(type.startsWith("trimmed-ref:")){
+                if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Resource reference is not a plain string.");return;}
+                String value=string(document,node),normalized=value.trim();int first=0,last=value.length();while(first<last && value.charAt(first)<=32)first++;while(last>first && value.charAt(last-1)<=32)last--;
+                reference(path,document,node,pointer,type.substring(12),normalized,false,value.substring(0,first),value.substring(last));return;
             }
             if(type.startsWith("unsupported:")){issue(path,pointer,"Nested type "+type.substring(12)+" is not certified for reference maintenance.");return;}
             if(type.startsWith("ref:") || type.equals("block-ref")){
@@ -145,13 +237,18 @@ final class ResourceOperation {
                 check(cancelled);String path=row.getKey(),model=SCHEMA.getProperty("root."+Objects.toString(ResourceTypes.base(path),""));
                 if(model==null){scan.issue(path,"","This JSON reference owner is outside the closed typed operation schema; operation blocked.");continue;}
                 var document=JsonStructure.inspect(copy(row.getValue(),cancelled));scan.inspected++;if(!document.indexed() || document.status()!=JsonStructure.Status.READY){scan.issue(path,"","Malformed, duplicate-key or node/depth-limited JSON prevents a complete typed reference scan.");continue;}
-                scan.documents.put(path,document);scan.node(path,document,0,"object:"+model,"");
+                scan.documents.put(path,document);
             }
+            for(var row:scan.documents.entrySet())scan.collectImageMapUses(row.getValue(),0,"object:"+SCHEMA.getProperty("root."+ResourceTypes.base(row.getKey())));
+            for(var row:scan.documents.entrySet()){
+                check(cancelled);scan.node(row.getKey(),row.getValue(),0,"object:"+SCHEMA.getProperty("root."+ResourceTypes.base(row.getKey())),"");
+            }
+            scan.checkCategoricalComparisons();
             var resulting=new TreeSet<>(source.paths);resulting.remove(source.plan.source());if(source.plan.target()!=null)resulting.add(source.plan.target());
             var nextResolver=new Resolver(resulting,cancelled);if(source.plan.mode()!=Mode.DELETE)for(var reference:scan.refs){String expected=Objects.equals(reference.resolved(),source.plan.source())?source.plan.target():reference.resolved();String next=nextResolver.resolve(reference.family(),reference.replacement()==null?reference.key():reference.replacement());if(!Objects.equals(next,expected))scan.issue(reference.path(),reference.pointer(),"Operation would change another reference's resolution, including an unresolved or dotted-prefix alias.");}
         }
         var replacements=new TreeMap<String,byte[]>();if(scan.issues.isEmpty() && scan.omitted==0)for(var row:scan.rewrites.entrySet()){
-            check(cancelled);var document=scan.documents.get(row.getKey());var text=new StringBuilder(document.source());var spans=new ArrayList<>(row.getValue());spans.sort(Comparator.comparingInt(JsonStructure.Node::start).reversed());String quoted="\""+key(source.plan.target())+"\"";for(var node:spans)text.replace(node.start(),node.end(),quoted);byte[] bytes=text.toString().getBytes(StandardCharsets.UTF_8);if(bytes.length>MAX_JSON_BYTES){scan.issue(row.getKey(),"","Rewritten JSON would exceed the 1 MB supported-source limit.");break;}new LosslessJson(bytes);replacements.put(row.getKey(),bytes);
+            check(cancelled);var document=scan.documents.get(row.getKey());var text=new StringBuilder(document.source());var spans=new ArrayList<>(row.getValue());spans.sort(Comparator.comparingInt((Rewrite rewrite)->rewrite.node().start()).reversed());for(var rewrite:spans)text.replace(rewrite.node().start(),rewrite.node().end(),LosslessJson.quote(rewrite.value()));byte[] bytes=text.toString().getBytes(StandardCharsets.UTF_8);if(bytes.length>MAX_JSON_BYTES){scan.issue(row.getKey(),"","Rewritten JSON would exceed the 1 MB supported-source limit.");break;}new LosslessJson(bytes);replacements.put(row.getKey(),bytes);
         }
         check(cancelled);if(!scan.issues.isEmpty() || scan.omitted!=0)replacements.clear();var report=new Report(source.plan,scan.inspected,scan.refs,scan.issues,scan.omitted,replacements.size());return new Prepared(source,report,replacements);
     }

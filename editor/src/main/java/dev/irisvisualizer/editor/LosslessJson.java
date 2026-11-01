@@ -289,7 +289,7 @@ public final class LosslessJson {
     byte[] stringArrayMove(String field, int from, int to) {
         return moveSpans(stringEntries(field).stream().map(StringEntry::span).toList(),from,to);
     }
-    private static String quote(String value) {
+    static String quote(String value) {
         StringBuilder out = new StringBuilder("\"");
         for (int i=0;i<value.length();i++) {
             char c = value.charAt(i);

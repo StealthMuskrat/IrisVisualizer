@@ -1096,6 +1096,8 @@ jobs:
               Invoke-WebRequest "https://raw.githubusercontent.com/VolmitSoftware/Iris/$revision/core/src/main/java/art/arcane/iris/$($source.Name)" -OutFile $name
             }
           }
+          python editor/tools/test_java_model_inventory.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python editor/tools/test_resource_operation_schema.py .
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python editor/tools/resource_operation_schema.py . generated-resource-operation-schema.properties editor/policy/resource-operation-sources.json

@@ -26,8 +26,31 @@ assert values['IrisBlockData.block'] == 'block-ref'
 assert values['IrisBlockData.block.implicit'] == 'blocks||air'
 assert values['IrisObjectReplace.replace.implicit'] == 'blocks|palette/0/block|STONE'
 assert values['IrisBlockData.tileData'] == 'opaque-object'
-assert len([k for k in values if k.startswith('root.')]) == 7
-assert not any(k.startswith('root.dimensions') for k in values)
+assert len([k for k in values if k.startswith('root.')]) == 10
+assert values['root.dimensions'] == 'IrisDimension'
+assert values['root.regions'] == 'IrisRegion'
+assert values['root.biomes'] == 'IrisBiome'
+assert values['IrisTreeSettings.fields'] == 'enabled,mode'
+assert values['IrisBiomeGeneratorLink.generator'] == 'fallback-ref:generators|default'
+assert values['IrisBiome.generators.implicit.0'] == 'generators|0/generator|default'
+assert values['IrisBiome.layers.implicit.0'] == 'blocks|0/palette/0/block|GRASS_BLOCK'
+assert 'IrisBiome.slab.implicit.count' not in values and 'IrisBiome.wall.implicit.count' not in values
+assert values['IrisDimension.hydrology.implicit.count'] == '7'
+assert values['IrisDimension.hydrology.implicit.0'].endswith('|sand')
+assert values['IrisDimension.hydrology.implicit.3'].endswith('|dirt')
+assert values['IrisSurfaceRiverBedConfig.paddingPalette.implicit.count'] == '2'
+assert values['IrisDimension.upperDimension'] == 'sentinel-ref:dimensions|none'
+assert values['IrisStructurePlacement.structures'] == 'list:ref:structures'
+assert values['IrisStructurePlacement.caveBiomes'] == 'list:guard:biomes'
+assert values['IrisSubterrainFeature.allowedRegions'] == 'list:guard:regions'
+assert values['IrisFloatingChildBiomes.carving'] == 'guard:biomes'
+assert values['IrisDepositGenerator.includedBiomes'] == 'list:guard:biomes'
+assert values['IrisImageMapMask.map'] == 'string' # named binding, not a resource key
+assert values['IrisLoot.customNbt'] == 'opaque-object'
+assert values['IrisDimension.terrainTransform'] == 'unsupported:external-terrain-transform'
+assert values['IrisDimension.blockFallbacks'] == 'map:string'
+assert values['IrisDimension.disabledComponents'] == 'list:string'
+assert not any(k.endswith('.defaultBlock') for k in values)
 
 with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     fixture = Path(directory)
@@ -49,6 +72,11 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
         ('IrisBlockData', 'private String block = "air";', 'private String block = "stone";'),
         ('IrisMaterialPalette', 'new IrisBlockData("STONE")', 'new IrisBlockData("AIR")'),
         ('InterpolationMethod', 'enum InterpolationMethod', 'class InterpolationMethod'),
+        ('IrisTreeSettings', 'boolean enabled = false;', 'boolean hidden = false;'),
+        ('IrisBiomeGeneratorLink', 'private String generator = "default";', 'private String generator = "other";'),
+        ('IrisDimension', 'private String upperDimension = "none";', 'private String upperDimension = "upper";'),
+        ('IrisBiomePaletteLayer', 'new IrisBlockData("GRASS_BLOCK")', 'new IrisBlockData("DIRT")'),
+        ('IrisImageMapBinding', '@RegistryListResource(IrisImageMap.class)', ''),
     ]:
         assert old in sources[name], old
         changed = fixture / (name + '.java')
@@ -65,4 +93,4 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     loader = fixture / 'ResourceLoader.java'
     loader.write_text(sources['ResourceLoader'].replace('candidate.isFile()', 'candidate.exists()'))
     assert extract(fixture)[1] != manifest['sources']
-print('PASS: closed resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')
+print('PASS: ten-owner inherited/nested resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')
