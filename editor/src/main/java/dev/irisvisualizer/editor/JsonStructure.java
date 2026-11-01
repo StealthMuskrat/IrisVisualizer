@@ -76,12 +76,12 @@ public final class JsonStructure {
         public Page page(int parent,String query,int requestedPage) {
             node(parent);
             if (query==null || query.length()>MAX_QUERY_CHARACTERS || query.indexOf(0)>=0 || requestedPage<0) throw new IllegalArgumentException("Use up to 256 search characters without NUL and a nonnegative page");
-            String text=query.strip().toLowerCase(Locale.ROOT);var matches=new ArrayList<Integer>();
-            for (var n : nodes) {
-                if (text.isEmpty() ? n.parent()==parent : n.segment().toLowerCase(Locale.ROOT).contains(text) || (n.kind()!=Kind.OBJECT && n.kind()!=Kind.ARRAY && summary(n.id()).toLowerCase(Locale.ROOT).contains(text))) matches.add(n.id());
-            }
-            int page=Math.min(requestedPage,Math.max(0,(matches.size()-1)/PAGE_SIZE)),start=page*PAGE_SIZE;
-            return new Page(page,matches.size(),matches.subList(start,Math.min(matches.size(),start+PAGE_SIZE)));
+            String text=query.strip().toLowerCase(Locale.ROOT);
+            java.util.function.Predicate<Node> matches=n->text.isEmpty()?n.parent()==parent:n.segment().toLowerCase(Locale.ROOT).contains(text) || (n.kind()!=Kind.OBJECT && n.kind()!=Kind.ARRAY && summary(n.id()).toLowerCase(Locale.ROOT).contains(text));
+            int count=0;for(var n:nodes)if(matches.test(n))count++;
+            int page=Math.min(requestedPage,Math.max(0,(count-1)/PAGE_SIZE)),start=page*PAGE_SIZE;var selected=new ArrayList<Integer>();int index=0;
+            for(var n:nodes){if(!matches.test(n))continue;if(index++<start)continue;if(selected.size()==PAGE_SIZE)break;selected.add(n.id());}
+            return new Page(page,count,selected);
         }
     }
     private static String prefix(String source,int start,int end,int maximum) {
@@ -108,7 +108,7 @@ public final class JsonStructure {
         public void clear() { snapshot=null;query=null;page=null; }
         public Page page(Snapshot current,int currentParent,String text,int number) {
             Objects.requireNonNull(current);
-            if (snapshot!=current || parent!=currentParent || requested!=number || !Objects.equals(query,text) || page==null) { page=current.page(currentParent,text,number);snapshot=current;parent=currentParent;query=text;requested=number; }
+            if (snapshot!=current || parent!=currentParent || requested!=number || !Objects.equals(query,text) || page==null) { var prepared=current.page(currentParent,text,number);snapshot=current;parent=currentParent;query=text;requested=number;page=prepared; }
             return page;
         }
     }

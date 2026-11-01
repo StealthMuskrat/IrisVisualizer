@@ -147,6 +147,8 @@ public final class WorkspaceTests {
    AssetImportTests.run(temp);
    JsonStructureTests.run(temp);
    SourceTextPagesTests.run(temp);
+   SharedSourceIndexTests.run(temp);
+   JsonSourceStageTests.run(temp);
    SourceMatchTests.run(temp);
    ReadOnlyPolicyTests.run(temp);
    StructureDefinitionTests.run(temp);

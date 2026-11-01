@@ -6,6 +6,11 @@ import java.util.Objects;
 final class SourceMatch {
     static final int MAX_SIDE_CHARACTERS=512;
     record Request(PackWorkspace workspace,String path,long contentRevision,int offset,int line,int column,String literal) {}
+    record Location(int offset,int line,int column,String literal) {
+        Location {new WorkspaceTextSearch.Query(literal,ResourceFinder.Family.ALL,false);if(offset<0 || line<1 || column<1)throw new IllegalArgumentException("Invalid source match location");}
+        static Location of(Request request){return new Location(request.offset(),request.line(),request.column(),request.literal());}
+    }
+    record Context(String before,String matched,String after,boolean clippedBefore,boolean clippedAfter) {}
     record View(Request request,String before,String matched,String after,boolean clippedBefore,boolean clippedAfter) {}
     static Request request(PackWorkspace workspace,WorkspaceTextSearch.Query query,WorkspaceTextSearch.Hit hit) {
         Objects.requireNonNull(workspace);Objects.requireNonNull(query);Objects.requireNonNull(hit);
@@ -25,10 +30,16 @@ final class SourceMatch {
         String text;
         try { text=WorkspaceTextSearch.decode(workspace.read(request.path())); }
         catch (java.nio.charset.CharacterCodingException invalid) { throw new IllegalArgumentException("Source is not strict UTF-8; search again",invalid); }
+        var context=context(text,Location.of(request));
+        return new View(request,context.before(),context.matched(),context.after(),context.clippedBefore(),context.clippedAfter());
+    }
+    /** Pure decoded-source validation, usable by a worker without a live workspace or Request. */
+    static Context context(String text,Location location) {
+        Objects.requireNonNull(text);Objects.requireNonNull(location);
         if (text.chars().anyMatch(c -> Character.isISOControl(c) && c!='\r' && c!='\n' && c!='\t')) throw new IllegalArgumentException("Source contains control text; match context is unavailable");
-        long end=(long)request.offset()+request.literal().length();
-        if (end>text.length() || !text.startsWith(request.literal(),request.offset())) throw new IllegalArgumentException("Literal match is no longer at this offset; search again");
-        int offset=request.offset(),stop=(int)end;
+        long end=(long)location.offset()+location.literal().length();
+        if (end>text.length() || !text.startsWith(location.literal(),location.offset())) throw new IllegalArgumentException("Literal match is no longer at this offset; search again");
+        int offset=location.offset(),stop=(int)end;
         if (split(text,offset) || split(text,stop)) throw new IllegalArgumentException("Match splits a Unicode character; search for the complete character");
         int cursor=0,line=1,lineStart=0;
         while (cursor<offset) {
@@ -36,10 +47,10 @@ final class SourceMatch {
             if (c=='\r') { if (cursor<offset && text.charAt(cursor)=='\n') cursor++;line++;lineStart=cursor; }
             else if (c=='\n') { line++;lineStart=cursor; }
         }
-        if (line!=request.line() || offset-lineStart+1!=request.column()) throw new IllegalArgumentException("Search line/column no longer matches the source; search again");
+        if (line!=location.line() || offset-lineStart+1!=location.column()) throw new IllegalArgumentException("Search line/column no longer matches the source; search again");
         int start=Math.max(0,offset-MAX_SIDE_CHARACTERS),finish=Math.min(text.length(),stop+MAX_SIDE_CHARACTERS);
         if (split(text,start)) start++;if (split(text,finish)) finish--;
-        return new View(request,text.substring(start,offset),text.substring(offset,stop),text.substring(stop,finish),start>0,finish<text.length());
+        return new Context(text.substring(start,offset),text.substring(offset,stop),text.substring(stop,finish),start>0,finish<text.length());
     }
     private static boolean split(String text,int position) { return position>0 && position<text.length() && Character.isHighSurrogate(text.charAt(position-1)) && Character.isLowSurrogate(text.charAt(position)); }
     /** Deepest indexed value/container containing the whole raw-source match; member names belong to a container. */

@@ -76,6 +76,8 @@ public final class PackWorkspace implements PackResourceView {
     }
     /** Bounded definition snapshots pin owned arrays; metadata only is copied on the UI thread. */
     DefinitionAuditSource captureDefinitionAudit(DefinitionAuditSource.Family family) { return DefinitionAuditSource.pin(files,family); }
+    /** Selected source bytes are immutable by ownership; no payload copy or parsing on the UI thread. */
+    JsonSourceReview.Source captureJsonSource(String path,SourceMatch.Location location) { return new JsonSourceReview.Source(path,path==null?null:files.get(path),location); }
     /** Search membership is frozen from the current changed set; the source retains neither it nor this workspace. */
     TextSearchSource captureTextSearch(WorkspaceTextSearch.Query query) { return TextSearchSource.pin(files,query,changed::contains); }
     /** Bounded worker sources borrow only private immutable applied arrays; UI capture copies metadata. */

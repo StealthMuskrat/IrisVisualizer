@@ -154,7 +154,7 @@ public final class EditorApp extends Application {
         imageTexture=0;imageError=null;imageData=null;imageViewport=null;imageWidth=0;imageHeight=0;imageOwner=null;imageSourcePath=null;imageContentRevision=-1;imageRegion=null;imageRegionStart=null;imageStatisticsError=null;imageStatistics.clear();
     }
     @Override protected void disposeImGui() {
-        try { packLoad.close();referenceInspection.close();fileComparison.close();byteInspection.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
+        try { packLoad.close();jsonSourceReview.close();referenceInspection.close();fileComparison.close();byteInspection.close();resourceAddition.close();pendingDiskReview.close();textSearch.close();saveAsTransfer.close();folderCopy.close();zipExport.close();assetBatchImport.close();assetImport.close();assetReplacement.close();structureThemeReferences.close();blockFallbackAudits.close();blockAliasAudits.close();expressionAudits.close();jigsawReview.close();packReferenceReview.close();imageLoader.close();imageStatistics.close();clearImage(); }
         finally { super.disposeImGui(); }
     }
     private void uploadImage(AssetImage.Decoded image) {
@@ -323,7 +323,11 @@ public final class EditorApp extends Application {
     private String jigsawReviewRoot;
     private JigsawDependencyReview.Scope jigsawReviewScope=JigsawDependencyReview.Scope.ALL;
     private boolean showJsonStructure;
-    private final JsonStructure.Cache jsonSourceCache=new JsonStructure.Cache();
+    private final AsyncJsonSourceReview jsonSourceReview=new AsyncJsonSourceReview();
+    private JsonSourceReview.Report jsonActiveReport;
+    private SourceMatch.Request pendingJsonMatch;
+    private boolean jsonSourcePaused;
+    private final ImString jsonNodeJump=new ImString("1",32);
     private JsonStructure.Snapshot jsonActiveSnapshot,jsonTokenSnapshot;
     private final JsonStructure.PageCache jsonPages=new JsonStructure.PageCache();
     private final SourceTextPane jsonWholePane=new SourceTextPane(),jsonTokenPane=new SourceTextPane();
@@ -371,6 +375,7 @@ public final class EditorApp extends Application {
         pollDefinitionAuditViews();
         packReferenceReview.poll(workspace);
         jigsawReview.poll(workspace,jigsawReviewRoot);
+        pollJsonSourceReview();
         updateSourceMatchFocus();
 
         if (!styled) { ImGui.styleColorsLight(); styled = true; }
@@ -599,7 +604,7 @@ public final class EditorApp extends Application {
             if (ExpressionDefinitions.supports(selected) || "image-maps".equals(ResourceTypes.base(selected))) drawExpressionReferenceAudit();
             drawCoverage();
             if (JsonStructure.supports(selected)) {
-                if (ImGui.button("Browse JSON structure (read-only)")) showJsonStructure=true;
+                if (ImGui.button("Browse JSON structure (read-only)")) {jsonSourcePaused=false;showJsonStructure=true;}
                 if (ImGui.collapsingHeader("Original/current JSON (read-only)")) drawJsonSource(currentJsonSnapshot());
             } else {
                 ImGui.text(byteCount + " bytes");
@@ -646,13 +651,11 @@ public final class EditorApp extends Application {
                     boolean pendingChange=changesPendingWorkspace==workspace && navigationRequest.target().equals(changesPendingPath);
                     boolean referenceReview=referenceReviewPendingWorkspace==workspace && navigationRequest.target().equals(referenceReviewPendingPath);
                     var sourceLocation=navigationRequest.match();
-                    var sourceView=sourceLocation==null ? null : SourceMatch.inspect(workspace,sourceLocation);
+                    if(sourceLocation!=null)SourceMatch.validate(workspace,sourceLocation);
                     boolean opened=navigationRequest.target().equals(selected) || transition(false,() -> { if (sourceLocation!=null) SourceMatch.validate(workspace,sourceLocation);selected=navigationRequest.target();filter.set("");error=null; });
-                    if (opened && sourceView!=null) {
-                        sourceMatchFocus.show(workspace,sourceView);showJsonStructure=true;var snapshot=currentJsonSnapshot();int containing=SourceMatch.containing(snapshot,sourceView);
-                        if (containing>=0) { openJsonNode(containing);jsonTokenPane.jump(snapshot,containing,sourceView.request().offset());var pointer=snapshot.pointer(containing);if (pointer.complete()) jsonPointer.set(pointer.text()); }
-                        if(SourceTextPages.available(snapshot)){jsonWholePane.jump(snapshot,-1,sourceView.request().offset());jsonFocusWholeSource=true;}
-                        updateSourceMatchFocus();
+                    if (opened && sourceLocation!=null) {
+                        clearSourceMatchFocus();pendingJsonMatch=sourceLocation;jsonSourcePaused=false;showJsonStructure=true;
+                        jsonSourceReview.start(workspace,selected,SourceMatch.Location.of(sourceLocation));resetJsonSourcePages();
                     }
                     if ((picker || textResult || pendingChange || referenceReview) && opened) { if (picker) showQuickOpen=false;filter.set("");revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); }
                 }
@@ -674,7 +677,7 @@ public final class EditorApp extends Application {
         textSearch.poll(workspace); // Release stale captures even while the search window is collapsed.
         var statisticsImage=currentStatisticsImage();imageStatistics.poll(statisticsImage);
         if(showImageStatistics)drawImageStatistics(statisticsImage);
-        if(jsonActiveSnapshot!=null && !jsonSourceCache.matches(workspace,selected))clearJsonSourcePages();
+        pollJsonSourceReview();
         fileComparison.poll(workspace); // Saved-baseline and source changes invalidate hidden comparisons without rereading disk.
         byteInspection.poll(workspace,selected); // Release stale captures even when byte inspection is hidden.
         pollDefinitionAuditViews();
@@ -6642,7 +6645,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;referenceInspection.clear();clearReferenceInspectionResult();referenceInspectionQuery.set("");referenceInspectionState=ReferenceInspection.StateFilter.ALL;referenceInspectionError=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();authoringReferences.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();aliasAuditReview.clear();expressionAuditReview.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceCache.clear();showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false;resourceBrowser.clear();browserOwner=null;browserQuery=null;browserPage=0;browserPageJump.set("1");browserReveal=true;browserScroll=false;browserResetScroll=true; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;referenceInspection.clear();clearReferenceInspectionResult();referenceInspectionQuery.set("");referenceInspectionState=ReferenceInspection.StateFilter.ALL;referenceInspectionError=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();authoringReferences.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();aliasAuditReview.clear();expressionAuditReview.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceReview.clear();jsonActiveReport=null;pendingJsonMatch=null;jsonSourcePaused=false;showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false;resourceBrowser.clear();browserOwner=null;browserQuery=null;browserPage=0;browserPageJump.set("1");browserReveal=true;browserScroll=false;browserResetScroll=true; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {
@@ -6654,9 +6657,30 @@ public final class EditorApp extends Application {
     }
     private static ImString jsonReadOnlyBuffer(String text) { return new ImString(text,Math.max(128,text.getBytes(StandardCharsets.UTF_8).length+1)); }
     private JsonStructure.Snapshot currentJsonSnapshot() {
-        var snapshot=jsonSourceCache.inspect(workspace,selected);
-        if (jsonActiveSnapshot!=snapshot) { jsonActiveSnapshot=snapshot;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonBufferedNode=-1;openJsonNode(0);jsonPointer.set(""); }
-        return snapshot;
+        if(!jsonSourcePaused)jsonSourceReview.select(workspace,selected);
+        pollJsonSourceReview();return jsonActiveSnapshot;
+    }
+    /** Called at both frame boundaries: hidden stale reports are released without automatic parsing. */
+    private void pollJsonSourceReview() {
+        var state=jsonSourceReview.poll(workspace,selected);
+        if(state.phase()!=AsyncJsonSourceReview.Phase.READY){
+            if(jsonActiveReport!=null)resetJsonSourcePages();
+            if(state.phase()==AsyncJsonSourceReview.Phase.IDLE){pendingJsonMatch=null;clearSourceMatchFocus();}
+            return;
+        }
+        var report=state.report();if(jsonActiveReport==report)return;
+        resetJsonSourcePages();jsonActiveReport=report;jsonActiveSnapshot=report.structure();openJsonNode(0);
+        if(pendingJsonMatch!=null && report.location()!=null){
+            try{
+                SourceMatch.validate(workspace,pendingJsonMatch);if(!SourceMatch.Location.of(pendingJsonMatch).equals(report.location()))throw new IllegalArgumentException("Prepared source match belongs to another request");
+                var context=report.context();var view=new SourceMatch.View(pendingJsonMatch,context.before(),context.matched(),context.after(),context.clippedBefore(),context.clippedAfter());sourceMatchFocus.show(workspace,view);
+                int containing=SourceMatch.containing(jsonActiveSnapshot,view);
+                if(containing>=0){openJsonNode(containing);jsonTokenPane.jump(jsonActiveSnapshot,report.lines(),containing,pendingJsonMatch.offset());var pointer=jsonActiveSnapshot.pointer(containing);if(pointer.complete())jsonPointer.set(pointer.text());}
+                if(report.lines()!=null){jsonWholePane.jump(jsonActiveSnapshot,report.lines(),-1,pendingJsonMatch.offset());jsonFocusWholeSource=true;}
+                updateSourceMatchFocus();
+            }catch(IllegalArgumentException invalid){jsonFindError=invalid.getMessage();clearSourceMatchFocus();}
+            pendingJsonMatch=null;
+        }
     }
     private void clearSourceMatchFocus() {
         sourceMatchFocus.clear();sourceMatchBuffered=null;sourceMatchBefore=null;sourceMatchText=null;sourceMatchAfter=null;
@@ -6678,25 +6702,25 @@ public final class EditorApp extends Application {
         if (containing>=0) {
             var pointer=snapshot.pointer(containing);ImGui.textWrapped("Containing indexed token: "+(pointer.text().isEmpty() ? "(root)" : InspectorText.label(pointer.text(),512)));
             if (!pointer.complete() || snapshot.status()==JsonStructure.Status.LIMITED) ImGui.textWrapped("The JSON index or pointer is limited; a more specific token may be unindexed.");
-            if (ImGui.smallButton("Return to containing indexed token")) { openJsonNode(containing);jsonTokenPane.jump(snapshot,containing,request.offset());if (pointer.complete()) jsonPointer.set(pointer.text()); }
+            if (ImGui.smallButton("Return to containing indexed token")) { openJsonNode(containing);jsonTokenPane.jump(snapshot,jsonActiveReport.lines(),containing,request.offset());if (pointer.complete()) jsonPointer.set(pointer.text()); }
             ImGui.textWrapped("Member-name and separator matches belong to their containing object/array. This locates source text; it does not identify an editable field.");
         } else ImGui.textWrapped("No containing indexed token is available. The literal context remains visible for malformed/duplicate-key JSON, text outside root tokens or source above the 1 MB JSON-index limit.");
-        if(SourceTextPages.available(snapshot) && ImGui.smallButton("Show match start in whole source pages")){jsonWholePane.jump(snapshot,-1,request.offset());jsonFocusWholeSource=true;}
+        if(SourceTextPages.available(snapshot) && ImGui.smallButton("Show match start in whole source pages")){jsonWholePane.jump(snapshot,jsonActiveReport.lines(),-1,request.offset());jsonFocusWholeSource=true;}
         if (ImGui.smallButton("Clear focused match")) clearSourceMatchFocus();
         ImGui.separator();
     }
-    private void clearJsonSourcePages() {
-        jsonSourceCache.clear();jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonBufferedNode=-1;jsonNode=jsonPage=0;jsonFind.set("");jsonPreviousFind="";jsonFindError=null;jsonPointer.set("");
+    private void resetJsonSourcePages() {
+        jsonActiveReport=null;jsonNodeJump.set("1");jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonBufferedNode=-1;jsonNode=jsonPage=0;jsonFind.set("");jsonPreviousFind="";jsonFindError=null;jsonPointer.set("");
     }
     /** One current immutable source page and UI buffers; whole-source and token panes remain independent. */
     private static final class SourceTextPane {
         private JsonStructure.Snapshot owner;private int node=-2,page;private SourceTextPages pages;private SourceTextPages.Page shown;private ImString text;
         private final ImString pageJump=new ImString("1",32),lineJump=new ImString("1",32),offsetJump=new ImString("0",32);private String problem;
         void clear(){owner=null;node=-2;page=0;pages=null;shown=null;text=null;problem=null;pageJump.set("1");lineJump.set("1");offsetJump.set("0");}
-        private void bind(JsonStructure.Snapshot snapshot,int selected){if(owner!=snapshot || node!=selected){clear();owner=snapshot;node=selected;pages=selected<0 ? SourceTextPages.whole(snapshot) : SourceTextPages.token(snapshot,selected);var first=pages.page(0);lineJump.set(Integer.toString(first.from().line()));offsetJump.set(Integer.toString(first.start()));}}
-        void jump(JsonStructure.Snapshot snapshot,int selected,int offset){bind(snapshot,selected);page=pages.offsetPage(offset);pageJump.set(Integer.toString(page+1));offsetJump.set(Integer.toString(offset));problem=null;}
-        void draw(JsonStructure.Snapshot snapshot,int selected,String label){
-            bind(snapshot,selected);ImGui.pushID(label);var current=pages.page(page);int requested=current.page();boolean navigated=false;
+        private void bind(JsonStructure.Snapshot snapshot,SourceTextPages.Index lines,int selected){if(owner!=snapshot || node!=selected){clear();owner=snapshot;node=selected;pages=selected<0 ? SourceTextPages.whole(snapshot,lines) : SourceTextPages.token(snapshot,selected,lines);var first=pages.page(0);lineJump.set(Integer.toString(first.from().line()));offsetJump.set(Integer.toString(first.start()));}}
+        void jump(JsonStructure.Snapshot snapshot,SourceTextPages.Index lines,int selected,int offset){bind(snapshot,lines,selected);page=pages.offsetPage(offset);pageJump.set(Integer.toString(page+1));offsetJump.set(Integer.toString(offset));problem=null;}
+        void draw(JsonStructure.Snapshot snapshot,SourceTextPages.Index lines,int selected,String label){
+            bind(snapshot,lines,selected);ImGui.pushID(label);var current=pages.page(page);int requested=current.page();boolean navigated=false;
             ImGui.beginDisabled(!current.previous());if(ImGui.smallButton("First text page")){requested=0;navigated=true;}ImGui.sameLine();if(ImGui.smallButton("Previous text page")){requested=current.page()-1;navigated=true;}ImGui.endDisabled();ImGui.sameLine();
             ImGui.beginDisabled(!current.next());if(ImGui.smallButton("Next text page")){requested=current.page()+1;navigated=true;}ImGui.sameLine();if(ImGui.smallButton("Last text page")){requested=current.pages()-1;navigated=true;}ImGui.endDisabled();
             boolean submitPage=ImGui.inputText("Text page number",pageJump,ImGuiInputTextFlags.EnterReturnsTrue|ImGuiInputTextFlags.AutoSelectAll);ImGui.sameLine();boolean goPage=ImGui.smallButton("Go to text page");
@@ -6713,16 +6737,20 @@ public final class EditorApp extends Application {
         if(jsonTokenSnapshot!=snapshot || jsonBufferedNode!=jsonNode){jsonTokenSnapshot=snapshot;jsonBufferedNode=jsonNode;jsonCurrentPointer=snapshot.pointer(jsonNode);}
     }
     private void drawJsonSource(JsonStructure.Snapshot snapshot) {
+        if(snapshot==null){var state=jsonSourceReview.poll(workspace,selected);ImGui.textWrapped(state.phase()==AsyncJsonSourceReview.Phase.FAILED?"Source preparation failed: "+state.error():jsonSourcePaused?"Source review cleared.":"Preparing applied source and shared line metadata in the background...");if(state.phase()==AsyncJsonSourceReview.Phase.FAILED || jsonSourcePaused){if(ImGui.smallButton("Prepare applied source again")){pendingJsonMatch=null;clearSourceMatchFocus();jsonSourcePaused=false;jsonSourceReview.start(workspace,selected,null);}}return;}
         ImGui.textWrapped(snapshot.detail());
         if(!SourceTextPages.available(snapshot)){ImGui.textUnformatted(snapshot.bytes()+" applied bytes; source text unavailable.");return;}
-        ImGui.textWrapped("Applied source: "+snapshot.bytes()+" bytes, "+snapshot.source().length()+" UTF-16 characters. Every decoded source character is reachable; each page preserves spelling and line endings.");jsonWholePane.draw(snapshot,-1,"Applied source text");
+        ImGui.textWrapped("Applied source: "+snapshot.bytes()+" bytes, "+snapshot.source().length()+" UTF-16 characters. Every decoded source character is reachable; each page preserves spelling and line endings.");jsonWholePane.draw(snapshot,jsonActiveReport.lines(),-1,"Applied source text");
     }
-    private void openJsonNode(int id) {jsonNode=id;jsonPage=0;jsonFind.set("");jsonPreviousFind="";jsonFindError=null;jsonTokenPane.clear();}
+    private void openJsonNode(int id) {jsonNodeJump.set("1");jsonNode=id;jsonPage=0;jsonFind.set("");jsonPreviousFind="";jsonFindError=null;jsonTokenPane.clear();}
     private void drawJsonStructure() {
         if (!ImGui.begin("JSON structure (read-only)")) { ImGui.end();return; }
-        if (ImGui.button("Close JSON browser")) { clearSourceMatchFocus();showJsonStructure=false;ImGui.end();return; }
+        if (ImGui.button("Close JSON browser")) { jsonSourceReview.clear();resetJsonSourcePages();pendingJsonMatch=null;jsonSourcePaused=true;clearSourceMatchFocus();showJsonStructure=false;ImGui.end();return; }
+        ImGui.sameLine();if(ImGui.button("Refresh applied source")){pendingJsonMatch=null;clearSourceMatchFocus();jsonSourcePaused=false;jsonSourceReview.start(workspace,selected,null);resetJsonSourcePages();}
+        ImGui.sameLine();if(ImGui.button("Cancel / clear source")){jsonSourceReview.clear();resetJsonSourcePages();pendingJsonMatch=null;clearSourceMatchFocus();jsonSourcePaused=true;}
         var snapshot=currentJsonSnapshot();
         ImGui.textWrapped("Resource: "+InspectorText.label(selected,256));
+        if(snapshot==null){var state=jsonSourceReview.poll(workspace,selected);if(state.phase()==AsyncJsonSourceReview.Phase.FAILED)ImGui.textWrapped("Source preparation failed: "+state.error()+" Use Refresh applied source to retry.");else ImGui.textWrapped(jsonSourcePaused?"Source review cleared. Use Refresh applied source to prepare it again.":"Preparing source, JSON index, line metadata and any focused match in the background. Editing and Save/Export remain available.");ImGui.end();return;}
         drawSourceMatchFocus(snapshot);
         if (!snapshot.indexed()) { drawJsonSource(snapshot);ImGui.end();return; }
         ImGui.textWrapped(snapshot.detail());
@@ -6735,21 +6763,22 @@ public final class EditorApp extends Application {
         }
         refreshJsonToken(snapshot);ImGui.textWrapped("Current pointer: "+(jsonNode==0 ? "(root)" : InspectorText.label(jsonCurrentPointer.text(),512)));if (!jsonCurrentPointer.complete()) ImGui.textWrapped("Pointer exceeds the 16,384-character representation limit; this display is incomplete.");
         ImGui.inputText("Find indexed names / scalar prefixes",jsonFind);
-        if (!jsonFind.get().equals(jsonPreviousFind)) { jsonPage=0;jsonPreviousFind=jsonFind.get();jsonFindError=null; }
-        if (ImGui.button("Clear JSON search")) { jsonFind.set("");jsonPreviousFind="";jsonPage=0;jsonFindError=null; }
+        if (!jsonFind.get().equals(jsonPreviousFind)) { jsonPage=0;jsonNodeJump.set("1");jsonPreviousFind=jsonFind.get();jsonFindError=null; }
+        if (ImGui.button("Clear JSON search")) { jsonFind.set("");jsonPreviousFind="";jsonPage=0;jsonNodeJump.set("1");jsonFindError=null; }
         try {
             var page=jsonPages.page(snapshot,jsonNode,jsonFind.get(),jsonPage);jsonPage=page.page();
             ImGui.textWrapped(page.matches()+" matching indexed nodes; page "+(page.page()+1)+"; "+page.nodes().size()+" shown. Empty search lists direct children; search matches names or the first 256 source characters of scalar tokens.");
-            ImGui.beginDisabled(!page.previous());if (ImGui.button("Previous nodes")) jsonPage--;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(!page.next());if (ImGui.button("Next nodes")) jsonPage++;ImGui.endDisabled();
+            int requested=drawReviewPager("json-node-pages",ReviewPagination.Window.at(page.matches(),page.page()),jsonNodeJump);
+            page=jsonPages.page(snapshot,jsonNode,jsonFind.get(),requested);jsonPage=page.page();
             for (int id : page.nodes()) { var node=snapshot.node(id);ImGui.pushID(id);if (ImGui.button("Open node")) openJsonNode(id);ImGui.sameLine();ImGui.textUnformatted(node.kind()+" : "+(node.segment().isEmpty() ? "(empty member name)" : InspectorText.label(node.segment(),256)));ImGui.textWrapped(snapshot.summary(id));ImGui.popID(); }
         } catch (IllegalArgumentException invalid) { jsonFindError=invalid.getMessage(); }
         if (jsonFindError!=null) ImGui.textWrapped(jsonFindError);
         refreshJsonToken(snapshot);var node=snapshot.node(jsonNode);
         ImGui.separator();ImGui.textWrapped(node.kind()+" token; source UTF-16 offsets "+node.start()+".."+node.end()+"; "+(node.end()-node.start())+" original characters.");
         if (node.limited()) ImGui.textWrapped("Some direct children or descendants are not indexed. The original token remains preserved.");
-        jsonTokenPane.draw(snapshot,jsonNode,"Selected original token");
+        jsonTokenPane.draw(snapshot,jsonActiveReport.lines(),jsonNode,"Selected original token");
         if(jsonFocusWholeSource){ImGui.setNextItemOpen(true);jsonFocusWholeSource=false;}if(ImGui.collapsingHeader("Whole applied source (read-only)"))drawJsonSource(snapshot);
-        ImGui.textWrapped("Limits: 1 MB source, 4,096 nodes, 32 indexed child levels, 200 nodes/page, 256 search characters and 16,384 characters per source/token text page and bounded pointers. Text pages never split surrogate pairs or CRLF; offsets/lines are global source locations, not byte positions. Labels shorten text; source/token pages preserve every original character. Pointers use / segments and ~0 / ~1 escapes, not dotted field paths. Save/Export remain independent; unsupported previews stay disabled.");
+        ImGui.textWrapped("Preparation runs on one background worker; newer source requests replace pending work, and cancelled/stale reports cannot publish. Source copying, decoding, JSON indexing, match validation and shared line indexing happen there. Limits: 1 MB source, 4,096 nodes, 32 indexed child levels, 200 nodes/page, 256 search characters and 16,384 characters per source/token text page and bounded pointers. Text pages never split surrogate pairs or CRLF; offsets/lines are global source locations, not byte positions. Labels shorten text; source/token pages preserve every original character. Pointers use / segments and ~0 / ~1 escapes, not dotted field paths. Save/Export remain independent; unsupported previews stay disabled.");
         ImGui.end();
     }
     private void clearThemeReviewView() { themeReviewedReview=null;themeReviewPages.clear();themeReviewPage=0; }
@@ -7478,7 +7507,7 @@ public final class EditorApp extends Application {
             case UNDO->{ if (workspace.undoCount()>0) restoreAppliedEdit(false); }
             case REDO->{ if (workspace.redoCount()>0) restoreAppliedEdit(true); }
             case PALETTE->{ showCommandPalette=true;focusCommandPalette=true; }
-            case INSPECT_JSON->{ if (JsonStructure.supports(selected)) showJsonStructure=true; }
+            case INSPECT_JSON->{ if (JsonStructure.supports(selected)) {jsonSourcePaused=false;showJsonStructure=true;} }
             case INSPECT_BYTES->inspectSelectedBytes();
             case COMPARE_DISK_FILE->startFileComparison(selected);
             case REVIEW_CHANGES->showPendingChanges=true;
