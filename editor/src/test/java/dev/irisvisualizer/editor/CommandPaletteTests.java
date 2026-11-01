@@ -12,7 +12,7 @@ final class CommandPaletteTests {
         check(entries.size()==30 && entries.stream().map(CommandPalette.Entry::action).distinct().count()==entries.size() && new HashSet<>(entries.stream().map(CommandPalette.Entry::action).toList()).equals(all),"each supported UI action appears exactly once, without recursive palette or native close");
         check(CommandPalette.search(" ").equals(entries),"empty query retains stable catalog order");
         check(has("sAvE cOpY",EditorCommands.Action.SAVE_COPY) && has("Ctrl+Shift+S",EditorCommands.Action.SAVE_AS) && has("references",EditorCommands.Action.REVIEW_LINKS),"case-insensitive title/shortcut/task matching");
-        check(CommandPalette.search("File: Save Copy").size()==1 && has("File: Save Copy",EditorCommands.Action.SAVE_COPY),"every term must match the same command");
+        check(CommandPalette.search("Workspace: Save Copy").size()==1 && has("Workspace: Save Copy",EditorCommands.Action.SAVE_COPY),"every term must match the same command in its current menu");
         check(CommandPalette.search("native terrain preview").isEmpty() && CommandPalette.search("[a-z]+").isEmpty(),"no unsupported preview action or regex interpretation");
         check(CommandPalette.search("x".repeat(256)).isEmpty() && CommandPalette.search("zz zz zz zz zz zz zz zz").isEmpty(),"exact query character and token limits");
         rejected(()->CommandPalette.search(null));rejected(()->CommandPalette.search("x".repeat(257)));rejected(()->CommandPalette.search("a a a a a a a a a"));

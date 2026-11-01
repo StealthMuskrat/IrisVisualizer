@@ -10,17 +10,17 @@ public final class WorkspaceChanges {
     public static final int MAX_RESULTS=ReviewPagination.PAGE_SIZE, MAX_QUERY_CHARACTERS=256;
     public static final long MAX_CHECK_BYTES=16L*1024*1024;
     public enum Kind {
-        NEW_FILE("New file"), MODIFIED_FILE("Modified file"), NEW_FOLDER("New folder"), REMOVED_FOLDER("Removed empty folder");
+        NEW_FILE("New file"), MODIFIED_FILE("Modified file"), REMOVED_FILE("Removed file"), NEW_FOLDER("New folder"), REMOVED_FOLDER("Removed empty folder");
         private final String label;
         Kind(String label) { this.label=label; }
         public String label() { return label; }
     }
     public enum Filter {
-        ALL("All pending changes"), FILES("Files"), NEW_FILES("New files"), MODIFIED_FILES("Modified files"), FOLDERS("Folder changes");
+        ALL("All pending changes"), FILES("Files"), NEW_FILES("New files"), MODIFIED_FILES("Modified files"), REMOVED_FILES("Removed files"), FOLDERS("Folder changes");
         private final String label;
         Filter(String label) { this.label=label; }
         public String label() { return label; }
-        boolean matches(Kind kind) { return switch (this) { case ALL -> true;case FILES -> kind==Kind.NEW_FILE || kind==Kind.MODIFIED_FILE;case NEW_FILES -> kind==Kind.NEW_FILE;case MODIFIED_FILES -> kind==Kind.MODIFIED_FILE;case FOLDERS -> kind==Kind.NEW_FOLDER || kind==Kind.REMOVED_FOLDER; }; }
+        boolean matches(Kind kind) { return switch (this) { case ALL -> true;case FILES -> kind==Kind.NEW_FILE || kind==Kind.MODIFIED_FILE || kind==Kind.REMOVED_FILE;case NEW_FILES -> kind==Kind.NEW_FILE;case MODIFIED_FILES -> kind==Kind.MODIFIED_FILE;case REMOVED_FILES -> kind==Kind.REMOVED_FILE;case FOLDERS -> kind==Kind.NEW_FOLDER || kind==Kind.REMOVED_FOLDER; }; }
     }
     public record Entry(String path, Kind kind, int bytes) {}
     public record Query(String text, Filter filter) {
@@ -30,10 +30,11 @@ public final class WorkspaceChanges {
             text=text.strip().toLowerCase(Locale.ROOT);
         }
     }
-    public record Result(int newFiles, int modifiedFiles, int newFolders, int removedFolders, long fileBytes, int matches, List<Entry> entries) {
+    public record Result(int newFiles, int modifiedFiles, int newFolders, int removedFolders, long fileBytes, int matches, List<Entry> entries,int removedFiles) {
+        public Result(int newFiles,int modifiedFiles,int newFolders,int removedFolders,long fileBytes,int matches,List<Entry> entries){this(newFiles,modifiedFiles,newFolders,removedFolders,fileBytes,matches,entries,0);}
         public Result(int newFiles,int modifiedFiles,int newFolders,long fileBytes,int matches,List<Entry> entries) { this(newFiles,modifiedFiles,newFolders,0,fileBytes,matches,entries); }
         public Result { entries=List.copyOf(entries); }
-        public int total() { return newFiles+modifiedFiles+newFolders+removedFolders; }
+        public int total() { return newFiles+modifiedFiles+newFolders+removedFolders+removedFiles; }
         public boolean truncated() { return matches>entries.size(); }
     }
     public record Page(ReviewPagination.Window window,Result result) {}
@@ -46,7 +47,7 @@ public final class WorkspaceChanges {
         private List<Entry> inventory=List.of();
         private Query previous;
         private Page page;
-        private int added,modified,folders,removed;
+        private int added,modified,folders,removed,deleted;
         private long bytes;
         private Check checked;
         public void clear() { workspace=null;revision=-1;saveRevision=-1;inventory=List.of();previous=null;page=null;checked=null; }
@@ -54,8 +55,8 @@ public final class WorkspaceChanges {
             Objects.requireNonNull(current);
             if (workspace!=current || revision!=current.revision() || saveRevision!=current.saveRevision()) {
                 inventory=current.pendingChanges();workspace=current;revision=current.revision();saveRevision=current.saveRevision();previous=null;page=null;checked=null;
-                added=modified=folders=removed=0;bytes=0;
-                for(var entry:inventory) { switch(entry.kind()) { case NEW_FILE->added++;case MODIFIED_FILE->modified++;case NEW_FOLDER->folders++;case REMOVED_FOLDER->removed++; }bytes+=entry.bytes(); }
+                added=modified=folders=removed=deleted=0;bytes=0;
+                for(var entry:inventory) { switch(entry.kind()) { case NEW_FILE->added++;case MODIFIED_FILE->modified++;case REMOVED_FILE->deleted++;case NEW_FOLDER->folders++;case REMOVED_FOLDER->removed++; }bytes+=entry.bytes(); }
             }
         }
         /** Compatibility entry point: the first bounded page. */
@@ -64,7 +65,7 @@ public final class WorkspaceChanges {
             Objects.requireNonNull(query);ensure(current);
             if(page!=null && query.equals(previous) && page.window().page()==ReviewPagination.Window.at(page.window().matches(),requested).page())return page;
             var selected=ReviewPagination.select(inventory,entry->query.filter().matches(entry.kind()) && entry.path().toLowerCase(Locale.ROOT).contains(query.text()),requested);
-            previous=query;page=new Page(selected.window(),new Result(added,modified,folders,removed,bytes,selected.window().matches(),selected.entries()));return page;
+            previous=query;page=new Page(selected.window(),new Result(added,modified,folders,removed,bytes,selected.window().matches(),selected.entries(),deleted));return page;
         }
         public Check check(PackWorkspace current, Entry entry) {
             ensure(current);

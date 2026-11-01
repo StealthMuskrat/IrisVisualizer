@@ -23,13 +23,14 @@ public final class PendingDiskReview {
         private final Path directory;
         private final List<WorkspaceChanges.Entry> entries;
         private final Map<String,byte[]> hashes;
-        private final Set<String> removed,relocated;
-        Source(Path directory,List<WorkspaceChanges.Entry> entries,Map<String,byte[]> hashes,Set<String> removed,Set<String> relocated) throws IOException {
-            if (entries.size()>MAX_ENTRIES || removed.size()>MAX_ENTRIES || relocated.size()>MAX_ENTRIES) throw new IOException("Pending disk review exceeds 100,000 entries per metadata collection");
-            long characters=0;for (var entry : entries) characters+=entry.path().length();for (String path : removed) characters+=path.length();for (String path : relocated) characters+=path.length();
+        private final Set<String> removed,relocated,removedFiles;
+        Source(Path directory,List<WorkspaceChanges.Entry> entries,Map<String,byte[]> hashes,Set<String> removed,Set<String> relocated) throws IOException {this(directory,entries,hashes,removed,relocated,Set.of());}
+        Source(Path directory,List<WorkspaceChanges.Entry> entries,Map<String,byte[]> hashes,Set<String> removed,Set<String> relocated,Set<String> removedFiles) throws IOException {
+            if (entries.size()>MAX_ENTRIES || removed.size()>MAX_ENTRIES || relocated.size()>MAX_ENTRIES || removedFiles.size()>MAX_ENTRIES) throw new IOException("Pending disk review exceeds 100,000 entries per metadata collection");
+            long characters=0;for (var entry : entries) characters+=entry.path().length();for (String path : removed) characters+=path.length();for (String path : relocated) characters+=path.length();for(String path:removedFiles)characters+=path.length();
             if (characters>MAX_PATH_CHARACTERS) throw new IOException("Pending disk review exceeds 16 million metadata path characters");
-            this.directory=directory;this.entries=List.copyOf(entries);this.removed=Set.copyOf(removed);this.relocated=Set.copyOf(relocated);
-            var copies=new HashMap<String,byte[]>();for (var entry : entries) if (entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE) {
+            this.removedFiles=Set.copyOf(removedFiles);this.directory=directory;this.entries=List.copyOf(entries);this.removed=Set.copyOf(removed);this.relocated=Set.copyOf(relocated);
+            var copies=new HashMap<String,byte[]>();for (var entry : entries) if ((entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE || entry.kind()==WorkspaceChanges.Kind.REMOVED_FILE)) {
                 byte[] hash=hashes.get(entry.path());if (hash==null || hash.length!=32) throw new IOException("Pending file has no saved baseline: "+entry.path());copies.put(entry.path(),hash.clone());
             }
             this.hashes=Collections.unmodifiableMap(copies);
@@ -85,7 +86,7 @@ public final class PendingDiskReview {
             if (!Files.isDirectory(root,LinkOption.NOFOLLOW_LINKS)) return result(source,entry,WorkspaceChanges.Status.CONFLICT,-1,"The active pack folder is missing or is no longer a directory.");
             Path file=PackWorkspace.checkedTarget(root,PackWorkspace.safe(entry.path()));BasicFileAttributes attributes;
             try { attributes=Files.readAttributes(file,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS); }
-            catch (NoSuchFileException missing) { return result(source,entry,kind==WorkspaceChanges.Kind.MODIFIED_FILE ? WorkspaceChanges.Status.CONFLICT : WorkspaceChanges.Status.AVAILABLE,-1,kind==WorkspaceChanges.Kind.MODIFIED_FILE ? "The resource was removed outside the editor." : "The destination is absent at this check. Permissions and future races are unchecked."); }
+            catch (NoSuchFileException missing) { return result(source,entry,kind==WorkspaceChanges.Kind.MODIFIED_FILE ? WorkspaceChanges.Status.CONFLICT : kind==WorkspaceChanges.Kind.REMOVED_FILE?WorkspaceChanges.Status.REMOVAL_READY:WorkspaceChanges.Status.AVAILABLE,-1,kind==WorkspaceChanges.Kind.MODIFIED_FILE ? "The resource was removed outside the editor." : "The destination is absent at this check. Permissions and future races are unchecked."); }
             if (kind==WorkspaceChanges.Kind.NEW_FOLDER) return result(source,entry,source.relocated.contains(entry.path()) || !attributes.isDirectory() ? WorkspaceChanges.Status.CONFLICT : WorkspaceChanges.Status.FOLDER_EXISTS,-1,source.relocated.contains(entry.path()) ? "The relocated-folder destination became occupied outside the workspace." : attributes.isDirectory() ? "The destination is already a directory; its contents were not inspected." : "The folder destination is occupied by a non-directory.");
             if (kind==WorkspaceChanges.Kind.REMOVED_FOLDER) {
                 if (!attributes.isDirectory()) return result(source,entry,WorkspaceChanges.Status.CONFLICT,-1,"Folder removal destination is no longer a directory.");
@@ -93,7 +94,7 @@ public final class PendingDiskReview {
                     for (Path child : children) {
                         budget.check();if (budget.children>=budget.limits.children()) return result(source,entry,WorkspaceChanges.Status.REVIEW_LIMIT,-1,"The shared 100,000 directory-child review budget was exhausted; removal readiness is unchecked.");budget.children++;
                         String relative=root.relativize(child).toString().replace('\\','/');
-                        if (!source.removed.contains(relative) || !Files.isDirectory(child,LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(child)) return result(source,entry,WorkspaceChanges.Status.CONFLICT,-1,"Unexpected contents block empty-folder removal: "+relative);
+                        if (!(source.removed.contains(relative) && Files.isDirectory(child,LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(child)) && !(source.removedFiles.contains(relative) && Files.isRegularFile(child,LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(child))) return result(source,entry,WorkspaceChanges.Status.CONFLICT,-1,"Unexpected contents block empty-folder removal: "+relative);
                     }
                 }
                 PackWorkspace.rejectLinks(root);PackWorkspace.checkedTarget(root,entry.path());
@@ -121,7 +122,7 @@ public final class PendingDiskReview {
             budget.check();PackWorkspace.rejectLinks(root);PackWorkspace.checkedTarget(root,entry.path());
             if (!same(attributes,Files.readAttributes(file,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS)) || total!=attributes.size()) return result(source,entry,WorkspaceChanges.Status.CONFLICT,total,"The file changed during its disk check. Refresh explicitly.");
             boolean matches=Arrays.equals(source.hashes.get(entry.path()),digest.digest());
-            return result(source,entry,matches ? WorkspaceChanges.Status.BASELINE_MATCH : WorkspaceChanges.Status.CONFLICT,total,matches ? "Disk bytes match the captured saved baseline at this check; later Save still performs its own full preflight." : "Disk bytes differ from the captured saved baseline. Reopen to review disk changes, or use Save As/Save Copy to a fresh folder.");
+            return result(source,entry,matches ? (kind==WorkspaceChanges.Kind.REMOVED_FILE?WorkspaceChanges.Status.REMOVAL_READY:WorkspaceChanges.Status.BASELINE_MATCH) : WorkspaceChanges.Status.CONFLICT,total,matches ? "Disk bytes match the captured saved baseline at this check; later Save still performs its own full preflight." : "Disk bytes differ from the captured saved baseline. Reopen to review disk changes, or use Save As/Save Copy to a fresh folder.");
         } catch (IOException | SecurityException failure) { return result(source,entry,WorkspaceChanges.Status.IO_ERROR,-1,"Disk check could not complete: "+Objects.toString(failure.getMessage(),failure.getClass().getSimpleName())); }
         catch (NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
     }

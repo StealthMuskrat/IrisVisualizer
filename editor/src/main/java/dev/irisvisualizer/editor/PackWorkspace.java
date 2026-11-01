@@ -12,6 +12,8 @@ public final class PackWorkspace implements PackResourceView {
     private final Set<String> savedDirectories = new HashSet<>();
     private final Set<String> removedDirectories = new TreeSet<>();
     private final Set<String> relocatedDirectoryTargets = new HashSet<>();
+    private final Object resourceOperationAuthority=new Object();
+    private final Map<String,byte[]> removedFiles=new TreeMap<>();
     private final Set<String> created = new HashSet<>();
     private long resourceRevision, editRevision;
     private long saveRevision;
@@ -422,7 +424,7 @@ public final class PackWorkspace implements PackResourceView {
     public boolean changed(String path) { return changed.contains(path); }
     public int size(String path) { return Objects.requireNonNull(files.get(path), "Unknown resource").length; }
     public byte[] read(String path) { return Objects.requireNonNull(files.get(path), "Unknown resource").clone(); }
-    public boolean dirty() { return !changed.isEmpty() || !changedDirectories.isEmpty() || !removedDirectories.isEmpty(); }
+    public boolean dirty() { return !changed.isEmpty() || !changedDirectories.isEmpty() || !removedDirectories.isEmpty() || !removedFiles.isEmpty(); }
     public Path directory() { return directory; }
     // Save may advance per-file baselines before a later write fails; review caches must notice those advances.
     long saveRevision() { return saveRevision; }
@@ -430,6 +432,7 @@ public final class PackWorkspace implements PackResourceView {
         var entries=new ArrayList<WorkspaceChanges.Entry>();
         for (String path : changed) entries.add(new WorkspaceChanges.Entry(path,created.contains(path) ? WorkspaceChanges.Kind.NEW_FILE : WorkspaceChanges.Kind.MODIFIED_FILE,files.get(path).length));
         for (String path : changedDirectories) entries.add(new WorkspaceChanges.Entry(path,WorkspaceChanges.Kind.NEW_FOLDER,0));
+        for (String path : removedFiles.keySet()) entries.add(new WorkspaceChanges.Entry(path,WorkspaceChanges.Kind.REMOVED_FILE,0));
         for (String path : removedDirectories) entries.add(new WorkspaceChanges.Entry(path,WorkspaceChanges.Kind.REMOVED_FOLDER,0));
         entries.sort(Comparator.comparing(WorkspaceChanges.Entry::path));return List.copyOf(entries);
     }
@@ -440,7 +443,7 @@ public final class PackWorkspace implements PackResourceView {
             if (!entries.contains(selected)) throw new IOException("This pending destination is no longer available");
             entries=List.of(selected);
         }
-        return new PendingDiskReview.Source(directory,entries,savedHashes,removedDirectories,relocatedDirectoryTargets);
+        return new PendingDiskReview.Source(directory,entries,savedHashes,removedDirectories,relocatedDirectoryTargets,removedFiles.keySet());
     }
     WorkspaceChanges.Check checkPendingChange(WorkspaceChanges.Entry entry,long byteLimit) {
         if (byteLimit<0 || byteLimit>WorkspaceChanges.MAX_CHECK_BYTES) throw new IllegalArgumentException("Invalid disk-check byte limit");
@@ -452,7 +455,7 @@ public final class PackWorkspace implements PackResourceView {
             java.nio.file.attribute.BasicFileAttributes attributes;
             try { attributes=Files.readAttributes(file,java.nio.file.attribute.BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS); }
             catch (NoSuchFileException missing) {
-                return diskCheck(entry,entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE ? WorkspaceChanges.Status.CONFLICT : WorkspaceChanges.Status.AVAILABLE,-1,
+                return diskCheck(entry,entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE ? WorkspaceChanges.Status.CONFLICT : entry.kind()==WorkspaceChanges.Kind.REMOVED_FILE?WorkspaceChanges.Status.REMOVAL_READY:WorkspaceChanges.Status.AVAILABLE,-1,
                         entry.kind()==WorkspaceChanges.Kind.MODIFIED_FILE ? "The resource was removed outside the editor." : entry.kind()==WorkspaceChanges.Kind.REMOVED_FOLDER ? "The folder is already absent. Save will not recreate it; permissions and future races are unchecked." : "The destination does not currently exist. Permissions and future races are not checked.");
             }
             if (entry.kind()==WorkspaceChanges.Kind.NEW_FOLDER && relocatedDirectoryTargets.contains(entry.path())) return diskCheck(entry,WorkspaceChanges.Status.CONFLICT,-1,"The relocated-folder destination became occupied outside the workspace. Save refuses the collision.");
@@ -476,12 +479,42 @@ public final class PackWorkspace implements PackResourceView {
                 }
             }
             boolean matches=Arrays.equals(savedHashes.get(entry.path()),digest.digest());
-            return diskCheck(entry,matches ? WorkspaceChanges.Status.BASELINE_MATCH : WorkspaceChanges.Status.CONFLICT,total,
+            return diskCheck(entry,matches ? (entry.kind()==WorkspaceChanges.Kind.REMOVED_FILE?WorkspaceChanges.Status.REMOVAL_READY:WorkspaceChanges.Status.BASELINE_MATCH) : WorkspaceChanges.Status.CONFLICT,total,
                     matches ? "Disk bytes match the saved baseline at this check. This is not a guarantee that a later Save will succeed." : "Disk bytes differ from the saved baseline. Review disk changes by reopening, or save the applied workspace to a fresh folder with Save As/Save Copy.");
         } catch (IOException | SecurityException failure) { return diskCheck(entry,WorkspaceChanges.Status.IO_ERROR,-1,"Disk check could not complete: "+failure.getMessage()); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
     }
     private WorkspaceChanges.Check diskCheck(WorkspaceChanges.Entry entry,WorkspaceChanges.Status status,long bytes,String detail) { return new WorkspaceChanges.Check(entry,directory,status,bytes,detail); }
+    ResourceOperation.Plan reviewResourceOperation(ResourceOperation.Mode mode,String source,String value)throws IOException{
+        Objects.requireNonNull(mode);source=safe(source);if(!files.containsKey(source) || ResourceTypes.fileFamily(source)==null)throw new IOException("Choose an existing editable JSON resource or permitted image/object asset");
+        String target=null;
+        if(mode!=ResourceOperation.Mode.DELETE){
+            String parent=source.substring(0,source.lastIndexOf('/')),name=source.substring(source.lastIndexOf('/')+1,source.lastIndexOf('.'));
+            if(mode==ResourceOperation.Mode.RENAME){if(value==null || !value.matches("[a-z0-9_-]+"))throw new IOException("Use one lowercase resource name without extension or slashes");name=value;}
+            else{parent=safe(value);String family=ResourceTypes.fileFamily(source);if(!parent.equals(family) && !parent.startsWith(family+"/"))throw new IOException("Move resources only within their current base family");if(family.equals("dimensions") && !parent.equals("dimensions"))throw new IOException("Dimensions must remain directly inside dimensions/");if(!directories.contains(parent) && files.keySet().stream().noneMatch(path->path.startsWith(value+"/")))throw new IOException("Choose an existing resource folder");}
+            String family=ResourceTypes.fileFamily(source);String key=(parent.equals(family)?"":parent.substring(family.length()+1)+"/")+name;target=safe(ResourceTypes.target(source,key));for(String component:target.split("/"))if(component.length()>255)throw new IOException("Resource path components must fit 255 characters including the extension");
+            if(source.equalsIgnoreCase(target) && !source.equals(target))throw new IOException("Case-only resource renames are not supported on Windows");
+            if(!source.equals(target)){if(foldedFiles.contains(target.toLowerCase(Locale.ROOT)))throw new IOException("Resource destination is already occupied");validatePaths(target);}
+        }
+        return new ResourceOperation.Plan(mode,source,value,target);
+    }
+    ResourceOperation.Source captureResourceOperation(ResourceOperation.Mode mode,String source,String value)throws IOException{
+        var plan=reviewResourceOperation(mode,source,value);return new ResourceOperation.Source(plan,files.navigableKeySet(),files,resourceOperationAuthority,revision(),saveRevision);
+    }
+    String installResourceOperation(ResourceOperation.Prepared prepared)throws IOException{
+        if(prepared==null || !prepared.available() || !prepared.report.permitted() || !prepared.origin.current(resourceOperationAuthority,revision(),saveRevision))throw new IOException("Resource operation is stale, foreign, blocked or already consumed");
+        var plan=prepared.report.plan();if(!plan.equals(reviewResourceOperation(plan.mode(),plan.source(),plan.value())))throw new IOException("Resource operation destination changed");if(!plan.changes()){prepared.transfer();return plan.target();}
+        long bytes=files.values().stream().mapToLong(data->data.length).sum();var changedHashes=new HashMap<String,byte[]>();
+        for(var row:prepared.sizes().entrySet()){if(!files.containsKey(row.getKey()))throw new IOException("A reference owner is no longer available");bytes+=(long)row.getValue()-files.get(row.getKey()).length;changedHashes.put(row.getKey(),prepared.hash(row.getKey()));}
+        if(plan.mode()==ResourceOperation.Mode.DELETE)bytes-=files.get(plan.source()).length;if(bytes>MAX_BYTES)throw new IOException("Resource operation exceeds workspace byte capacity");
+        boolean wasCreated=created.contains(plan.source());byte[] baseline=wasCreated?null:savedHashes.get(plan.source());if(!wasCreated && (baseline==null || baseline.length!=32))throw new IOException("Resource has no saved baseline");byte[] removalHash=baseline==null?null:baseline.clone();
+        var replacements=prepared.transfer();byte[] moved=replacements.getOrDefault(plan.source(),files.get(plan.source()));created.remove(plan.source());
+        if(!wasCreated)removedFiles.put(plan.source(),removalHash);else savedHashes.remove(plan.source());
+        files.remove(plan.source());foldedFiles.remove(plan.source().toLowerCase(Locale.ROOT));contentRevisions.remove(plan.source());changed.remove(plan.source());
+        if(plan.target()!=null){files.put(plan.target(),moved);foldedFiles.add(plan.target().toLowerCase(Locale.ROOT));contentRevisions.put(plan.target(),++contentSequence);if(removedFiles.remove(plan.target())==null)created.add(plan.target());changed.add(plan.target());}
+        for(var row:replacements.entrySet())if(!row.getKey().equals(plan.source())){files.put(row.getKey(),row.getValue());contentRevisions.put(row.getKey(),++contentSequence);if(created.contains(row.getKey()) || !Arrays.equals(savedHashes.get(row.getKey()),changedHashes.get(row.getKey())))changed.add(row.getKey());else changed.remove(row.getKey());}
+        resourceRevision++;editRevision++;history.clear("Resource operation applied; earlier applied-edit history was cleared.");return plan.target();
+    }
     public int undoCount() { return history.undoCount(); }
     public int redoCount() { return history.redoCount(); }
     public long historyBytes() { return history.bytes(); }
@@ -533,8 +566,9 @@ public final class PackWorkspace implements PackResourceView {
         save(target,FileSaves::write);
     }
     /** Injectable publication boundary for filesystem failure contracts; normal callers use the same staged writer. */
-    void save(Path target,FileSaves.Writer writer) throws IOException {
-        Objects.requireNonNull(writer);
+    void save(Path target,FileSaves.Writer writer) throws IOException {save(target,writer,FileSaves::remove);}
+    void save(Path target,FileSaves.Writer writer,FileSaves.Remover remover) throws IOException {
+        Objects.requireNonNull(writer);Objects.requireNonNull(remover);
         target = target.toAbsolutePath().normalize();
         rejectLinks(target);
         boolean same = directory != null && Files.exists(target) && target.toRealPath().equals(directory);
@@ -549,6 +583,7 @@ public final class PackWorkspace implements PackResourceView {
             if (same && !changed.contains(key)) continue;
             FileSaves.preflight(target.resolve(key),same && !created.contains(key) ? savedHashes.get(key) : null);
         }
+        var fileRemovals=new TreeMap<String,FileSaves.RemovalPlan>();if(same)for(var row:removedFiles.entrySet())fileRemovals.put(row.getKey(),FileSaves.prepareRemoval(target,row.getKey(),row.getValue()));
         if (same) for (String key : removedDirectories) preflightDirectoryRemoval(target,key);
         Files.createDirectories(target);
         for (String key : directories) {
@@ -564,6 +599,9 @@ public final class PackWorkspace implements PackResourceView {
             saveRevision++;
         }
         if (same) {
+            for(var row:fileRemovals.entrySet()){
+                var receipt=Objects.requireNonNull(remover.remove(row.getValue()),"File removal returned no receipt");if(!receipt.matches(row.getValue()))throw new IOException("File removal receipt belongs to another path");removedFiles.remove(row.getKey());savedHashes.remove(row.getKey());saveRevision++;
+            }
             var removals=removedDirectories.stream().sorted(Comparator.comparingInt((String p) -> p.split("/").length).reversed().thenComparing(Comparator.naturalOrder())).toList();
             for (String key : removals) {
                 Path folder=checkedTarget(target,key);
@@ -577,14 +615,14 @@ public final class PackWorkspace implements PackResourceView {
         }
         directory = target.toRealPath();
         // Published-file receipts already installed exact captured-byte hashes; untouched baselines stay independent.
-        changed.clear(); created.clear(); changedDirectories.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);
+        changed.clear(); created.clear(); changedDirectories.clear();removedFiles.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);
         saveRevision++;
     }
     /** Full in-memory snapshot to a fresh folder, then adopt its save baseline without clearing edit history. */
     public void saveAs(Path target) throws IOException {
         Path destination=freshDestination(target);var snapshot=freshSnapshot();snapshot.save(destination);
         directory=snapshot.directory;savedHashes.clear();savedHashes.putAll(snapshot.savedHashes);
-        changed.clear();created.clear();changedDirectories.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);
+        changed.clear();created.clear();changedDirectories.clear();removedFiles.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);
         saveRevision++;
     }
     /** UI-only baseline adoption after a guarded, successfully published immutable Save As snapshot. */
@@ -592,7 +630,7 @@ public final class PackWorkspace implements PackResourceView {
         if (baseline==null || baseline.summary().revision()!=revision() || !baseline.matches(files.keySet(),directories)) throw new IOException("Applied workspace differs from the published Save As snapshot");
         Path destination=target.toAbsolutePath().normalize();var hashes=baseline.copyHashes();
         directory=destination;savedHashes.clear();savedHashes.putAll(hashes);
-        changed.clear();created.clear();changedDirectories.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);saveRevision++;
+        changed.clear();created.clear();changedDirectories.clear();removedFiles.clear();removedDirectories.clear();relocatedDirectoryTargets.clear();savedDirectories.clear();savedDirectories.addAll(directories);saveRevision++;
     }
     /** Full in-memory snapshot without changing this workspace's folder, baseline, revisions or history. */
     public void saveCopy(Path target) throws IOException { Path destination=freshDestination(target);var snapshot=freshSnapshot();snapshot.save(destination); }
@@ -662,6 +700,7 @@ public final class PackWorkspace implements PackResourceView {
     private void validatePaths(List<String> additionalFiles,Set<String> proposedDirectories,boolean boundCharacters) throws IOException {
         long pathCharacters=0;
         Map<String, String> spellings = new HashMap<>(); Set<String> folders = new HashSet<>();
+        for(String additional:additionalFiles)for(String removed:removedFiles.keySet())if(additional.equalsIgnoreCase(removed))throw new IOException("Save pending file removals before reusing this path: "+additional);
         List<String> plannedFiles=new ArrayList<>(files.keySet());plannedFiles.addAll(additionalFiles);
         for (String file : plannedFiles) for (String current=file;!current.isEmpty();) {
             if (removedDirectories.contains(current)) throw new IOException("Restore the pending folder removal before adding resources inside it: "+current);
@@ -682,7 +721,7 @@ public final class PackWorkspace implements PackResourceView {
         for (String file : plannedFiles) if (folders.contains(file.toLowerCase(Locale.ROOT)))
             throw new IOException("File/directory path collision: " + file);
         // Pending old spellings constrain Windows collisions without consuming the final pack's entry budget.
-        for (String removed : removedDirectories) {
+        var pendingOldPaths=new TreeSet<>(removedDirectories);pendingOldPaths.addAll(removedFiles.keySet());for (String removed : pendingOldPaths) {
             String current="";for (String part : removed.split("/")) {
                 current+=(current.isEmpty() ? "" : "/")+part;String prior=spellings.get(current.toLowerCase(Locale.ROOT));
                 if (prior!=null && !prior.equals(current)) throw new IOException("Conflicting pending Windows folder spelling: "+current);
@@ -697,7 +736,9 @@ public final class PackWorkspace implements PackResourceView {
         try (var children=Files.newDirectoryStream(folder)) {
             for (Path child : children) {
                 String relative=root.relativize(child).toString().replace('\\','/');
-                if (!removedDirectories.contains(relative) || !Files.isDirectory(child,LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(child)) throw new IOException("Folder changed outside the editor; unexpected contents block removal: "+key);
+                boolean removedFile=removedFiles.containsKey(relative) && Files.isRegularFile(child,LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(child);
+                boolean removedFolder=removedDirectories.contains(relative) && Files.isDirectory(child,LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(child);
+                if(!removedFile && !removedFolder)throw new IOException("Folder changed outside the editor; unexpected contents block removal: "+key);
             }
         }
     }

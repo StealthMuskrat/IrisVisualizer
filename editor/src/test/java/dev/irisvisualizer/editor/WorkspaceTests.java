@@ -133,6 +133,9 @@ public final class WorkspaceTests {
         FileComparisonTests.run(temp);
         ReviewedResourceAdditionTests.run(temp);
         ReviewedFolderOperationTests.run(temp);
+        ResourceOperationTests.run(temp);
+        ResourceRemovalSaveTests.run(temp);
+        ResourceOperationCoverageTests.run(temp);
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);
@@ -148,6 +151,7 @@ public final class WorkspaceTests {
    JsonStructureTests.run(temp);
    SourceTextPagesTests.run(temp);
    SharedSourceIndexTests.run(temp);
+   EditorShellPreviewTests.run(temp);
    JsonSourceStageTests.run(temp);
    SourceMatchTests.run(temp);
    ReadOnlyPolicyTests.run(temp);

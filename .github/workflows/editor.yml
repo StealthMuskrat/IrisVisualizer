@@ -1081,6 +1081,26 @@ jobs:
           if ((Get-FileHash generated-coverage/field-coverage.properties).Hash -ne (Get-FileHash editor/src/main/resources/field-coverage.properties).Hash) { throw 'Coverage metadata differs' }
           if ((Get-FileHash generated-coverage/coverage-report.md).Hash -ne (Get-FileHash editor/coverage-report.md).Hash) { throw 'Coverage report differs' }
           Get-Content generated-coverage/coverage-report.md
+      - name: Verify closed typed resource-operation schema
+        shell: pwsh
+        run: |
+          $revision = (Get-Content iris.lock.json -Raw | ConvertFrom-Json).iris.revision
+          $policy = Get-Content editor/policy/resource-operation-sources.json -Raw | ConvertFrom-Json
+          foreach ($source in $policy.sources.PSObject.Properties) {
+            $name = Split-Path $source.Name -Leaf
+            if ($source.Name.StartsWith('@volmlib/')) {
+              $volmlibRevision = (Get-Content iris.lock.json -Raw | ConvertFrom-Json).volmlib.revision
+              $relative = $source.Name.Substring('@volmlib/'.Length)
+              Invoke-WebRequest "https://raw.githubusercontent.com/VolmitSoftware/VolmLib/$volmlibRevision/shared/src/main/java/art/arcane/volmlib/$relative" -OutFile $name
+            } else {
+              Invoke-WebRequest "https://raw.githubusercontent.com/VolmitSoftware/Iris/$revision/core/src/main/java/art/arcane/iris/$($source.Name)" -OutFile $name
+            }
+          }
+          python editor/tools/test_resource_operation_schema.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/resource_operation_schema.py . generated-resource-operation-schema.properties editor/policy/resource-operation-sources.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-resource-operation-schema.properties).Hash -ne (Get-FileHash editor/src/main/resources/resource-operation-schema.properties).Hash) { throw 'Pinned resource-operation schema differs' }
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes
       - name: Build Windows x64 package

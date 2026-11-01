@@ -32,6 +32,27 @@ public final class FileSaves {
     }
     private record Stamp(Identity identity,long bytes,FileTime modified,String sha256) {}
     private record Target(Stamp bytes,SaveMetadata.State metadata) {}
+    /** Baseline-bound nonrecursive file deletion; retains only hashes and metadata, never old file bytes. */
+    static final class RemovalPlan {
+        private final Path root,file,parent;private final String key;private final byte[] hash;private final Identity rootIdentity,parentIdentity;private final Target target;
+        private RemovalPlan(Path root,String key,byte[] hash,Identity rootIdentity,Identity parentIdentity,Target target){this.root=root;this.key=key;this.file=root.resolve(key);parent=file.getParent();this.hash=hash.clone();this.rootIdentity=rootIdentity;this.parentIdentity=parentIdentity;this.target=target;}
+    }
+    static final class RemovalReceipt {private final RemovalPlan plan;private RemovalReceipt(RemovalPlan plan){this.plan=plan;}boolean matches(RemovalPlan expected){return plan==expected;}}
+    @FunctionalInterface interface Remover {RemovalReceipt remove(RemovalPlan plan)throws IOException;}
+    static RemovalPlan prepareRemoval(Path root,String key,byte[] hash)throws IOException{
+        if(hash==null || hash.length!=32)throw new IOException("Pending file removal has no saved baseline");Path base=root.toAbsolutePath().normalize();PackWorkspace.rejectLinks(base);base=base.toRealPath();Path file=PackWorkspace.checkedTarget(base,PackWorkspace.safe(key)),parent=file.getParent();var rootAttributes=attributes(base);var parentAttributes=attributes(parent);if(!rootAttributes.isDirectory() || !parentAttributes.isDirectory())throw new IOException("Pending file removal parent is not a directory");
+        var captured=absent(file)?null:target(file,hash);return new RemovalPlan(base,key,hash,Identity.of(rootAttributes),Identity.of(parentAttributes),captured);
+    }
+    @FunctionalInterface interface RemovalCheckpoint {void ready(Path file)throws IOException;}
+    static RemovalReceipt remove(RemovalPlan plan)throws IOException{return remove(plan,file->{});}
+    static RemovalReceipt remove(RemovalPlan plan,RemovalCheckpoint checkpoint)throws IOException{
+        Objects.requireNonNull(plan);Objects.requireNonNull(checkpoint);checkpoint.ready(plan.file);PackWorkspace.rejectLinks(plan.root);PackWorkspace.checkedTarget(plan.root,plan.key);
+        if(!plan.rootIdentity.matches(attributes(plan.root)) || !plan.parentIdentity.matches(attributes(plan.parent)))throw new IOException("Pending file removal parent identity changed");
+        if(plan.target==null){if(!absent(plan.file))throw new IOException("A file appeared at an absent pending-removal path");return new RemovalReceipt(plan);}
+        Target current=target(plan.file,plan.hash);
+        if(!plan.target.bytes().identity().equals(current.bytes().identity()) || plan.target.bytes().bytes()!=current.bytes().bytes() || !plan.target.bytes().modified().equals(current.bytes().modified()) || !plan.target.metadata().equals(current.metadata()))throw new IOException("Pending file removal changed since preflight");
+        PackWorkspace.rejectLinks(plan.file);Files.delete(plan.file);return new RemovalReceipt(plan);
+    }
     private static MessageDigest digest() { try { return MessageDigest.getInstance("SHA-256"); } catch(NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); } }
     private static BasicFileAttributes attributes(Path path) throws IOException { return Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS); }
     private static boolean absent(Path path) throws IOException { try { attributes(path);return false; } catch(NoSuchFileException missing) { return true; } }
