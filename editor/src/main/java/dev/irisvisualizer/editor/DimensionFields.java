@@ -153,6 +153,7 @@ public final class DimensionFields {
     }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
     public static String options(String field) { return DEFINITIONS.getProperty(field + ".options", ""); }
+    public static NumericChoices numericChoices(String field) { return NumericChoices.parse(options(field)); }
     public static NumericBounds numericBounds(String field) { return options(field).isEmpty() ? NumericBounds.from(DEFINITIONS,field) : NumericBounds.TEXT; }
     public static double min(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".minimum")); }
     public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum")); }

@@ -27,6 +27,7 @@ public final class StaticObjects {
     }
     static void verifyReplacementDefinitions() { if (!"emptyDisables".equals(DATA.getProperty("edit.policy")) || !"requiredFindAndPalette".equals(DATA.getProperty("edit.validation")) || !"beforeBlockStateRotation".equals(DATA.getProperty("edit.dispatch"))) throw new IllegalStateException("Unsupported fixed replacement policy"); }
     public static String listPrefix() { return "staticObjects#."; }
+    public static NumericBounds numericBounds(String field) { return List.of("rotation","scale").contains(field) ? NumericBounds.from(DATA,field,"double") : NumericBounds.TEXT; }
     public static String scalePrefix() { return "dimensionObjectScale#."; }
     static void authorize(String path) { if (!DimensionFields.dimension(path)) throw new IllegalArgumentException("Static objects belong to dimensions"); }
     public static String help(String field) { if (!EDITABLE.contains(field) && !ROOT_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported object field");return DATA.getProperty(field+".description",""); }

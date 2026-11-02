@@ -31,6 +31,7 @@ public final class StructureDefinitions {
     private static void field(String field) { if (field==null || !EDITABLE.contains(field)) throw new IllegalArgumentException("Structure field is read-only"); }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description"); }
     public static String defaultValue(String field) { field(field);return DATA.getProperty(field+".default"); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field,"int"); }
     public static int minimum(String field) { if (field==null || !NUMBERS.contains(field)) throw new IllegalArgumentException("Select a structure integer");return Integer.parseInt(DATA.getProperty(field+".minimum")); }
     public static int maximum(String field) { minimum(field);return Integer.parseInt(DATA.getProperty(field+".maximum")); }
     public static List<String> choices(String field) { if (field==null || !ENUMS.contains(field)) throw new IllegalArgumentException("Select a structure enum");return List.of(DATA.getProperty(field+".choices").split(",")); }

@@ -10,7 +10,12 @@ public record NumericBounds(boolean integer, double minimum, double maximum, boo
     public static final double MAXIMUM_SLIDER_SPAN = 1024;
 
     public static NumericBounds from(Properties definitions, String field) {
-        return of(definitions.getProperty(field + ".type"), definitions.getProperty(field + ".minimum"),
+        return from(definitions, field, null);
+    }
+
+    /** Some audited contracts store bounds only; their owning helper supplies the native type. */
+    public static NumericBounds from(Properties definitions, String field, String nativeType) {
+        return of(definitions.getProperty(field + ".type", nativeType), definitions.getProperty(field + ".minimum"),
                 definitions.getProperty(field + ".maximum"));
     }
 

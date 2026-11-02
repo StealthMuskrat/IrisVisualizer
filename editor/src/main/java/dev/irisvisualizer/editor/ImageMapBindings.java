@@ -110,6 +110,7 @@ public final class ImageMapBindings {
         if (!List.of("threshold","falloff").contains(field)) return false;String token=node.token(field);if (token==null) return true;
         try { return LosslessJson.numericToken(token) && Double.isFinite(new BigDecimal(token).doubleValue()); } catch (NumberFormatException invalid) { return false; }
     }
+    public static NumericBounds numericBounds(String field) { return List.of("threshold","falloff").contains(field) ? NumericBounds.of("double","0","1") : NumericBounds.TEXT; }
     public static byte[] enableScalar(String path,byte[] original,Context context,String field) { authorize(path);mask(context);if (!List.of("threshold","falloff").contains(field)) throw new IllegalArgumentException("Unsupported mask scalar");return edit(original,context,node -> node.enable(field,defaultToken(context,field))); }
     public static byte[] setScalar(String path,byte[] original,Context context,String field,String input) {
         authorize(path);mask(context);if (!List.of("threshold","falloff").contains(field)) throw new IllegalArgumentException("Unsupported mask scalar");double value;

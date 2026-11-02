@@ -581,7 +581,7 @@ public final class EditorApp extends Application {
                         ImGui.text(field + " [" + DimensionFields.min(field) + " .. " + DimensionFields.max(field) + "]");
                         if (!DimensionFields.options(field).isEmpty()) ImGui.textWrapped("Allowed: " + DimensionFields.options(field));
                         ImString input = values.computeIfAbsent(field, key -> new ImString(token, 128));
-                        NumericInput.draw(field,input,DimensionFields.numericBounds(field));
+                        NumericInput.draw(field,input,DimensionFields.numericBounds(field),DimensionFields.numericChoices(field));
                         drafts.update(field, token, input.get());
                         ImGui.sameLine();
                         if (ImGui.button("Apply##" + field)) {
@@ -1052,11 +1052,12 @@ public final class EditorApp extends Application {
         for (String field : StructureDefinitions.NUMBERS) {
             ImGui.pushID(field);ImGui.textWrapped(StructureDefinitions.help(field));
             try {
-                int[] input={Integer.parseInt(StructureDefinitions.value(root,field))};
-                if (root.token(field)==null) ImGui.textUnformatted("Implicit default: "+input[0]);
-                if (ImGui.sliderInt(field,input,StructureDefinitions.minimum(field),StructureDefinitions.maximum(field))) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setInteger(selected,workspace.read(selected),field,Integer.toString(input[0]))));
-                if (root.token(field)==null && ImGui.button("Store displayed default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.setInteger(selected,workspace.read(selected),field,StructureDefinitions.defaultValue(field))));
-                if (root.token(field)!=null && ImGui.button("Use class default")) applyRoutingExtra(() -> workspace.replace(selected,StructureDefinitions.reset(selected,workspace.read(selected),field)));
+                String current=StructureDefinitions.value(root,field),key="structureDefinition#"+field;
+                if (root.token(field)==null) ImGui.textUnformatted("Implicit default: "+current);
+                ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,128));
+                NumericInput.draw(field,input,StructureDefinitions.numericBounds(field));drafts.update(key,current,input.get());
+                if (ImGui.button(root.token(field)==null ? "Store value" : "Apply")) commitRiverOverride(key,() -> workspace.replace(selected,StructureDefinitions.setInteger(selected,workspace.read(selected),field,input.get())));
+                if (root.token(field)!=null && ImGui.button("Use class default")) { try { commitProfileChange(key,StructureDefinitions.reset(selected,workspace.read(selected),field),null); } catch (Exception failure) { error=failure.getMessage(); } }
             } catch (IllegalArgumentException unsupported) { ImGui.textWrapped(unsupported.getMessage()); }
             ImGui.popID();
         }
@@ -1194,8 +1195,8 @@ public final class EditorApp extends Application {
             var size=index<0 ? StructureWorkcells.size(root,index) : StructureWorkcells.entrySize(entry);String[] stored={Integer.toString(size.width()),Integer.toString(size.height()),Integer.toString(size.depth())};ImString[] inputs=new ImString[3];
             for (int axis=0;axis<3;axis++) {
                 String field=StructureWorkcells.DIMENSIONS.get(axis),key=prefix+field,value=stored[axis];
-                inputs[axis]=values.computeIfAbsent(key,ignored -> new ImString(value,64));int[] slider={Integer.parseInt(inputs[axis].get())};
-                if (ImGui.sliderInt(field,slider,StructureWorkcells.minimum(field),StructureWorkcells.maximum(field))) inputs[axis].set(Integer.toString(slider[0]));
+                inputs[axis]=values.computeIfAbsent(key,ignored -> new ImString(value,64));
+                NumericInput.draw(field,inputs[axis],StructureWorkcells.numericBounds(field));
             }
             drafts.update(draftKey,size.key(),inputs[0].get()+"|"+inputs[1].get()+"|"+inputs[2].get());
             if (ImGui.button(index<0 ? "Store legacy bounds together" : "Apply cell bounds together")) {
@@ -1759,7 +1760,7 @@ public final class EditorApp extends Application {
                     ImGui.pushID(field);ImGui.textWrapped(ImageMapBindings.help(context,field));String token=node.token(field),draft=context.prefix()+field;
                     if (token==null) { if (ImGui.button("Enable "+field+" default 0")) applyRoutingExtra(() -> workspace.replace(selected,ImageMapBindings.enableScalar(selected,workspace.read(selected),context,field))); }
                     else if (!ImageMapBindings.numericSupported(node,field)) ImGui.textWrapped("Stored scalar is not a finite number (read-only).");
-                    else { ImString input=values.computeIfAbsent(draft,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field+" (0..1)",input);drafts.update(draft,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(draft,() -> workspace.replace(selected,ImageMapBindings.setScalar(selected,workspace.read(selected),context,field,input.get()))); }
+                    else { ImString input=values.computeIfAbsent(draft,ignored -> new ImString(token,Math.max(128,token.length()+1)));NumericInput.draw(field+" (0..1)",input,ImageMapBindings.numericBounds(field));drafts.update(draft,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(draft,() -> workspace.replace(selected,ImageMapBindings.setScalar(selected,workspace.read(selected),context,field,input.get()))); }
                     ImGui.popID();
                 }
                 for (String field : node.fields()) if (!ImageMapBindings.MASK_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");
@@ -1846,7 +1847,7 @@ public final class EditorApp extends Application {
                         if (NativeJigsawOverrides.NUMBERS.contains(field)) ImGui.textWrapped("Exact integer "+NativeJigsawOverrides.bounds(field)+"; empty display inherits until explicitly applied.");
                         if ("null".equals(object.token(field)) && !NativeJigsawOverrides.NUMBERS.contains(field)) ImGui.textWrapped("Stored null may fail pack validation; reset to inherit or apply a supported value.");
                         if (field.equals("useExpansionHack") || !NativeJigsawOverrides.choices(field).isEmpty()) { var choices=field.equals("useExpansionHack") ? List.of("true","false") : NativeJigsawOverrides.choices(field);if (ImGui.beginCombo(field,current.isEmpty() ? "Inherit" : current)) { for (String choice : choices) if (ImGui.selectable(choice,choice.equals(current))) commitRiverOverride(key,() -> workspace.replace(selected,NativeJigsawOverrides.set(selected,workspace.read(selected),context,field,choice)));ImGui.endCombo(); } }
-                        else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply override")) commitRiverOverride(key,() -> workspace.replace(selected,NativeJigsawOverrides.set(selected,workspace.read(selected),context,field,input.get()))); }
+                        else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));NumericInput.draw(field,input,NativeJigsawOverrides.numericBounds(field));drafts.update(key,current,input.get());if (ImGui.button("Apply override")) commitRiverOverride(key,() -> workspace.replace(selected,NativeJigsawOverrides.set(selected,workspace.read(selected),context,field,input.get()))); }
                         if (object.token(field)!=null && ImGui.button("Reset to inherited (remove field)")) { try { commitProfileChange(key,NativeJigsawOverrides.resetLeaf(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
                     } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored field has an unsupported type/width (read-only)."); }ImGui.popID();
                 }
@@ -1996,7 +1997,7 @@ public final class EditorApp extends Application {
                 else {
                     for (String field : NativeGenerationFilters.FREQUENCY_FIELDS) {
                         ImGui.pushID(field);ImGui.textWrapped(NativeGenerationFilters.help(field));String key=entryPrefix+field;
-                        try { String current=field.equals("structureSet") ? NativeGenerationFilters.structureSet(entry) : NativeGenerationFilters.multiplier(entry);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,field.equals("structureSet") ? NativeGenerationFilters.setStructureSet(selected,workspace.read(selected),item,input.get()) : NativeGenerationFilters.setMultiplier(selected,workspace.read(selected),item,input.get())));if (field.equals("multiplier") && entry.token(field)!=null && ImGui.button("Restore absent multiplier (1)")) { try { commitProfileChange(key,NativeGenerationFilters.resetMultiplier(selected,workspace.read(selected),index),null); } catch (Exception failure) { error=failure.getMessage(); } } }
+                        try { String current=field.equals("structureSet") ? NativeGenerationFilters.structureSet(entry) : NativeGenerationFilters.multiplier(entry);if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));NumericInput.draw(field,input,NativeGenerationFilters.numericBounds(field));drafts.update(key,current,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,field.equals("structureSet") ? NativeGenerationFilters.setStructureSet(selected,workspace.read(selected),item,input.get()) : NativeGenerationFilters.setMultiplier(selected,workspace.read(selected),item,input.get())));if (field.equals("multiplier") && entry.token(field)!=null && ImGui.button("Restore absent multiplier (1)")) { try { commitProfileChange(key,NativeGenerationFilters.resetMultiplier(selected,workspace.read(selected),index),null); } catch (Exception failure) { error=failure.getMessage(); } } }
                         catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored value has an unsupported type/finite value (read-only)."); }ImGui.popID();
                     }
                 }
@@ -2253,7 +2254,7 @@ public final class EditorApp extends Application {
                     ImGui.pushID(field);ImGui.textWrapped(DimensionCarvings.help(field));ImGui.textWrapped(field.equals("childRecursionDepth") ? "Exact depth 0..32; editor uses the native clamp range." : "Finite shrink factor >= 0.0001; editor uses the native minimum clamp.");String token=entry.token(field),key=prefix+field;
                     if (token==null) { if (ImGui.button("Enable default "+DimensionCarvings.defaultToken(field))) applyRoutingExtra(() -> workspace.replace(selected,DimensionCarvings.enableScalar(selected,workspace.read(selected),entryIndex,field))); }
                     else if (!DimensionCarvings.numericSupported(entry,field)) ImGui.textWrapped("Stored scalar has an unsupported type or integer width (read-only).");
-                    else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionCarvings.setScalar(selected,workspace.read(selected),entryIndex,field,input.get()))); }
+                    else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));NumericInput.draw(field,input,DimensionCarvings.numericBounds(field));drafts.update(key,token,input.get());if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionCarvings.setScalar(selected,workspace.read(selected),entryIndex,field,input.get()))); }
                     ImGui.popID();
                 }
                 drawCarvingChildren(document,entry,index);
@@ -2521,7 +2522,7 @@ public final class EditorApp extends Application {
         if (a!=null && !LosslessJson.numericToken(a) || b!=null && !LosslessJson.numericToken(b)) { ImGui.textWrapped("Stored pair has unsupported numeric types (read-only).");ImGui.treePop();return; }
         String first=a==null ? slope ? BiomeLayers.slopeDefault(low) : BiomeDecorators.defaultToken(low) : a,second=b==null ? slope ? BiomeLayers.slopeDefault(high) : BiomeDecorators.defaultToken(high) : b,prefix=context.prefix()+(slope ? "slopeCondition." : ""),minKey=prefix+low,maxKey=prefix+high;
         ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(first,Math.max(128,first.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(second,Math.max(128,second.getBytes(StandardCharsets.UTF_8).length+1)));
-        ImGui.inputText(low,minimum);drafts.update(minKey,first,minimum.get());ImGui.inputText(high,maximum);drafts.update(maxKey,second,maximum.get());
+        NumericInput.draw(low,minimum,slope ? BiomeLayers.numericBounds(low) : BiomeDecorators.numericBounds(low));drafts.update(minKey,first,minimum.get());NumericInput.draw(high,maximum,slope ? BiomeLayers.numericBounds(high) : BiomeDecorators.numericBounds(high));drafts.update(maxKey,second,maximum.get());
         if (ImGui.button("Apply pair")) { try { byte[] next=slope ? BiomeDecorators.setSlope(selected,workspace.read(selected),context,minimum.get(),maximum.get()) : BiomeDecorators.setStack(selected,workspace.read(selected),context,minimum.get(),maximum.get());workspace.replace(selected,next);drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
         if (slope) for (String field : container.fields()) if (!BiomeLayers.SLOPE_FIELDS.contains(field)) ImGui.textWrapped(field+" (read-only)");ImGui.treePop();
     }
@@ -2551,7 +2552,7 @@ public final class EditorApp extends Application {
                 String token=entry.token("weight"),key=prefix+"weight";
                 if (token==null) { if (ImGui.button("Enable weight 1")) applyRoutingExtra(() -> workspace.replace(selected,BiomeDecorators.enableWeight(selected,workspace.read(selected),context,field,blockIndex))); }
                 else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored weight has an unsupported type (read-only).");
-                else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Exact weight 1..1000",input);drafts.update(key,token,input.get());if (ImGui.button("Apply weight")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setWeight(selected,workspace.read(selected),context,field,blockIndex,input.get()))); }
+                else { ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));NumericInput.draw("Exact weight 1..1000",input,DimensionPalettes.weightBounds());drafts.update(key,token,input.get());if (ImGui.button("Apply weight")) commitRiverOverride(key,() -> workspace.replace(selected,BiomeDecorators.setWeight(selected,workspace.read(selected),context,field,blockIndex,input.get()))); }
             }
             RiverProfiles.Action action=null;if (ImGui.button("Duplicate block")) action=RiverProfiles.Action.DUPLICATE;ImGui.sameLine();ImGui.beginDisabled(field.equals("palette") && entries.size()<=1);if (ImGui.button("Remove block")) action=RiverProfiles.Action.REMOVE;ImGui.endDisabled();
             ImGui.beginDisabled(index==0);if (ImGui.button("Block up")) action=RiverProfiles.Action.UP;ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled(index==entries.size()-1);if (ImGui.button("Block down")) action=RiverProfiles.Action.DOWN;ImGui.endDisabled();
@@ -2839,7 +2840,7 @@ public final class EditorApp extends Application {
         if (rootScale!=null && !LosslessJson.numericToken(rootScale)) ImGui.textWrapped("Dimension object scale has an unsupported type (read-only).");
         else {
             String stored=rootScale==null ? "1" : rootScale,key=StaticObjects.scalePrefix()+"value";ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));
-            ImGui.inputText(rootScale==null ? "Dimension object scale (default 1)" : "Dimension object scale",input);drafts.update(key,stored,input.get());
+            NumericInput.draw(rootScale==null ? "Dimension object scale (default 1)" : "Dimension object scale",input,StaticObjects.numericBounds("scale"));drafts.update(key,stored,input.get());
             if (ImGui.button("Apply dimension object scale")) { try { workspace.replace(selected,StaticObjects.setDimensionScale(selected,workspace.read(selected),input.get()));drafts.applied(key);values.remove(key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
         }
         List<LosslessJson> entries;
@@ -2892,7 +2893,7 @@ public final class EditorApp extends Application {
             String name=StaticObjects.AXES.get(axis),token=transform==null ? null : transform.token(name);
             if (token!=null && !LosslessJson.numericToken(token)) { ImGui.textWrapped("Stored "+name+" is not numeric (read-only).");ImGui.treePop();return; }
             stored[axis]=token==null ? "0" : token;String key=context.prefix()+field+"."+name;String value=stored[axis];input[axis]=values.computeIfAbsent(key,ignored -> new ImString(value,Math.max(128,value.getBytes(StandardCharsets.UTF_8).length+1)));
-            ImGui.inputText(name,input[axis]);drafts.update(key,value,input[axis].get());
+            NumericInput.draw(name,input[axis],StaticObjects.numericBounds(field));drafts.update(key,value,input[axis].get());
         }
         if (ImGui.button("Apply fixed "+field)) {
             try {
@@ -2907,7 +2908,7 @@ public final class EditorApp extends Application {
         if (!LosslessJson.numericToken(stored)) ImGui.textWrapped("Stored scale has an unsupported type (read-only).");
         else {
             ImGui.textWrapped(token==null || token.equals("null") ? "Scale inherits the dimension default. Apply an explicit factor to override it." : "Explicit scale overrides the dimension factor, including 1.");
-            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Fixed scale (0.01..50)",input);drafts.update(key,stored,input.get());
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(stored,Math.max(128,stored.getBytes(StandardCharsets.UTF_8).length+1)));NumericInput.draw("Fixed scale (0.01..50)",input,StaticObjects.numericBounds("scale"));drafts.update(key,stored,input.get());
             if (ImGui.button("Apply fixed scale")) { try { workspace.replace(selected,StaticObjects.setScale(selected,workspace.read(selected),context,input.get()));drafts.applied(key);values.remove(key);error=null; } catch (Exception failure) { error=failure.getMessage(); } }
             if (token!=null && !token.equals("null") && ImGui.button("Inherit dimension scale")) { try { commitProfileChange(context.prefix()+"scale",StaticObjects.setScale(selected,workspace.read(selected),context,null),null); } catch (Exception failure) { error=failure.getMessage(); } }
         }
@@ -3184,7 +3185,7 @@ public final class EditorApp extends Application {
             else { ImBoolean flag=new ImBoolean(Boolean.parseBoolean(token));if (ImGui.checkbox("Surface pass",flag)) applyRoutingExtra(() -> workspace.replace(selected,OreGenerators.setSurface(selected,workspace.read(selected),context,flag.get()))); }
         } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored threshold has an unsupported type (read-only).");
         else {
-            String key=context.prefix()+field;ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText("Threshold",input);drafts.update(key,token,input.get());
+            String key=context.prefix()+field;ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));NumericInput.draw("Threshold",input,OreGenerators.thresholdBounds());drafts.update(key,token,input.get());
             if (ImGui.button("Apply threshold")) commitRiverOverride(key,() -> workspace.replace(selected,OreGenerators.setThreshold(selected,workspace.read(selected),context,input.get())));
         }
         ImGui.popID();
@@ -3262,7 +3263,7 @@ public final class EditorApp extends Application {
         try { String current=ProceduralAccents.value(entry,context,field),type=ProceduralAccents.type(context,field);ImGui.textWrapped(entry.token(field)==null ? "Implicit native default: "+current : "null".equals(entry.token(field)) ? "Explicit null block is preserved; replace/reset to use supported text." : "Explicit stored value");
             if (!ProceduralAccents.choices(context,field).isEmpty()) { if (ImGui.beginCombo(field,current.length()>128 || current.indexOf(0)>=0 ? "Stored target" : current)) { for (String choice : ProceduralAccents.choices(context,field)) { if (ImGui.selectable(choice,choice.equals(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralAccents.set(selected,workspace.read(selected),context,field,choice)));if (ImGui.isItemHovered()) ImGui.setTooltip(ProceduralAccents.choiceHelp(context,field,choice)); }ImGui.endCombo(); } }
             else if (type.equals("boolean")) { if (ImGui.checkbox(field,Boolean.parseBoolean(current))) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralAccents.set(selected,workspace.read(selected),context,field,Boolean.toString(!Boolean.parseBoolean(current)))));if (entry.token(field)==null && ImGui.button("Store native default")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralAccents.set(selected,workspace.read(selected),context,field,current))); }
-            else { if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");if (type.equals("String")) { if (!current.isEmpty() && !ProceduralMaterials.blockSyntax(current)) ImGui.textWrapped("Unsupported external/invalid block text is preserved. Replace it with supported syntax or reset.");ImGui.textWrapped("Empty text restores the native no-single-block default; a palette can still resolve the decorator material."); }else ImGui.textWrapped(ProceduralAccents.constraints(context,field));ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));ImGui.inputText(field,input);drafts.update(key,current,input.get());if (ImGui.button("Apply accent value")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralAccents.set(selected,workspace.read(selected),context,field,input.get()))); }
+            else { if (current.indexOf(0)>=0) throw new IllegalArgumentException("NUL text");if (type.equals("String")) { if (!current.isEmpty() && !ProceduralMaterials.blockSyntax(current)) ImGui.textWrapped("Unsupported external/invalid block text is preserved. Replace it with supported syntax or reset.");ImGui.textWrapped("Empty text restores the native no-single-block default; a palette can still resolve the decorator material."); }else ImGui.textWrapped(ProceduralAccents.constraints(context,field));ImString input=values.computeIfAbsent(key,ignored -> new ImString(current,Math.max(16384,current.getBytes(StandardCharsets.UTF_8).length+1)));NumericInput.draw(field,input,ProceduralAccents.numericBounds(context,field));drafts.update(key,current,input.get());if (ImGui.button("Apply accent value")) commitRiverOverride(key,() -> workspace.replace(selected,ProceduralAccents.set(selected,workspace.read(selected),context,field,input.get()))); }
             if (entry.token(field)!=null && ImGui.button("Reset field to native default")) { try { commitProfileChange(key,ProceduralAccents.resetLeaf(selected,workspace.read(selected),context,field),null); } catch (Exception failure) { error=failure.getMessage(); } }
         } catch (IllegalArgumentException unsupported) { ImGui.textWrapped("Stored accent value has unsupported type/width (read-only, preserved)."); }ImGui.popID();
     }
@@ -3588,8 +3589,8 @@ public final class EditorApp extends Application {
         String minKey=context.prefix(field)+minField,maxKey=context.prefix(field)+maxField;
         ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1)));
         ImString maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
-        ImGui.inputText(min==null ? "Minimum (Iris default)" : "Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());
-        ImGui.inputText(max==null ? "Maximum (Iris default)" : "Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        NumericInput.draw(min==null ? "Minimum (Iris default)" : "Minimum",minimum,FloatingPlacementConstraints.boundBounds(field,minField));drafts.update(minKey,storedMin,minimum.get());
+        NumericInput.draw(max==null ? "Maximum (Iris default)" : "Maximum",maximum,FloatingPlacementConstraints.boundBounds(field,maxField));drafts.update(maxKey,storedMax,maximum.get());
         if (ImGui.button("Apply bounds")) {
             try { workspace.replace(selected,FloatingPlacementConstraints.setBounds(selected,workspace.read(selected),context,field,minimum.get(),maximum.get()));drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
             catch (Exception failure) { error=failure.getMessage(); }
@@ -4147,7 +4148,7 @@ public final class EditorApp extends Application {
         else {
             String minKey=FloatingBiomes.entryPrefix(index)+minField,maxKey=FloatingBiomes.entryPrefix(index)+maxField,storedMin=min==null || optional && min.equals("null") ? optional ? "" : FloatingBiomes.defaultToken(minField) : min,storedMax=max==null || optional && max.equals("null") ? optional ? "" : FloatingBiomes.defaultToken(maxField) : max;
             ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
-            ImGui.inputText("Minimum",minimum);drafts.update(minKey,storedMin,minimum.get());ImGui.inputText("Maximum",maximum);drafts.update(maxKey,storedMax,maximum.get());
+            NumericInput.draw("Minimum",minimum,FloatingBiomes.numericBounds(minField));drafts.update(minKey,storedMin,minimum.get());NumericInput.draw("Maximum",maximum,FloatingBiomes.numericBounds(maxField));drafts.update(maxKey,storedMax,maximum.get());
             if (ImGui.button("Apply paired bounds")) {
                 try {
                     byte[] next=optional ? FloatingBiomes.setAbsoluteBounds(selected,workspace.read(selected),index,minimum.get(),maximum.get()) : FloatingBiomes.setPair(selected,workspace.read(selected),index,minField.equals("minHeightAboveSurface"),minimum.get(),maximum.get());
@@ -4320,8 +4321,8 @@ public final class EditorApp extends Application {
         String minKey=prefix+"minHeight",maxKey=prefix+"maxHeight",storedMin=min==null ? BiomeLayers.defaultHeight("minHeight") : min,storedMax=max==null ? BiomeLayers.defaultHeight("maxHeight") : max;
         ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
         ImGui.textWrapped("Thickness: exact integers; minimum 0-2032, maximum 1-2032. The editor requires minimum <= maximum and applies both together.");
-        ImGui.inputText(min==null ? "Minimum thickness (Iris default)" : "Minimum thickness",minimum);drafts.update(minKey,storedMin,minimum.get());
-        ImGui.inputText(max==null ? "Maximum thickness (Iris default)" : "Maximum thickness",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        NumericInput.draw(min==null ? "Minimum thickness (Iris default)" : "Minimum thickness",minimum,BiomeLayers.numericBounds("minHeight"));drafts.update(minKey,storedMin,minimum.get());
+        NumericInput.draw(max==null ? "Maximum thickness (Iris default)" : "Maximum thickness",maximum,BiomeLayers.numericBounds("maxHeight"));drafts.update(maxKey,storedMax,maximum.get());
         if (ImGui.button("Apply layer thickness")) {
             try { writer.apply(minimum.get(),maximum.get());drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
             catch (Exception failure) { error=failure.getMessage(); }
@@ -4350,8 +4351,8 @@ public final class EditorApp extends Application {
         if (min!=null && !LosslessJson.numericToken(min) || max!=null && !LosslessJson.numericToken(max)) { ImGui.textWrapped("Stored slope bound has an unsupported type (read-only).");return; }
         String minKey=prefix+"slopeCondition.minimumSlope",maxKey=prefix+"slopeCondition.maximumSlope",storedMin=min==null ? BiomeLayers.slopeDefault("minimumSlope") : min,storedMax=max==null ? BiomeLayers.slopeDefault("maximumSlope") : max;
         ImString minimum=values.computeIfAbsent(minKey,ignored -> new ImString(storedMin,Math.max(128,storedMin.getBytes(StandardCharsets.UTF_8).length+1))),maximum=values.computeIfAbsent(maxKey,ignored -> new ImString(storedMax,Math.max(128,storedMax.getBytes(StandardCharsets.UTF_8).length+1)));
-        ImGui.inputText(min==null ? "Minimum slope (Iris default)" : "Minimum slope",minimum);drafts.update(minKey,storedMin,minimum.get());
-        ImGui.inputText(max==null ? "Maximum slope (Iris default)" : "Maximum slope",maximum);drafts.update(maxKey,storedMax,maximum.get());
+        NumericInput.draw(min==null ? "Minimum slope (Iris default)" : "Minimum slope",minimum,BiomeLayers.numericBounds("minimumSlope"));drafts.update(minKey,storedMin,minimum.get());
+        NumericInput.draw(max==null ? "Maximum slope (Iris default)" : "Maximum slope",maximum,BiomeLayers.numericBounds("maximumSlope"));drafts.update(maxKey,storedMax,maximum.get());
         if (ImGui.button("Apply slope pair")) {
             try { writer.apply(minimum.get(),maximum.get());drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null; }
             catch (Exception failure) { error=failure.getMessage(); }
@@ -4459,7 +4460,7 @@ public final class EditorApp extends Application {
             } else if (!LosslessJson.numericToken(token) || target.nativeStructure() && !NativeStructurePalettes.supportedWeight(entry) || target.procedural() && !ProceduralMaterials.supportedWeight(entry)) ImGui.textWrapped("Stored weight has an unsupported type (read-only).");
             else {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
-                ImGui.inputText("Weight (1-"+DimensionPalettes.maximumWeight()+")",input);drafts.update(key,token,input.get());
+                NumericInput.draw("Weight (1-"+DimensionPalettes.maximumWeight()+")",input,DimensionPalettes.weightBounds());drafts.update(key,token,input.get());
                 if (ImGui.button("Apply weight")) commitRiverOverride(key,() -> workspace.replace(selected,target.setWeight(selected,workspace.read(selected),entryIndex,input.get())));
             }
             drawInlineBlockData(entry,new PaletteBlockData.Context(target.styleTarget(),entryIndex),entries.size());
@@ -4520,7 +4521,7 @@ public final class EditorApp extends Application {
             if (ImGui.button("Enable "+field+" ("+DimensionStacks.defaultToken(field)+")")) applyRoutingExtra(() -> workspace.replace(selected,DimensionStacks.enableScalar(selected,workspace.read(selected),field)));
         } else if (!DimensionStacks.numericSupported(object,field)) ImGui.textWrapped("Stored value has an unsupported type or integer width (read-only).");
         else {
-            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));ImGui.inputText(field,input);drafts.update(key,token,input.get());
+            ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.length()+1)));NumericInput.draw(field,input,DimensionStacks.numericBounds(field));drafts.update(key,token,input.get());
             if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,DimensionStacks.setScalar(selected,workspace.read(selected),field,input.get())));
         }
         ImGui.popID();
@@ -5062,7 +5063,7 @@ public final class EditorApp extends Application {
             } else if (!LosslessJson.numericToken(weight)) ImGui.textWrapped("Stored fluid weight has an unsupported type (read-only).");
             else {
                 ImString input=values.computeIfAbsent(weightKey,ignored -> new ImString(weight,Math.max(128,weight.getBytes(StandardCharsets.UTF_8).length+1)));
-                ImGui.inputText("Weight (1-64)",input);drafts.update(weightKey,weight,input.get());
+                NumericInput.draw("Weight (1-64)",input,HydrologyFluidPalettes.weightBounds());drafts.update(weightKey,weight,input.get());
                 if (ImGui.button("Apply weight")) commitRiverOverride(weightKey,() -> workspace.replace(selected,target.setWeight(selected,workspace.read(selected),fluidIndex,input.get())));
             }
             drawInlineBlockData(entry,new PaletteBlockData.Context(target.styleTarget(),fluidIndex),fluids.size());
@@ -5456,7 +5457,7 @@ public final class EditorApp extends Application {
             } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped(field+" has an unsupported type (read-only).");
             else {
                 ImString input=values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
-                ImGui.inputText(field+(index<0 ? " (1-8)" : " (1-64)"),input); drafts.update(key,token,input.get());
+                NumericInput.draw(field+(index<0 ? " (1-8)" : " (1-64)"),input,RiverMaterialFields.numericBounds(field)); drafts.update(key,token,input.get());
                 if (ImGui.button("Apply")) commitRiverOverride(key,() -> workspace.replace(selected,index<0 ? RiverMaterialFields.setDepth(selected,workspace.read(selected),target,input.get()) : RiverMaterialFields.setWeight(selected,workspace.read(selected),target,index,input.get())));
             }
         } finally { ImGui.popID(); }

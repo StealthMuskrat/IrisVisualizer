@@ -36,6 +36,7 @@ public final class OreGenerators {
     private static void authorize(String path,Context context) { authorize(path,context.resourceBase()); }
     public static String listPrefix(String base) { context(base);return "oreGenerators#"+base+"."; }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description",""); }
+    public static NumericBounds thresholdBounds() { return NumericBounds.from(DATA,"threshold","double"); }
     public static String defaultToken(String field) { field(field);return DATA.getProperty(field+".default"); }
     public static String styleDefault() { return DATA.getProperty("chanceStyle.default"); }
     public static String rangeDefault(String member,boolean existing) { if (!List.of("min","max").contains(member)) throw new IllegalArgumentException("Select a range bound");return DATA.getProperty((existing ? "range.class." : "range.context.")+member); }

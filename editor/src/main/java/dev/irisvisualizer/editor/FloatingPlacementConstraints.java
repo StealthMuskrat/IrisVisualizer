@@ -38,8 +38,9 @@ public final class FloatingPlacementConstraints {
     public static String carvingHelp(String value) { if (value==null || !carvingModes().contains(value)) throw new IllegalArgumentException("Unknown carving mode");return DATA.getProperty("carvingSupport."+value+".description",""); }
     private static String key(String field,String member) { objectField(field);if (!(field.equals("clamp") ? CLAMP_FIELDS : SLOPE_FIELDS).contains(member)) throw new IllegalArgumentException("Unsupported bound member");return field+"."+member; }
     public static String boundDefault(String field,String member) { return DATA.getProperty(key(field,member)+".default"); }
-    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field,"int"); }
     public static String constraints(String field) { if (!SCALARS.contains(field)) throw new IllegalArgumentException("Unsupported placement scalar");return "Exact integer, minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum"); }
+    public static NumericBounds boundBounds(String field,String member) { return NumericBounds.from(DATA,key(field,member),field.equals("clamp") ? "int" : "double"); }
     public static String boundConstraints(String field,String member) { String key=key(field,member);return (field.equals("clamp") ? "Exact integer" : "Finite number")+", minimum "+DATA.getProperty(key+".minimum")+", maximum "+DATA.getProperty(key+".maximum"); }
     public static String warpDefault() { return DATA.getProperty("warp.default"); }
     public static String multiplierDefault() { return DATA.getProperty("warp.multiplier.default"); }

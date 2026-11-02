@@ -142,6 +142,7 @@ public final class WorkspaceTests {
         FieldCoverageInspectionTests.run(temp);
         ResourceOperationContextTests.run(temp);
         NumericBoundsTests.run();
+        NumericChoicesTests.run();
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);
    AsyncPackReferenceReviewTests.run(temp);

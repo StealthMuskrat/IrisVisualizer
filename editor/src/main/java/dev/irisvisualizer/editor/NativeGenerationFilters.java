@@ -25,6 +25,7 @@ public final class NativeGenerationFilters {
     }
     public static String prefix(String list) { return "nativeGeneration#"+list+"."; }
     public static List<String> steps() { return List.of(DATA.getProperty("steps").split(",")); }
+    public static NumericBounds numericBounds(String field) { return field.equals("multiplier") ? NumericBounds.from(DATA,field,"double") : NumericBounds.TEXT; }
     public static String help(String field) { return DATA.getProperty(field+".description",""); }
     public static String stepHelp(String step) { return DATA.getProperty("step."+step+".description",""); }
     private static void authorize(String path) { if (!DimensionFields.dimension(path)) throw new IllegalArgumentException("Native generation filters are dimension-only"); }

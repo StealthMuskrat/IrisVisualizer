@@ -22,6 +22,7 @@ public final class DimensionPalettes {
     public static String defaultBlock(String field) { field(field);return DATA.getProperty(field+".block"); }
     public static String classBlock() { return DATA.getProperty("palette.classBlock"); }
     public static String description(String field) { field(field);return DATA.getProperty(field+".description",""); }
+    public static NumericBounds weightBounds() { return NumericBounds.from(DATA,"weight","int"); }
     public static String weightDefault() { return DATA.getProperty("weight.default"); }
     static int minimumWeight() { return Integer.parseInt(DATA.getProperty("weight.minimum")); }
     static int minimumEntries() { return Integer.parseInt(DATA.getProperty("palette.minimum")); }

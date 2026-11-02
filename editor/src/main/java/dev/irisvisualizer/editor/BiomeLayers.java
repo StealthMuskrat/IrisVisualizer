@@ -27,6 +27,7 @@ public final class BiomeLayers {
     public static String defaultBlock() { return DATA.getProperty("palette.defaultBlock"); }
     public static String styleDefault() { return DATA.getProperty("style.default"); }
     public static String styleDescription() { return DATA.getProperty("style.description",""); }
+    public static NumericBounds numericBounds(String field) { return List.of("minHeight","maxHeight").contains(field) ? NumericBounds.from(DATA,field,"int") : SLOPE_FIELDS.contains(field) ? NumericBounds.from(DATA,field,"double") : NumericBounds.TEXT; }
     public static String defaultHeight(String field) { if (!List.of("minHeight","maxHeight").contains(field)) throw new IllegalArgumentException("Unsupported thickness bound");return DATA.getProperty(field+".default"); }
     public static String slopeDefault(String field) { if (!SLOPE_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported slope bound");return DATA.getProperty(field+".default"); }
     public static String zoomDefault() { return DATA.getProperty("zoom.default"); }

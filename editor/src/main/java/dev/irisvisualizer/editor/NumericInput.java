@@ -8,6 +8,28 @@ import imgui.type.ImString;
 final class NumericInput {
     private NumericInput() {}
 
+    static void draw(String label, ImString input, NumericBounds bounds, NumericChoices choices) {
+        if (choices.tokens().isEmpty()) {
+            draw(label, input, bounds);
+            return;
+        }
+        ImGui.pushID(label);
+        int current = choices.index(input.get());
+        if (current >= 0) {
+            int[] position = {current};
+            int flags = ImGuiSliderFlags.NoInput | ImGuiSliderFlags.AlwaysClamp;
+            // Validated numeric tokens contain no printf directives. Display the selected value,
+            // while slider movement uses an integer index through the source's discrete options.
+            if (ImGui.sliderInt(label, position, 0, choices.tokens().size() - 1, choices.tokens().get(current), flags)
+                    && position[0] != current) input.set(choices.tokens().get(position[0]));
+        } else if (ImGui.beginCombo(label, "Choose allowed value")) {
+            for (String choice : choices.tokens()) if (ImGui.selectable(choice)) input.set(choice);
+            ImGui.endCombo();
+        }
+        ImGui.inputText("Exact value", input);
+        ImGui.popID();
+    }
+
     static void draw(String label, ImString input, NumericBounds bounds) {
         if (!bounds.slider()) {
             ImGui.inputText(label, input);

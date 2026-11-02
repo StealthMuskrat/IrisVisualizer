@@ -33,6 +33,7 @@ final class HydrologyFluidPalettes {
             if (!"invertedDefinitelyNotFluid".equals(DATA.getProperty("fluid.rule"))) throw new IOException("Unsupported fluid rule");
         } catch (IOException failure) { throw new ExceptionInInitializerError(failure); }
     }
+    static NumericBounds weightBounds() { return NumericBounds.from(DATA,"weight","int"); }
     static int maximumFluids() { return Integer.parseInt(DATA.getProperty("fluid.maximumEntries")); }
     private static byte[] blockEntry(String value) { return new LosslessJson("{}".getBytes(StandardCharsets.UTF_8)).enableStringPath("block",value); }
     static byte[] seedEntries(LosslessJson palette,String fluid) {

@@ -40,6 +40,22 @@ final class NumericBoundsTests {
         check(DimensionTypeFields.numericBounds("ambientLight").draft("0").isPresent(), "explicit zero does not acquire inheritance meaning");
         check(!DimensionTypeFields.numericBounds("fixedTime").slider(), "nullable exact time remains text");
         check(FloatingObjectRotations.numericBounds("interval").slider(), "angle intervals use audited degree bounds");
+        properties.remove("x.type");
+        check(!NumericBounds.from(properties, "x").slider() && NumericBounds.from(properties, "x", "int").integer(), "bounds-only contracts require their owner's explicit native type");
+        check(FloatingPlacementEffects.numericBounds("boreExtendMinY").integer()
+                && FloatingPlacementEffects.numericBounds("boreExtendMinY").draft("-1").isPresent(), "bounds-only bore integers preserve the native negative sentinel");
+        check(FloatingPlacementConstraints.numericBounds("surfaceSupportBuffer").slider()
+                && FloatingPlacementConstraints.numericBounds("surfaceSupportBuffer").draft("0.5").isEmpty(), "support controls retain exact integer semantics");
+        check(FloatingPlacementConstraints.boundBounds("slopeCondition", "minimumSlope").slider()
+                && !FloatingPlacementConstraints.boundBounds("clamp", "minimumHeight").slider(), "bounded slopes and wide world-height clamps remain distinct");
+        check(DimensionPalettes.weightBounds().maximum() == 1000 && HydrologyFluidPalettes.weightBounds().maximum() == 64, "general and hydrology weights retain their distinct source limits");
+        check(RiverMaterialFields.numericBounds("depth").maximum() == 8, "material depth does not borrow palette weight limits");
+        check(StructureWorkcells.numericBounds("width").draft("-").isEmpty(), "an incomplete workcell draft remains correctable without integer parsing");
+        check(StructureDefinitions.numericBounds("maxDepth").slider() && DimensionStacks.numericBounds("spacer").integer(), "structure and dimension-stack integer controls use pinned metadata");
+        check(NativeJigsawOverrides.numericBounds("maxDepth").slider()
+                && !NativeJigsawOverrides.numericBounds("maxDistanceVertical").slider(), "native jigsaw wide overrides stay exact fields");
+        check(StaticObjects.numericBounds("rotation").slider() && StaticObjects.numericBounds("scale").slider()
+                && !StaticObjects.numericBounds("position").slider(), "fixed rotations/scale do not change world-coordinate presentation");
         System.out.println("PASS: numeric presentation bounds, double precision, signed zero, exact integer width, malformed/out-of-range drafts, inheritance and signed64 text controls");
     }
 }

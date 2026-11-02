@@ -23,6 +23,7 @@ public final class DimensionCarvings {
     public static String prefix(int index) { if (index<0) throw new IllegalArgumentException("Select a carving entry");return prefix()+index+"."; }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description",""); }
     private static void field(String field) { if (field==null || !EDITABLE.contains(field)) throw new IllegalArgumentException("Unsupported carving field"); }
+    public static NumericBounds numericBounds(String field) { return field.equals("childRecursionDepth") ? NumericBounds.of("int","0",DATA.getProperty("depth.maximum")) : NumericBounds.TEXT; }
     public static String defaultToken(String field) { field(field);return DATA.getProperty(field+".default"); }
     public static String styleDefault() { return DATA.getProperty("childStyle.default"); }
     private static void authorize(String path) { if (!"dimensions".equals(ResourceTypes.base(path))) throw new IllegalArgumentException("Carving entries are dimension-only"); }

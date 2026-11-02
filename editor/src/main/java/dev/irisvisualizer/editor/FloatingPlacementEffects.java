@@ -32,7 +32,7 @@ public final class FloatingPlacementEffects {
         return contextHelp(field)+("objects".equals(list) && "fromBottom".equals(field) ? " Native floor alignment takes precedence." : "");
     }
     public static String defaultToken(String field) { field(field,EDITABLE);return DATA.getProperty(field+".default"); }
-    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field,"int"); }
     public static String constraints(String field) { field(field,SCALARS);return "Exact integer, minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum"); }
     public static byte[] enableFlag(String path,byte[] original,Context context,String field) { authorize(path,context,field);field(field,FLAGS);return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.enable(field,defaultToken(field))); }
     public static byte[] setFlag(String path,byte[] original,Context context,String field,boolean value) { authorize(path,context,field);field(field,FLAGS);return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),p -> p.bool(field,value)); }

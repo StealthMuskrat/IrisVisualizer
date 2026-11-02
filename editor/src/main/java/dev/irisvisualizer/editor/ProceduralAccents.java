@@ -37,6 +37,7 @@ public final class ProceduralAccents {
     public static String defaultValue(Context c,String field) { scalar(c,field);return property(c,field,"default"); }
     public static List<String> choices(Context c,String field) { scalar(c,field);String values=property(c,field,"choices");return values==null ? List.of() : List.of(values.split(",")); }
     public static String choiceHelp(Context c,String field,String choice) { return property(c,field,choice+".description"); }
+    public static NumericBounds numericBounds(Context context,String field) { return NumericBounds.of(type(context,field),property(context,field,"minimum"),property(context,field,"maximum")); }
     public static String constraints(Context c,String field) { String min=property(c,field,"minimum"),max=property(c,field,"maximum");return (type(c,field).equals("int") ? "Exact signed 32-bit integer" : "Finite number")+(min==null ? "" : "; minimum "+min)+(max==null ? "" : "; maximum "+max); }
     static List<LosslessJson> entries(LosslessJson entry,String list) { if (list==null || !List.of("decorators","weightedSecondaryLeaves","accents").contains(list)) throw new IllegalArgumentException("Unknown accent list");String token=entry.token(list);return token==null || token.equals("null") ? null : entry.objectArray(list); }
     private static void limit(List<LosslessJson> rows,boolean adding) { if (rows!=null && (rows.size()>64 || adding && rows.size()>=64)) throw new IllegalArgumentException("Accent collections have a 64-entry editor limit"); }

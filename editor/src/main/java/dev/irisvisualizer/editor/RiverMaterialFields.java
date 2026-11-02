@@ -31,6 +31,7 @@ public final class RiverMaterialFields {
     private static void target(String target) { if (!MATERIAL_TARGETS.contains(target) && !PADDING.equals(target)) throw new IllegalArgumentException("Unsupported river palette target"); }
     private static void authorize(String path,String target) { if (!DimensionFields.dimension(path)) throw new IllegalArgumentException("River materials are dimension-only"); target(target); }
     private static void materialTarget(String target) { if (!MATERIAL_TARGETS.contains(target)) throw new IllegalArgumentException("This target is a standalone palette"); }
+    public static NumericBounds numericBounds(String field) { return List.of("depth","weight").contains(field) ? NumericBounds.from(DATA,field,"int") : NumericBounds.TEXT; }
     public static String defaultToken(String field) {
         if (!List.of("enabled","depth","weight").contains(field)) throw new IllegalArgumentException("Unsupported material scalar");
         return DATA.getProperty(field+".default");

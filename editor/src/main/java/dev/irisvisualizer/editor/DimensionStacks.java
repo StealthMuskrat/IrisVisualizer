@@ -26,6 +26,7 @@ public final class DimensionStacks {
     public static String prefix() { return "dimensionStack#"; }
     public static String blendPrefix() { return prefix()+"blend."; }
     public static String help(String field) { return DATA.getProperty(field+".description",""); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field,"int"); }
     public static String defaultToken(String field) { if (field==null || !List.of("spacer","amplitude").contains(field)) throw new IllegalArgumentException("Unsupported stack scalar");return DATA.getProperty(field+".default"); }
     public static String styleDefault() { return DATA.getProperty("style.default"); }
     public static List<String> choices(PackWorkspace workspace) { return ResourceTypes.referenceKeys(workspace,"dimensions"); }

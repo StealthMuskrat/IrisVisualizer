@@ -28,6 +28,7 @@ public final class NativeJigsawOverrides {
     public static byte[] reset(String path,byte[] raw,Context c) { authorize(path,c);return editSource(raw,c,s -> { object(s);return s.token("jigsaw")==null ? s.sourceBytes() : s.removeField("jigsaw"); }); }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description"); }
     public static List<String> choices(String field) { field(field);String items=DATA.getProperty(field+".choices");return items==null ? List.of() : List.of(items.split(",")); }
+    public static NumericBounds numericBounds(String field) { return NUMBERS.contains(field) ? NumericBounds.from(DATA,field,"int") : NumericBounds.TEXT; }
     public static String bounds(String field) { return DATA.getProperty(field+".minimum")+".."+DATA.getProperty(field+".maximum"); }
     static String value(LosslessJson object,String field) {
         field(field);String token=object.token(field);if (token==null || token.equals("null")) return choices(field).isEmpty() ? "" : "SOURCE";

@@ -26,6 +26,7 @@ public final class StructureWorkcells {
         public long volume() { return Math.multiplyExact(Math.multiplyExact((long)width,height),depth); }
     }
     public static List<String> archetypes() { return List.of(DATA.getProperty("archetypes").split(",")); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field,"int"); }
     public static int minimum(String field) { dimension(field);return Integer.parseInt(DATA.getProperty(field+".minimum")); }
     public static int maximum(String field) { dimension(field);return Integer.parseInt(DATA.getProperty(field+".maximum")); }
     public static long maximumVolume() { return Long.parseLong(DATA.getProperty("native.MAX_VOLUME")); }
