@@ -12,6 +12,7 @@ public final class InspectorDrafts {
     public int count() { return changed.size(); }
     public boolean any() { return !changed.isEmpty(); }
     public boolean contains(String key) { return changed.contains(key); }
+    public int countMatching(java.util.function.Predicate<String> predicate){java.util.Objects.requireNonNull(predicate);return (int)changed.stream().filter(predicate).count();}
     public boolean anyUnder(String prefix) { return changed.stream().anyMatch(key -> key.startsWith(prefix)); }
     public boolean anyOtherUnder(String prefix,String appliedKey) { return changed.stream().anyMatch(key -> key.startsWith(prefix) && !key.equals(appliedKey)); }
     public void applied(String key) { changed.remove(key); }

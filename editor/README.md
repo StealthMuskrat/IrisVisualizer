@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+Large original reference/registry lists and biome-generator links now use 200-row editor pages with global entry indices. Changing pages keeps pending text, including drafts on other pages; the new-entry form stays available and structural edits retain their existing discard guard. Successful add/duplicate/move/remove reveals the resulting row across page boundaries. Clean off-page input buffers are released, while pending inputs are kept. NUL-containing or oversized string entries remain text read-only and byte-preserved, with explicit removal still available. Paging never becomes pack data or enables a preview.
+
 Background asset capture, image analysis, pending disk review, folder copy and ZIP export now report memory failures instead of remaining busy after a worker stops. Retry is explicit. Copy/export errors identify when publication had begun and the destination needs inspection; a failed Save As keeps the current active folder and save baseline. Completed or cleared snapshot payloads are released from idle worker loops. These paths still await end-of-UI regression and interactive verification.
 
 Supported original scalar controls now offer Use Iris default. This removes the stored override and keeps its containing object and unknown settings intact; it does not write the displayed default into JSON. The action covers main resource, nested noise, numeric style and terrain controls. Use height defaults resets both biome-generator endpoints together while retaining the generator reference. Only the affected unapplied text is cleared after success; unsupported values stay read-only and failed resets retain drafts. Saving/reopening preserves the omitted fields.

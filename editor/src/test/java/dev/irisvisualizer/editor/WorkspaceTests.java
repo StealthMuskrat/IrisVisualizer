@@ -79,6 +79,7 @@ public final class WorkspaceTests {
    AuthoringReferencesTests.run(temp);
    ResourceBrowserTests.run(temp);
    ResourceBrowserCommandsTests.run();
+   InspectorListPagesTests.run(temp);
    ReferenceInspectionTests.run(temp);
    ReferenceLinkTests.run(temp);
    NoiseReferenceTests.run(temp);
