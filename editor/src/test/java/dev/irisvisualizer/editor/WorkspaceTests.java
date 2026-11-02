@@ -165,6 +165,7 @@ public final class WorkspaceTests {
    EditorShellPreviewTests.run(temp);
    EditorShellLayoutTests.run();
    EditorDisplayScaleTests.run();
+   PreviewModeTabsTests.run();
    PreviewFramingTests.run(temp);
    PreviewIsolationTests.run(temp);
    PreviewDimensionContextTests.run(temp);

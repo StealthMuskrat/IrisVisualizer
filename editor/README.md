@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+The 2D/3D tabs now keep user switches stable instead of requesting the previous tab every frame. Resource changes and responsive toolbar layouts synchronize a meaningful default/current mode once; unsupported tabs remain disabled. Original-image capture/decode/upload memory failures show an explicit retry action. Navigating away, applying new image bytes, Undo or opening another pack invalidates obsolete image work without decoding another source in the background. Image contents remain read-only and failed previews never block Save/Export. Native tab/GPU interaction still awaits end-of-UI validation.
+
 The pinned catalog now has no unclassified fields: 1,237 implemented generation fields and 225 read-only fields. A complete audit of 1,778 pinned production Java files classified the remaining modification recipes as schema/compatibility data with no production application consumer. Recipe editing and file-operation authority remain disabled, and unknown properties stay read-only. See docs/FIELD-POLICY.md for the evidence and scope; this does not mark UI or native preview validation complete.
 
 Unambiguous qualified cave-biome selectors such as iris:forest now follow biome rename/move while preserving the namespace and surrounding whitespace. This applies when Iris's raw, case-sensitive biome-folder filter rejects the compatibility lookup. Literal biomes: rewrites, ambiguous aliases, newly captured names and unsupported namespace forms remain guarded. The cave selector help explains this distinction. Save remains explicit after resource Apply.

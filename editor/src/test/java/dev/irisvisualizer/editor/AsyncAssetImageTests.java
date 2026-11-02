@@ -109,6 +109,59 @@ final class AsyncAssetImageTests {
         try (var loader=new AsyncAssetImage()) {
             loader.select(real,a);var decoded=terminal(loader);check(decoded.phase()==AsyncAssetImage.Phase.READY && decoded.image().argbAt(0,0)==0x80402010 && decoded.image().argbAt(1,0)==0xff00ff00,"actual PNG channel fidelity");loader.select(real,"images/photo.jpg");check(terminal(loader).image().width()==2,"actual JPEG first frame");loader.select(real,b);check(terminal(loader).phase()==AsyncAssetImage.Phase.FAILED,"actual invalid image error");check(real.revision()==revision && Arrays.equals(real.read(a),png.toByteArray()),"actual decoding does not write the pack");
         }
-        System.out.println("PASS: single-worker/latest-pending asynchronous PNG/JPEG loading, UI-thread-independent decode, selected-byte stamps and unrelated Save/history isolation, stale selection/content/workspace rejection, explicit retry/error bounds, private immutable pixels, nonblocking close and exact persistence without native preview generation");
+        failureAndHiddenOwnership(temp);
+        System.out.println("PASS: single-worker/latest-pending asynchronous PNG/JPEG loading, UI-thread-independent decode, selected-byte stamps and unrelated Save/history isolation, stale selection/content/workspace rejection, stable capture/codec exhaustion and explicit recovery, metadata-only hidden invalidation, explicit retry/error bounds, private immutable pixels, nonblocking close and exact persistence without native preview generation");
+    }
+    private static void failureAndHiddenOwnership(Path temp)throws Exception{
+        String a="images/failure.png",b="images/later.png",other="blocks/other.json";
+        var pack=PackWorkspace.newPack(Map.of(a,new byte[]{0},b,new byte[]{1},other,bytes("{}")));
+        var thread=new AtomicReference<Thread>();var calls=new AtomicInteger();
+        try(var loader=new AsyncAssetImage(raw->{calls.incrementAndGet();if(raw[0]==0)throw new OutOfMemoryError("Injected codec exhaustion");return pixel(raw[0]);},threads(thread))){
+            loader.select(pack,a);var failed=terminal(loader);check(failed.phase()==AsyncAssetImage.Phase.FAILED && failed.image()==null && failed.error().contains("memory") && thread.get().isAlive(),"codec exhaustion publishes a stable error and leaves the worker alive");
+            for(int frame=0;frame<8;frame++)check(loader.select(pack,a)==failed && loader.poll(pack,a)==failed && calls.get()==1,"memory failure does not restart from unchanged frames or polling");
+            pack.saveCopy(temp.resolve("image-exhaustion-copy"));pack.exportZip(temp.resolve("image-exhaustion.zip"));
+            for(var reopened:List.of(PackWorkspace.open(temp.resolve("image-exhaustion-copy")),PackWorkspace.importZip(temp.resolve("image-exhaustion.zip"))))for(String path:pack.paths())check(Arrays.equals(pack.read(path),reopened.read(path)),"failed preview does not block exact Save Copy/ZIP");
+            loader.retry(pack,a);check(terminal(loader).phase()==AsyncAssetImage.Phase.FAILED && calls.get()==2,"explicit retry is consumed once even if memory failure repeats");
+            pack.replace(a,new byte[]{2});loader.select(pack,a);var ready=terminal(loader);check(ready.phase()==AsyncAssetImage.Phase.READY && ready.image().argbAt(0,0)==0xff020000 && calls.get()==3,"later valid bytes recover on the same worker");
+            pack.replace(other,bytes("{\"unrelated\":1}"));check(loader.poll(pack,a)==ready,"hidden polling ignores unrelated applied changes");
+            pack.replace(a,new byte[]{3});var invalidated=loader.poll(pack,a);check(invalidated.phase()==AsyncAssetImage.Phase.NONE && invalidated.image()==null && calls.get()==3,"hidden source edits invalidate without decoding new bytes");
+            check(loader.poll(pack,a)==invalidated,"invalidated output stays released across unchanged hidden frames");
+            loader.select(pack,a);ready=terminal(loader);check(ready.image().argbAt(0,0)==0xff030000 && calls.get()==4,"returning to visible content explicitly schedules latest bytes");
+            pack.undo();check(loader.poll(pack,a).phase()==AsyncAssetImage.Phase.NONE && calls.get()==4,"Undo invalidates hidden selected-byte identity without automatic capture");
+            loader.select(pack,a);terminal(loader);check(loader.poll(pack,null).phase()==AsyncAssetImage.Phase.NONE,"leaving an image releases decoded output");
+        }stop(thread.get());
+        var mode=new AtomicInteger();var captures=new AtomicInteger();var decodes=new AtomicInteger();var caller=Thread.currentThread();thread=new AtomicReference<>();
+        var capturePack=PackWorkspace.newPack(Map.of(a,new byte[]{7}));
+        try(var loader=new AsyncAssetImage(raw->{decodes.incrementAndGet();return pixel(raw[0]);},threads(thread),(current,path)->{
+            check(Thread.currentThread()==caller,"bounded source capture stays on the UI caller");captures.incrementAndGet();
+            return switch(mode.get()){
+                case 0->throw new OutOfMemoryError("Injected copy exhaustion");
+                case 1->null;
+                case 2->new byte[2];
+                case 3->throw new IllegalArgumentException();
+                case 5->{byte[] previous=current.read(path);current.replace(path,new byte[]{8});yield previous;}
+                default->current.read(path);
+            };
+        })){
+            for(int failure=0;failure<4;failure++){
+                mode.set(failure);var failed=failure==0?loader.select(capturePack,a):loader.retry(capturePack,a);
+                check(failed.phase()==AsyncAssetImage.Phase.FAILED && failed.image()==null && failed.error()!=null && decodes.get()==0,"capture memory/null/size/exception failures never enqueue decoder work");
+                int count=captures.get();check(loader.select(capturePack,a)==failed && loader.poll(capturePack,a)==failed && captures.get()==count,"capture failures remain stable until explicit retry");
+            }
+            mode.set(5);check(loader.retry(capturePack,a).phase()==AsyncAssetImage.Phase.FAILED && decodes.get()==0,"changed content identity during capture cannot enqueue stale bytes");
+            mode.set(4);loader.select(capturePack,a);var ready=terminal(loader);check(ready.image().argbAt(0,0)==0xff080000 && decodes.get()==1,"source capture can recover after a changed stamp");
+            var first=PackWorkspace.newPack(Map.of(a,new byte[]{8}));loader.select(first,a);terminal(loader);
+            int copies=captures.get();var another=PackWorkspace.newPack(Map.of(a,new byte[]{8}));check(first.contentRevision(a)==another.contentRevision(a),"owner test uses equal source stamps");check(loader.poll(another,a).phase()==AsyncAssetImage.Phase.NONE && captures.get()==copies,"equal path/stamp in a new workspace invalidates without source capture");
+            loader.select(another,a);terminal(loader);loader.close();check(loader.poll(another,a).phase()==AsyncAssetImage.Phase.CLOSED && captures.get()==copies+1,"closed polling never reads the source again");
+        }stop(thread.get());
+        // An obsolete active codec must neither publish after hidden invalidation nor run its old pending request.
+        var active=new Gate();var pending=new Gate();var codec=new Controlled(Map.of(1,active,2,pending));thread=new AtomicReference<>();
+        var hidden=PackWorkspace.newPack(Map.of(a,new byte[]{1},b,new byte[]{2}));
+        try(var loader=new AsyncAssetImage(codec,threads(thread))){
+            loader.select(hidden,a);await(active.started,"hidden invalidation active codec starts");loader.select(hidden,b);
+            var next=PackWorkspace.newPack(Map.of(a,new byte[]{1},b,new byte[]{2}));var stale=loader.poll(next,b);check(stale.phase()==AsyncAssetImage.Phase.NONE && stale.image()==null && pending.started.getCount()==1,"hidden workspace replacement drops the old pending capture immediately");
+            loader.select(next,b);active.release.countDown();await(pending.started,"new visible source follows obsolete active codec");pending.release.countDown();var ready=terminal(loader);
+            check(ready.phase()==AsyncAssetImage.Phase.READY && ready.path().equals(b) && codec.calls.equals(List.of(1,2)) && codec.maximum.get()==1,"only newest owner publishes, with one active codec and no stale pending decode");
+        }finally{active.release.countDown();pending.release.countDown();}stop(thread.get());
     }
 }
