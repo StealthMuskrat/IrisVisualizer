@@ -17,11 +17,13 @@ def index_hash(files):
 
 def source_path(root,relative):
     path=PurePosixPath(relative)
-    if path.is_absolute() or '..' in path.parts or not relative.endswith('.java') or '/src/' not in relative:
+    if path.is_absolute() or '..' in path.parts or '\\' in relative or ':' in relative or not relative.endswith('.java') or '/src/' not in relative:
         raise ValueError('Invalid production source path: '+relative)
-    destination=root/path
-    if not destination.resolve().is_relative_to(root.resolve()) or destination.is_symlink():
-        raise ValueError('Source cache path escapes its root: '+relative)
+    canonical_root=root.resolve()
+    destination=canonical_root/path
+    resolved=destination.resolve()
+    if not resolved.is_relative_to(canonical_root) or destination.is_symlink():
+        raise ValueError('Source cache path escapes its root: '+relative+' (root='+str(canonical_root)+', resolved='+str(resolved)+')')
     return destination
 
 def production_path(relative):
@@ -73,13 +75,18 @@ def audit(source_dir,policy_file,manifest_file=MANIFEST,lock_file=ROOT/'iris.loc
 def download(source_dir,manifest_file=MANIFEST):
     manifest=json.loads(manifest_file.read_text());revision=manifest['irisRevision']
     if not re.fullmatch('[0-9a-f]{40}',revision):raise ValueError('Invalid pinned source revision')
+    # Resolve existing directories consistently before parallel Windows realpath/file creation.
+    source_dir.mkdir(parents=True,exist_ok=True)
+    source_dir=source_dir.resolve(strict=True)
+    for relative in manifest['sources']:
+        source_path(source_dir,relative).parent.mkdir(parents=True,exist_ok=True)
     def fetch(row):
         relative,expected=row;destination=source_path(source_dir,relative)
         if destination.is_file() and git_blob(destination.read_bytes())==expected:return
         url='https://raw.githubusercontent.com/VolmitSoftware/Iris/'+revision+'/'+relative
         with urlopen(url,timeout=30) as response:raw=response.read(2_000_001)
         if len(raw)>2_000_000 or git_blob(raw)!=expected:raise ValueError('Downloaded production source differs: '+relative)
-        destination.parent.mkdir(parents=True,exist_ok=True);destination.write_bytes(raw)
+        destination.write_bytes(raw)
     with ThreadPoolExecutor(max_workers=16) as workers:list(workers.map(fetch,manifest['sources'].items()))
 
 if __name__=='__main__':

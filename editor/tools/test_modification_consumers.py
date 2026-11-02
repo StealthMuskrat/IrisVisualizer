@@ -1,7 +1,8 @@
 """Deferred source-audit contracts; does not run Iris, consume a pack or authorize recipe edits."""
 from pathlib import Path
-import copy,json,shutil,sys,tempfile
-from audit_modification_consumers import ROOT,MANIFEST,audit,verify_policy,reference_sites,production_path
+import copy,io,json,shutil,sys,tempfile
+from unittest.mock import patch
+from audit_modification_consumers import ROOT,MANIFEST,audit,verify_policy,reference_sites,production_path,source_path,download,git_blob
 
 def rejects(action):
     try:action()
@@ -31,4 +32,22 @@ with tempfile.TemporaryDirectory(prefix='mod-audit-',dir=build) as directory:
     data=cache/'core/src/main/java/art/arcane/iris/pack/loading/IrisData.java';original=data.read_bytes();data.write_bytes(original+b'\n// source changed\n');rejects(lambda:audit(cache,policy_file));data.write_bytes(original)
     data.unlink();rejects(lambda:audit(cache,policy_file));data.write_bytes(original)
     lock=temp/'lock.json';lock.write_text(json.dumps({'iris':{'revision':'0'*40}}));rejects(lambda:verify_policy(policy,manifest,lock))
+    # Network-free download contract: every canonical parent exists before concurrent fetch begins.
+    small=temp/'download-cache';payload=b'class Example {}\n'
+    paths=['core/src/main/java/example/group'+str(i)+'/Example.java' for i in range(32)]
+    definition=temp/'download.json';definition.write_text(json.dumps({'irisRevision':manifest['irisRevision'],'sources':{p:git_blob(payload) for p in paths}}))
+    def fetch(url,timeout):
+        assert small.is_dir() and small.resolve(strict=True).is_absolute()
+        assert all(source_path(small,p).parent.is_dir() for p in paths)
+        assert url.startswith('https://raw.githubusercontent.com/VolmitSoftware/Iris/'+manifest['irisRevision']+'/') and timeout==30
+        return io.BytesIO(payload)
+    with patch('audit_modification_consumers.urlopen',side_effect=fetch) as network:
+        download(small,definition);assert network.call_count==32
+    assert all(source_path(small,p).read_bytes()==payload for p in paths)
+    with patch('audit_modification_consumers.urlopen',side_effect=AssertionError('Verified cache must not download')):download(small,definition)
+    source_path(small,paths[0]).unlink()
+    with patch('audit_modification_consumers.urlopen',return_value=io.BytesIO(b'changed source')):rejects(lambda:download(small,definition))
+    assert not source_path(small,paths[0]).exists()
+    for invalid in ['../core/src/Escape.java','/core/src/Escape.java','core/src/../../Escape.java',r'core/src/..\..\Escape.java','C:/src/Escape.java']:
+        rejects(lambda:source_path(small,invalid))
 print('PASS: pinned complete production-source scope, exact blob/consumer evidence, lexer comment/literal/Unicode handling, read-only policy/revision guards and missing/extra/changed source rejection')
