@@ -5873,134 +5873,134 @@
       "reason": "Human-readable modification metadata; not voxel generation."
     },
     "forDimension": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "overrideFluidHeight": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "removeBiomes": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "removeObjects": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "removeRegions": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "injectRegions": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "biomeInjectors": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "biomeReplacers": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "objectReplacers": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "biomeObjectPlacementInjectors": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "regionObjectPlacementInjectors": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "regionReplacers": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "blockReplacers": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "styleReplacers": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "modBiomeInjector": {
     "region": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "inject": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "modBiomeReplacer": {
     "find": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "replace": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "modNoiseStyleReplacer": {
     "find": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "replaceTypeOnly": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "replace": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "modObjectPlacementBiomeInjector": {
     "biome": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "place": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "modObjectPlacementRegionInjector": {
     "biome": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "place": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "modObjectReplacer": {
     "find": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "replace": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "modRegionReplacer": {
     "find": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     },
     "replace": {
-      "classification": "unclassified",
-      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+      "classification": "read-only",
+      "reason": "Pinned production Java has no modification recipe application consumer. These schema/compatibility recipe fields are not direct voxel-generation settings in the supported native path; preserve them read-only."
     }
   },
   "objectLoot": {

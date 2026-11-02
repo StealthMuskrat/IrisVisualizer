@@ -136,14 +136,14 @@ Serialized instance fields in the shared pinned JSON model graph, including inhe
 | lootReference | 3 | 0 | 0 | 3 | 0 |
 | lootTable | 6 | 0 | 0 | 6 | 0 |
 | marker | 4 | 0 | 0 | 4 | 0 |
-| mod | 15 | 0 | 0 | 1 | 14 |
-| modBiomeInjector | 2 | 0 | 0 | 0 | 2 |
-| modBiomeReplacer | 2 | 0 | 0 | 0 | 2 |
-| modNoiseStyleReplacer | 3 | 0 | 0 | 0 | 3 |
-| modObjectPlacementBiomeInjector | 2 | 0 | 0 | 0 | 2 |
-| modObjectPlacementRegionInjector | 2 | 0 | 0 | 0 | 2 |
-| modObjectReplacer | 2 | 0 | 0 | 0 | 2 |
-| modRegionReplacer | 2 | 0 | 0 | 0 | 2 |
+| mod | 15 | 0 | 0 | 15 | 0 |
+| modBiomeInjector | 2 | 0 | 0 | 2 | 0 |
+| modBiomeReplacer | 2 | 0 | 0 | 2 | 0 |
+| modNoiseStyleReplacer | 3 | 0 | 0 | 3 | 0 |
+| modObjectPlacementBiomeInjector | 2 | 0 | 0 | 2 | 0 |
+| modObjectPlacementRegionInjector | 2 | 0 | 0 | 2 | 0 |
+| modObjectReplacer | 2 | 0 | 0 | 2 | 0 |
+| modRegionReplacer | 2 | 0 | 0 | 2 | 0 |
 | objectLoot | 4 | 0 | 0 | 4 | 0 |
 | objectMarker | 4 | 0 | 0 | 4 | 0 |
 | objectVanillaLoot | 4 | 0 | 0 | 4 | 0 |
@@ -154,7 +154,7 @@ Serialized instance fields in the shared pinned JSON model graph, including inhe
 | treeSettings | 2 | 0 | 0 | 2 | 0 |
 | treeSize | 2 | 0 | 0 | 2 | 0 |
 
-Totals: fields=1462, generation=1237, implemented=1237, read-only=196, unclassified=29, missingPolicies=0.
+Totals: fields=1462, generation=1237, implemented=1237, read-only=225, unclassified=0, missingPolicies=0.
 Source scope: 150 class models, 149 nonempty field groups, 247 pinned source files.
 
 ## jigsawConnector
@@ -687,35 +687,35 @@ Unclassified: none.
 
 ## mod
 
-Unclassified: `biomeInjectors`, `biomeObjectPlacementInjectors`, `biomeReplacers`, `blockReplacers`, `forDimension`, `injectRegions`, `objectReplacers`, `overrideFluidHeight`, `regionObjectPlacementInjectors`, `regionReplacers`, `removeBiomes`, `removeObjects`, `removeRegions`, `styleReplacers`.
+Unclassified: none.
 
 ## modBiomeInjector
 
-Unclassified: `inject`, `region`.
+Unclassified: none.
 
 ## modBiomeReplacer
 
-Unclassified: `find`, `replace`.
+Unclassified: none.
 
 ## modNoiseStyleReplacer
 
-Unclassified: `find`, `replace`, `replaceTypeOnly`.
+Unclassified: none.
 
 ## modObjectPlacementBiomeInjector
 
-Unclassified: `biome`, `place`.
+Unclassified: none.
 
 ## modObjectPlacementRegionInjector
 
-Unclassified: `biome`, `place`.
+Unclassified: none.
 
 ## modObjectReplacer
 
-Unclassified: `find`, `replace`.
+Unclassified: none.
 
 ## modRegionReplacer
 
-Unclassified: `find`, `replace`.
+Unclassified: none.
 
 ## objectLoot
 

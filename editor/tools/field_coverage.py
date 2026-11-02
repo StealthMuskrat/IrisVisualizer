@@ -8,6 +8,7 @@ import sys
 from iris_source_inventory import POLICY, FILES, MODELS, JSON_ROOTS, load_inventory, source_path
 from java_model_inventory import inventory, tokens
 from pathlib import Path
+from audit_modification_consumers import verify_policy as verify_modification_policy
 
 SOURCES = {
  'jigsawConnector': 'structure/jigsaw/IrisJigsawConnector.java',
@@ -161,6 +162,7 @@ def editable(java_dir, name, allowlist='EDITABLE'):
 def run(source_dir, policy_file, java_dir, output_dir):
     policy = json.loads(policy_file.read_text())
     if not isinstance(policy,dict):raise ValueError('Policy must be a class-group object')
+    verify_modification_policy(policy)
     catalog=load_inventory(source_dir,verify_sources=True)
     if catalog.models['IrisRegistrant'].fields:raise ValueError('New inherited registrant fields require an explicit policy group')
     if set(policy)-set(SOURCES):raise ValueError('Policy has an unknown class group')

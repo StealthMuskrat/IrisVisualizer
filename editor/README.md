@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+The pinned catalog now has no unclassified fields: 1,237 implemented generation fields and 225 read-only fields. A complete audit of 1,778 pinned production Java files classified the remaining modification recipes as schema/compatibility data with no production application consumer. Recipe editing and file-operation authority remain disabled, and unknown properties stay read-only. See docs/FIELD-POLICY.md for the evidence and scope; this does not mark UI or native preview validation complete.
+
 Unambiguous qualified cave-biome selectors such as iris:forest now follow biome rename/move while preserving the namespace and surrounding whitespace. This applies when Iris's raw, case-sensitive biome-folder filter rejects the compatibility lookup. Literal biomes: rewrites, ambiguous aliases, newly captured names and unsupported namespace forms remain guarded. The cave selector help explains this distinction. Save remains explicit after resource Apply.
 
 Workspace > Layout > Display scale follows Windows by default or accepts an absolute 100–200% scale for this session. Text, shell/divider dimensions, preview controls and initial review-window sizes scale together; panel-width preferences survive moving between displays. Focus summary and Height details buttons open keyboard-accessible explanations. F6/Shift+F6 still cycle panels; Layout provides keyboard width/reset actions. These preferences never enter pack files.
