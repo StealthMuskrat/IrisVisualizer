@@ -25,7 +25,11 @@ public final class AsyncFolderCopy implements AutoCloseable {
         Objects.requireNonNull(current);Objects.requireNonNull(directory);
         synchronized (lock) {
             if (closed) throw new IllegalStateException("Folder copy is closed");if (pending!=null || active!=null) throw new IOException("A folder copy is active; wait for completion or cancellation before starting another");
-            var source=current.captureZipExport();Path path=directory.toAbsolutePath().normalize();var job=new Job(++generation,source,path);pending=job;snapshot=new Snapshot(generation,Phase.COPYING,source.summary(),path,0,0,null,null);lock.notifyAll();return snapshot;
+            try{
+                var source=current.captureZipExport();Path path=directory.toAbsolutePath().normalize();var job=new Job(generation+1,source,path);
+                var next=new Snapshot(job.request,Phase.COPYING,source.summary(),path,0,0,null,null);
+                generation=job.request;pending=job;snapshot=next;lock.notifyAll();return snapshot;
+            }catch(OutOfMemoryError exhausted){throw new IOException("Not enough memory to capture the folder-copy snapshot. No copy was started; retry explicitly when more memory is available.");}
         }
     }
     /** UI-captured immutable source only; callers retain their own UI-owned adoption tokens. */
@@ -33,7 +37,11 @@ public final class AsyncFolderCopy implements AutoCloseable {
         Objects.requireNonNull(source);Objects.requireNonNull(directory);
         synchronized (lock) {
             if (closed) throw new IllegalStateException("Folder copy is closed");if (pending!=null || active!=null) throw new IOException("A folder copy is active; wait for completion or cancellation before starting another");
-            Path path=directory.toAbsolutePath().normalize();var job=new Job(++generation,source,path);pending=job;snapshot=new Snapshot(generation,Phase.COPYING,source.summary(),path,0,0,null,null);lock.notifyAll();return snapshot;
+            try{
+                Path path=directory.toAbsolutePath().normalize();var job=new Job(generation+1,source,path);
+                var next=new Snapshot(job.request,Phase.COPYING,source.summary(),path,0,0,null,null);
+                generation=job.request;pending=job;snapshot=next;lock.notifyAll();return snapshot;
+            }catch(OutOfMemoryError exhausted){throw new IOException("Not enough memory to queue the folder-copy snapshot. No copy was started; retry explicitly when more memory is available.");}
         }
     }
     public Snapshot poll() {
@@ -45,6 +53,15 @@ public final class AsyncFolderCopy implements AutoCloseable {
     }
     public boolean cancel() { synchronized (lock) { var job=active!=null ? active : pending;if (job==null || closed) return false;boolean accepted=job.control.cancel();if (accepted) worker.interrupt();return accepted; } }
     public void clear() { synchronized (lock) { if (closed) return;if (pending!=null || active!=null) throw new IllegalStateException("Wait for the active copy before clearing its receipt");snapshot=new Snapshot(++generation,Phase.IDLE,null,null,0,0,null,null); } }
+    private record Completion(Phase phase,FolderCopies.Receipt receipt,String detail) {}
+    private Completion execute(Job job){
+        FolderCopies.Receipt receipt=null;String detail=null;Phase phase;
+        try { job.control.check();receipt=Objects.requireNonNull(writer.write(job.source,job.directory,job.control,(entries,bytes) -> { job.entries=entries;job.bytes=bytes; }),"Folder-copy writer returned no receipt");job.control.check();phase=Phase.SUCCEEDED; }
+        catch (CancellationException cancelled) { phase=Phase.CANCELLED;detail="Folder copy cancelled before publication. Captured data was not marked saved."; }
+        catch (OutOfMemoryError exhausted) { phase=Phase.FAILED;detail="Not enough memory to copy this folder. "+(job.control.publicationStarted()?"Publication had begun; inspect the destination before retrying.":"Retry explicitly when more memory is available."); }
+        catch (Exception failure) { if (job.control.cancelled()) { phase=Phase.CANCELLED;detail=InspectorText.label("Folder copy cancelled before publication; cleanup/I/O detail: "+Objects.toString(failure.getMessage(),failure.getClass().getSimpleName()),512); } else { phase=Phase.FAILED;detail=InspectorText.label(Objects.toString(failure.getMessage(),"Folder copy failed ("+failure.getClass().getSimpleName()+")"),512); } }
+        return new Completion(phase,phase==Phase.SUCCEEDED?receipt:null,detail);
+    }
     private void run() {
         while (true) {
             Job job;
@@ -52,11 +69,9 @@ public final class AsyncFolderCopy implements AutoCloseable {
                 Thread.interrupted();while (!closed && pending==null) try { lock.wait(); } catch (InterruptedException interrupted) { if (closed) return; }
                 if (closed) return;active=job=pending;pending=null;
             }
-            FolderCopies.Receipt receipt=null;String detail=null;Phase phase;
-            try { job.control.check();receipt=Objects.requireNonNull(writer.write(job.source,job.directory,job.control,(entries,bytes) -> { job.entries=entries;job.bytes=bytes; }),"Folder-copy writer returned no receipt");job.control.check();phase=Phase.SUCCEEDED; }
-            catch (CancellationException cancelled) { phase=Phase.CANCELLED;detail="Folder copy cancelled before publication. Captured data was not marked saved."; }
-            catch (Exception failure) { if (job.control.cancelled()) { phase=Phase.CANCELLED;detail=InspectorText.label("Folder copy cancelled before publication; cleanup/I/O detail: "+Objects.toString(failure.getMessage(),failure.getClass().getSimpleName()),512); } else { phase=Phase.FAILED;detail=InspectorText.label(Objects.toString(failure.getMessage(),"Folder copy failed ("+failure.getClass().getSimpleName()+")"),512); } }
-            synchronized (lock) { active=null;if (!closed) snapshot=new Snapshot(job.request,phase,job.source.summary(),job.directory,job.entries,job.bytes,phase==Phase.SUCCEEDED ? receipt : null,detail); }
+            Completion result=execute(job);
+            synchronized (lock) { active=null;if (!closed) snapshot=new Snapshot(job.request,result.phase(),job.source.summary(),job.directory,job.entries,job.bytes,result.receipt(),result.detail()); }
+            job=null;result=null; // Release old frozen source/receipt payloads before parking.
         }
     }
     @Override public void close() { synchronized (lock) { if (closed) return;closed=true;if (active!=null) active.control.cancel();if (pending!=null) pending.control.cancel();pending=null;snapshot=new Snapshot(++generation,Phase.CLOSED,null,null,0,0,null,null);lock.notifyAll(); }worker.interrupt(); }

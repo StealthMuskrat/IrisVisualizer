@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+Background asset capture, image analysis, pending disk review, folder copy and ZIP export now report memory failures instead of remaining busy after a worker stops. Retry is explicit. Copy/export errors identify when publication had begun and the destination needs inspection; a failed Save As keeps the current active folder and save baseline. Completed or cleared snapshot payloads are released from idle worker loops. These paths still await end-of-UI regression and interactive verification.
+
 Supported original scalar controls now offer Use Iris default. This removes the stored override and keeps its containing object and unknown settings intact; it does not write the displayed default into JSON. The action covers main resource, nested noise, numeric style and terrain controls. Use height defaults resets both biome-generator endpoints together while retaining the generator reference. Only the affected unapplied text is cleared after success; unsupported values stay read-only and failed resets retain drafts. Saving/reopening preserves the omitted fields.
 
 Numeric drafts in the main resource editors and nested noise/style/terrain controls now use strict JSON spelling, exact native integer widths and decimal bounds/options before conversion. Accepted exponent, trailing-zero and signed-zero tokens retain their spelling. Inputs such as a fractional integer that rounds to a whole double, a Java hex/float suffix or a nonzero value that underflows to zero are rejected without losing the draft. Generator minimum/maximum heights validate together, including Add; absent members become explicit only on Apply. Unsupported stored types/widths remain read-only, and Save/Export preserves them.

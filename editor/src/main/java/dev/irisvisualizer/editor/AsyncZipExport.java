@@ -25,7 +25,11 @@ public final class AsyncZipExport implements AutoCloseable {
         Objects.requireNonNull(current);Objects.requireNonNull(archive);
         synchronized (lock) {
             if (closed) throw new IllegalStateException("ZIP export is closed");if (pending!=null || active!=null) throw new IOException("A ZIP export is active; wait for completion or cancellation before starting another");
-            var source=current.captureZipExport();Path path=archive.toAbsolutePath().normalize();var job=new Job(++generation,source,path,replace);pending=job;snapshot=new Snapshot(generation,Phase.EXPORTING,source.summary(),path,replace,0,0,null,null);lock.notifyAll();return snapshot;
+            try{
+                var source=current.captureZipExport();Path path=archive.toAbsolutePath().normalize();var job=new Job(generation+1,source,path,replace);
+                var next=new Snapshot(job.request,Phase.EXPORTING,source.summary(),path,replace,0,0,null,null);
+                generation=job.request;pending=job;snapshot=next;lock.notifyAll();return snapshot;
+            }catch(OutOfMemoryError exhausted){throw new IOException("Not enough memory to capture the ZIP snapshot. No export was started; retry explicitly when more memory is available.");}
         }
     }
     public Snapshot poll() {
@@ -37,6 +41,15 @@ public final class AsyncZipExport implements AutoCloseable {
     }
     public boolean cancel() { synchronized (lock) { var job=active!=null ? active : pending;if (job==null || closed) return false;boolean accepted=job.control.cancel();if (accepted) worker.interrupt();return accepted; } }
     public void clear() { synchronized (lock) { if (closed) return;if (pending!=null || active!=null) throw new IllegalStateException("Wait for the active export before clearing its receipt");snapshot=new Snapshot(++generation,Phase.IDLE,null,null,false,0,0,null,null); } }
+    private record Completion(Phase phase,ZipExports.Receipt receipt,String detail) {}
+    private Completion execute(Job job){
+        ZipExports.Receipt receipt=null;String detail=null;Phase phase;
+        try { job.control.check();receipt=Objects.requireNonNull(writer.write(job.source,job.archive,job.replace,job.control,(entries,bytes) -> { job.entries=entries;job.bytes=bytes; }),"ZIP writer returned no receipt");job.control.check();phase=Phase.SUCCEEDED; }
+        catch (CancellationException cancelled) { phase=Phase.CANCELLED;detail="ZIP export cancelled before publication. Captured data was not marked saved."; }
+        catch (OutOfMemoryError exhausted) { phase=Phase.FAILED;detail="Not enough memory to export this ZIP. "+(job.control.publicationStarted()?"Publication had begun; inspect the destination before retrying.":"Retry explicitly when more memory is available."); }
+        catch (Exception failure) { if (job.control.cancelled()) { phase=Phase.CANCELLED;detail="ZIP export cancelled before publication."; } else { phase=Phase.FAILED;detail=InspectorText.label(Objects.toString(failure.getMessage(),"ZIP export failed ("+failure.getClass().getSimpleName()+")"),512); } }
+        return new Completion(phase,phase==Phase.SUCCEEDED?receipt:null,detail);
+    }
     private void run() {
         while (true) {
             Job job;
@@ -44,11 +57,9 @@ public final class AsyncZipExport implements AutoCloseable {
                 Thread.interrupted();while (!closed && pending==null) try { lock.wait(); } catch (InterruptedException interrupted) { if (closed) return; }
                 if (closed) return;active=job=pending;pending=null;
             }
-            ZipExports.Receipt receipt=null;String detail=null;Phase phase;
-            try { job.control.check();receipt=Objects.requireNonNull(writer.write(job.source,job.archive,job.replace,job.control,(entries,bytes) -> { job.entries=entries;job.bytes=bytes; }),"ZIP writer returned no receipt");job.control.check();phase=Phase.SUCCEEDED; }
-            catch (CancellationException cancelled) { phase=Phase.CANCELLED;detail="ZIP export cancelled before publication. Captured data was not marked saved."; }
-            catch (Exception failure) { if (job.control.cancelled()) { phase=Phase.CANCELLED;detail="ZIP export cancelled before publication."; } else { phase=Phase.FAILED;detail=InspectorText.label(Objects.toString(failure.getMessage(),"ZIP export failed ("+failure.getClass().getSimpleName()+")"),512); } }
-            synchronized (lock) { active=null;if (!closed) snapshot=new Snapshot(job.request,phase,job.source.summary(),job.archive,job.replace,job.entries,job.bytes,phase==Phase.SUCCEEDED ? receipt : null,detail); }
+            Completion result=execute(job);
+            synchronized (lock) { active=null;if (!closed) snapshot=new Snapshot(job.request,result.phase(),job.source.summary(),job.archive,job.replace,job.entries,job.bytes,result.receipt(),result.detail()); }
+            job=null;result=null; // Release old frozen source/receipt payloads before parking.
         }
     }
     @Override public void close() { synchronized (lock) { if (closed) return;closed=true;if (active!=null) active.control.cancel();if (pending!=null) pending.control.cancel();pending=null;snapshot=new Snapshot(++generation,Phase.CLOSED,null,null,false,0,0,null,null);lock.notifyAll(); }worker.interrupt(); }

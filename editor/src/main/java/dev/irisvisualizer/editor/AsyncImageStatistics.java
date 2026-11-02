@@ -40,15 +40,22 @@ public final class AsyncImageStatistics implements AutoCloseable {
         }
     }
     public void clear() { synchronized(lock) { if(closed)return;invalidate();owner=null;snapshot=new Snapshot(generation,Phase.IDLE,null,0,null,null); }worker.interrupt(); }
+    private record Completion(ImageStatistics.Result result,String error) {}
+    private Completion execute(Job job){
+        ImageStatistics.Result result=null;String error=null;
+        try { result=Objects.requireNonNull(analyzer.analyze(job.image,job.region,job.cancelled::get,pixels->job.processed=pixels),"Image analyzer returned no result");if(!result.region().equals(job.region))throw new IllegalArgumentException("Image analyzer returned a different region"); }
+        catch(CancellationException cancelled) { error="Image statistics cancelled; analyze again explicitly."; }
+        catch(OutOfMemoryError exhausted) { error="Not enough memory to analyze these pixels. Analyze again explicitly when more memory is available."; }
+        catch(Exception failure) { String detail=failure.getMessage();if(detail==null || detail.isBlank())detail="Image analysis failed ("+failure.getClass().getSimpleName()+")";error=InspectorText.label(detail,512); }
+        return new Completion(result,error);
+    }
     private void run() {
         while(true) {
             Job job;
             synchronized(lock) { Thread.interrupted();while(!closed && pending==null)try { lock.wait(); }catch(InterruptedException interrupted) { if(closed)return; }if(closed)return;active=job=pending;pending=null; }
-            ImageStatistics.Result result=null;String error=null;
-            try { result=Objects.requireNonNull(analyzer.analyze(job.image,job.region,job.cancelled::get,pixels->job.processed=pixels),"Image analyzer returned no result");if(!result.region().equals(job.region))throw new IllegalArgumentException("Image analyzer returned a different region"); }
-            catch(CancellationException cancelled) { error="Image statistics cancelled; analyze again explicitly."; }
-            catch(Exception failure) { String detail=failure.getMessage();if(detail==null || detail.isBlank())detail="Image analysis failed ("+failure.getClass().getSimpleName()+")";error=InspectorText.label(detail,512); }
-            synchronized(lock) { active=null;if(!closed && !job.cancelled.get() && job.request==generation)snapshot=new Snapshot(generation,error==null ? Phase.READY : Phase.FAILED,job.region,job.processed,error==null ? result : null,error); }
+            Completion result=execute(job);
+            synchronized(lock) { active=null;if(!closed && !job.cancelled.get() && job.request==generation)snapshot=new Snapshot(generation,result.error()==null ? Phase.READY : Phase.FAILED,job.region,job.processed,result.error()==null ? result.result() : null,result.error()); }
+            job=null;result=null; // Release old payloads before the worker parks.
         }
     }
     @Override public void close() { synchronized(lock) { if(closed)return;closed=true;invalidate();owner=null;snapshot=new Snapshot(generation,Phase.CLOSED,null,0,null,null);lock.notifyAll(); }worker.interrupt(); }

@@ -31,8 +31,12 @@ public final class AsyncPendingDiskReview implements AutoCloseable {
         Objects.requireNonNull(current);
         synchronized (lock) {
             if (closed) throw new IllegalStateException("Pending disk review is closed");if (active!=null || pending!=null) throw new IOException("A disk review is active; wait for it to finish or cancel before starting another");
-            var source=current.capturePendingDiskReview(selected);workspace=current;revision=current.revision();saveRevision=current.saveRevision();directory=current.directory();previous=null;page=null;
-            pending=new Job(++generation,source);snapshot=new Snapshot(generation,Phase.CHECKING,directory,source.entries(),0,0,null,null);lock.notifyAll();return snapshot;
+            try{
+                var source=current.capturePendingDiskReview(selected);var job=new Job(generation+1,source);
+                var next=new Snapshot(job.request,Phase.CHECKING,current.directory(),source.entries(),0,0,null,null);
+                workspace=current;revision=current.revision();saveRevision=current.saveRevision();directory=current.directory();previous=null;page=null;
+                generation=job.request;pending=job;snapshot=next;lock.notifyAll();return snapshot;
+            }catch(OutOfMemoryError exhausted){throw new IOException("Not enough memory to capture pending-destination metadata. No disk review was started; retry explicitly when more memory is available.");}
         }
     }
     private void cancelJobs() { if (active!=null) active.cancelled.set(true);if (pending!=null) pending.cancelled.set(true);pending=null;generation++;previous=null;page=null; }
@@ -56,6 +60,15 @@ public final class AsyncPendingDiskReview implements AutoCloseable {
     }
     public void cancel() { synchronized (lock) { if (closed || snapshot.phase()!=Phase.CHECKING) return;var old=snapshot;cancelJobs();snapshot=new Snapshot(generation,Phase.CANCELLED,old.directory(),old.total(),0,0,null,"Disk review cancelled. Review again explicitly to retry."); }worker.interrupt(); }
     public void clear() { synchronized (lock) { if (closed) return;cancelJobs();workspace=null;revision=-1;saveRevision=-1;directory=null;snapshot=new Snapshot(generation,Phase.IDLE,null,0,0,0,null,null); }worker.interrupt(); }
+    private record Completion(Phase phase,PendingDiskReview.Report report,String detail) {}
+    private Completion execute(Job job){
+        PendingDiskReview.Report report=null;String detail=null;Phase phase;
+        try { report=Objects.requireNonNull(scanner.inspect(job.source,job.cancelled::get,(checked,bytes)->{ job.checked=checked;job.bytes=bytes; }),"Disk scanner returned no report");phase=Phase.READY; }
+        catch (CancellationException cancelled) { phase=Phase.CANCELLED;detail="Disk review cancelled; review again explicitly."; }
+        catch (OutOfMemoryError exhausted) { phase=Phase.FAILED;detail="Not enough memory to review pending destinations. Review again explicitly when more memory is available."; }
+        catch (Exception failure) { phase=Phase.FAILED;detail=InspectorText.label(Objects.toString(failure.getMessage(),"Disk review failed ("+failure.getClass().getSimpleName()+")"),512); }
+        return new Completion(phase,report,detail);
+    }
     private void run() {
         while (true) {
             Job job;
@@ -63,13 +76,11 @@ public final class AsyncPendingDiskReview implements AutoCloseable {
                 Thread.interrupted();while (!closed && pending==null) try { lock.wait(); } catch (InterruptedException interrupted) { if (closed) return; }
                 if (closed) return;active=job=pending;pending=null;
             }
-            PendingDiskReview.Report report=null;String detail=null;Phase phase;
-            try { report=Objects.requireNonNull(scanner.inspect(job.source,job.cancelled::get,(checked,bytes)->{ job.checked=checked;job.bytes=bytes; }),"Disk scanner returned no report");phase=Phase.READY; }
-            catch (CancellationException cancelled) { phase=Phase.CANCELLED;detail="Disk review cancelled; review again explicitly."; }
-            catch (Exception failure) { phase=Phase.FAILED;detail=InspectorText.label(Objects.toString(failure.getMessage(),"Disk review failed ("+failure.getClass().getSimpleName()+")"),512); }
+            Completion result=execute(job);
             synchronized (lock) {
-                active=null;if (!closed && !job.cancelled.get() && job.request==generation) snapshot=new Snapshot(job.request,phase,job.source.directory(),job.source.entries(),job.checked,job.bytes,phase==Phase.READY ? report : null,detail);
+                active=null;if (!closed && !job.cancelled.get() && job.request==generation) snapshot=new Snapshot(job.request,result.phase(),job.source.directory(),job.source.entries(),job.checked,job.bytes,result.phase()==Phase.READY ? result.report() : null,result.detail());
             }
+            job=null;result=null; // Release old payloads before the worker parks.
         }
     }
     @Override public void close() { synchronized (lock) { if (closed) return;closed=true;cancelJobs();workspace=null;directory=null;snapshot=new Snapshot(generation,Phase.CLOSED,null,0,0,0,null,null);lock.notifyAll(); }worker.interrupt(); }

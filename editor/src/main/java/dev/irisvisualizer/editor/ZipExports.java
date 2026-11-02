@@ -28,6 +28,8 @@ public final class ZipExports {
         public boolean cancel() { return state.compareAndSet(RUNNING,CANCELLED) || state.get()==CANCELLED; }
         public boolean cancelled() { return state.get()==CANCELLED; }
         public boolean publishing() { return state.get()==PUBLISHING; }
+        /** Includes completed publication, so a later worker failure cannot claim the destination is absent. */
+        boolean publicationStarted() { return state.get()>=PUBLISHING; }
         void check() { if (cancelled()) throw new CancellationException("ZIP export cancelled before publication"); }
         void beginPublication() { if (!state.compareAndSet(RUNNING,PUBLISHING)) throw new CancellationException("ZIP publication was cancelled"); }
         void finished() { state.compareAndSet(PUBLISHING,DONE); }

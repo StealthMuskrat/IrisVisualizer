@@ -160,6 +160,7 @@ public final class WorkspaceTests {
    DefinitionAuditReviewTests.run(temp);
    ImageViewportTests.run(temp);
    AsyncAssetImageTests.run(temp);
+   AsyncWorkerFailureTests.run(temp);
    AssetImportTests.run(temp);
    JsonStructureTests.run(temp);
    SourceTextPagesTests.run(temp);

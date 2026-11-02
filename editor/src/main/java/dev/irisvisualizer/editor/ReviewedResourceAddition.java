@@ -82,14 +82,18 @@ public final class ReviewedResourceAddition implements AutoCloseable {
         synchronized(lock) { invalidate();target=null;snapshot=new Snapshot(generation,Phase.APPLIED,plan,receipt,"Resource added in memory; applied-edit history cleared. Save remains explicit.");return path; }
     }
     public void clear() { synchronized(lock) { if(closed)return;invalidate();owner=null;target=null;checkedResources=-1;snapshot=new Snapshot(generation,Phase.IDLE,null,null,null); }worker.interrupt(); }
+    private Outcome execute(Job job){
+        try { var result=Objects.requireNonNull(preparer.prepare(job.source(),job.cancelled()::get),"Resource preparer returned no bytes");if(result.origin!=job.source())throw new IOException("Prepared resource belongs to another request");return new Outcome(job.request(),result,null); }
+        catch(CancellationException cancelled) { return new Outcome(job.request(),null,"Resource preparation cancelled; prepare again explicitly."); }
+        catch(OutOfMemoryError exhausted) { return new Outcome(job.request(),null,"Not enough memory to prepare this resource; clear the review and choose a smaller resource."); }
+        catch(Exception failure) { String detail=failure.getMessage();if(detail==null || detail.isBlank())detail="Resource preparation failed ("+failure.getClass().getSimpleName()+")";return new Outcome(job.request(),null,InspectorText.label(detail,512)); }
+    }
     private void run() {
         while(true) {
             Job job;synchronized(lock) { Thread.interrupted();while(!closed && pending==null)try { lock.wait(); }catch(InterruptedException interrupted) { if(closed)return; }if(closed)return;active=job=pending;pending=null; }
-            Outcome outcome;try { var result=Objects.requireNonNull(preparer.prepare(job.source(),job.cancelled()::get),"Resource preparer returned no bytes");if(result.origin!=job.source())throw new IOException("Prepared resource belongs to another request");outcome=new Outcome(job.request(),result,null); }
-            catch(CancellationException cancelled) { outcome=new Outcome(job.request(),null,"Resource preparation cancelled; prepare again explicitly."); }
-            catch(OutOfMemoryError exhausted) { outcome=new Outcome(job.request(),null,"Not enough memory to prepare this resource; clear the review and choose a smaller resource."); }
-            catch(Exception failure) { String detail=failure.getMessage();if(detail==null || detail.isBlank())detail="Resource preparation failed ("+failure.getClass().getSimpleName()+")";outcome=new Outcome(job.request(),null,InspectorText.label(detail,512)); }
+            Outcome outcome=execute(job);
             synchronized(lock) { active=null;if(!closed && !job.cancelled().get() && job.request()==generation)completed=outcome; }
+            job=null;outcome=null; // Release old payloads before the worker parks.
         }
     }
     @Override public void close() { synchronized(lock) { if(closed)return;closed=true;invalidate();owner=null;target=null;snapshot=new Snapshot(generation,Phase.CLOSED,null,null,null);lock.notifyAll(); }worker.interrupt(); }

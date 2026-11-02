@@ -67,6 +67,12 @@ public final class AsyncAssetBatchImport implements AutoCloseable {
     }
     public void clear() { synchronized (lock) { if (closed) return;invalidate();workspace=null;target=null;snapshot=new Snapshot(generation,Phase.IDLE,null,List.of(),null); } }
     private static String error(Exception failure) { String message=failure.getMessage();return InspectorText.label(message==null || message.isBlank() ? "Asset capture failed ("+failure.getClass().getSimpleName()+")" : message,512); }
+    private Outcome execute(Job job){
+        try { return new Outcome(job.request(),Objects.requireNonNull(reader.read(job.inputs(),job.budget(),job.cancelled()::get),"Asset reader returned no captured bytes"),null); }
+        catch (CancellationException cancelled) { return new Outcome(job.request(),null,"Asset capture cancelled; choose a source again to retry"); }
+        catch (OutOfMemoryError exhausted) { return new Outcome(job.request(),null,"Not enough memory to capture the asset bytes. Choose the source again explicitly when more memory is available."); }
+        catch (Exception failure) { return new Outcome(job.request(),null,error(failure)); }
+    }
     private void run() {
         while (true) {
             Job job;
@@ -74,11 +80,9 @@ public final class AsyncAssetBatchImport implements AutoCloseable {
                 while (!closed && pending==null) { try { lock.wait(); } catch (InterruptedException interrupted) { if (closed) return; } }
                 if (closed) return;active=job=pending;pending=null;
             }
-            Outcome outcome;
-            try { outcome=new Outcome(job.request(),Objects.requireNonNull(reader.read(job.inputs(),job.budget(),job.cancelled()::get),"Asset reader returned no captured bytes"),null); }
-            catch (CancellationException cancelled) { outcome=new Outcome(job.request(),null,"Asset capture cancelled; choose a source again to retry"); }
-            catch (Exception failure) { outcome=new Outcome(job.request(),null,error(failure)); }
+            Outcome outcome=execute(job);
             synchronized (lock) { active=null;if (!closed && !job.cancelled().get() && job.request()==generation) completed=outcome; }
+            job=null;outcome=null; // Release old payloads before the worker parks.
         }
     }
     @Override public void close() { synchronized (lock) { if (closed) return;closed=true;invalidate();workspace=null;target=null;snapshot=new Snapshot(generation,Phase.CLOSED,null,List.of(),null);lock.notifyAll(); }worker.interrupt(); }

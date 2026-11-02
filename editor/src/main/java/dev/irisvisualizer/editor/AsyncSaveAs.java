@@ -19,7 +19,10 @@ public final class AsyncSaveAs implements AutoCloseable {
     public boolean busy() { return copy.busy(); }
     public Snapshot start(PackWorkspace current,Path destination) throws IOException {
         if (closed) throw new IllegalStateException("Save As is closed");if (copy.busy()) throw new IOException("A Save As transfer is active; wait or cancel before starting another");
-        var captured=StagedSaveAs.capture(current,destination);var started=copy.startSnapshot(captured.source,destination);target=captured.target;kept=false;keepReason=null;
+        StagedSaveAs.Capture captured;
+        try{captured=StagedSaveAs.capture(current,destination);}
+        catch(OutOfMemoryError exhausted){throw new IOException("Not enough memory to capture the Save As snapshot. No transfer was started; the active folder and save baseline were retained.");}
+        var started=copy.startSnapshot(captured.source,destination);target=captured.target;kept=false;keepReason=null;
         snapshot=new Snapshot(started.request(),Phase.COPYING,target,0,0,null,null);return snapshot;
     }
     public void keepCopy() { if (target!=null && pendingAdoption()) { kept=true;keepReason="Keeping the captured snapshot as a separate copy by request."; } }
