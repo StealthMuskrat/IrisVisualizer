@@ -33,27 +33,32 @@ public final class BiomeFields {
         return booleanField(field) ? token : new java.math.BigDecimal(token).stripTrailingZeros().toPlainString();
     }
     public static byte[] enable(String path, byte[] original, String field) { authorize(path, field); return new LosslessJson(original).enable(field, defaultToken(field)); }
-    private static void checkNumber(String field, double value) {
-        if (booleanField(field) || !Double.isFinite(value) || value < min(field) || value > max(field)
-                || ("int".equals(DEFINITIONS.getProperty(field + ".type")) && (value != Math.rint(value) || value < Integer.MIN_VALUE || value > Integer.MAX_VALUE)))
-            throw new IllegalArgumentException("Value violates pinned Iris biome constraints");
-    }
     public static byte[] edit(String path, byte[] original, String field, double value) {
-        authorize(path, field); checkNumber(field, value); return new LosslessJson(original).number(field, value);
+        return editText(path,original,field,PinnedNumbers.canonical(value));
     }
+    public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
+    public static byte[] editText(String path,byte[] original,String field,String input){authorize(path,field);return PinnedNumbers.edit(new LosslessJson(original),DEFINITIONS,field,input);}
     public static byte[] editBoolean(String path, byte[] original, String field, boolean value) {
         authorize(path, field); if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");
         return new LosslessJson(original).bool(field, value);
     }
     public static byte[] generatorRange(String path, byte[] original, int index, double minimum, double maximum) {
-        if (!biome(path)) throw new IllegalArgumentException("Resource is read-only");
-        validateGeneratorRange(minimum, maximum);
-        byte[] next = new LosslessJson(original).objectArrayNumber("generators", index, "min", minimum);
-        return new LosslessJson(next).objectArrayNumber("generators", index, "max", maximum);
+        return generatorRangeText(path,original,index,PinnedNumbers.canonical(minimum),PinnedNumbers.canonical(maximum));
     }
     static void validateGeneratorRange(double minimum, double maximum) {
-        checkNumber("generators.min", minimum); checkNumber("generators.max", maximum);
-        if (minimum > maximum) throw new IllegalArgumentException("Generator minimum must not exceed maximum");
+        validateGeneratorRange(PinnedNumbers.canonical(minimum),PinnedNumbers.canonical(maximum));
+    }
+    static void validateGeneratorRange(String minimum,String maximum){
+        PinnedNumbers.input(DEFINITIONS,"generators.min",minimum);PinnedNumbers.input(DEFINITIONS,"generators.max",maximum);
+        if(new java.math.BigDecimal(minimum).compareTo(new java.math.BigDecimal(maximum))>0)throw new IllegalArgumentException("Generator minimum must not exceed maximum");
+    }
+    public static boolean generatorNumberSupported(String field,String token){return Set.of("min","max").contains(field) && PinnedNumbers.supported(DEFINITIONS,"generators."+field,token);}
+    public static byte[] generatorRangeText(String path,byte[] original,int index,String minimum,String maximum){
+        if(!biome(path))throw new IllegalArgumentException("Resource is read-only");validateGeneratorRange(minimum,maximum);
+        return new LosslessJson(original).objectArrayEdit("generators",index,object->{
+            byte[] next=PinnedNumbers.edit(object,"min",DEFINITIONS.getProperty("generators.min.type"),DEFINITIONS.getProperty("generators.min.minimum"),DEFINITIONS.getProperty("generators.min.maximum"),null,minimum);
+            return PinnedNumbers.edit(new LosslessJson(next),"max",DEFINITIONS.getProperty("generators.max.type"),DEFINITIONS.getProperty("generators.max.minimum"),DEFINITIONS.getProperty("generators.max.maximum"),null,maximum);
+        });
     }
     public static String generatorDefault(String field) {
         if (!Set.of("min", "max").contains(field)) throw new IllegalArgumentException("Not a generator height field");

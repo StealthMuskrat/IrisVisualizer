@@ -158,13 +158,8 @@ public final class DimensionFields {
     public static double min(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".minimum")); }
     public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum")); }
     public static byte[] edit(String path, byte[] original, String field, double value) {
-        authorize(path, field);
-        if (booleanField(field) || arrayField(field)) throw new IllegalArgumentException("Field requires its typed control");
-        if (!Double.isFinite(value) || value < min(field) || value > max(field)
-                || (DEFINITIONS.getProperty(field + ".type").equals("int") && value != Math.rint(value)))
-            throw new IllegalArgumentException("Value violates the pinned Iris field constraints");
-        if (!options(field).isEmpty() && Arrays.stream(options(field).split(",")).noneMatch(option -> Double.parseDouble(option) == value))
-            throw new IllegalArgumentException("Choose one of the pinned Iris options: " + options(field));
-        return new LosslessJson(original).numberPath(field, value);
+        return editText(path,original,field,PinnedNumbers.canonical(value));
     }
+    public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
+    public static byte[] editText(String path,byte[] original,String field,String input){authorize(path,field);return PinnedNumbers.edit(new LosslessJson(original),DEFINITIONS,field,input);}
 }

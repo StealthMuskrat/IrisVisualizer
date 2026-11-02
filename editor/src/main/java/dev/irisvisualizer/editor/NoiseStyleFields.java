@@ -204,6 +204,7 @@ public final class NoiseStyleFields {
     }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
     public static NumericBounds numericBounds(Target target,String field) { return NumericBounds.of("double",bound(target,field,"minimum"),bound(target,field,"maximum")); }
+    public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
     public static String constraints(String field) {
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
         return "Finite number" + (min == null ? "" : ", minimum " + min) + (max == null ? "" : ", maximum " + max)
@@ -263,11 +264,12 @@ public final class NoiseStyleFields {
     public static byte[] editText(String path, byte[] original, Target target, String field, String input) {
         authorize(path, target, field);
         if (field.equals("style")) throw new IllegalArgumentException("Use the noise style picker");
+        PinnedNumbers.input("double",bound(target,field,"minimum"),bound(target,field,"maximum"),null,input);
         double value = Double.parseDouble(input);
         validateNumber(target,field,value);
         return editContainer(original, target, container -> container.objectEdit(target.member(), style -> {
             validateCellularChange(style,target,field,value);
-            return style.number(field,value);
+            return PinnedNumbers.edit(style,field,"double",bound(target,field,"minimum"),bound(target,field,"maximum"),null,input);
         }, false), false);
     }
     private static void validateNumber(Target target, String field, double value) {

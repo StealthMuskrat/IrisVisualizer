@@ -38,6 +38,7 @@ public final class Terrain3DFields {
         return booleanField(field) ? token : new java.math.BigDecimal(token).stripTrailingZeros().toPlainString();
     }
     public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
+    public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
     public static String constraints(String field) {
         if ("long".equals(DEFINITIONS.getProperty(field+".type"))) return "Signed 64-bit integer (exact)";
         return "Finite number, minimum "+DEFINITIONS.getProperty(field+".minimum")+", maximum "+DEFINITIONS.getProperty(field+".maximum");
@@ -57,16 +58,7 @@ public final class Terrain3DFields {
     }
     public static byte[] editText(String path, byte[] original, String field, String input) {
         authorize(path,field);
-        if (booleanField(field)) throw new IllegalArgumentException("Boolean terrain field requires its toggle");
-        if ("long".equals(DEFINITIONS.getProperty(field+".type"))) {
-            long value = Long.parseLong(input);
-            return new LosslessJson(original).objectEdit("terrain3D",object -> object.integer(field,value),false);
-        }
-        double value = Double.parseDouble(input);
-        if (!Double.isFinite(value) || value < Double.parseDouble(DEFINITIONS.getProperty(field+".minimum"))
-                || value > Double.parseDouble(DEFINITIONS.getProperty(field+".maximum")))
-            throw new IllegalArgumentException("Value violates pinned native terrain bounds");
-        return new LosslessJson(original).objectEdit("terrain3D",object -> object.number(field,value),false);
+        return new LosslessJson(original).objectEdit("terrain3D",object->PinnedNumbers.edit(object,DEFINITIONS,field,input),false);
     }
     static LosslessJson object(LosslessJson document) {
         String token = document.token("terrain3D");

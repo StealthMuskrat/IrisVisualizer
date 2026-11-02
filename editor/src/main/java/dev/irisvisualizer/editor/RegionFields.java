@@ -31,13 +31,10 @@ public final class RegionFields {
     }
     public static byte[] enable(String path, byte[] original, String field) { authorize(path, field); return new LosslessJson(original).enable(field, defaultToken(field)); }
     public static byte[] edit(String path, byte[] original, String field, double value) {
-        authorize(path, field); if (arrayField(field)) throw new IllegalArgumentException("Use biome list controls");
-        String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
-        if (!Double.isFinite(value) || (min != null && value < Double.parseDouble(min)) || (max != null && value > Double.parseDouble(max))
-                || ("int".equals(DEFINITIONS.getProperty(field + ".type")) && value != Math.rint(value)))
-            throw new IllegalArgumentException("Value violates pinned Iris region constraints");
-        return new LosslessJson(original).number(field, value);
+        return editText(path,original,field,PinnedNumbers.canonical(value));
     }
+    public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
+    public static byte[] editText(String path,byte[] original,String field,String input){authorize(path,field);return PinnedNumbers.edit(new LosslessJson(original),DEFINITIONS,field,input);}
     public static List<String> biomeKeys(PackWorkspace workspace) {
         return ResourceTypes.referenceKeys(workspace,"biomes");
     }

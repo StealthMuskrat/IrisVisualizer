@@ -29,19 +29,22 @@ public final class BiomeGeneratorLinks {
     private static void requireKey(PackWorkspace workspace, String key) {
         if (key == null || !choices(workspace).contains(key)) throw new IllegalArgumentException("Choose an exact generator key present in this pack; aliases and target contents are not checked");
     }
-    private static byte[] link(String key, double minimum, double maximum) {
+    private static byte[] link(String key, String minimum, String maximum) {
         BiomeFields.validateGeneratorRange(minimum, maximum);
         byte[] created = new LosslessJson("{}".getBytes(StandardCharsets.UTF_8)).enableStringPath("generator", key);
-        created = new LosslessJson(created).enable("min", java.math.BigDecimal.valueOf(minimum).stripTrailingZeros().toPlainString());
-        return new LosslessJson(created).enable("max", java.math.BigDecimal.valueOf(maximum).stripTrailingZeros().toPlainString());
+        created = new LosslessJson(created).enable("min", minimum);
+        return new LosslessJson(created).enable("max", maximum);
     }
     /** Makes the pinned one-link implicit list explicit, without choosing a pack resource silently. */
     public static byte[] enable(String path, byte[] original) {
         authorize(path);
         var document = new LosslessJson(new LosslessJson(original).enable("generators", "[]"));
-        return document.objectArrayInsert("generators", 0, link(defaultGenerator(), Double.parseDouble(BiomeFields.generatorDefault("min")), Double.parseDouble(BiomeFields.generatorDefault("max"))));
+        return document.objectArrayInsert("generators", 0, link(defaultGenerator(), BiomeFields.generatorDefault("min"), BiomeFields.generatorDefault("max")));
     }
     public static byte[] add(String path, byte[] original, PackWorkspace workspace, String key, double minimum, double maximum) {
+        return addText(path,original,workspace,key,PinnedNumbers.canonical(minimum),PinnedNumbers.canonical(maximum));
+    }
+    public static byte[] addText(String path,byte[] original,PackWorkspace workspace,String key,String minimum,String maximum){
         authorize(path); requireKey(workspace, key);
         var document = new LosslessJson(original);
         int index = document.objectArray("generators").size();
@@ -54,6 +57,9 @@ public final class BiomeGeneratorLinks {
     }
     /** User-provided paired values explicitly enable missing members and replace only their tokens. */
     public static byte[] range(String path, byte[] original, int index, double minimum, double maximum) {
+        return rangeText(path,original,index,PinnedNumbers.canonical(minimum),PinnedNumbers.canonical(maximum));
+    }
+    public static byte[] rangeText(String path,byte[] original,int index,String minimum,String maximum){
         authorize(path); BiomeFields.validateGeneratorRange(minimum, maximum);
         byte[] prepared = new LosslessJson(original).objectArrayEdit("generators", index, object -> {
             byte[] next = object.sourceBytes();
@@ -63,7 +69,7 @@ public final class BiomeGeneratorLinks {
             }
             return next;
         });
-        return BiomeFields.generatorRange(path, prepared, index, minimum, maximum);
+        return BiomeFields.generatorRangeText(path, prepared, index, minimum, maximum);
     }
     public static byte[] change(String path, byte[] original, int index, Action action) {
         authorize(path);

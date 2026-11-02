@@ -43,6 +43,7 @@ public final class NoiseFields {
     public static boolean booleanField(String field) { return "boolean".equals(DEFINITIONS.getProperty(field + ".type")); }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
     public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
+    public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
     public static String constraints(String field) {
         if ("long".equals(DEFINITIONS.getProperty(field + ".type"))) return "Signed 64-bit integer (exact)";
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
@@ -63,18 +64,7 @@ public final class NoiseFields {
     }
     public static byte[] editText(String path, byte[] original, Target target, String field, String input) {
         authorize(path, target, field);
-        if (booleanField(field)) throw new IllegalArgumentException("Boolean field requires its toggle");
-        if ("long".equals(DEFINITIONS.getProperty(field + ".type"))) {
-            long value = Long.parseLong(input);
-            return editObject(original, target, object -> object.integer(field, value), false);
-        }
-        double value;
-        try { value = "int".equals(DEFINITIONS.getProperty(field + ".type")) ? new java.math.BigDecimal(input).intValueExact() : Double.parseDouble(input); }
-        catch (NumberFormatException | ArithmeticException | NullPointerException invalid) { throw new IllegalArgumentException("Enter a valid noise number; integer fields require exact signed 32-bit values",invalid); }
-        String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
-        if (!Double.isFinite(value) || (min != null && value < Double.parseDouble(min)) || (max != null && value > Double.parseDouble(max)))
-            throw new IllegalArgumentException("Value violates pinned Iris generator constraints");
-        return editObject(original, target, object -> object.number(field, value), false);
+        return editObject(original,target,object->PinnedNumbers.edit(object,DEFINITIONS,field,input),false);
     }
     public static byte[] editBoolean(String path, byte[] original, Target target, String field, boolean value) {
         authorize(path, target, field); if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");

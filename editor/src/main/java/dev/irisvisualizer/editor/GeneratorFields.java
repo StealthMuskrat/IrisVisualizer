@@ -33,14 +33,9 @@ public final class GeneratorFields {
     public static byte[] enable(String path, byte[] original, String field) { authorize(path, field); return new LosslessJson(original).enablePath(field, defaultToken(field)); }
     public static byte[] editText(String path, byte[] original, String field, String input) {
         authorize(path, field);
-        if (booleanField(field)) throw new IllegalArgumentException("Boolean field requires its toggle");
-        if ("long".equals(DEFINITIONS.getProperty(field + ".type"))) return new LosslessJson(original).integerPath(field, Long.parseLong(input));
-        double value = Double.parseDouble(input);
-        String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
-        if (!Double.isFinite(value) || (min != null && value < Double.parseDouble(min)) || (max != null && value > Double.parseDouble(max)))
-            throw new IllegalArgumentException("Value violates pinned Iris generator constraints");
-        return new LosslessJson(original).numberPath(field, value);
+        return PinnedNumbers.edit(new LosslessJson(original),DEFINITIONS,field,input);
     }
+    public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
     public static byte[] editBoolean(String path, byte[] original, String field, boolean value) {
         authorize(path, field); if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");
         return new LosslessJson(original).boolPath(field, value);

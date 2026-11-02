@@ -770,6 +770,7 @@ public final class EditorApp extends Application {
                             }
                             continue;
                         }
+                        if(!DimensionFields.numericSupported(field,token)){ImGui.textWrapped(field+": unsupported stored numeric type, width or token limit (read-only)");continue;}
                         ImGui.text(field + " [" + DimensionFields.min(field) + " .. " + DimensionFields.max(field) + "]");
                         if (!DimensionFields.options(field).isEmpty()) ImGui.textWrapped("Allowed: " + DimensionFields.options(field));
                         ImString input = values.computeIfAbsent(field, key -> new ImString(token, 128));
@@ -777,7 +778,7 @@ public final class EditorApp extends Application {
                         drafts.update(field, token, input.get());
                         ImGui.sameLine();
                         if (ImGui.button("Apply##" + field)) {
-                            try { workspace.replace(selected, DimensionFields.edit(selected, workspace.read(selected), field, Double.parseDouble(input.get()))); drafts.applied(field); values.remove(field); error = null; }
+                            try { workspace.replace(selected, DimensionFields.editText(selected, workspace.read(selected), field, input.get())); drafts.applied(field); values.remove(field); error = null; }
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
                     }
@@ -1438,12 +1439,13 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             } else if (RegionFields.arrayField(field)) drawArray(field, document);
+            else if(!RegionFields.numericSupported(field,token))ImGui.textWrapped("Stored numeric type, width or token limit is unsupported (read-only).");
             else {
                 ImGui.textWrapped(RegionFields.constraints(field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
                 NumericInput.draw("Value",input,RegionFields.numericBounds(field)); drafts.update(key, token, input.get());
                 if (ImGui.button("Apply")) {
-                    try { workspace.replace(selected, RegionFields.edit(selected, workspace.read(selected), field, Double.parseDouble(input.get()))); drafts.applied(key); values.remove(key); error = null; }
+                    try { workspace.replace(selected, RegionFields.editText(selected, workspace.read(selected), field, input.get())); drafts.applied(key); values.remove(key); error = null; }
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
@@ -1479,6 +1481,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             } else {
+                if(!GeneratorFields.numericSupported(field,token)){ImGui.textWrapped("Stored numeric type, width or token limit is unsupported (read-only).");ImGui.popID();continue;}
                 ImGui.textWrapped(GeneratorFields.constraints(field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
                 NumericInput.draw("Value",input,GeneratorFields.numericBounds(field)); drafts.update(key, token, input.get());
@@ -1562,7 +1565,7 @@ public final class EditorApp extends Application {
                     try { workspace.replace(selected, NoiseFields.editBoolean(selected, workspace.read(selected), target, field, !token.equals("true"))); error = null; }
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
-            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored noise number has an unsupported type (read-only).");
+            } else if (!NoiseFields.numericSupported(field,token)) ImGui.textWrapped("Stored noise numeric type, width or token limit is unsupported (read-only).");
             else {
                 ImGui.textWrapped(NoiseFields.constraints(field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
@@ -1656,7 +1659,7 @@ public final class EditorApp extends Application {
                         ImGui.endCombo();
                     }
                 }
-            } else if (!LosslessJson.numericToken(token)) ImGui.textWrapped("Stored value has an unsupported type (read-only).");
+            } else if (!NoiseStyleFields.numericSupported(field,token)) ImGui.textWrapped("Stored numeric type or token limit is unsupported (read-only).");
             else {
                 ImGui.textWrapped(NoiseStyleFields.constraints(target,field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
@@ -1754,11 +1757,12 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             } else {
+                if(!BiomeFields.numericSupported(field,token)){ImGui.textWrapped("Stored numeric type, width or token limit is unsupported (read-only).");ImGui.popID();continue;}
                 ImGui.textWrapped(BiomeFields.constraints(field));
                 ImString input = values.computeIfAbsent(key, ignored -> new ImString(token, 128));
                 NumericInput.draw("Value",input,BiomeFields.numericBounds(field)); drafts.update(key, token, input.get());
                 if (ImGui.button("Apply")) {
-                    try { workspace.replace(selected, BiomeFields.edit(selected, workspace.read(selected), field, Double.parseDouble(input.get()))); drafts.applied(key); values.remove(key); error = null; }
+                    try { workspace.replace(selected, BiomeFields.editText(selected, workspace.read(selected), field, input.get())); drafts.applied(key); values.remove(key); error = null; }
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
@@ -6460,6 +6464,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             } else {
+                if(!Terrain3DFields.numericSupported(field,token)){ImGui.textWrapped("Stored numeric type, width or token limit is unsupported (read-only).");ImGui.popID();continue;}
                 ImGui.textWrapped(Terrain3DFields.constraints(field));
                 ImString input = values.computeIfAbsent(key,ignored -> new ImString(token,Math.max(128,token.getBytes(StandardCharsets.UTF_8).length+1)));
                 NumericInput.draw("Value",input,Terrain3DFields.numericBounds(field)); drafts.update(key,token,input.get());
@@ -6517,6 +6522,9 @@ public final class EditorApp extends Application {
             String minimumToken = link.token("min"), maximumToken = link.token("max");
             String storedMin = minimumToken == null ? BiomeFields.generatorDefault("min") : minimumToken;
             String storedMax = maximumToken == null ? BiomeFields.generatorDefault("max") : maximumToken;
+            if(!BiomeFields.generatorNumberSupported("min",storedMin) || !BiomeFields.generatorNumberSupported("max",storedMax)){
+                ImGui.textWrapped("Stored generator heights have an unsupported numeric type, width or token limit (range read-only).");ImGui.popID();ImGui.separator();continue;
+            }
             String minKey = key + ".min", maxKey = key + ".max";
             ImString minimum = values.computeIfAbsent(minKey, ignored -> new ImString(storedMin, 128));
             ImString maximum = values.computeIfAbsent(maxKey, ignored -> new ImString(storedMax, 128));
@@ -6526,7 +6534,7 @@ public final class EditorApp extends Application {
             if (ImGui.isItemHovered()) ImGui.setTooltip(BiomeFields.description("generators.max"));
             if (ImGui.button(minimumToken == null || maximumToken == null ? "Apply/enable height range" : "Apply height range")) {
                 try {
-                    workspace.replace(selected, BiomeGeneratorLinks.range(selected, workspace.read(selected), index, Double.parseDouble(minimum.get()), Double.parseDouble(maximum.get())));
+                    workspace.replace(selected, BiomeGeneratorLinks.rangeText(selected, workspace.read(selected), index, minimum.get(), maximum.get()));
                     drafts.applied(minKey); drafts.applied(maxKey); values.remove(minKey); values.remove(maxKey); error = null;
                 } catch (Exception failure) { error = failure.getMessage(); }
             }
@@ -6546,7 +6554,7 @@ public final class EditorApp extends Application {
         drafts.update(prefix+"min",BiomeFields.generatorDefault("min"),minimum.get());
         drafts.update(prefix+"max",BiomeFields.generatorDefault("max"),maximum.get());
         if (ImGui.button("Add generator link")) {
-            try { commitBiomeGenerators(BiomeGeneratorLinks.add(selected,workspace.read(selected),workspace,reference.get(),Double.parseDouble(minimum.get()),Double.parseDouble(maximum.get())),true); }
+            try { commitBiomeGenerators(BiomeGeneratorLinks.addText(selected,workspace.read(selected),workspace,reference.get(),minimum.get(),maximum.get()),true); }
             catch (Exception failure) { error = failure.getMessage(); }
         }
         ImGui.popID();

@@ -204,6 +204,12 @@ public final class LosslessJson {
     }
     public byte[] integerPath(String path, long value) { return updatePath(path, (doc, field) -> doc.integer(field, value), false); }
     public byte[] numberPath(String path, double value) { return updatePath(path, (doc, field) -> doc.number(field, value), false); }
+    /** Exact numeric-token splice; owning UI helpers remain responsible for native type/width/bounds. */
+    byte[] numberTokenPath(String path,String value){return updatePath(path,(doc,field)->{
+        String previous=doc.token(field);
+        if(!numericToken(previous) || !numericToken(value))throw new IllegalArgumentException("Stored and replacement fields must be numeric JSON tokens");
+        Span span=doc.root.get(field);return previous.equals(value)?doc.sourceBytes():doc.splice(span.start(),span.end(),value);
+    },false);}
     public byte[] boolPath(String path, boolean value) { return updatePath(path, (doc, field) -> doc.bool(field, value), false); }
     public byte[] stringPath(String path, String value) { return updatePath(path, (doc, field) -> doc.stringValue(field, value), false); }
     public String stringPath(String path) {
