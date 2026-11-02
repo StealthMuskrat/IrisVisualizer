@@ -124,7 +124,7 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
         changed.write_text(sources[name].replace(old, new))
         try:
             extract(fixture)
-        except AssertionError:
+        except (AssertionError, ValueError):
             pass
         else:
             raise AssertionError('Accepted unreviewed ownership/default/inheritance drift: ' + old)
