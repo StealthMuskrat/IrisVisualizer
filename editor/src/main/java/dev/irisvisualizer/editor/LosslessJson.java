@@ -12,9 +12,15 @@ public final class LosslessJson {
     private final Map<String, Span> rootKeys = new LinkedHashMap<>();
     private record Span(int start, int end) {}
     public LosslessJson(byte[] bytes) {
+        this(bytes,true);
+    }
+    /** Only read-only, shape-checked metadata may opt out of the editable root-object contract. */
+    LosslessJson(byte[] bytes,boolean requireObject) {
         try { text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString(); }
         catch (CharacterCodingException failure) { throw new IllegalArgumentException("JSON is not valid UTF-8", failure); }
-        space(); if (peek() != '{') throw error(); object(true, 0); space(); if (at != text.length()) throw error();
+        space(); if (requireObject && peek() != '{') throw error();
+        if (peek()=='{') object(true,0);else value(0);
+        space(); if (at != text.length()) throw error();
     }
     public Set<String> fields() { return Collections.unmodifiableSet(root.keySet()); }
     /** Source spans for the read-only browser. Constructor validation remains authoritative; no writer state changes. */

@@ -7,6 +7,19 @@ tasks.register('workspaceTest', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'dev.irisvisualizer.editor.WorkspaceTests'
+    maxHeapSize = '1536m'
+}
+tasks.register('overworldTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.irisvisualizer.editor.OverworldEditorTests'
+    maxHeapSize = '1536m'
+    doFirst {
+        def pack = providers.gradleProperty('overworldPack').orNull
+        if (!pack) throw new GradleException('Supply -PoverworldPack=<pinned Overworld folder>')
+        def lock = new groovy.json.JsonSlurper().parse(file('../iris.lock.json'))
+        args = [file(pack).absolutePath, lock.pack.revision, layout.buildDirectory.dir('overworld-acceptance').get().asFile.absolutePath]
+    }
 }
 
 // Development dependency includes several platforms. The deliverable retains Windows x64 natives only.

@@ -1,5 +1,8 @@
 name: Windows editor
 on:
+  push:
+    branches: [main]
+    paths: ['editor/**', '.github/workflows/editor.yml']
   pull_request:
     paths: ['editor/**', '.github/workflows/editor.yml']
   workflow_dispatch:
@@ -1116,6 +1119,19 @@ jobs:
           Get-Content generated-coverage/coverage-report.md
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes
+      - name: Exercise the pinned Overworld through editor Save and Export
+        shell: pwsh
+        run: |
+          $lock = Get-Content iris.lock.json -Raw | ConvertFrom-Json
+          $revision = $lock.pack.revision
+          $fixture = Join-Path $env:RUNNER_TEMP 'iris-ui-pack'
+          New-Item -ItemType Directory -Path $fixture | Out-Null
+          $archive = Join-Path $fixture 'overworld.zip'
+          Invoke-WebRequest "https://github.com/IrisDimensions/overworld/archive/$revision.zip" -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $fixture
+          $pack = Join-Path $fixture "overworld-$revision"
+          gradle -p editor --no-daemon overworldTest "-PoverworldPack=$pack"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build Windows x64 package
         run: gradle -p editor --no-daemon windowsZip
       - name: Verify launcher runtime check and missing-runtime message
@@ -1141,3 +1157,9 @@ jobs:
           name: IrisVisualizer-windows-x64
           path: editor/build/distributions/IrisVisualizer-windows-x64.zip
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: UI-stage-acceptance
+          path: editor/build/overworld-acceptance/acceptance.txt
+          if-no-files-found: warn

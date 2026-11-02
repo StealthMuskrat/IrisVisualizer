@@ -21,6 +21,11 @@ final class AsyncWorkerFailureTests {
     private static byte[] bytes(String text){return text.getBytes(StandardCharsets.UTF_8);}
     private static void check(boolean value,String message){if(!value)throw new AssertionError("UI worker failure: "+message);}
     private static OutOfMemoryError exhausted(){return new OutOfMemoryError("Injected worker failure");}
+    private interface ImportAction { void run()throws Exception; }
+    private static void guarded(ImportAction action)throws Exception{
+        try{action.run();}catch(IOException expected){check(expected.getMessage().contains("acknowledge"),"import retains explicit history-clear guard");return;}
+        throw new AssertionError("Import bypassed history-clear acknowledgement");
+    }
     private static final class Probe implements ThreadFactory {
         private Thread thread;private final AtomicReference<Throwable> uncaught=new AtomicReference<>();
         @Override public Thread newThread(Runnable task){thread=new Thread(task,"test-ui-worker-failure");thread.setUncaughtExceptionHandler((t,error)->uncaught.set(error));return thread;}
@@ -46,7 +51,8 @@ final class AsyncWorkerFailureTests {
             for(int frame=0;frame<8;frame++)check(worker.poll(pack)==failed && calls.get()==1,"polling a failed capture does not retry");
             pack.saveCopy(temp.resolve("worker-failed-copy"));pack.exportZip(temp.resolve("worker-failed.zip"));check(worker.poll(pack)==failed,"Save Copy/ZIP remain available and do not retry asset capture");
             worker.request(pack,source,"added");check(terminal(()->worker.poll(pack),s->s.phase()==AsyncAssetImport.Phase.CAPTURING).phase()==AsyncAssetImport.Phase.READY && calls.get()==2,"same import worker recovers on explicit source choice");
-            check(worker.apply(pack,false).equals("objects/added.iob") && Arrays.equals(pack.read("objects/added.iob"),incoming),"retried import applies exact captured bytes");
+            guarded(()->worker.apply(pack,false));check(worker.poll(pack).phase()==AsyncAssetImport.Phase.READY && pack.revision()==revision,"rejected acknowledgement keeps capture ready and workspace unchanged");
+            check(worker.apply(pack,true).equals("objects/added.iob") && Arrays.equals(pack.read("objects/added.iob"),incoming),"retried import applies exact captured bytes");
         }probe.stopped();
         var replacementPack=PackWorkspace.newPack(Map.of("objects/original.iob",new byte[]{0}));probe=new Probe();var replacementCalls=new AtomicInteger();
         try(var worker=new AsyncAssetReplacement((path,target,budget,cancelled)->{if(replacementCalls.incrementAndGet()==1)throw exhausted();return AssetReplacement.prepare(path,target,budget,cancelled);},probe)){
@@ -60,7 +66,7 @@ final class AsyncWorkerFailureTests {
             worker.request(batchPack,List.of(source),"batch");var failed=terminal(()->worker.poll(batchPack),s->s.phase()==AsyncAssetBatchImport.Phase.CAPTURING);
             check(failed.phase()==AsyncAssetBatchImport.Phase.FAILED && failed.receipts().isEmpty() && batchPack.paths().size()==1,"batch failure installs no partial files");probe.alive();
             check(worker.poll(batchPack)==failed && batchCalls.get()==1,"batch failure does not automatically recapture");worker.request(batchPack,List.of(source),"batch");
-            check(terminal(()->worker.poll(batchPack),s->s.phase()==AsyncAssetBatchImport.Phase.CAPTURING).phase()==AsyncAssetBatchImport.Phase.READY,"batch capture recovers on its existing worker");String installed=worker.apply(batchPack,false).getFirst();check(Arrays.equals(batchPack.read(installed),incoming),"retried batch preserves opaque bytes");
+            check(terminal(()->worker.poll(batchPack),s->s.phase()==AsyncAssetBatchImport.Phase.CAPTURING).phase()==AsyncAssetBatchImport.Phase.READY,"batch capture recovers on its existing worker");guarded(()->worker.apply(batchPack,false));String installed=worker.apply(batchPack,true).getFirst();check(Arrays.equals(batchPack.read(installed),incoming),"retried batch preserves opaque bytes");
         }probe.stopped();
     }
     private static void imageAndDisk(Path temp)throws Exception{

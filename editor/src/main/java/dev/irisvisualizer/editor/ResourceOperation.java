@@ -449,7 +449,8 @@ final class ResourceOperation {
             for(var row:source.json.entrySet()){
                 check(cancelled);String path=row.getKey(),descriptor=ownerDescriptor(path);
                 if(descriptor==null){scan.issue(path,"","This JSON reference owner is outside the closed typed operation schema; operation blocked.");continue;}
-                var document=JsonStructure.inspect(copy(row.getValue(),cancelled));scan.inspected++;if(!document.indexed() || document.status()!=JsonStructure.Status.READY){scan.issue(path,"","Malformed, duplicate-key or node/depth-limited JSON prevents a complete typed reference scan.");continue;}
+                byte[] json=copy(row.getValue(),cancelled);
+                var document=SCHEMA.getProperty("metadata."+path)!=null ? JsonStructure.inspectMetadata(json) : JsonStructure.inspect(json);scan.inspected++;if(!document.indexed() || document.status()!=JsonStructure.Status.READY){scan.issue(path,"","Malformed, duplicate-key or node/depth-limited JSON prevents a complete typed reference scan.");continue;}
                 if(SCHEMA.getProperty("metadata."+path)!=null){
                     boolean valid=document.node(0).kind()==JsonStructure.Kind.ARRAY;
                     if(valid)for(int child:document.node(0).children()){check(cancelled);if(document.node(child).kind()!=JsonStructure.Kind.STRING){valid=false;break;}}

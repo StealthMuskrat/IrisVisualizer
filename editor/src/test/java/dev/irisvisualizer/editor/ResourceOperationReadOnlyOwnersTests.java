@@ -51,7 +51,8 @@ final class ResourceOperationReadOnlyOwnersTests {
         var selectors=PackWorkspace.newPack(Map.of("mods/selectors.json",bytes("{\"forDimension\":\"world\",\"removeBiomes\":[\"forest\"],\"removeRegions\":[\"land\"],\"removeObjects\":[\"shape\"]}"),"dimensions/world.json",bytes("{}"),"biomes/forest.json",bytes("{}"),"regions/land.json",bytes("{}"),"objects/shape.iob",new byte[]{1},"expressions/free.json",bytes("{}")));
         for(String path:List.of("dimensions/world.json","biomes/forest.json","regions/land.json","objects/shape.iob"))check(!rename(selectors,path,"other").report.permitted(),"uncertified mod selector retains its family guard");
         check(rename(selectors,"expressions/free.json","other").report.permitted(),"unrelated family is not blocked by a mod selector");
-        for(String payload:List.of("{}","null","[\"alias\",{}]","[null]")){
+        check(!JsonStructure.inspect(bytes("[\"alias\"]")).indexed(),"metadata indexing must not widen editable root-object parsing");
+        for(String payload:List.of("{}","null","[\"alias\",{}]","[null]","[\"alias\",]","[\"alias\"] trailing","{\"x\":1,\"x\":2}","["+"\"alias\",".repeat(JsonStructure.MAX_NODES)+"\"alias\"]")){
             var malformed=PackWorkspace.newPack(Map.of("Schema.json",bytes(payload),"objects/shape.iob",new byte[]{1}));check(!rename(malformed,"objects/shape.iob","other").report.permitted(),"metadata exemption is restricted to the exact field-order array shape");
         }
         for(String path:List.of("loots/table.json","unknown/owner.json")){

@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+UI feature implementation is closed and full UI-stage validation is in progress. The Windows editor workflow now runs on editor changes pushed to `main`, reproduces the pinned source/policy evidence, executes the complete regression suite and exercises real Overworld edits with Save/reopen/Copy/As/ZIP before packaging. See [the validation scope](../docs/UI-IMPLEMENTATION-REVIEW.md) for current status and the separate interactive Windows checks. Historical batch notes below describe the state when each change was implemented.
+
 Large original reference/registry lists and biome-generator links now use 200-row editor pages with global entry indices. Changing pages keeps pending text, including drafts on other pages; the new-entry form stays available and structural edits retain their existing discard guard. Successful add/duplicate/move/remove reveals the resulting row across page boundaries. Clean off-page input buffers are released, while pending inputs are kept. NUL-containing or oversized string entries remain text read-only and byte-preserved, with explicit removal still available. Paging never becomes pack data or enables a preview.
 
 Background asset capture, image analysis, pending disk review, folder copy and ZIP export now report memory failures instead of remaining busy after a worker stops. Retry is explicit. Copy/export errors identify when publication had begun and the destination needs inspection; a failed Save As keeps the current active folder and save baseline. Completed or cleared snapshot payloads are released from idle worker loops. These paths still await end-of-UI regression and interactive verification.

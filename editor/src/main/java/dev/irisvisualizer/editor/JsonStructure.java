@@ -92,6 +92,10 @@ public final class JsonStructure {
     public static boolean supports(String path) { return path!=null && path.toLowerCase(Locale.ROOT).endsWith(".json"); }
     public static Snapshot inspect(byte[] bytes) { return inspect(bytes,new Limits(MAX_NODES,MAX_DEPTH)); }
     static Snapshot inspect(byte[] bytes,Limits limits) {
+        return inspect(bytes,limits,true);
+    }
+    static Snapshot inspectMetadata(byte[] bytes) { return inspect(bytes,new Limits(MAX_NODES,MAX_DEPTH),false); }
+    private static Snapshot inspect(byte[] bytes,Limits limits,boolean requireObject) {
         Objects.requireNonNull(bytes);Objects.requireNonNull(limits);
         if (bytes.length>MAX_BYTES) return new Snapshot(Status.TOO_LARGE,bytes.length,"",List.of(),"Structure/source display is limited to 1 MB; original bytes remain saveable/exportable.");
         String source;
@@ -99,8 +103,8 @@ public final class JsonStructure {
         catch (CharacterCodingException invalid) { return new Snapshot(Status.INVALID_UTF8,bytes.length,"",List.of(),"Source is not strict UTF-8; text display is unavailable."); }
         if (source.chars().anyMatch(c -> Character.isISOControl(c) && c!='\r' && c!='\n' && c!='\t')) return new Snapshot(Status.CONTROL_TEXT,bytes.length,"",List.of(),"Source contains control characters unsuitable for text display; original bytes are preserved.");
         try {
-            var index=new LosslessJson(bytes).structure(limits.nodes(),limits.depth());
-            return new Snapshot(index.limited() ? Status.LIMITED : Status.READY,bytes.length,source,index.nodes(),index.limited() ? "Some children are not indexed because node/depth limits were reached." : "Strict root-object source indexed. This is not schema/native validation.");
+            var index=new LosslessJson(bytes,requireObject).structure(limits.nodes(),limits.depth());
+            return new Snapshot(index.limited() ? Status.LIMITED : Status.READY,bytes.length,source,index.nodes(),index.limited() ? "Some children are not indexed because node/depth limits were reached." : "Strict JSON source indexed. This is not schema/native validation.");
         } catch (IllegalArgumentException unavailable) { return new Snapshot(Status.UNAVAILABLE,bytes.length,source,List.of(),"Structure unavailable: "+InspectorText.label(unavailable.getMessage(),MAX_LABEL_CHARACTERS)); }
     }
     public static final class PageCache {

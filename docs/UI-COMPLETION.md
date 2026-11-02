@@ -2,7 +2,7 @@
 
 The authoritative requirements are [SPECIFICATION.md](SPECIFICATION.md), particularly sections 5, 7, 8 and 9. Development order is **Engine → UI → Renderer → final integration**. The application is currently in the UI stage. A work batch is not a new stage.
 
-Continue UI work in large batches. Compilation and code inspection may continue, but defer test execution until UI implementation is complete, then run the full UI-stage and GitHub validation before renderer work. Keep the complete current project on `main` and commit ongoing UI work there, with skip-CI commit messages and no test-triggering pull request or workflow dispatch. Branches may be used for actual development stages when necessary; integrate them into `main` and delete them immediately afterward. Do not create a branch for each work batch. Do not start the renderer merely because one UI batch passes. Unsupported generation/rendering previews remain disabled while their native support is incomplete.
+UI feature implementation closed at `a22a62e117211db06f2a1c38f556082d1b3ae07e`. Full UI-stage validation is now in progress as described in [UI-IMPLEMENTATION-REVIEW.md](UI-IMPLEMENTATION-REVIEW.md): the complete editor regression suite, real pinned Overworld storage/edit acceptance and Windows GitHub workflows. Resolve and record those results before renderer work. Keep the complete current project on `main`, without per-batch branches. Unsupported generation/rendering previews remain disabled. Older batch notes below retain their historical test-deferral statements; they do not describe the current validation phase.
 
 ## Completion checklist
 
