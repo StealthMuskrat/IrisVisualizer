@@ -163,9 +163,24 @@ def audit_object_collision_context(texts):
          'return new Decoded(objectKey, Integer.parseInt(marker.substring(separator + 1)), null);',
          'return new Decoded(objectKey, placementId, structureKey);')
 
+def audit_cave_qualified_lookup(texts):
+ """Qualified comparisons and the unmodified raw compatibility lookup are separate consumers."""
+ def require(name,*contracts):
+  source=compact(texts[name])
+  for contract in contracts:assert compact(contract) in source,'Changed cave compatibility lookup: '+name+' '+contract
+ require('ResourceLoader','this.folderName = folderName;',
+         'return resolveFile(name, extension, getFolders(name));',
+         'if (i.getName().equals(folderName)) { fc.add(i); break; }',
+         'if (rc.contains(":")) { for (File i : folders.copy()) { if (!rc.startsWith(i.getName() + ":")) { folders.remove(i); } } }',
+         'File exact = new File(folder, name + extension);')
+ require('IrisData','this.biomeLoader = registerLoader(IrisBiome.class, replacement);',
+         'r = new ResourceLoader<>(dataFolder, this, rr.getFolderName(), rr.getTypeName(), registrant, options);')
+ require('IrisStructurePlacement','String key = caveBiomes.get(index); IrisBiome biome = data.getBiomeLoader().load(key);')
+
 def extract(root):
  catalog=load_inventory(root);models,texts,evidence=catalog.models,catalog.texts,catalog.evidence
  audit_object_collision_context(texts)
+ audit_cave_qualified_lookup(texts)
  for name,model in models.items():assert not model.custom_noarg,'Custom no-arg constructor needs explicit default policy: '+name
  fields=catalog.fields
  result={'root.'+family:model for family,model in ROOTS.items()} | {'owner.'+family:model for family,model in OWNERS.items()} | {'metadata.'+path:kind for path,kind in METADATA.items()};definitions={}
@@ -183,6 +198,7 @@ def extract(root):
  assert isinstance(default_derivative,str) and re.fullmatch(r'[A-Za-z0-9:/_.-]+',default_derivative),'Unreviewed biome derivative default'
  result['context.biome.derivative.default']=default_derivative
  result['context.objectCollision.policy']='exactLoadKeyWithProceduralGuard'
+ result['context.cave.qualifiedCompatibility']='rawBiomeFolderFilter'
  potential={name:set() for name in MODELS}
  while True:
   next_={n:set().union(*(families(k,potential) for _,k in fs.values())) for n,fs in definitions.items()}

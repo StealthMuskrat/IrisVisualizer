@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+Unambiguous qualified cave-biome selectors such as iris:forest now follow biome rename/move while preserving the namespace and surrounding whitespace. This applies when Iris's raw, case-sensitive biome-folder filter rejects the compatibility lookup. Literal biomes: rewrites, ambiguous aliases, newly captured names and unsupported namespace forms remain guarded. The cave selector help explains this distinction. Save remains explicit after resource Apply.
+
 Workspace > Layout > Display scale follows Windows by default or accepts an absolute 100–200% scale for this session. Text, shell/divider dimensions, preview controls and initial review-window sizes scale together; panel-width preferences survive moving between displays. Focus summary and Height details buttons open keyboard-accessible explanations. F6/Shift+F6 still cycle panels; Layout provides keyboard width/reset actions. These preferences never enter pack files.
 
 Object rename/move now maintains canonical allowedCollisions/forbiddenCollisions keys using Iris's exact loaded-key comparison. This also covers shared placement snippets and required reference maintenance in read-only owners. Aliases, newly captured names, unsupported spellings and native procedural/ collision-marker identities remain guarded. Collision field help explains exact matching and allowed-over-forbidden precedence; object bytes remain opaque. Save remains explicit after resource Apply.

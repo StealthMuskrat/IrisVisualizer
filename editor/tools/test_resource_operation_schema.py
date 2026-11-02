@@ -66,6 +66,7 @@ assert values['IrisSurfaceRiverBedConfig.paddingPalette.implicit.count'] == '2'
 assert values['IrisDimension.upperDimension'] == 'sentinel-ref:dimensions|none'
 assert values['IrisStructurePlacement.structures'] == 'list:ref:structures'
 assert values['IrisStructurePlacement.caveBiomes'] == 'list:cave-match:biomes'
+assert values['context.cave.qualifiedCompatibility'] == 'rawBiomeFolderFilter'
 assert values['IrisSubterrainFeature.allowedRegions'] == 'list:exact-key:regions'
 assert values['IrisFloatingChildBiomes.carving'] == 'dual-carving:biomes'
 assert values['IrisDepositGenerator.includedBiomes'] == 'list:dual-deposit:biomes'
@@ -105,6 +106,11 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
         ('IrisImageMapBinding', '@RegistryListResource(IrisImageMap.class)', ''),
         ('IrisGeneratorStyle', '@Snippet("style")', '@Snippet("other")'),
         ('IrisLootTable', 'return "loot";', 'return "loots";'),
+        ('ResourceLoader', 'rc.startsWith(i.getName() + ":")', 'rc.toLowerCase().startsWith(i.getName() + ":")'),
+        ('ResourceLoader', 'if (i.getName().equals(folderName))', 'if (i.getName().equalsIgnoreCase(folderName))'),
+        ('ResourceLoader', 'return resolveFile(name, extension, getFolders(name));', 'return resolveFile(name, extension, getFolders());'),
+        ('IrisStructurePlacement', 'getBiomeLoader().load(key);', 'getBiomeLoader().load(key.trim());'),
+        ('IrisData', 'r = new ResourceLoader<>(dataFolder, this, rr.getFolderName(), rr.getTypeName(), registrant, options);', 'r = new ResourceLoader<>(dataFolder, this, "other", rr.getTypeName(), registrant, options);'),
         ('IrisObjectPlacementRunner', 'config.getForbiddenCollisions().contains(key) && !config.getAllowedCollisions().contains(key)', 'config.getForbiddenCollisions().contains(key) || !config.getAllowedCollisions().contains(key)'),
         ('IrisObjectPlacementRunner', 'String key = o.getLoadKey();', 'String key = o.getTypeName();'),
         ('Engine', 'object.startsWith("procedural/")', 'object.startsWith("generated/")'),

@@ -28,7 +28,7 @@ public final class StructurePlacements {
     public static String help(String field) {
         // The pinned annotation mentions prefixes, but the native resolver compares complete
         // normalized load keys and namespace suffixes. Keep the editor's guidance accurate.
-        if("caveBiomes".equals(field))return "Optional cave-biome allowlist for cave anchors. An empty list accepts any resolved cave biome. Native matching trims whitespace, ignores case and accepts namespace-qualified names; partial prefixes do not match.";
+        if("caveBiomes".equals(field))return "Optional cave-biome allowlist for cave anchors. An empty list accepts any resolved cave biome. Native matching trims whitespace, ignores case and accepts namespace-qualified names; partial prefixes do not match. Qualified selectors rejected by the raw, case-sensitive biomes: compatibility folder filter can follow unambiguous rename/move. Literal biomes: rewrites remain guarded because that raw lookup keeps the prefix.";
         return DATA.getProperty(field+".description","");
     }
     public static String defaultToken(String field) { String value=DATA.getProperty(field+".default");if (value==null) throw new IllegalArgumentException("Unsupported placement field");return value; }

@@ -268,16 +268,15 @@ final class ResourceOperation {
             if(!ResourceTypes.referenceKey(rawKey) || !rawKey.matches("[A-Za-z0-9_./-]+")){
                 issue(path,pointer,"Cave-biome key is outside certified ASCII comparison/lookup rules.");return;
             }
-            if(!namespace.isEmpty()){
-                String base=namespace.substring(0,namespace.length()-1);
-                if(base.equalsIgnoreCase(key(source.plan.source())+".json") || source.plan.target()!=null && base.equalsIgnoreCase(key(source.plan.target())+".json"))issue(path,pointer,"Qualified cave-biome compatibility lookup could depend on an affected Windows base file; operation blocked.");
-            }
             String normalized=rawKey.toLowerCase(Locale.ROOT);int before=refs.size();
             reference(path,document,node,pointer,"biomes",normalized,false,value.substring(0,first)+namespace,value.substring(last));
             if(refs.size()>before){
-                if(!namespace.isEmpty() && refs.getLast().replacement()!=null)issue(path,pointer,"Qualified cave-biome matching and its Windows compatibility lookup cannot both be maintained confidently. Choose a canonical local key before this operation.");
+                if(!namespace.isEmpty() && value.startsWith("biomes:") && refs.getLast().replacement()!=null)issue(path,pointer,"The raw biomes: compatibility lookup passes the native folder filter without stripping its prefix. Its Windows file/stream lookup cannot be rewritten confidently; choose a canonical local key before this operation.");
                 // Native content-gate reporting also loads the original untrimmed string.
-                // Qualified lookup strings stay unchanged; affected forms remain guarded above.
+                // All qualified forms not starting with the exact biomes: folder prefix are
+                // rejected before any file lookup; changing their suffix preserves that rejection.
+                // Literal biomes: rewrites remain guarded above. Unqualified raw lookups are
+                // checked independently, including case-sensitive dotted fallback.
                 String compatibilityKey=first==0 && last==value.length() && namespace.isEmpty()?rawKey:null;
                 caveComparisons.add(new CaveComparison(refs.getLast(),compatibilityKey,compatibilityKey==null?null:resolver.resolve("biomes",compatibilityKey)));
             }
