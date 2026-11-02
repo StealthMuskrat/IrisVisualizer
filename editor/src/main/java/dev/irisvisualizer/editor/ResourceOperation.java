@@ -9,7 +9,7 @@ import java.util.function.BooleanSupplier;
 
 /** Closed, source-audited typed-reference planning. Partial diagnostic reports never authorize an operation. */
 final class ResourceOperation {
-    static final int MAX_JSON_FILES=4096,MAX_JSON_BYTES=1_000_000,MAX_REFERENCES=16384,MAX_ISSUES=256,MAX_SNIPPET_LINKS=16384,MAX_SNIPPET_DEPTH=32;
+    static final int MAX_JSON_FILES=4096,MAX_JSON_BYTES=1_000_000,MAX_REFERENCES=16384,MAX_ISSUES=256,MAX_SNIPPET_LINKS=16384,MAX_SNIPPET_DEPTH=32,MAX_SYMBOLIC_IDS=16384,MAX_SYMBOLIC_CHARACTERS=1_000_000;
     static final long MAX_BYTES=64L*1024*1024,MAX_PATH_CHARACTERS=16_000_000;
     enum Mode {RENAME,MOVE,DELETE}
     record Plan(Mode mode,String source,String value,String target){boolean changes(){return mode==Mode.DELETE || !source.equals(target);}}
@@ -71,12 +71,13 @@ final class ResourceOperation {
         return SCHEMA.getProperty("owner."+family);
     }
     static String ownerDescriptor(String path){String metadata=SCHEMA.getProperty("metadata."+path);if(metadata!=null)return metadata;String model=ownerModel(path);return model==null?null:"object:"+model;}
-    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
+    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Canonical exact region filters and unambiguous carving fallback links are maintained. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
     static void check(BooleanSupplier cancelled){if(cancelled.getAsBoolean() || Thread.currentThread().isInterrupted())throw new CancellationException("Resource operation review cancelled");}
     private static byte[] copy(byte[] owned,BooleanSupplier cancelled){var bytes=new byte[owned.length];for(int i=0;i<bytes.length;i+=65536){check(cancelled);System.arraycopy(owned,i,bytes,i,Math.min(65536,bytes.length-i));}check(cancelled);return bytes;}
     private record Rewrite(JsonStructure.Node node,String value){}
+    private record ReservedKey(String path,String pointer,String family){}
     private static final class Scan {
-        final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<Rewrite>> rewrites=new TreeMap<>();final Map<String,Set<String>> imageMapUses=new TreeMap<>();final List<Reference> categoricalBiomes=new ArrayList<>();final Map<String,Set<String>> snippetEdges=new TreeMap<>();int omitted,inspected,snippetLinks;
+        final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<Rewrite>> rewrites=new TreeMap<>();final Map<String,Set<String>> imageMapUses=new TreeMap<>();final List<Reference> categoricalBiomes=new ArrayList<>();final Map<String,Set<String>> snippetEdges=new TreeMap<>();final Set<Reference> exactComparisons=new HashSet<>();final List<ReservedKey> reservedKeys=new ArrayList<>();final Set<String> carvingIds=new HashSet<>();int omitted,inspected,snippetLinks,symbolicCharacters;boolean incompleteCarvingIds;
         Scan(Source source,BooleanSupplier cancelled){this.source=source;this.cancelled=cancelled;resolver=new Resolver(source.paths,cancelled);issues.addAll(source.issues);}
         void issue(String path,String pointer,String detail){if(issues.size()<MAX_ISSUES)issues.add(new Issue(path,pointer,detail));else omitted++;}
         String string(JsonStructure.Snapshot snapshot,JsonStructure.Node node){return new LosslessJson(("{\"x\":"+snapshot.source().substring(node.start(),node.end())+"}").getBytes(StandardCharsets.UTF_8)).stringToken("x");}
@@ -84,8 +85,16 @@ final class ResourceOperation {
             reference(path,document,node,pointer,family,key,implicit,"","");
         }
         void reference(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String family,String key,boolean implicit,String prefix,String suffix){
-            if(key.isEmpty() || key.equals("null"))return;
             boolean block=family.equals("blocks");
+            if(key.isEmpty())return;
+            if(key.equals("null") && !block){
+                // Standard calls refuse this literal, but quiet native calls can load it.
+                if(affected(family)){
+                    if(refs.size()+reservedKeys.size()>=MAX_REFERENCES)issue(path,pointer,"Complete typed reference set exceeds 16,384 references.");
+                    else reservedKeys.add(new ReservedKey(path,pointer,family));
+                }
+                return;
+            }
             // Iris consults the custom-block loader before the vanilla registry for bare block strings.
             // Namespaced block IDs cannot name a local Windows resource path and remain untouched.
             if(block && key.contains(":"))return;
@@ -96,7 +105,7 @@ final class ResourceOperation {
             }
             String resolved=resolver.resolve(family,key);boolean incoming=source.plan.source().equals(resolved);
             String replacement=incoming && source.plan.mode()!=Mode.DELETE && !implicit?key(source.plan.target()):null;
-            if(refs.size()>=MAX_REFERENCES){issue(path,pointer,"Complete typed reference set exceeds 16,384 references.");return;}
+            if(refs.size()+reservedKeys.size()>=MAX_REFERENCES){issue(path,pointer,"Complete typed reference set exceeds 16,384 references.");return;}
             refs.add(new Reference(path,pointer,family,key,resolved,replacement,implicit));
             if(incoming){
                 if(implicit)issue(path,pointer,"An omitted setting implicitly references this resource. Set an explicit value before this operation; absent defaults are never materialized by resource maintenance.");
@@ -124,13 +133,26 @@ final class ResourceOperation {
             return null;
         }
         void mapUse(String map,String application){if(!Set.of("BIOME","REGION","SURFACE_BLOCK","TERRAIN_HEIGHT","MASK","CUSTOM","SCALAR").contains(application))application="UNKNOWN";String resolved=resolver.resolve("image-maps",map);if(resolved!=null)imageMapUses.computeIfAbsent(resolved,p->new TreeSet<>()).add(application);}
-        // Every frozen owner is parsed before this pass. Binding roles and scalar consumers are collected before labels.
-        void collectImageMapUses(JsonStructure.Snapshot document,int id,String type){
+        // Frozen owners contribute binding roles, scalar map consumers and carving IDs before reference classification.
+        void collectContexts(String path,JsonStructure.Snapshot document,int id,String type){
             check(cancelled);var current=document.node(id);
             if(current.kind()==JsonStructure.Kind.NULL)return;
-            if(type.startsWith("list:") && current.kind()==JsonStructure.Kind.ARRAY){for(int child:current.children())collectImageMapUses(document,child,type.substring(5));return;}
+            if(type.startsWith("list:") && current.kind()==JsonStructure.Kind.ARRAY){for(int child:current.children())collectContexts(path,document,child,type.substring(5));return;}
             if(!type.startsWith("object:") || current.kind()!=JsonStructure.Kind.OBJECT)return;
             String model=type.substring(7);
+            if(model.equals("IrisDimensionCarvingEntry") && affected("biomes") && !incompleteCarvingIds){
+                var identifier=member(document,current,"id");
+                if(identifier!=null && identifier.kind()==JsonStructure.Kind.STRING){
+                    String value=string(document,identifier);
+                    if(!value.isBlank()){
+                        String normalized=value.trim();
+                        if(!carvingIds.contains(normalized)){
+                            if(carvingIds.size()>=MAX_SYMBOLIC_IDS || normalized.length()>MAX_SYMBOLIC_CHARACTERS-symbolicCharacters){incompleteCarvingIds=true;issue(path,document.pointer(identifier.id()).text(),"Complete carving-entry context exceeds 16,384 IDs or 1,000,000 UTF-16 characters; fallback biome reference maintenance is blocked.");}
+                            else{carvingIds.add(normalized);symbolicCharacters+=normalized.length();}
+                        }
+                    }
+                }
+            }
             if(model.equals("IrisImageMapBinding")){
                 var map=member(document,current,"map");var application=member(document,current,"application");
                 if(map!=null && map.kind()==JsonStructure.Kind.STRING)mapUse(string(document,map).trim(),application==null?"CUSTOM":application.kind()==JsonStructure.Kind.STRING?string(document,application):"UNKNOWN");
@@ -139,7 +161,7 @@ final class ResourceOperation {
             }
             for(int child:current.children()){
                 String field=document.node(child).segment();String childType=MODEL_FIELDS.getOrDefault(model,Set.of()).contains(field)?SCHEMA.getProperty(model+"."+field):null;
-                if(childType!=null)collectImageMapUses(document,child,childType);
+                if(childType!=null)collectContexts(path,document,child,childType);
             }
         }
         void categorical(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String families){
@@ -169,6 +191,37 @@ final class ResourceOperation {
             for(var ref:categoricalBiomes){
                 check(cancelled);if(!source.plan.source().equals(ref.resolved()) || poolKeys.isEmpty())continue;
                 if(poolKeys.size()!=1 || !poolKeys.contains(ref.key()))issue(ref.path(),ref.pointer(),"Categorical biome role uses exact region-pool spelling. Collapsing distinct loader aliases could change its inferred role; operation blocked.");
+            }
+        }
+        void exactKey(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String family){
+            if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Exact resource-name comparison is not a plain string.");return;}
+            if(!affected(family))return;
+            String value=string(document,node),resolved=resolver.resolve(family,value);
+            if(source.plan.source().equals(resolved) && !value.equals(key(source.plan.source())))issue(path,pointer,"Exact comparison uses a noncanonical loader alias; rewriting it could change string matching. Set an explicit canonical key before this operation.");
+            int before=refs.size();reference(path,document,node,pointer,family,value,false);
+            if(refs.size()>before)exactComparisons.add(refs.getLast());
+        }
+        void checkExactComparisons(){
+            if(source.plan.mode()==Mode.DELETE || exactComparisons.isEmpty())return;
+            String oldKey=key(source.plan.source());boolean alias=false;
+            for(var ref:refs){check(cancelled);if(source.plan.source().equals(ref.resolved()) && !exactComparisons.contains(ref) && !oldKey.equals(ref.key())){alias=true;break;}}
+            if(alias)for(var ref:exactComparisons){check(cancelled);if(source.plan.source().equals(ref.resolved()))issue(ref.path(),ref.pointer(),"Incoming loader aliases would collapse to one replacement key and change an exact resource-name comparison; operation blocked.");}
+        }
+        void dualCarving(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer){
+            if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Carving entry-or-biome reference is not a plain string.");return;}
+            if(!affected("biomes") || incompleteCarvingIds)return;
+            String value=string(document,node);if(value.isBlank() || value.equals("null"))return; // This fallback uses the standard warning loader, not a quiet lookup.
+            boolean incoming=source.plan.source().equals(resolver.resolve("biomes",value));
+            if(incoming && source.plan.mode()!=Mode.DELETE){
+                if(carvingIds.contains(value))issue(path,pointer,"Carving value can name a dimension entry as well as this biome. A global rename/move cannot preserve both contexts; operation blocked.");
+                if(carvingIds.contains(key(source.plan.target())))issue(path,pointer,"Replacement biome key is a carving-entry ID in a known dimension/snippet context; entry lookup would take precedence over biome lookup.");
+            }
+            reference(path,document,node,pointer,"biomes",value,false);
+        }
+        void checkReservedKeys(Resolver next){
+            for(var ref:reservedKeys){
+                check(cancelled);String before=resolver.resolve(ref.family(),"null",true),after=next.resolve(ref.family(),"null",true);
+                if(source.plan.source().equals(before) || !Objects.equals(before,after))issue(ref.path(),ref.pointer(),"Literal null may be accepted by a quiet native lookup. Its file resolution would be affected; operation blocked until this lookup mode is certified.");
             }
         }
         void snippet(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String model,String pointer){
@@ -248,6 +301,8 @@ final class ResourceOperation {
                 }else categorical(path,document,node,pointer,families);
                 return;
             }
+            if(type.startsWith("exact-key:")){exactKey(path,document,node,pointer,type.substring(10));return;}
+            if(type.equals("dual-carving:biomes")){dualCarving(path,document,node,pointer);return;}
             if(type.startsWith("guard:")){
                 if(node.kind()!=JsonStructure.Kind.STRING)issue(path,pointer,"Runtime-comparison reference is not a plain string.");
                 else if(affected(type.substring(6)) && !string(document,node).isBlank())issue(path,pointer,"Runtime comparison, prefix or dual-domain reference is not certified for this resource family; operation blocked.");
@@ -283,7 +338,8 @@ final class ResourceOperation {
         Resolver(Set<String> paths,BooleanSupplier cancelled){int count=0;for(String path:new TreeSet<>(paths)){if((count++&4095)==0)check(cancelled);exact.put(path.toLowerCase(Locale.ROOT),path);int slash=path.indexOf('/');if(slash<0 || path.indexOf('/',slash+1)>=0)continue;String family=path.substring(0,slash),name=path.substring(slash+1),extension=extension(family);if(name.endsWith(extension))fallback.putIfAbsent(family+"/"+name.split("\\.",-1)[0]+extension,path);}}
         private static String extension(String family){return switch(family){case "objects"->".iob";case "images"->".png";default->".json";};}
         String exactPath(String path){return exact.get(path.toLowerCase(Locale.ROOT));}
-        String resolve(String family,String key){if(key==null || key.equals("null") || key.trim().isEmpty())return null;String extension=extension(family),wanted=family+"/"+key+extension;String path=exact.get(wanted.toLowerCase(Locale.ROOT));return path!=null?path:key.contains("/")?null:fallback.get(wanted);}
+        String resolve(String family,String key){return resolve(family,key,family.equals("blocks"));}
+        String resolve(String family,String key,boolean quiet){if(key==null || (!quiet && key.equals("null")) || key.trim().isEmpty())return null;String extension=extension(family),wanted=family+"/"+key+extension;String path=exact.get(wanted.toLowerCase(Locale.ROOT));return path!=null?path:key.contains("/")?null:fallback.get(wanted);}
     }
     static String resolve(Set<String> paths,String family,String key){return new Resolver(paths,()->false).resolve(family,key);}
     static String key(String path){String family=ResourceTypes.fileFamily(path);return path.substring(family.length()+1,path.length()-ResourceTypes.extension(path).length());}
@@ -304,13 +360,13 @@ final class ResourceOperation {
                 if(path.startsWith("snippet/") && document.node(0).kind()!=JsonStructure.Kind.OBJECT && document.node(0).kind()!=JsonStructure.Kind.NULL){scan.issue(path,"","Snippet payload root must be an object or null, not another indirection or container shape.");continue;}
                 scan.documents.put(path,document);
             }
-            for(var row:scan.documents.entrySet())scan.collectImageMapUses(row.getValue(),0,ownerDescriptor(row.getKey()));
+            for(var row:scan.documents.entrySet())scan.collectContexts(row.getKey(),row.getValue(),0,ownerDescriptor(row.getKey()));
             for(var row:scan.documents.entrySet()){
                 check(cancelled);scan.node(row.getKey(),row.getValue(),0,ownerDescriptor(row.getKey()),"");
             }
-            scan.checkSnippetGraph();scan.checkCategoricalComparisons();
+            scan.checkSnippetGraph();scan.checkCategoricalComparisons();scan.checkExactComparisons();
             var resulting=new TreeSet<>(source.paths);resulting.remove(source.plan.source());if(source.plan.target()!=null)resulting.add(source.plan.target());
-            var nextResolver=new Resolver(resulting,cancelled);if(source.plan.mode()!=Mode.DELETE)for(var reference:scan.refs){String expected=Objects.equals(reference.resolved(),source.plan.source())?source.plan.target():reference.resolved();String next=nextResolver.resolve(reference.family(),reference.replacement()==null?reference.key():reference.replacement());if(!Objects.equals(next,expected))scan.issue(reference.path(),reference.pointer(),"Operation would change another reference's resolution, including an unresolved or dotted-prefix alias.");}
+            var nextResolver=new Resolver(resulting,cancelled);scan.checkReservedKeys(nextResolver);if(source.plan.mode()!=Mode.DELETE)for(var reference:scan.refs){String expected=Objects.equals(reference.resolved(),source.plan.source())?source.plan.target():reference.resolved();String next=nextResolver.resolve(reference.family(),reference.replacement()==null?reference.key():reference.replacement());if(!Objects.equals(next,expected))scan.issue(reference.path(),reference.pointer(),"Operation would change another reference's resolution, including an unresolved or dotted-prefix alias.");}
         }
         var replacements=new TreeMap<String,byte[]>();if(scan.issues.isEmpty() && scan.omitted==0)for(var row:scan.rewrites.entrySet()){
             check(cancelled);var document=scan.documents.get(row.getKey());var text=new StringBuilder(document.source());var spans=new ArrayList<>(row.getValue());spans.sort(Comparator.comparingInt((Rewrite rewrite)->rewrite.node().start()).reversed());for(var rewrite:spans)text.replace(rewrite.node().start(),rewrite.node().end(),LosslessJson.quote(rewrite.value()));byte[] bytes=text.toString().getBytes(StandardCharsets.UTF_8);if(bytes.length>MAX_JSON_BYTES){scan.issue(row.getKey(),"","Rewritten JSON would exceed the 1 MB supported-source limit.");break;}new LosslessJson(bytes);replacements.put(row.getKey(),bytes);

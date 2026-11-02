@@ -26,6 +26,7 @@
     "generation/hydrology/IrisCoastalRiverGrottoConfig.java": "435d2a44b41293c2e99476aba62c7431fd03735082d3c8d59ba10e501d115a50",
     "command/IrisCommand.java": "8343fa1c960353d5fe22254252730c2a850da078cd36a44ae0cc3707a519feb4",
     "command/IrisCommandRegistry.java": "c5a7797f27829de90b11f574cff208a23f42078b6aa10f5a5f026be60a4ff08c",
+    "generation/runtime/IrisComplex.java": "97a6cc027a266041e7a9c16b6675b4dcaa2e7576528fd66c0f035d08fcdc7e13",
     "generation/decoration/coral/IrisCoral.java": "649c4f679e772b22522aa39146ba43cb65a58a110bf358489a7c9d4ad78680dd",
     "generation/decoration/coral/IrisCoralBranchAzimuth.java": "2075abb5838e170373430430c44a313be7ceb92bfb77b27d54a6337919a68add",
     "generation/decoration/coral/IrisCoralForm.java": "007facca464a74e3af4c53951a1ff562a615382b6951ad8cbd6e8a56df6bcfa4",

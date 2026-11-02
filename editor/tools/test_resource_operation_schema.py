@@ -63,8 +63,8 @@ assert values['IrisSurfaceRiverBedConfig.paddingPalette.implicit.count'] == '2'
 assert values['IrisDimension.upperDimension'] == 'sentinel-ref:dimensions|none'
 assert values['IrisStructurePlacement.structures'] == 'list:ref:structures'
 assert values['IrisStructurePlacement.caveBiomes'] == 'list:guard:biomes'
-assert values['IrisSubterrainFeature.allowedRegions'] == 'list:guard:regions'
-assert values['IrisFloatingChildBiomes.carving'] == 'guard:biomes'
+assert values['IrisSubterrainFeature.allowedRegions'] == 'list:exact-key:regions'
+assert values['IrisFloatingChildBiomes.carving'] == 'dual-carving:biomes'
 assert values['IrisDepositGenerator.includedBiomes'] == 'list:guard:biomes'
 assert values['IrisImageMapMask.map'] == 'string' # named binding, not a resource key
 assert values['IrisLoot.customNbt'] == 'opaque-object'
@@ -116,4 +116,9 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     loader = fixture / 'ResourceLoader.java'
     loader.write_text(sources['ResourceLoader'].replace('candidate.isFile()', 'candidate.exists()'))
     assert extract(fixture)[1] != manifest['sources']
+    loader.write_text(sources['ResourceLoader'])
+    assert '(x, z) -> regionStream.get(x, z).getLoadKey()' in sources['IrisComplex']
+    complex_source=fixture/'IrisComplex.java'
+    complex_source.write_text(sources['IrisComplex'].replace('(x, z) -> regionStream.get(x, z).getLoadKey()', '(x, z) -> regionStream.get(x, z).getName()'))
+    assert extract(fixture)[1]['generation/runtime/IrisComplex.java'] != manifest['sources']['generation/runtime/IrisComplex.java']
 print('PASS: ten-target/fifteen-owner/typed-snippet inherited/nested resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')

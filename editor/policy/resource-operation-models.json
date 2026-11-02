@@ -931,6 +931,7 @@
     "IrisCoastalRiverGrottoConfig": "generation/hydrology/IrisCoastalRiverGrottoConfig.java",
     "IrisCommand": "command/IrisCommand.java",
     "IrisCommandRegistry": "command/IrisCommandRegistry.java",
+    "IrisComplex": "generation/runtime/IrisComplex.java",
     "IrisCoral": "generation/decoration/coral/IrisCoral.java",
     "IrisCoralBranchAzimuth": "generation/decoration/coral/IrisCoralBranchAzimuth.java",
     "IrisCoralForm": "generation/decoration/coral/IrisCoralForm.java",

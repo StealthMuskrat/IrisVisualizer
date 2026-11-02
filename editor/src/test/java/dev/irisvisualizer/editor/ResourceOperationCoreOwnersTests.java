@@ -72,7 +72,7 @@ final class ResourceOperationCoreOwnersTests {
         check(rename(legacy,"dimensions/none.json","other").report.permitted(),"inactive none sentinel never binds to a same-named file");
         var sentinel=PackWorkspace.newPack(Map.of("dimensions/a.json",bytes("{\"upperDimension\":\"upper\"}"),"dimensions/upper.json",bytes("{}")));
         check(!rename(sentinel,"dimensions/upper.json","none").report.permitted(),"rename cannot turn active legacy dimension link into none sentinel");
-        for(String field:List.of("\"floatingChildBiomes\":[{\"carving\":\"forest\"}]","\"deposits\":[{\"includedBiomes\":[\"forest\"]}]","\"structures\":[{\"caveBiomes\":[\"forest\"]}]")){
+        for(String field:List.of("\"deposits\":[{\"includedBiomes\":[\"forest\"]}]","\"structures\":[{\"caveBiomes\":[\"forest\"]}]")){
             var guarded=PackWorkspace.newPack(Map.of("biomes/forest.json",bytes("{"+field+"}"),"objects/unused.iob",new byte[]{1}));
             check(!rename(guarded,"biomes/forest.json","other").report.permitted(),"nonempty dual-domain/prefix biome comparisons stay guarded");
             check(rename(guarded,"objects/unused.iob","other").report.permitted(),"family guard does not block unrelated object maintenance");
@@ -96,7 +96,7 @@ final class ResourceOperationCoreOwnersTests {
         var aliasRole=PackWorkspace.newPack(Map.of("dimensions/a.json",bytes("{\"regions\":[\"land\"],\"imageMaps\":[{\"map\":\"map\",\"application\":\"BIOME\"}]}"),"regions/land.json",bytes("{\"landBiomes\":[\"target\"],\"seaBiomes\":[\"TARGET\"]}"),"biomes/target.json",bytes("{}"),"image-maps/map.json",bytes("{\"fallbackTarget\":\"target\"}")));
         check(!rename(aliasRole,"biomes/target.json","other").report.permitted(),"categorical role cannot collapse previously unequal region-pool aliases into two matching native roles");
         var regionComparison=PackWorkspace.newPack(Map.of("dimensions/a.json",bytes("{\"subterrainFeatures\":[{\"allowedRegions\":[\"land\"]}]}"),"regions/land.json",bytes("{}")));
-        check(!rename(regionComparison,"regions/land.json","other").report.permitted(),"subterrain region comparisons retain their family guard");
+        check(rename(regionComparison,"regions/land.json","other").report.permitted(),"canonical exact region comparison now has certified reference maintenance");
         var nativeOnly=PackWorkspace.newPack(Map.of("dimensions/a.json",bytes("{\"imageMaps\":[{\"map\":\"map\",\"application\":\"SURFACE_BLOCK\"}]}"),"biomes/target.json",bytes("{}"),"image-maps/map.json",bytes("{\"colors\":{\"#ffffff\":\"target\"}}")));
         byte[] legend=nativeOnly.read("image-maps/map.json");ResourceOperationTests.apply(nativeOnly,ResourceOperation.Mode.RENAME,"biomes/target.json","other");check(Arrays.equals(legend,nativeOnly.read("image-maps/map.json")),"surface-block categories are native registry IDs, not pack biome aliases");
         var scalar=PackWorkspace.newPack(Map.of("dimensions/a.json",bytes("{\"imageMaps\":[{\"map\":\"map\",\"application\":\"BIOME\"}]}"),"biomes/target.json",bytes("{}"),"generators/a.json",bytes("{\"composite\":[{\"style\":{\"imageMap\":\"map\"}}]}"),"image-maps/map.json",bytes("{\"fallbackTarget\":\"target\"}")));
