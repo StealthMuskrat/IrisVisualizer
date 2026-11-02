@@ -101,14 +101,14 @@ final class AsyncWorkerFailureTests {
         }probe.stopped();check(pack.directory()==null && pack.dirty(),"copy/export never mark the captured workspace saved");
     }
     private static void saveAs(Path temp)throws Exception{
-        var pack=PackWorkspace.newPack(Map.of("blocks/a.json",bytes("before")));Path original=temp.resolve("worker-save-as-source");pack.save(original);pack.replace("blocks/a.json",bytes("after"));long saved=pack.saveRevision(),revision=pack.revision();int history=pack.undoCount();var probe=new Probe();var calls=new AtomicInteger();
+        var pack=PackWorkspace.newPack(Map.of("blocks/a.json",bytes("before")));Path original=temp.resolve("worker-save-as-source");pack.save(original);Path active=pack.directory();check(Files.isSameFile(active,original),"saved source has the expected filesystem identity");pack.replace("blocks/a.json",bytes("after"));long saved=pack.saveRevision(),revision=pack.revision();int history=pack.undoCount();var probe=new Probe();var calls=new AtomicInteger();
         try(var worker=new AsyncSaveAs((source,path,control,progress)->{var receipt=FolderCopies.copyForSaveAs(source,path,control,progress);if(calls.incrementAndGet()==1)throw exhausted();return receipt;},probe)){
             Path failedDirectory=temp.resolve("worker-save-as-failed"),retry=temp.resolve("worker-save-as-retry");worker.start(pack,failedDirectory);var failed=terminal(()->worker.poll(pack),s->worker.busy());
             check(failed.phase()==AsyncSaveAs.Phase.FAILED && failed.receipt()==null && failed.detail().contains("Publication had begun"),"Save As exposes postpublication memory failure without a receipt");probe.alive();
-            check(worker.finish(pack).phase()==AsyncSaveAs.Phase.FAILED && pack.directory().equals(original.toAbsolutePath().normalize()) && pack.saveRevision()==saved && pack.revision()==revision && pack.undoCount()==history && pack.dirty(),"failed Save As never adopts a destination or clears its old baseline/history");
+            check(worker.finish(pack).phase()==AsyncSaveAs.Phase.FAILED && pack.directory().equals(active) && pack.saveRevision()==saved && pack.revision()==revision && pack.undoCount()==history && pack.dirty(),"failed Save As never adopts a destination or clears its old baseline/history");
             check(Arrays.equals(PackWorkspace.open(failedDirectory).read("blocks/a.json"),bytes("after")),"failed adoption retains the published snapshot for manual inspection");
             worker.start(pack,retry);check(terminal(()->worker.poll(pack),s->worker.busy()).phase()==AsyncSaveAs.Phase.READY,"same Save As worker can publish a fresh explicit retry");
-            check(worker.finish(pack).phase()==AsyncSaveAs.Phase.ADOPTED && pack.directory().equals(retry.toAbsolutePath().normalize()) && !pack.dirty() && pack.undoCount()==history,"only successful current receipt adopts its baseline");
+            check(worker.finish(pack).phase()==AsyncSaveAs.Phase.ADOPTED && pack.directory().equals(retry.toRealPath()) && !pack.dirty() && pack.undoCount()==history,"only successful current receipt adopts its baseline");
         }probe.stopped();
     }
     private static void obsoleteFailure(Path source)throws Exception{
