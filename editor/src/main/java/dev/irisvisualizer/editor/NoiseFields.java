@@ -44,6 +44,7 @@ public final class NoiseFields {
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
     public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
+    public static byte[] reset(String path,byte[] original,Target target,String field){authorize(path,target,field);return editObject(original,target,object->PinnedNumbers.reset(object,DEFINITIONS,field),false);}
     public static String constraints(String field) {
         if ("long".equals(DEFINITIONS.getProperty(field + ".type"))) return "Signed 64-bit integer (exact)";
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");

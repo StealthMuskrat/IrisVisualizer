@@ -36,6 +36,7 @@ public final class GeneratorFields {
         return PinnedNumbers.edit(new LosslessJson(original),DEFINITIONS,field,input);
     }
     public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
+    public static byte[] reset(String path,byte[] original,String field){authorize(path,field);return PinnedNumbers.reset(new LosslessJson(original),DEFINITIONS,field);}
     public static byte[] editBoolean(String path, byte[] original, String field, boolean value) {
         authorize(path, field); if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");
         return new LosslessJson(original).boolPath(field, value);

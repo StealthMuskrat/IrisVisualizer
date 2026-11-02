@@ -147,6 +147,7 @@ public final class WorkspaceTests {
         ResourceOperationObjectCollisionTests.run(temp);
         NumericBoundsTests.run();
    PinnedNumbersTests.run(temp);
+   ScalarDefaultTests.run(temp);
         NumericChoicesTests.run();
    EmptyFolderTests.run(temp);
    PackReferenceAuditTests.run(temp);

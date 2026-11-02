@@ -39,6 +39,7 @@ public final class Terrain3DFields {
     }
     public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
+    public static byte[] reset(String path,byte[] original,String field){authorize(path,field);return new LosslessJson(original).objectEdit("terrain3D",object->PinnedNumbers.reset(object,DEFINITIONS,field),false);}
     public static String constraints(String field) {
         if ("long".equals(DEFINITIONS.getProperty(field+".type"))) return "Signed 64-bit integer (exact)";
         return "Finite number, minimum "+DEFINITIONS.getProperty(field+".minimum")+", maximum "+DEFINITIONS.getProperty(field+".maximum");

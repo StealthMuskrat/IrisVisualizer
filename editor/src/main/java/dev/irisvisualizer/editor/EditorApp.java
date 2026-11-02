@@ -768,6 +768,7 @@ public final class EditorApp extends Application {
                                 try { workspace.replace(selected, DimensionFields.editBoolean(selected, workspace.read(selected), field, !token.equals("true"))); error = null; }
                                 catch (Exception failure) { error = failure.getMessage(); }
                             }
+                            drawScalarDefault(field,DimensionFields.defaultToken(field),()->workspace.replace(selected,DimensionFields.reset(selected,workspace.read(selected),field)));
                             continue;
                         }
                         if(!DimensionFields.numericSupported(field,token)){ImGui.textWrapped(field+": unsupported stored numeric type, width or token limit (read-only)");continue;}
@@ -781,6 +782,7 @@ public final class EditorApp extends Application {
                             try { workspace.replace(selected, DimensionFields.editText(selected, workspace.read(selected), field, input.get())); drafts.applied(field); values.remove(field); error = null; }
                             catch (Exception failure) { error = failure.getMessage(); }
                         }
+                        drawScalarDefault(field,DimensionFields.defaultToken(field),()->workspace.replace(selected,DimensionFields.reset(selected,workspace.read(selected),field)));
                     }
                     drawBlockFallbacks(document);
                     drawStaticObjects(document);
@@ -1449,6 +1451,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
+            if(token!=null && !RegionFields.arrayField(field) && RegionFields.numericSupported(field,token))drawScalarDefault(key,RegionFields.defaultToken(field),()->workspace.replace(selected,RegionFields.reset(selected,workspace.read(selected),field)));
             ImGui.popID();
         }
         drawCaveProfile(document);
@@ -1490,6 +1493,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
+            if(token!=null && (GeneratorFields.booleanField(field)?token.equals("true") || token.equals("false"):GeneratorFields.numericSupported(field,token)))drawScalarDefault(key,GeneratorFields.defaultToken(field),()->workspace.replace(selected,GeneratorFields.reset(selected,workspace.read(selected),field)));
             ImGui.popID();
         }
         if (ImGui.collapsingHeader("Interpolation method")) drawInterpolation(document);
@@ -1575,6 +1579,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
+            if(token!=null && (NoiseFields.booleanField(field)?token.equals("true") || token.equals("false"):NoiseFields.numericSupported(field,token)))drawScalarDefault(key,NoiseFields.defaultToken(field),()->workspace.replace(selected,NoiseFields.reset(selected,workspace.read(selected),target,field)));
             ImGui.popID();
         }
         if (ImGui.treeNode("Style settings##" + target.draftPrefix())) {
@@ -1669,6 +1674,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
+            if(token!=null && !field.equals("style") && NoiseStyleFields.numericSupported(field,token))drawScalarDefault(key,NoiseStyleFields.defaultToken(field),()->workspace.replace(selected,NoiseStyleFields.reset(selected,workspace.read(selected),target,field)));
             ImGui.popID();
         }
         drawStyleSources(style,target);
@@ -1766,6 +1772,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
+            if(token!=null && (BiomeFields.booleanField(field)?token.equals("true") || token.equals("false"):BiomeFields.numericSupported(field,token)))drawScalarDefault(key,BiomeFields.defaultToken(field),()->workspace.replace(selected,BiomeFields.reset(selected,workspace.read(selected),field)));
             ImGui.popID();
         }
         drawBiomeDerivatives(document);
@@ -6184,6 +6191,10 @@ public final class EditorApp extends Application {
             values.keySet().removeIf(key -> key.startsWith(prefix)); error = null;
         }
     }
+    private void drawScalarDefault(String key,String defaultToken,InspectorDrafts.Change action){
+        if(ImGui.smallButton("Use Iris default##"+key))commitRiverOverride(key,action);
+        if(ImGui.isItemHovered())ImGui.setTooltip("Remove this stored override and use Iris default: "+InspectorText.label(defaultToken,128)+". Other settings and drafts stay unchanged.");
+    }
     private void commitRiverOverride(String key, InspectorDrafts.Change action) {
         try { action.run(); drafts.applied(key); values.remove(key); error = null; }
         catch (Exception failure) { error = failure.getMessage(); }
@@ -6473,6 +6484,7 @@ public final class EditorApp extends Application {
                     catch (Exception failure) { error = failure.getMessage(); }
                 }
             }
+            if(token!=null && (Terrain3DFields.booleanField(field)?token.equals("true") || token.equals("false"):Terrain3DFields.numericSupported(field,token)))drawScalarDefault(key,Terrain3DFields.defaultToken(field),()->workspace.replace(selected,Terrain3DFields.reset(selected,workspace.read(selected),field)));
             ImGui.popID();
         }
         for (String field : NoiseStyleFields.TERRAIN_FIELDS) {
@@ -6537,6 +6549,15 @@ public final class EditorApp extends Application {
                     workspace.replace(selected, BiomeGeneratorLinks.rangeText(selected, workspace.read(selected), index, minimum.get(), maximum.get()));
                     drafts.applied(minKey); drafts.applied(maxKey); values.remove(minKey); values.remove(maxKey); error = null;
                 } catch (Exception failure) { error = failure.getMessage(); }
+            }
+            if(minimumToken!=null || maximumToken!=null){
+                if(ImGui.smallButton("Use height defaults")){
+                    try{
+                        workspace.replace(selected,BiomeFields.resetGeneratorRange(selected,workspace.read(selected),index));
+                        drafts.applied(minKey);drafts.applied(maxKey);values.remove(minKey);values.remove(maxKey);error=null;
+                    }catch(Exception failure){error=failure.getMessage();}
+                }
+                if(ImGui.isItemHovered())ImGui.setTooltip("Remove the two stored heights and use Iris defaults: "+BiomeFields.generatorDefault("min")+" / "+BiomeFields.generatorDefault("max")+". Other link data and drafts stay unchanged.");
             }
             ImGui.popID(); ImGui.separator();
         }

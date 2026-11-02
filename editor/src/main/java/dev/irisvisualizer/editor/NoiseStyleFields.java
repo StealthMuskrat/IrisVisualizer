@@ -277,6 +277,14 @@ public final class NoiseStyleFields {
         if (!Double.isFinite(value) || (min != null && value < Double.parseDouble(min)) || (max != null && value > Double.parseDouble(max)))
             throw new IllegalArgumentException("Value violates pinned Iris style constraints");
     }
+    public static byte[] reset(String path,byte[] original,Target target,String field){
+        authorize(path,target,field);if(field.equals("style"))throw new IllegalArgumentException("Use the base style picker");
+        return editContainer(original,target,container->container.objectEdit(target.member(),style->{
+            if(style.token(field)==null)return style.sourceBytes();
+            double value=Double.parseDouble(defaultToken(field));validateNumber(target,field,value);validateCellularChange(style,target,field,value);
+            return PinnedNumbers.reset(style,DEFINITIONS,field);
+        },false),false);
+    }
     private static double numericOrDefault(LosslessJson style, String field) {
         String token = style.token(field);
         try { return Double.parseDouble(token == null ? defaultToken(field) : token); }

@@ -38,6 +38,7 @@ public final class BiomeFields {
     }
     public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
     public static byte[] editText(String path,byte[] original,String field,String input){authorize(path,field);return PinnedNumbers.edit(new LosslessJson(original),DEFINITIONS,field,input);}
+    public static byte[] reset(String path,byte[] original,String field){authorize(path,field);return PinnedNumbers.reset(new LosslessJson(original),DEFINITIONS,field);}
     public static byte[] editBoolean(String path, byte[] original, String field, boolean value) {
         authorize(path, field); if (!booleanField(field)) throw new IllegalArgumentException("Numeric field requires a number");
         return new LosslessJson(original).bool(field, value);
@@ -53,6 +54,17 @@ public final class BiomeFields {
         if(new java.math.BigDecimal(minimum).compareTo(new java.math.BigDecimal(maximum))>0)throw new IllegalArgumentException("Generator minimum must not exceed maximum");
     }
     public static boolean generatorNumberSupported(String field,String token){return Set.of("min","max").contains(field) && PinnedNumbers.supported(DEFINITIONS,"generators."+field,token);}
+    public static byte[] resetGeneratorRange(String path,byte[] original,int index){
+        if(!biome(path))throw new IllegalArgumentException("Resource is read-only");
+        return new LosslessJson(original).objectArrayEdit("generators",index,object->{
+            byte[] next=object.sourceBytes();
+            for(String field:List.of("min","max")){
+                var current=new LosslessJson(next);String token=current.token(field);
+                if(token!=null){if(!generatorNumberSupported(field,token))throw new IllegalArgumentException("Stored generator height stays read-only");next=current.removeField(field);}
+            }
+            return next;
+        });
+    }
     public static byte[] generatorRangeText(String path,byte[] original,int index,String minimum,String maximum){
         if(!biome(path))throw new IllegalArgumentException("Resource is read-only");validateGeneratorRange(minimum,maximum);
         return new LosslessJson(original).objectArrayEdit("generators",index,object->{

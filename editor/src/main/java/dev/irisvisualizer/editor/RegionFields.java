@@ -35,6 +35,7 @@ public final class RegionFields {
     }
     public static boolean numericSupported(String field,String token){return EDITABLE.contains(field) && PinnedNumbers.supported(DEFINITIONS,field,token);}
     public static byte[] editText(String path,byte[] original,String field,String input){authorize(path,field);return PinnedNumbers.edit(new LosslessJson(original),DEFINITIONS,field,input);}
+    public static byte[] reset(String path,byte[] original,String field){authorize(path,field);return PinnedNumbers.reset(new LosslessJson(original),DEFINITIONS,field);}
     public static List<String> biomeKeys(PackWorkspace workspace) {
         return ResourceTypes.referenceKeys(workspace,"biomes");
     }

@@ -204,6 +204,8 @@ public final class LosslessJson {
     }
     public byte[] integerPath(String path, long value) { return updatePath(path, (doc, field) -> doc.integer(field, value), false); }
     public byte[] numberPath(String path, double value) { return updatePath(path, (doc, field) -> doc.number(field, value), false); }
+    /** Removes one known object member; callers own authorization and absent/type checks. Parents are retained. */
+    byte[] removePath(String path){return updatePath(path,(doc,field)->doc.removeField(field),false);}
     /** Exact numeric-token splice; owning UI helpers remain responsible for native type/width/bounds. */
     byte[] numberTokenPath(String path,String value){return updatePath(path,(doc,field)->{
         String previous=doc.token(field);
