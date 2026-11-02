@@ -1,5 +1,5 @@
 """Deferred lexical-inventory regression contracts; no Java execution is involved."""
-from java_model_inventory import inventory
+from java_model_inventory import inventory, annotation_arguments
 
 source = r'''
 package example;
@@ -23,6 +23,9 @@ class Owner extends Parent {
 '''
 model = inventory(source, 'Owner')
 assert model.parent == 'Parent' and not model.custom_noarg
+assert annotation_arguments(model.annotations,'Description') == ('"class Wrong {;}"',)
+assert annotation_arguments('@Description("""@Snippet("fake")""")@Snippet("style")','Snippet') == ('"style"',)
+assert annotation_arguments('@Description("""@Snippet("fake")""")','Snippet') is None
 assert [f.name for f in model.fields] == ['retained','packageField','interleaved','annotated','map','array']
 assert model.fields[0].default == '"text // literal /* literal */"'
 assert '@Required' in model.fields[2].annotations

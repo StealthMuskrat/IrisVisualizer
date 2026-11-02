@@ -4,7 +4,7 @@ The Java inventory is lexical. Only rules below authorize resource-reference sem
 from dataclasses import asdict, dataclass
 from pathlib import Path
 import hashlib, json, re, sys
-from java_model_inventory import inventory, tokens, matching
+from java_model_inventory import inventory, tokens, matching, annotation_arguments
 
 POLICY = json.loads((Path(__file__).resolve().parents[1]/'policy/resource-operation-models.json').read_text())
 FILES = POLICY['files']
@@ -13,6 +13,10 @@ ENUMS = {name for name, row in POLICY['classes'].items() if row['kind']=='enum'}
 ROOTS = {'dimensions':'IrisDimension','regions':'IrisRegion','biomes':'IrisBiome',
          'structures':'IrisStructure','jigsaw-pools':'IrisJigsawPool','jigsaw-pieces':'IrisJigsawPiece',
          'generators':'IrisGenerator','expressions':'IrisExpression','image-maps':'IrisImageMap','blocks':'IrisBlockData'}
+READ_ONLY_ROOTS = {'loot':'IrisLootTable','spawners':'IrisSpawner','entities':'IrisEntity','markers':'IrisMarker','mods':'IrisMod'}
+OWNERS = ROOTS | READ_ONLY_ROOTS
+# Exact root ordering document, outside every loader/snippet root. Strings cannot encode typed pack lookups.
+METADATA = {'Schema.json':'list:string'}
 REFS = {model:family for family,model in ROOTS.items()} | {'IrisObject':'objects','IrisImage':'images'}
 # An annotation alone does not establish loader semantics. These exceptions are audited in the pinned source.
 OVERRIDES = {
@@ -37,7 +41,7 @@ OVERRIDES = {
  'IrisObjectPlacement.allowedCollisions':'list:guard:objects',
  'IrisObjectPlacement.forbiddenCollisions':'list:guard:objects',
 }
-FOREIGN_REFS = {'IrisSpawner','IrisLootTable','IrisMarker'}
+FOREIGN_REFS = set(READ_ONLY_ROOTS.values())
 NUMBERS = {'int','long','double','float','Integer','Long','Double','Float','short','byte','Short','Byte'}
 
 def source_path(root,name,relative):
@@ -48,19 +52,34 @@ def source_path(root,name,relative):
  return root/'core/src/main/java/art/arcane/iris'/relative
 
 def fingerprint(model):
- data={'kind':model.kind,'parent':model.parent,'customNoarg':model.custom_noarg,'fields':[asdict(f) for f in model.fields]}
+ data={'kind':model.kind,'parent':model.parent,'customNoarg':model.custom_noarg,'annotations':model.annotations,'fields':[asdict(f) for f in model.fields]}
  return hashlib.sha256(json.dumps(data,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+
+def owner_folder(text):
+ """Bind the owner route to the actual literal loader folder getter, not a guessed plural."""
+ items=tokens(text);found=[]
+ for i,t in enumerate(items):
+  if i<1 or t.value!='getFolderName' or items[i-1].value!='String':continue
+  body=[v.value for v in items[i+1:i+8]]
+  if len(body)==7 and body[:4]==['(',')','{','return'] and body[5:]==[';','}']:
+   found.append(json.loads(body[4]))
+ assert len(found)==1,'Unreviewed resource-owner folder getter'
+ return found[0]
 
 def descriptor(owner,field,texts):
  qualified=owner+'.'+field.name
  kind=field.type
  array=re.fullmatch(r'KList<(.+)>',kind)
  element=array[1] if array else kind
- ref=re.search(r'@RegistryListResource\((\w+)\.class\)',field.annotations)
+ ref_args=annotation_arguments(field.annotations,'RegistryListResource')
+ ref=None
+ if ref_args is not None:
+  assert len(ref_args)==3 and ref_args[1:]==('.', 'class'),'Unreviewed resource annotation: '+qualified
+  ref=ref_args[0]
  if ref:
   assert element=='String','Unsupported resource representation: '+qualified
-  assert ref[1] in REFS or ref[1] in FOREIGN_REFS,'Unreviewed resource family: '+qualified
-  result='ref:'+REFS[ref[1]] if ref[1] in REFS else 'string'
+  assert ref in REFS or ref in FOREIGN_REFS,'Unreviewed resource family: '+qualified
+  result='ref:'+REFS[ref] if ref in REFS else 'string'
  elif element in MODELS:result='object:'+element
  elif element in ENUMS or element=='String':result='string'
  elif element in NUMBERS:result='number'
@@ -72,6 +91,9 @@ def descriptor(owner,field,texts):
  elif element=='KMap<String,String>':result='map:string' # Native IDs/settings, no local resource lookup.
  else:result='unsupported:'+element
  if array:result='list:'+result
+ if owner.startswith('IrisMod') and ref and ref in REFS:
+  result=('list:' if array else '')+'guard:'+REFS[ref]
+ if qualified=='IrisMod.forDimension':result='guard:dimensions'
  return OVERRIDES.get(qualified,result)
 
 def families(kind,potential):
@@ -155,6 +177,7 @@ def extract(root):
   assert fingerprint(model)==row['declarationSha256'],'Changed serialized declaration/default/annotation: '+name
   assert not model.custom_noarg,'Custom no-arg constructor needs explicit default policy: '+name
   models[name]=model
+ for family,model in OWNERS.items():assert owner_folder(texts[model])==family,'Changed resource-owner folder: '+model
  # Inherited members are inventoried with the same rules. Shadowing would make JSON/default semantics ambiguous.
  merged={}
  def fields(name,active=()):
@@ -166,10 +189,18 @@ def extract(root):
     inherited[f.name]=(name,f)
    merged[name]=inherited
   return merged[name]
- result={'root.'+family:model for family,model in ROOTS.items()};definitions={}
+ result={'root.'+family:model for family,model in ROOTS.items()} | {'owner.'+family:model for family,model in OWNERS.items()} | {'metadata.'+path:kind for path,kind in METADATA.items()};definitions={}
+ for name in sorted(MODELS):
+  snippet=annotation_arguments(models[name].annotations,'Snippet')
+  if snippet is not None:
+   assert len(snippet)==1,'Unreviewed snippet annotation: '+name
+   label=json.loads(snippet[0]);assert re.fullmatch(r'[a-z0-9-]+',label),'Unsupported snippet kind'
+   assert 'snippet.'+label not in result,'Ambiguous snippet owner kind: '+label
+   result['snippet.'+label]=name;result[name+'.snippet']=label
  for name in sorted(MODELS):
   definitions[name]={}
   for field,(owner,f) in fields(name).items():
+   assert field not in {'fields','snippet'},'Serialized field collides with schema control metadata: '+name+'.'+field
    kind=descriptor(owner,f,texts);definitions[name][field]=(f,kind)
    result[name+'.'+field]=kind
   result[name+'.fields']=','.join(definitions[name])

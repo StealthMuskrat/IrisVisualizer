@@ -24,6 +24,7 @@ class Model:
     parent: str | None
     fields: tuple[Field, ...]
     custom_noarg: bool
+    annotations: str
 
 TOKEN = re.compile(r'//[^\n]*|/\*.*?\*/|""".*?"""|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[A-Za-z_$][\w$]*|\d+(?:[\w.]*\d)?|[^\s]', re.S)
 MODIFIERS = {'public','protected','private','static','transient','final','volatile','synchronized','abstract','native','strictfp','default'}
@@ -51,6 +52,23 @@ def strip_annotations(items):
         if i<len(items) and items[i].value=='(':i=matching(items,i)+1
         annotations.append(''.join(t.value for t in items[start:i]))
     return items[i:],''.join(annotations)
+
+def annotation_arguments(source,wanted):
+    """Read one top-level annotation without matching annotation-like text inside a literal."""
+    items=tokens(source);i=0;found=None
+    while i<len(items):
+        if items[i].value!='@':raise ValueError('Invalid annotation inventory')
+        i+=1
+        if i>=len(items):raise ValueError('Incomplete annotation type')
+        name=items[i].value;i+=1
+        while i+1<len(items) and items[i].value=='.':name+='.'+items[i+1].value;i+=2
+        args=()
+        if i<len(items) and items[i].value=='(':
+            end=matching(items,i);args=tuple(t.value for t in items[i+1:end]);i=end+1
+        if name.split('.')[-1]==wanted:
+            if found is not None:raise ValueError('Duplicate annotation: '+wanted)
+            found=args
+    return found
 
 def preamble(items):
     modifiers=[];annotations=''
@@ -92,13 +110,15 @@ def inventory(text,name):
     pos=next((i for i,t in enumerate(items[:-1]) if t.value in ['class','enum','record','interface'] and items[i+1].value==name and (i==0 or items[i-1].value!='.')),None)
     if pos is None:raise ValueError('Primary Java declaration not found: '+name)
     kind=items[pos].value
+    boundary=max((i for i in range(pos) if items[i].value==';'),default=-1)
+    _,annotations,_=preamble(items[boundary+1:pos])
     opening=next(i for i in range(pos+2,len(items)) if items[i].value=='{')
     header=items[pos+2:opening];parent=None
     for i,t in enumerate(header[:-1]):
         if t.value=='extends':parent=header[i+1].value;break
     if header and header[0].value=='<':raise ValueError('Generic model needs an explicit serialization policy: '+name)
     if kind=='record':raise ValueError('Record serialization needs an explicit adapter policy: '+name)
-    if kind in ['enum','interface']:return Model(name,kind,parent,(),False)
+    if kind in ['enum','interface']:return Model(name,kind,parent,(),False,annotations)
     fields=[];custom_noarg=False;depth=1;start=opening+1;i=start
     while i<len(items) and depth:
         value=items[i].value
@@ -120,4 +140,4 @@ def inventory(text,name):
         i+=1
     if depth:raise ValueError('Incomplete primary Java class: '+name)
     if len({f.name for f in fields})!=len(fields):raise ValueError('Duplicate serialized Java field: '+name)
-    return Model(name,kind,parent,tuple(fields),custom_noarg)
+    return Model(name,kind,parent,tuple(fields),custom_noarg,annotations)

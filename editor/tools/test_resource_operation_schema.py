@@ -30,6 +30,27 @@ assert len([k for k in values if k.startswith('root.')]) == 10
 assert values['root.dimensions'] == 'IrisDimension'
 assert values['root.regions'] == 'IrisRegion'
 assert values['root.biomes'] == 'IrisBiome'
+assert len([k for k in values if k.startswith('owner.')]) == 15
+assert values['owner.loot'] == 'IrisLootTable'
+assert values['owner.spawners'] == 'IrisSpawner'
+assert values['owner.entities'] == 'IrisEntity'
+assert values['owner.markers'] == 'IrisMarker'
+assert values['owner.mods'] == 'IrisMod'
+assert not any('root.'+f in values for f in ['loot','spawners','entities','markers','mods','snippet'])
+assert values['metadata.Schema.json'] == 'list:string'
+assert len([k for k in values if k.startswith('snippet.')]) == 73
+assert values['snippet.style'] == 'IrisGeneratorStyle'
+assert values['IrisGeneratorStyle.snippet'] == 'style'
+assert values['snippet.object-block-replacer'] == 'IrisObjectReplace'
+assert values['IrisMod.forDimension'] == 'guard:dimensions'
+assert values['IrisMod.removeObjects'] == 'list:guard:objects'
+assert values['IrisModObjectPlacementRegionInjector.biome'] == 'guard:regions'
+assert values['IrisMod.blockReplacers'] == 'list:object:IrisObjectReplace'
+assert values['IrisModNoiseStyleReplacer.replace'] == 'object:IrisGeneratorStyle'
+assert values['IrisEntity.passengers'] == 'list:object:IrisEntity'
+assert values['IrisEntitySpawn.entity'] == 'string'
+assert values['IrisLootTable.loot'] == 'list:object:IrisLoot'
+
 assert values['IrisTreeSettings.fields'] == 'enabled,mode'
 assert values['IrisBiomeGeneratorLink.generator'] == 'fallback-ref:generators|default'
 assert values['IrisBiome.generators.implicit.0'] == 'generators|0/generator|default'
@@ -77,6 +98,8 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
         ('IrisDimension', 'private String upperDimension = "none";', 'private String upperDimension = "upper";'),
         ('IrisBiomePaletteLayer', 'new IrisBlockData("GRASS_BLOCK")', 'new IrisBlockData("DIRT")'),
         ('IrisImageMapBinding', '@RegistryListResource(IrisImageMap.class)', ''),
+        ('IrisGeneratorStyle', '@Snippet("style")', '@Snippet("other")'),
+        ('IrisLootTable', 'return "loot";', 'return "loots";'),
     ]:
         assert old in sources[name], old
         changed = fixture / (name + '.java')
@@ -93,4 +116,4 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     loader = fixture / 'ResourceLoader.java'
     loader.write_text(sources['ResourceLoader'].replace('candidate.isFile()', 'candidate.exists()'))
     assert extract(fixture)[1] != manifest['sources']
-print('PASS: ten-owner inherited/nested resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')
+print('PASS: ten-target/fifteen-owner/typed-snippet inherited/nested resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')

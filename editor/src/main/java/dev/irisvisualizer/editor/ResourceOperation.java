@@ -9,7 +9,7 @@ import java.util.function.BooleanSupplier;
 
 /** Closed, source-audited typed-reference planning. Partial diagnostic reports never authorize an operation. */
 final class ResourceOperation {
-    static final int MAX_JSON_FILES=4096,MAX_JSON_BYTES=1_000_000,MAX_REFERENCES=16384,MAX_ISSUES=256;
+    static final int MAX_JSON_FILES=4096,MAX_JSON_BYTES=1_000_000,MAX_REFERENCES=16384,MAX_ISSUES=256,MAX_SNIPPET_LINKS=16384,MAX_SNIPPET_DEPTH=32;
     static final long MAX_BYTES=64L*1024*1024,MAX_PATH_CHARACTERS=16_000_000;
     enum Mode {RENAME,MOVE,DELETE}
     record Plan(Mode mode,String source,String value,String target){boolean changes(){return mode==Mode.DELETE || !source.equals(target);}}
@@ -46,13 +46,37 @@ final class ResourceOperation {
         Map<String,byte[]> transfer(){if(replacements==null)throw new IllegalStateException("Resource operation already consumed");var result=replacements;replacements=null;return result;}
     }
     private static final Properties SCHEMA=new Properties();
-    static {try(var input=ResourceOperation.class.getResourceAsStream("/resource-operation-schema.properties")){if(input==null)throw new IOException("Missing typed resource operation schema");SCHEMA.load(input);}catch(IOException failure){throw new ExceptionInInitializerError(failure);}}
+    private static final Map<String,Set<String>> MODEL_FIELDS;
+    static {
+        try(var input=ResourceOperation.class.getResourceAsStream("/resource-operation-schema.properties")){if(input==null)throw new IOException("Missing typed resource operation schema");SCHEMA.load(input);}catch(IOException failure){throw new ExceptionInInitializerError(failure);}
+        var fields=new HashMap<String,Set<String>>();
+        for(String property:SCHEMA.stringPropertyNames())if(property.endsWith(".fields")){
+            String value=SCHEMA.getProperty(property);fields.put(property.substring(0,property.length()-7),value.isEmpty()?Set.of():Set.copyOf(Arrays.asList(value.split(",",-1))));
+        }
+        MODEL_FIELDS=Map.copyOf(fields);
+    }
     static boolean targetFamily(String family){return family!=null && (SCHEMA.getProperty("root."+family)!=null || Set.of("objects","images").contains(family));}
+    /** Reference ownership is broader than editable file-operation targets. */
+    static String ownerModel(String path){
+        String family=ResourceTypes.base(path);if(family!=null)return SCHEMA.getProperty("owner."+family);
+        if(path==null || !path.endsWith(".json"))return null;
+        int slash=path.indexOf('/');if(slash<1)return null;family=path.substring(0,slash);
+        if(family.equals("dimensions"))return null; // Never certify nested dimension files as valid owners.
+        if(family.equals("snippet")){
+            int kindEnd=path.indexOf('/',slash+1);if(kindEnd<0)return null;
+            String key=path.substring(kindEnd+1,path.length()-5);
+            if(!ResourceTypes.referenceKey(key) || !key.matches("[A-Za-z0-9_./-]+"))return null;
+            return SCHEMA.getProperty("snippet."+path.substring(slash+1,kindEnd));
+        }
+        return SCHEMA.getProperty("owner."+family);
+    }
+    static String ownerDescriptor(String path){String metadata=SCHEMA.getProperty("metadata."+path);if(metadata!=null)return metadata;String model=ownerModel(path);return model==null?null:"object:"+model;}
+    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
     static void check(BooleanSupplier cancelled){if(cancelled.getAsBoolean() || Thread.currentThread().isInterrupted())throw new CancellationException("Resource operation review cancelled");}
     private static byte[] copy(byte[] owned,BooleanSupplier cancelled){var bytes=new byte[owned.length];for(int i=0;i<bytes.length;i+=65536){check(cancelled);System.arraycopy(owned,i,bytes,i,Math.min(65536,bytes.length-i));}check(cancelled);return bytes;}
     private record Rewrite(JsonStructure.Node node,String value){}
     private static final class Scan {
-        final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<Rewrite>> rewrites=new TreeMap<>();final Map<String,Set<String>> imageMapUses=new TreeMap<>();final List<Reference> categoricalBiomes=new ArrayList<>();int omitted,inspected;
+        final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<Rewrite>> rewrites=new TreeMap<>();final Map<String,Set<String>> imageMapUses=new TreeMap<>();final List<Reference> categoricalBiomes=new ArrayList<>();final Map<String,Set<String>> snippetEdges=new TreeMap<>();int omitted,inspected,snippetLinks;
         Scan(Source source,BooleanSupplier cancelled){this.source=source;this.cancelled=cancelled;resolver=new Resolver(source.paths,cancelled);issues.addAll(source.issues);}
         void issue(String path,String pointer,String detail){if(issues.size()<MAX_ISSUES)issues.add(new Issue(path,pointer,detail));else omitted++;}
         String string(JsonStructure.Snapshot snapshot,JsonStructure.Node node){return new LosslessJson(("{\"x\":"+snapshot.source().substring(node.start(),node.end())+"}").getBytes(StandardCharsets.UTF_8)).stringToken("x");}
@@ -114,7 +138,7 @@ final class ResourceOperation {
                 var map=member(document,current,"imageMap");if(map!=null && map.kind()==JsonStructure.Kind.STRING)mapUse(string(document,map),"SCALAR");
             }
             for(int child:current.children()){
-                String childType=SCHEMA.getProperty(model+"."+document.node(child).segment());
+                String field=document.node(child).segment();String childType=MODEL_FIELDS.getOrDefault(model,Set.of()).contains(field)?SCHEMA.getProperty(model+"."+field):null;
                 if(childType!=null)collectImageMapUses(document,child,childType);
             }
         }
@@ -147,6 +171,38 @@ final class ResourceOperation {
                 if(poolKeys.size()!=1 || !poolKeys.contains(ref.key()))issue(ref.path(),ref.pointer(),"Categorical biome role uses exact region-pool spelling. Collapsing distinct loader aliases could change its inferred role; operation blocked.");
             }
         }
+        void snippet(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String model,String pointer){
+            if(++snippetLinks>MAX_SNIPPET_LINKS){issue(path,pointer,"Complete snippet reference scan exceeds 16,384 links.");return;}
+            String kind=SCHEMA.getProperty(model+".snippet"),value=string(document,node);
+            if(kind==null || !value.startsWith("snippet/")){issue(path,pointer,"Typed object string is not a certified Iris snippet reference.");return;}
+            String base="snippet/"+kind+"/",relative=value.startsWith(base)?value:base+value.substring(8);
+            if(!ResourceTypes.referenceKey(relative) || !relative.matches("[A-Za-z0-9_./-]+")){issue(path,pointer,"Snippet path is outside certified relative ASCII Windows resolution.");return;}
+            // Iris opens the exact JSON file, with class-specific shorthand and no dotted-prefix loader fallback.
+            String resolved=resolver.exactPath(relative+".json");var payload=resolved==null?null:documents.get(resolved);
+            if(payload==null){issue(path,pointer,"Snippet payload is missing, malformed, unsupported or outside the complete scan: "+InspectorText.label(relative,256)+".json");return;}
+            if(!model.equals(ownerModel(resolved))){issue(path,pointer,"Snippet payload kind does not match the expected model.");return;}
+            if(payload.node(0).kind()!=JsonStructure.Kind.OBJECT && payload.node(0).kind()!=JsonStructure.Kind.NULL){issue(path,pointer,"Snippet payload must be an object or null; the native delegate does not follow root string aliases.");return;}
+            snippetEdges.computeIfAbsent(path,p->new TreeSet<>()).add(resolved);
+        }
+        void checkSnippetGraph(){
+            var indegrees=new TreeMap<String,Integer>();
+            for(var row:snippetEdges.entrySet()){
+                check(cancelled);indegrees.putIfAbsent(row.getKey(),0);
+                for(String next:row.getValue())indegrees.merge(next,1,Integer::sum);
+            }
+            var queue=new ArrayDeque<String>();var depths=new HashMap<String,Integer>();
+            for(var row:indegrees.entrySet())if(row.getValue()==0){queue.add(row.getKey());depths.put(row.getKey(),0);}
+            int visited=0;boolean depthReported=false;
+            while(!queue.isEmpty()){
+                check(cancelled);String current=queue.remove();visited++;
+                for(String next:snippetEdges.getOrDefault(current,Set.of())){
+                    int depth=depths.merge(next,depths.get(current)+1,Math::max);
+                    if(depth>MAX_SNIPPET_DEPTH && !depthReported){issue(next,"","Snippet expansion exceeds the certified 32-link depth budget.");depthReported=true;}
+                    if(indegrees.merge(next,-1,Integer::sum)==0)queue.add(next);
+                }
+            }
+            if(visited!=indegrees.size())for(var row:indegrees.entrySet())if(row.getValue()>0){issue(row.getKey(),"","Cyclic snippet expansion prevents a complete, finite typed review.");break;}
+        }
         void node(String path,JsonStructure.Snapshot document,int id,String type,String pointer){
             check(cancelled);var node=document.node(id);
             if(type.startsWith("fallback-ref:")){
@@ -166,11 +222,13 @@ final class ResourceOperation {
                 for(int child:node.children())node(path,document,child,type.substring(4),pointer+"/"+document.node(child).segment().replace("~","~0").replace("/","~1"));return;
             }
             if(type.startsWith("object:")){
-                if(node.kind()!=JsonStructure.Kind.OBJECT){issue(path,pointer,"Typed object is a snippet or unsupported value; reference coverage is unresolved.");return;}
-                String model=type.substring(7);var present=new HashSet<String>();
+                String model=type.substring(7);
+                if(node.kind()==JsonStructure.Kind.STRING){snippet(path,document,node,model,pointer);return;}
+                if(node.kind()!=JsonStructure.Kind.OBJECT){issue(path,pointer,"Typed object has an unsupported value; reference coverage is unresolved.");return;}
+                var present=new HashSet<String>();
                 for(int child:node.children()){
                     var member=document.node(child);String field=member.segment(),next=pointer+"/"+field.replace("~","~0").replace("/","~1");present.add(field);
-                    String descriptor=SCHEMA.getProperty(model+"."+field);
+                    String descriptor=MODEL_FIELDS.getOrDefault(model,Set.of()).contains(field)?SCHEMA.getProperty(model+"."+field):null;
                     if(descriptor==null){
                         if(pointer.isEmpty() && field.equals("$schema") && member.kind()==JsonStructure.Kind.STRING)continue;
                         issue(path,next,"Unknown field is outside the certified typed-reference schema.");
@@ -224,6 +282,7 @@ final class ResourceOperation {
         private final Map<String,String> exact=new HashMap<>(),fallback=new HashMap<>();
         Resolver(Set<String> paths,BooleanSupplier cancelled){int count=0;for(String path:new TreeSet<>(paths)){if((count++&4095)==0)check(cancelled);exact.put(path.toLowerCase(Locale.ROOT),path);int slash=path.indexOf('/');if(slash<0 || path.indexOf('/',slash+1)>=0)continue;String family=path.substring(0,slash),name=path.substring(slash+1),extension=extension(family);if(name.endsWith(extension))fallback.putIfAbsent(family+"/"+name.split("\\.",-1)[0]+extension,path);}}
         private static String extension(String family){return switch(family){case "objects"->".iob";case "images"->".png";default->".json";};}
+        String exactPath(String path){return exact.get(path.toLowerCase(Locale.ROOT));}
         String resolve(String family,String key){if(key==null || key.equals("null") || key.trim().isEmpty())return null;String extension=extension(family),wanted=family+"/"+key+extension;String path=exact.get(wanted.toLowerCase(Locale.ROOT));return path!=null?path:key.contains("/")?null:fallback.get(wanted);}
     }
     static String resolve(Set<String> paths,String family,String key){return new Resolver(paths,()->false).resolve(family,key);}
@@ -234,16 +293,22 @@ final class ResourceOperation {
             if(!targetFamily(ResourceTypes.fileFamily(source.plan.source())))scan.issue(source.plan.source(),"","This resource family has no certified mutation/reference policy yet.");
             for(String path:source.paths)if(ResourceTypes.fileFamily(path)!=null && !path.matches("[A-Za-z0-9_./-]+"))scan.issue(path,"","Resource path is outside certified ASCII Windows resource-key resolution.");
             for(var row:source.json.entrySet()){
-                check(cancelled);String path=row.getKey(),model=SCHEMA.getProperty("root."+Objects.toString(ResourceTypes.base(path),""));
-                if(model==null){scan.issue(path,"","This JSON reference owner is outside the closed typed operation schema; operation blocked.");continue;}
+                check(cancelled);String path=row.getKey(),descriptor=ownerDescriptor(path);
+                if(descriptor==null){scan.issue(path,"","This JSON reference owner is outside the closed typed operation schema; operation blocked.");continue;}
                 var document=JsonStructure.inspect(copy(row.getValue(),cancelled));scan.inspected++;if(!document.indexed() || document.status()!=JsonStructure.Status.READY){scan.issue(path,"","Malformed, duplicate-key or node/depth-limited JSON prevents a complete typed reference scan.");continue;}
+                if(SCHEMA.getProperty("metadata."+path)!=null){
+                    boolean valid=document.node(0).kind()==JsonStructure.Kind.ARRAY;
+                    if(valid)for(int child:document.node(0).children()){check(cancelled);if(document.node(child).kind()!=JsonStructure.Kind.STRING){valid=false;break;}}
+                    if(!valid){scan.issue(path,"","Known field-order metadata must be an array of strings; other root payloads remain uncertified.");continue;}
+                }
+                if(path.startsWith("snippet/") && document.node(0).kind()!=JsonStructure.Kind.OBJECT && document.node(0).kind()!=JsonStructure.Kind.NULL){scan.issue(path,"","Snippet payload root must be an object or null, not another indirection or container shape.");continue;}
                 scan.documents.put(path,document);
             }
-            for(var row:scan.documents.entrySet())scan.collectImageMapUses(row.getValue(),0,"object:"+SCHEMA.getProperty("root."+ResourceTypes.base(row.getKey())));
+            for(var row:scan.documents.entrySet())scan.collectImageMapUses(row.getValue(),0,ownerDescriptor(row.getKey()));
             for(var row:scan.documents.entrySet()){
-                check(cancelled);scan.node(row.getKey(),row.getValue(),0,"object:"+SCHEMA.getProperty("root."+ResourceTypes.base(row.getKey())),"");
+                check(cancelled);scan.node(row.getKey(),row.getValue(),0,ownerDescriptor(row.getKey()),"");
             }
-            scan.checkCategoricalComparisons();
+            scan.checkSnippetGraph();scan.checkCategoricalComparisons();
             var resulting=new TreeSet<>(source.paths);resulting.remove(source.plan.source());if(source.plan.target()!=null)resulting.add(source.plan.target());
             var nextResolver=new Resolver(resulting,cancelled);if(source.plan.mode()!=Mode.DELETE)for(var reference:scan.refs){String expected=Objects.equals(reference.resolved(),source.plan.source())?source.plan.target():reference.resolved();String next=nextResolver.resolve(reference.family(),reference.replacement()==null?reference.key():reference.replacement());if(!Objects.equals(next,expected))scan.issue(reference.path(),reference.pointer(),"Operation would change another reference's resolution, including an unresolved or dotted-prefix alias.");}
         }

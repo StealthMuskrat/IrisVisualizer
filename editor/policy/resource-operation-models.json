@@ -1,841 +1,909 @@
 {
-  "description": "Closed serialized declaration graph for ten JSON owners, with audited reference/default rules in resource_operation_schema.py. Presence in this inventory does not make a field editable or authorize a renderer. Unknown owners/fields/types remain blocking.",
+  "description": "Closed serialized declaration graph for ten mutable JSON families, five read-only owner families and pinned annotated snippet kinds. Inventory alone does not authorize edits or file operations. Unknown owners, fields, shapes, defaults and unresolved comparison semantics block mutation.",
   "classes": {
     "CarvingMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "59c25b334ca7af7a7e47f7656cb475b0e31ad0787a0d9cecce89a65794b3c616"
     },
     "FloatingBottomPaletteMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "8d5850ed217af1b62b6863ebeece1bd81fb9929e6072353666cc4fc7d6df7b5f"
     },
     "InterpolationMethod": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "9e2d4db4a893db4941f64daac2ab4cd79cc472c87ee3efdef26207d54005094a"
     },
     "InventorySlotType": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "4db63a6c91d7157eb9d48c28984fb2313e7bbd4d468453758f34c41fc3aa2f90"
     },
     "IrisAttributeModifier": {
       "kind": "class",
-      "declarationSha256": "0d914ff0a7966376e9f5964c75090dec54fdd94b94465ca9a27a1158df010e49"
+      "declarationSha256": "b1be7b6d8193fce89190517490110a305e9fa9d265a63dfb718f9553d2b4748e"
     },
     "IrisAxisRotationClamp": {
       "kind": "class",
-      "declarationSha256": "f4182986191b83accfd9f2c363a730276a6af7ac8d85937173652a767c2144d2"
+      "declarationSha256": "9a7d0574e79c1b07d4a6cc872c5098ee6d243a5149629be6895821ba495a0e8c"
     },
     "IrisBiome": {
       "kind": "class",
-      "declarationSha256": "a185357e482d28a64e9c473fc33105e31102a744043e38736ef297fd5dc1d7f7"
+      "declarationSha256": "3a6af10e0694f209e14ec7598ad53069244a647a0274f68044a264584a4bf614"
     },
     "IrisBiomeCustom": {
       "kind": "class",
-      "declarationSha256": "8a85a00c577f30e7343a751610ad2930f40931340fcfc5004656f80679405d0f"
+      "declarationSha256": "9d1ad76cd0dc1b22ad15981c494313b77b4b9b072a8ab378ab0bde8888e2686c"
     },
     "IrisBiomeCustomCategory": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "1cd3bf544a02376df463fa177b2a3a33a0e31301e179d4c51b477460ad277b91"
     },
     "IrisBiomeCustomParticle": {
       "kind": "class",
-      "declarationSha256": "3dba203dd303fd9defcd708bcc9460b5d12f457b76d86e8dcd707247c84057c3"
+      "declarationSha256": "c8a882aaf44b113315b279f1c51a5b435c5d805fd896f7746e7f3c653802ae27"
     },
     "IrisBiomeCustomPrecipType": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "20648e433e61ad78a195a54737b78cbc87b08422f19414755b5c2f1790d68f06"
     },
     "IrisBiomeCustomSpawn": {
       "kind": "class",
-      "declarationSha256": "5ece3261debc337fc5507efae5e29bf56b64bf033ba1782ffe4c2c2c462c043a"
+      "declarationSha256": "fc2c05a680d64e60176c13a7e1b0d8073d070d306f25bb7e7d590192c1b05861"
     },
     "IrisBiomeCustomSpawnType": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "bd8ff7867fd3b8a35a1456d021b58c3df931f2ee53d6a9d974c41293dde83448"
     },
     "IrisBiomeGeneratorLink": {
       "kind": "class",
-      "declarationSha256": "3750e895e802210e0b8b0763f40d39648cdf85431788571411cb493d8c7aeb7a"
+      "declarationSha256": "a7ea050fd8b263da15d9b58d49360d401b4dfca5af2cda304d4cf485543b9531"
     },
     "IrisBiomePaletteLayer": {
       "kind": "class",
-      "declarationSha256": "b6d3fc7ffb7133e9579b3350dcdcf0bf6d1f05612ea0c1b2d8d969a97dff6e6b"
+      "declarationSha256": "b82472bf314b84d9224668a957a8b108ee30d812fd3ba561a407393d8196d6a9"
     },
     "IrisBlockData": {
       "kind": "class",
-      "declarationSha256": "64e530e7b3496cf6d09277731a9bdbdee200111433714eb6ad967a778a5a224f"
+      "declarationSha256": "8a8526fca906e94944f5252288ae4dc775b5efcca6b98e0ae1ce56a412d44720"
     },
     "IrisBlockDrops": {
       "kind": "class",
-      "declarationSha256": "65e36ea883299f9dd68faa808b3047c571cfc9145f2a16c72e59d3bb3cb3cdf5"
+      "declarationSha256": "90b15e5229d4ba6b3db07a15e3c35e60dd2d9664630a01abb2283bcff9038d38"
     },
     "IrisCaveAnchorMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "8202e3d4efae87fde93c3d45f00eae76cd3bc11360fd82681510615beadb3f12"
     },
     "IrisCaveFieldModule": {
       "kind": "class",
-      "declarationSha256": "b91ffaaf1086438611a99d69205b1f7f9631ced07df9c989521ab04293551518"
+      "declarationSha256": "6f9e124c725381574b8c1f552b9e62be0b3b5912b36bc121bc5ae43853552981"
     },
     "IrisCaveProfile": {
       "kind": "class",
-      "declarationSha256": "d4ee69e704a7df485006000e67f41918efe8de206dd7a49bbcf3e0a3144ab10c"
+      "declarationSha256": "0ec78bfd807f6adb9eb43e629b20c7d3d2c779adbb3b81f47939d4d352b026ed"
     },
     "IrisCoastalRiverGrottoConfig": {
       "kind": "class",
-      "declarationSha256": "748798eec8ce370cbe758c6c69726172410a2a80bb6096799db081b59f49ebca"
+      "declarationSha256": "071ef7af329bb14f158a04b44dbd731e4e18f49e8caa4cc2bc3749176fcca14a"
     },
     "IrisCommand": {
       "kind": "class",
-      "declarationSha256": "b8a19f0eb476c8eee2e5e41954ccd49031bfaf6c1290f7fc2dbdabe06457272e"
+      "declarationSha256": "e488828c2bf2d00441a6e1f0c9e955c039083cf34889c8b8d9c862c4f5774436"
     },
     "IrisCommandRegistry": {
       "kind": "class",
-      "declarationSha256": "f4f7099a4748b17ed2ac68ce0f2c3d4132a17c15eec438924c1c69606861a935"
+      "declarationSha256": "c5ba81039570f2029e5a601147a0e59b748f53aad77c6f7cdcfd4ef82505f21e"
     },
     "IrisCoral": {
       "kind": "class",
-      "declarationSha256": "bb2bc3a5bacc09e9de67beb3a515a1f476fbd98266b851757231d8d0a09eb645"
+      "declarationSha256": "0c18d0628faeafe6f6fdb6a11372f7d14577899d6900370e8dcee6577e1b048f"
     },
     "IrisCoralBranchAzimuth": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "c26e440ae7c4073a93fcf6f5808da10fcf61d8f6687e7a5678d7545c6b59e946"
     },
     "IrisCoralForm": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "36a5e1f91037cf87354e56d60707272426fd1c3bebe953f6a33c4a30a06f1259"
     },
     "IrisCrystal": {
       "kind": "class",
-      "declarationSha256": "d392e1d201b15131b7110843dbf6b61773c94b478db31d0cef9eea1c01d67024"
+      "declarationSha256": "ba2d44730018bdf30b2ed3da6209a0f1f10a0c3970b21836da7a2754d36170ce"
     },
     "IrisCrystalDistribution": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "c084610b8095e499314fd21a8b6cb7e89fb98077ae089f2e4f2869e6eccd0df9"
     },
     "IrisCrystalSurface": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "78174d5538f656e3ea2cf98e645f2660cb1f95c1d99ff083fde2b096dcc7bfc3"
     },
     "IrisDecorationPart": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "a1d9db0bb85ee75b9cd7ba4d3275439765d87c5f0bb404c933538aa99ff46eb1"
     },
     "IrisDecorationStep": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "9c0dabbaaf15843a2379b9a21f8402d7b1313884f438e9feee2db92619f59b08"
     },
     "IrisDecorator": {
       "kind": "class",
-      "declarationSha256": "1a5b36153b59eee16d0ddc2420605f225bac8bf2d543ec9443b39faeaa46d9fc"
+      "declarationSha256": "f50b8e0deaa794ed351e6c24c787ffc4fb570a984682f85fe021fa89de00648c"
     },
     "IrisDeepFluidConfig": {
       "kind": "class",
-      "declarationSha256": "de3e6591901081fe5b8306acd5a8f8b19389f62b2cadd21ad16b5b9ca365adfc"
+      "declarationSha256": "fc24a22d2bc19e9f8c09ceff0c160c3524efe90804bcb22f23809bbc0b157e08"
     },
     "IrisDepositBiomeScope": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "bd55a1cd55cb875ffc20d85b8860844ecd5bbff74c37dbb75a898f02b832da82"
     },
     "IrisDepositGenerator": {
       "kind": "class",
-      "declarationSha256": "eddf08198788f9e4c99462cd8f96d965f81634b8c3c51f68da40f58af7cfd73e"
+      "declarationSha256": "8c43a65ca370d66fef3c1be6a4aa8c044c5a5c609fb537c31b88fb42ad3d462a"
     },
     "IrisDepositHeightDistribution": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "a8b0c1ab083b5455dfa0c624fd6d74931586e43bd5f5cb54000e87e59deab261"
     },
     "IrisDepositPlacementScope": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "df7cf3fb9ef6af9b3e958d495cc7410128d6a1945464101b085c30895b2c0d3c"
     },
     "IrisDepositShape": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "4583986a88f24e5f78493f7e59589e6c403a881821671aab079eceb3b8b86c9d"
     },
     "IrisDepositVariant": {
       "kind": "class",
-      "declarationSha256": "a93075b8d78592d99356e965f058c1ff20c606bddda7b7371180f4e338661ad9"
+      "declarationSha256": "82ef5e2e9b151e726fa3d9f0d330f961bdff9baab0c556a1f7a35db40b10bc6e"
     },
     "IrisDimension": {
       "kind": "class",
-      "declarationSha256": "3004def9a24aa9c35eadd11b73cb811209b45883a382f9aadbed696b0cc30e02"
+      "declarationSha256": "d6d64c399c079352b8cdf6bfde8e41a1f9788eb110153364efa012ceb83fb2f8"
     },
     "IrisDimensionCarvingEntry": {
       "kind": "class",
-      "declarationSha256": "a42bd488f4203e1e846ac6f95e9010dbf6be8a59af723c843c136092e4654b9e"
+      "declarationSha256": "011288fff7c1d196a72077267043eef464e32c60632cc92cabb86a379f471cb6"
     },
     "IrisDimensionMode": {
       "kind": "class",
-      "declarationSha256": "2cf59e8eaa2bebe47bdfd4170710085091f3fad7ee2534c58db979146a811f8e"
+      "declarationSha256": "56bb92561412d88bcc6992a5b4d1ed5810c8e0833be1f7ab3509fc639c4c0232"
     },
     "IrisDimensionModeType": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "c1b99c6fd5b90b7d5a8f871b93988a5203f52636873e7706045b07dff74aa7f8"
     },
     "IrisDimensionStack": {
       "kind": "class",
-      "declarationSha256": "c19b0059ded844b549d3a3c01e6a0c60770619d8ce24fbdfeabee1101be4bd77"
+      "declarationSha256": "f0b10d853c416635b07333619341884571114f48ccaa4907073c19016fbe0258"
     },
     "IrisDimensionStackBlend": {
       "kind": "class",
-      "declarationSha256": "e6633ad61de03c9672c1707a381ec2585d7c1929beab9d4116bd431053843544"
+      "declarationSha256": "ef4098f591e48692d86c358f6da474bf2dc294d8f7c598a96947bd835a1f9063"
     },
     "IrisDimensionTypeOptions": {
       "kind": "class",
-      "declarationSha256": "6bb57ea0036d21dd8daf72eb747be133727a1cde38f5224f8ca2bfa2bd21ca13"
+      "declarationSha256": "596d871f8461acebacc65d6c4a293644bd54a205e28040790c6209c8955282fa"
     },
     "IrisDirection": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "5a8a04588674f3c41fd683d1f429408bd4150dc168269a7394924c379f7e9e95"
+    },
+    "IrisDuration": {
+      "kind": "class",
+      "declarationSha256": "fda192cf41564c0bd2b7ac31dec2b794c9bedb4905f9fc6c705914b435fd7d95"
     },
     "IrisEffect": {
       "kind": "class",
-      "declarationSha256": "8632c7db36c149903dffa8038c9de467c4acfae6a17cfa011f4d48733d2c123c"
+      "declarationSha256": "56f4e9a81e9d0e567bf0ecc279c125aee36a61e2e1d5dd42ccbf8da317886512"
     },
     "IrisEnchantment": {
       "kind": "class",
-      "declarationSha256": "99d8bbc3ab1608931e4e21fd8f68439cbb8c61f6bddc54ee24dced24364feff8"
+      "declarationSha256": "7807e3d96e3c30d37f5bd748e19c2482b52f288732ea072b29121d51b1be68fe"
     },
     "IrisEngineStreamType": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "4e8302687f49b2d6f3088189cda7cc271b315c59466a7989052229972f2ecdd8"
     },
     "IrisEngineValueType": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "a49d973d509ce1ed94dddbccb2efb1296de2638aea3f3a82532a9387c970e3e8"
+    },
+    "IrisEntity": {
+      "kind": "class",
+      "declarationSha256": "17b91c3740a1ac51920b5549a80c9458d2c470c20bbae46d6b408d355fafb24f"
+    },
+    "IrisEntitySpawn": {
+      "kind": "class",
+      "declarationSha256": "2dade3a9c0025aed4691f8c27671b2a18c6b5f0520fd5bdcddd2c0554ef3fbaa"
     },
     "IrisEnvironment": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "5d92e6bfc2aa5b27d24f6d03912cfa52cac51c5ade7771003b4503d5c4fdbd6b"
     },
     "IrisExpression": {
       "kind": "class",
-      "declarationSha256": "efa14377139fc1f6097d3954a1cfdd91399be39b9069aec84d5d50f1af2d04e4"
+      "declarationSha256": "6ff639acd8262a75ea4d29e05dc49c86412ddbcbd632e0439b8148cbcf85e552"
     },
     "IrisExpressionFunction": {
       "kind": "class",
-      "declarationSha256": "c9a187c19bc7cec915e48dd8fe40722fe9f60d218a05d39c1a68807ce073e1ee"
+      "declarationSha256": "4616f683c494ed08068e8ab25902f5c616e4556ad955d43a84d0467e898a774a"
     },
     "IrisExpressionLoad": {
       "kind": "class",
-      "declarationSha256": "74e52f5316195c210c26e1484236a49b2ba5bae13faf2d41555bd0c3f876fb50"
+      "declarationSha256": "112c5b7875448d890e94cb6823703c1249c7dc6dd0a52a84125762f0243cd7bf"
     },
     "IrisFloatingChildBiomes": {
       "kind": "class",
-      "declarationSha256": "97b7812dcd8660dc74106343b8f39d6c461ada35d25d26ca921f77840b38f249"
+      "declarationSha256": "13bfa227085ecd79665827f6fa6bddae2175e1a72e55b2d35c03a92da4169459"
     },
     "IrisFormation": {
       "kind": "class",
-      "declarationSha256": "297d5b3e6f559e88b95015c6a90428d18e0cd4e99e0d5b1a15a3f2b1a6af02c5"
+      "declarationSha256": "4cf9ae5b16a8228c754255a284a555d863292672b92daf939b963dc9f3c450f1"
     },
     "IrisFormationForm": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "d1f98616f0e8905685005fec9ab014db79c2db324490e616de7db85649afde0d"
     },
     "IrisFormationProfile": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "66550ca777a0c366ca3610f0b78d55ccaa81625db55edee6594e3bb034a1e11e"
     },
     "IrisFungus": {
       "kind": "class",
-      "declarationSha256": "a50bb1b1ef70e4150e65894cf4422754d4676038736c18fc48073a0e6a196e9d"
+      "declarationSha256": "3cc46011715b5b0cb157d0cf18491769b7f4a5f106804f5ff9d44e5f1d4a3bb7"
     },
     "IrisFungusCapShape": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "6fcc6915ec2a4fe593fb162ee158782107aa652713fc1edf438c22162a4dce65"
     },
     "IrisGenerator": {
       "kind": "class",
-      "declarationSha256": "b7486ebb09fbcccbe170cc9dcf44070676f99807021462b05ae87cf0da89611d"
+      "declarationSha256": "a5e1029a2532f5c93b87c4455e5b24b741d4d81d700963cb4730de09a9ce6c21"
     },
     "IrisGeneratorStyle": {
       "kind": "class",
-      "declarationSha256": "4aee0c67c66dfabf1a13affa628cf47d7f3df0847bb2411117459dc72a5d495f"
+      "declarationSha256": "6956b9745d4c955cec33f81adbdb5d41079b5f766786eaad0c75d97e8b08f1a8"
     },
     "IrisGrottoPoolLevel": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "8e98a22c1eab03e2eea81501ac903a70d53b2d6aca3d041ec5cc14f468b9c233"
     },
     "IrisHydrology": {
       "kind": "class",
-      "declarationSha256": "e1162c047fd83f929dc9af944ea8a58e4da1a92a0f6bc30037034f0b5e9136d1"
+      "declarationSha256": "d48d64d0828681af741a0a21770545c2442e7d78b16dfaf9f2a46176bc4af083"
     },
     "IrisImageMap": {
       "kind": "class",
-      "declarationSha256": "8f97dde73dda47174c5e78e9f50021823d458019087e6713bcfb3bf9a6ed9f32"
+      "declarationSha256": "85f8441f6a1286b07c4b490d9322cdba075b7c7ed1032ff3229037988f80670d"
     },
     "IrisImageMapAlpha": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "1c4473d7c9bc178548964139c76d62f081fe854d547be54fdff23621bd71f2ff"
     },
     "IrisImageMapApplication": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "19fdbe08bb6b2df28d2487fd5b0abc3cadb85952bf28a725fa293f3d2e21075c"
     },
     "IrisImageMapBinding": {
       "kind": "class",
-      "declarationSha256": "8d1d236911c7881edec4d11077a087fb4eb63ba918f224ec82305641e7fa67e0"
+      "declarationSha256": "4c262064d279883e5c210e6778c8fee1abe88766eb6c26c27fb07862be597be3"
     },
     "IrisImageMapMask": {
       "kind": "class",
-      "declarationSha256": "afa09ce9799054287faad43166b3d40b2a815ec8979363d038e6aceab12fef4e"
+      "declarationSha256": "0632a4827b7890b23f729e3c5bdb3751a8c6c75d1c84e69f28565467f4215505"
     },
     "IrisImageMapMaskOperation": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "55bfab989aeea04c263ec0e42a2d4f90fa74c348233f2d8a24a2ee2311c9021b"
     },
     "IrisImageMapOrigin": {
       "kind": "class",
-      "declarationSha256": "38c2fa855ac49e5656796cdf7a02a8ca36104202fecfdfee0da4597db11b0c4a"
+      "declarationSha256": "f0c0cccf5cf5b683d7445d63ddf5b9a21d6fb6862dfa5ae922db10667f3ba252"
     },
     "IrisImageMapOutOfBounds": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "09351419f78b1fdb8662ebccb53de2c84ec2ee910212afa87af9d912565bd4e2"
     },
     "IrisImageMapRotation": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "93eadea4c2619ee43057f89ef1dde9ee394defe3573a2c628eb19aea022b3e3f"
     },
     "IrisImageMapSampling": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "a1f49669266d21eb144f94c8f425b54a97548aeb5b83782701e77558b7a9a1b9"
     },
     "IrisImageMapType": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "a89eb47e7d83502b5fc644857533842cc20f535ae833c5d552ce24a01018e0d0"
     },
     "IrisImageMapUnknownColor": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "412b74d3bcd73650bf97993a406ed17cacfc788f88390cead46b17cc3e6f2782"
     },
     "IrisImportedFeatureBiomeRule": {
       "kind": "class",
-      "declarationSha256": "5c36c1e202869c61c99ec83a882fcb33cb2289bce6971ff1df5a3567808bed05"
+      "declarationSha256": "1a418861dd12f2ae634efd23fdffc1aaee7a5dc5f051311b4c77e2e2a04e0658"
     },
     "IrisImportedFeatureControl": {
       "kind": "class",
-      "declarationSha256": "5586475f6c02e2a3468853df95c986c893e8a9daec2bbb78988244594c25376c"
+      "declarationSha256": "ec672a9e46f5053e628d5cc89b35344a7e83d2805477ffa4b59bfef1d03c696f"
     },
     "IrisImportedStructureControl": {
       "kind": "class",
-      "declarationSha256": "614a5f6cdaa7acc742b32e66946e921d15ea3bb356fdb5dbe5fcb5909720a6b6"
+      "declarationSha256": "7ed00eeec0290ef7241c6a2316c62a94efafa6a9cbc580622aa4a497c687948d"
     },
     "IrisInlandRiverGrottoConfig": {
       "kind": "class",
-      "declarationSha256": "ca6ab95acc9c433876004ee879915b25f1eb720d5ee82f573b46a05a93e1d515"
+      "declarationSha256": "e41fbe67ec008a4a22ada1202b3b488dca30f3017b66a9ecd75c384820ddad1d"
     },
     "IrisInterpolator": {
       "kind": "class",
-      "declarationSha256": "74d1621a4334007a267a146a2e585f3d1ea7eba26cbea5f085625ec536926ca6"
+      "declarationSha256": "b3a01d711958ce7141887dff3693063cb8fe90cda04d49eb21c1cbd13351e5f3"
     },
     "IrisJigsawBranchFailurePolicy": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "2749329a2d22f97f93750528fe8a8d41ddb5ba96ced39d76e3be466f7dabb57b"
     },
     "IrisJigsawCompatibility": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "57a110b186cf6ec6fb8e8e0476be5e606aed43fdf47f2ccac864e996b51fa4b7"
     },
     "IrisJigsawConfiguration": {
       "kind": "class",
-      "declarationSha256": "bae011faba15bf27ca0e4a248a2bcdce92bf161cb58742a73fdaa06da9dabb00"
+      "declarationSha256": "3eab4a846e20383d396926b784d3e7f1661d7daa8ef0ac35bc3308fff9df22fb"
     },
     "IrisJigsawConnector": {
       "kind": "class",
-      "declarationSha256": "c2b6805ee6a1b44fabfd09c0cbc8ddb4960ad44910b5042f2fcfb21d301f5ae5"
+      "declarationSha256": "f93dbe30ebc94aff32b067a06cf51ffb99cea851aaf17bb414c6d797cbdfaae7"
     },
     "IrisJigsawHeightmap": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "d4e6cde49f2c2b44fd0455b50ea8ef384673ec1c925e603d857ae894e90a1aaf"
     },
     "IrisJigsawLiquidSettings": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "21f90f711837a0dd2623ff0d77c532f18c9f0afa73f7375200b4bfc87c136daf"
     },
     "IrisJigsawMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "586e7757d471956e233fee9df8182e6f68cbe1fc8bad33ba78248520acc1a2d2"
     },
     "IrisJigsawPiece": {
       "kind": "class",
-      "declarationSha256": "1094b7c26811731b2e67aed6b1509fee1351db95ea4f27593defe1cfc8226697"
+      "declarationSha256": "e7f5cbec4a3ab30252be88a7bde27a24d35f935b5b28a62a058e8348a599108c"
     },
     "IrisJigsawPieceEntry": {
       "kind": "class",
-      "declarationSha256": "d03541c879dec939596573401e010136a438667e222fbd9582401c9f557ec634"
+      "declarationSha256": "6d4879853c95817608af15c4222238d44412f555f3b8a16f360a3cd46596ec3e"
     },
     "IrisJigsawPieceRules": {
       "kind": "class",
-      "declarationSha256": "4d2208edb33a1e91e080be35f9eee618109c249378a8f64e2714d06ae13f433f"
+      "declarationSha256": "c61bd0d920c75d86b72b7a21fe62ad8715bf09dce53f8c3ecc0e0657da47cad1"
     },
     "IrisJigsawPool": {
       "kind": "class",
-      "declarationSha256": "54f9cd4d4b3ff51dfc361141da8163b12d1d36ad15bff628367b3e1d4ca385b9"
+      "declarationSha256": "2a40683dc6c37076e6a37d21495109d9fa012379cc853015911e27e52fe114f4"
     },
     "IrisJigsawThemeSet": {
       "kind": "class",
-      "declarationSha256": "1ad88b5413de1194e0b93f2321f2f88963fb9505c7175587291203f9a6c4bc61"
+      "declarationSha256": "4c9792ec09f2420cfec708929c0e17e9afc014924af3caad403636d4ee0f50dc"
     },
     "IrisJigsawWorkcell": {
       "kind": "class",
-      "declarationSha256": "e19001a0e7a3bf10558dd20085864135523a95b8346c7d79ae6f7550328e70d1"
+      "declarationSha256": "f225067acbebb0859db5faae708f5de416805483742a120fdae25afc7327d746"
     },
     "IrisJigsawWorkcellArchetype": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "97df258fe47741a4d2d4dfb9397d4781c501148cfc5c382282ad061ba7b6a298"
     },
     "IrisLoot": {
       "kind": "class",
-      "declarationSha256": "fa060e028c6aae2198d31595ca9fa16c3e28f5f3037c8a925ffa45abfff0bd0a"
+      "declarationSha256": "7869c25fb59df00c30aafc1c3765283dfc432c9356e02f77e496f6cd26377342"
     },
     "IrisLootMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "5cc82544f35b89350639ab17bddf615021a0e8bffad45b10b0589765516b6a26"
     },
     "IrisLootReference": {
       "kind": "class",
-      "declarationSha256": "c3e83a89cce4d84e152e87c38deebbf51f0ae546f8ec1410be8f624232da3f22"
+      "declarationSha256": "814327271c9db5a5b17d92dff453d17de5744c1fb5d7af132cb2acd8c91ad7e7"
+    },
+    "IrisLootTable": {
+      "kind": "class",
+      "declarationSha256": "c4fae49d0e1b458808fe40bd86bf6ee9adf12edea58224312c842ad692ec665f"
+    },
+    "IrisMarker": {
+      "kind": "class",
+      "declarationSha256": "32635c407d116eb3f89ccfffa67e71ec6cf5be9e6f0511b5377e48f5c2a16405"
     },
     "IrisMaterialPalette": {
       "kind": "class",
-      "declarationSha256": "134cf96527ba0c0deee28d36f682fa1de07a738e0749e9c8dff253eb90931ead"
+      "declarationSha256": "ef58670b99d686d4d1af018c23a98320f299b6bafb8050dcf3998a4216e871ed"
+    },
+    "IrisMod": {
+      "kind": "class",
+      "declarationSha256": "986faa7bcb6afd90018638225c10604b817dd07f96d023d9ad1212b78338cd53"
+    },
+    "IrisModBiomeInjector": {
+      "kind": "class",
+      "declarationSha256": "5d1677b61fc63f69d651cb98da1fce53ecea903ad30849cc45c9cd20ef67b9be"
+    },
+    "IrisModBiomeReplacer": {
+      "kind": "class",
+      "declarationSha256": "a64ec330e0b0b2518f44fcf030bb2836ce484321b0206dedd547575c4ca31711"
+    },
+    "IrisModNoiseStyleReplacer": {
+      "kind": "class",
+      "declarationSha256": "d34571f4e6f5b8bc83869a3b252099237bbc7d85449900755b84e7a36acc5192"
+    },
+    "IrisModObjectPlacementBiomeInjector": {
+      "kind": "class",
+      "declarationSha256": "2f8f6bfa111aac016f8257e4aa6b40ecac9f8aa09e7dc5b081bbf9958bbb288d"
+    },
+    "IrisModObjectPlacementRegionInjector": {
+      "kind": "class",
+      "declarationSha256": "1babdf27c018e25d9549fda8b0f793494a100c9ff8cbea25174ae7505a5d45a0"
+    },
+    "IrisModObjectReplacer": {
+      "kind": "class",
+      "declarationSha256": "6449aadba32add0b1c22156da95a76d6ce68c3722b2d886afc28a23cf0a3b189"
+    },
+    "IrisModRegionReplacer": {
+      "kind": "class",
+      "declarationSha256": "5632e1e7e259013737e6430034c75d23eb0720d36d6a24cf85da9f4b76547271"
     },
     "IrisNativeStructure": {
       "kind": "class",
-      "declarationSha256": "1a7d984ad9101ea51f31b4944d33e35c2160851f453585075befc149fa55d993"
+      "declarationSha256": "dbf06d4362663b1e5315547ca07837d517e03daabd61682c3a9296ff2bc8ffdf"
     },
     "IrisNoiseGenerator": {
       "kind": "class",
-      "declarationSha256": "77277faef95879ea318875a8c468cccc4b19fce5ccc90ffe5380743efb98a418"
+      "declarationSha256": "1a0d167072267392832a1cdffedb992f111b3ae4b79e6af93e7ac86f30f71849"
     },
     "IrisObjectLimit": {
       "kind": "class",
-      "declarationSha256": "b9e0d65f441523ab7cebdd5b1037d802fad7c4c60e021721ed7aeeee91e587a4"
+      "declarationSha256": "a309bdf7474d84141bcd5ae1be5ab65497cb3dcf9462fe8cdb19526ac224d74d"
     },
     "IrisObjectLoot": {
       "kind": "class",
-      "declarationSha256": "2696ddc36c4ce8a0db8a45567329d9b7bf9e22617115ff4d42f8f27c24182784"
+      "declarationSha256": "026eeca592c5c218a2239ec557841d0b37e73bab80bd183429749a14773f40c5"
     },
     "IrisObjectMarker": {
       "kind": "class",
-      "declarationSha256": "60c3e75449054cc66f7bec7dbdd5ba92657a1f68cdcbfe0706297c0e99d4e7fd"
+      "declarationSha256": "b2afe1485cee20fdff69963dfff626f72b2a1f190e56e320bd71392b480bfce0"
     },
     "IrisObjectPlacement": {
       "kind": "class",
-      "declarationSha256": "bdb652a6537f5811058c959f56c3fe23bc48fd666cee0155020ac18315643745"
+      "declarationSha256": "cdbd194e06e218e593c148a3bff24694871e69f105f171918170358e2146a825"
     },
     "IrisObjectPlacementScaleInterpolator": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "5bb6c0bff5794ffb08ecfb5b92bdb7b1e771b1d90ab23d1b002a82f1692d2687"
     },
     "IrisObjectReplace": {
       "kind": "class",
-      "declarationSha256": "9480274d288bbb525039798f56d29388094c464d643c6e88df10af9a6488d69d"
+      "declarationSha256": "0e1a9b5953fd55d43164b7ea9bc6a95a66bca24f36970032211143323ae72891"
     },
     "IrisObjectRotation": {
       "kind": "class",
-      "declarationSha256": "37325d3197a9172b663b45163017223128436e00d12f3f67149348e920b36015"
+      "declarationSha256": "4fab3b300e02aca97d8a1902d89295d962dde07744f80dee781153581f5f5714"
     },
     "IrisObjectScale": {
       "kind": "class",
-      "declarationSha256": "8a0f632460d5a58c55c0f82f73482e8d184471899e7c685d7e0f40286274708b"
+      "declarationSha256": "682bf69b246760c732a1325239a60ad00803c4facc3c1aec180ca939d99d167e"
     },
     "IrisObjectTranslate": {
       "kind": "class",
-      "declarationSha256": "1d612bbbb30579f89ff746da8aff91079638cbb22e63c8aa2211c41c519f2d33"
+      "declarationSha256": "bae035c12da4b7eef33770c2dfe91b44e38c504ec4c6ede2e6273651c5b8297b"
     },
     "IrisObjectVanillaLoot": {
       "kind": "class",
-      "declarationSha256": "501b32ed45f7e7bdec91da4e6a0079582ec6a49b8e07c5b7bad3fab6c0e2af9d"
+      "declarationSha256": "a027d046bed2dc393f936ac7602ce107e3f07b219b28a84e80c288e99ada94c3"
     },
     "IrisOreGenerator": {
       "kind": "class",
-      "declarationSha256": "885a1eec80d927e12607e3d92be268c3ca15ef23a6dbdeeb06f1a6c52467fda0"
+      "declarationSha256": "e7138dca42ce9179c84f7359f1264b5695c5c3ca0eb4c68714327301e3c51ece"
     },
     "IrisPosition": {
       "kind": "class",
-      "declarationSha256": "dcb16f7a7938a661bc0e360ace494f41134f1a0fbc65721389e2459fb427a049"
+      "declarationSha256": "2413009de8fda4933710efc2e116d4919652a9cb1c076d0f6d3b9a5c408827b6"
     },
     "IrisProceduralObjects": {
       "kind": "class",
-      "declarationSha256": "eb607d84900adf90b59c2d8f9e7e8170af17fd42b764c5d51fa32d003021f769"
+      "declarationSha256": "f671c986f7bd4b3a3a5114945eb514a3571431b96e0d9c39647d130041fae6be"
     },
     "IrisProceduralTree": {
       "kind": "class",
-      "declarationSha256": "8af21534250f7de775b0881a9bdf6329e6de73e4b4414c7c4b551476398ef299"
+      "declarationSha256": "ff7d087c3fab1759332136753199fd370c15ab9c3f721d4e2f321704577fb79b"
     },
     "IrisRange": {
       "kind": "class",
-      "declarationSha256": "1a86c2fe205f11bae72fa65da69aa41c5cff44cc1c23297d8250548180265dac"
+      "declarationSha256": "581d9a90bba02cc1364be8c2bdff15d2a51e9ec26f0e881d84ddf89d86477c18"
+    },
+    "IrisRate": {
+      "kind": "class",
+      "declarationSha256": "fefe19cb85d60a3595d26a6ac5b7efcc8ff5e3f0b39a40e2346e16c7c99f5e73"
     },
     "IrisRegion": {
       "kind": "class",
-      "declarationSha256": "b33279db95f4ec9f51c7b8d1cadfe0d5c72414ba430233f60282a1ca5214d82a"
+      "declarationSha256": "a9daf008fc3c083205658e77373e0caa8a887e49fd12f9de5f207be20a767e61"
     },
     "IrisRegistrant": {
       "kind": "class",
-      "declarationSha256": "d339fdb50a1fa4701984241b89ef9a60b2d5100125ffa61fa6a330569da50e40"
+      "declarationSha256": "ec902c70d8730ce7ca2507512339bc417983a35491cfd5b0cd931995bea04b9e"
     },
     "IrisRiverBank3DConfig": {
       "kind": "class",
-      "declarationSha256": "57b51dd7134616f9adeb624524590d18a5f4d03b68e4ddd3060b3d51c8da7a25"
+      "declarationSha256": "61b4640f93258a8c19f732e2fbecc35715a681794872b8f2e5659fc541fa27b1"
     },
     "IrisRiverBedProfile": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "35a6cd52d12764922399bd636b35bc43199ad56d5645ddec5b560ddd6392e46a"
     },
     "IrisRiverBlendStyle": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "68187784b89268503679b8503810bae02717ae7a22b451c7b74725452235d7b8"
     },
     "IrisRiverChannelShapeConfig": {
       "kind": "class",
-      "declarationSha256": "cac5de131ff30420d1362bcb3feaf1b4bd010a1f5b3e61c8a20d44af8d1dec28"
+      "declarationSha256": "dfccd0706e66028aa1511625b7bf3b3b02b6eb67ff8e0675a172c0eac37b12fb"
     },
     "IrisRiverDropShapeConfig": {
       "kind": "class",
-      "declarationSha256": "9caca9dba2603bc930e882ba2d2eb04fc1cd8879d35008d7ef7d8b90b562634d"
+      "declarationSha256": "00884b61250b9f2c01c60178404900a1f441f5bf7390b56801e5061b405bfb2a"
     },
     "IrisRiverExcavationConfig": {
       "kind": "class",
-      "declarationSha256": "dc44435a7e9b2a12105bbc35629759312277d7c99c0b36d57780e54c94b29c95"
+      "declarationSha256": "05cf4d5cd31ebffd12f05c59db04d052ac6a7470ccb64becc73ff077b19cca29"
     },
     "IrisRiverGeometryConfig": {
       "kind": "class",
-      "declarationSha256": "3c8cd237388dafca4bc499a53ea7db6aabbefd08c7adcac16372b03f04436844"
+      "declarationSha256": "9c64034ed0510f8fb35fae2babde25e5b52f3bc9e33212d96eee6120d9feefd2"
     },
     "IrisRiverGrottoConfig": {
       "kind": "class",
-      "declarationSha256": "eece6524de413962472d5005c8fb8a6b53009be0c9f26fa2410730716bb25788"
+      "declarationSha256": "bb7af974aab6bbfef54596a2f1d955602f497d6fd6ca0329207d3760dfe9ab68"
     },
     "IrisRiverHydrology": {
       "kind": "class",
-      "declarationSha256": "77243a8ea4618aba476e12c3279afd80f38dafd0bee7ce00349e54e091bf903e"
+      "declarationSha256": "e61f8a89bfa2d53caf9ff0ce4789fc80e473f3ddd6aa3c294dc48cf4b91988a9"
     },
     "IrisRiverInlandOutlet": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "fecf1d627bdf738768aeccec04704890aaf9ce851227f385d03b6451ef2dd984"
     },
     "IrisRiverMaterialConfig": {
       "kind": "class",
-      "declarationSha256": "2bf16ad6390da4c6ed790a28d261800cb0f049203a92b2efdcdb4dcae9787043"
+      "declarationSha256": "c88e43595deaa4c2ba890b1ec4ad753b08321e5089afe9b1ec5ee77293dace8c"
     },
     "IrisRiverMeanderConfig": {
       "kind": "class",
-      "declarationSha256": "3dae3501c4773cd085ececfe7f83a3774f73407c7e118f3fa54a12c7cdc45f66"
+      "declarationSha256": "ac0db0a9698a24ae837ed22ccb64218d9eaad630a11d5841a93be69b25b29a87"
     },
     "IrisRiverMouthConfig": {
       "kind": "class",
-      "declarationSha256": "07c7814c1aba1f64209b7e2539b72bc3ba9d542288f8bbeccc0f4fc6724a6e64"
+      "declarationSha256": "4d5ddbf655da42fa0d02ea9d520bb8bd9ffe3f7a4571e4f1c49b6f29eb5d0321"
     },
     "IrisRiverPlacementMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "646dff2551cdf06cd67ac15f020179ad5634f6caeab1bc1af9799c666579e129"
     },
     "IrisRiverPolicy": {
       "kind": "class",
-      "declarationSha256": "dd45cfc8b43238c80000f5800d4edfca8b082184fd81afb50a4876230e685e60"
+      "declarationSha256": "78598a08f06dbff7c819222f828360750cf3cfc79769346929d5bc60bd550614"
     },
     "IrisRiverProfile": {
       "kind": "class",
-      "declarationSha256": "189da73aa7422ae61b416f76726a1dbcca1c63e791b464bcb2d4b0a98ca72596"
+      "declarationSha256": "3f22a5dfaa6962f6b129c1801edbe3818a4e470f1a6de6f442c783523c805ad0"
     },
     "IrisRiverRegionalConfig": {
       "kind": "class",
-      "declarationSha256": "b98596db40bcb34475139fd2c57e4d26b4b7e0068022b3f6f215878556737510"
+      "declarationSha256": "c5f8f9075e4cca8f6ff83242a71733fc1ab662b1d16e38bc0d298d4203e08bfa"
     },
     "IrisRiverRoutingConfig": {
       "kind": "class",
-      "declarationSha256": "ad48fcc954b0fbaf51e06850b45f9a5bd00b49d458967ed64fec39804fb06913"
+      "declarationSha256": "7c105a6fb4b7d9c761c279bf32e44688fc7739a6c4067bbba0499bd854cc4074"
     },
     "IrisRiverRoutingMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "079af73c05dc6d9043652ce278a3805dfa7fc3ac4e72019c32b5f11629c98ae8"
     },
     "IrisRuin": {
       "kind": "class",
-      "declarationSha256": "52eff4a95457a7cb459460c87b31d450205ae4993dabab2528c1d9d011d8c12c"
+      "declarationSha256": "57957eccd02e85454b9ab9e3a7a8fc106236510b0fee528bfed6835328099b77"
     },
     "IrisRuinDecorator": {
       "kind": "class",
-      "declarationSha256": "482c00fe1144d2a73678055f43f276aba12b7d1f7c145c13f946cb1c4aa7ab0a"
+      "declarationSha256": "d4268b443c3f08e59a86e8bedf56f9e388a9ee819fd6694e5151a45519fecbac"
     },
     "IrisRuinDecoratorTarget": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "14683a49073a5596d17836b66e8ce7f71a9eb52989647359047d95f99e83bbee"
     },
     "IrisRuinForm": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "e9d3faab602b782d408e4687b33641e0615da4dc913315608be6c602f9c4f7dd"
     },
     "IrisSeaCaveConfig": {
       "kind": "class",
-      "declarationSha256": "8531139a2ca1aabdd56ec607784f276152e81804d8f3e32b578c0e7cdc8feefb"
+      "declarationSha256": "729efd1d40ceac7397b5adc9fb064c3cbcb30193daab52c646f9836ba30b9922"
     },
     "IrisShapedGeneratorStyle": {
       "kind": "class",
-      "declarationSha256": "e92a0e43f73556c78bec12c615df4826cc18f5117d903b01c0516ed82224de9d"
+      "declarationSha256": "caea1bf8790df9aec0a62944545ae83570e46fcc214fd525f4534ae6285a364a"
     },
     "IrisSlopeClip": {
       "kind": "class",
-      "declarationSha256": "187a73165161f54ae7d112917fb2f387d807c6d56c0eb30963bc9d8298d10c95"
+      "declarationSha256": "736870a9f88525839affd90b52709a94a3e3230acff0972529ed99330db4906a"
+    },
+    "IrisSpawnGroup": {
+      "kind": "enum",
+      "declarationSha256": "3b9b93dfa34761bdc6cbe2feb7ea630185e0cfd8c2f506b04d518ec61ec10a4d"
+    },
+    "IrisSpawner": {
+      "kind": "class",
+      "declarationSha256": "7961ab72fc6f74ea30398e0eaa4acec0c7eacc911cd3fbbb48b0bde5da6cafeb"
     },
     "IrisStaticObject": {
       "kind": "class",
-      "declarationSha256": "c541836a7300c7af72626cac448e46aad83a4feadff53c37a3f9d404c57e900b"
+      "declarationSha256": "263cf512660668829b45b72c4743497e4d6d18effac52e9b9f22916e39cbfd39"
     },
     "IrisStaticObjectRotation": {
       "kind": "class",
-      "declarationSha256": "cb12e582faa310d1ec1da7d721c3aaf81c7cd5c5b67e59d034096bf45c9bb22c"
+      "declarationSha256": "71ba12a2f18f524aaa8048ea14d6b13374738fb3e7d81c17b9718273e5407962"
     },
     "IrisStiltSettings": {
       "kind": "class",
-      "declarationSha256": "1f868bf0bdd22f187ec6939812b0dc785d5034a25107dab816b07d7ecd36840b"
+      "declarationSha256": "e460bc7f4e5e21009bba5b4a33026a2bbc1bf63be58ed7a373aac47291b9ec27"
     },
     "IrisStructure": {
       "kind": "class",
-      "declarationSha256": "988d2bd38c1badfd1c593f38b92626250e77378062fad5a6699662df0c28ff98"
+      "declarationSha256": "e4a610141308285dbc56a02a0c7dfd7368bcbd2512091a82934146861bceceb9"
     },
     "IrisStructureAnchorMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "9d1b6d43959922acff54f2531cdaa485fd9aeb6b26e9232e779053c9a02c373c"
     },
     "IrisStructurePlacement": {
       "kind": "class",
-      "declarationSha256": "cf7e04948ca98ff2eb6228faaae9a78d180bda609771e5d151f42b987b4e6f23"
+      "declarationSha256": "65def9f85db0d44821eeb2d8efc98519cba23c2863304e79f88577baff4b9724"
     },
     "IrisStructureSetFrequencyOverride": {
       "kind": "class",
-      "declarationSha256": "cab3a1d917d30f1744f5f0e24ade0e10c4ac1f1c67d3cda662d998294b60cb5a"
+      "declarationSha256": "12e4571a6fe8aba1d733aba4fc70b35721349d759657b9bceff9f8299fa72746"
     },
     "IrisStructureStiltSettings": {
       "kind": "class",
-      "declarationSha256": "ef8f69e5b24cd285cf73ddda27cec05f6560a25f697dfbfbf1d41feb26bc02be"
+      "declarationSha256": "3c39359a694c18e59bbcb9a042f628d0544a4239a6d84a5a7e6372d102804766"
     },
     "IrisStructureTerrain": {
       "kind": "class",
-      "declarationSha256": "ea87d106673f16f45c2b80cd4f2220e67f6b03dc36ccbb658712ba9eca01848d"
+      "declarationSha256": "13c5ed1512b49d676c4d5f7d17344a10f605af3f6431d2f959a752f28110b330"
     },
     "IrisStructureYBand": {
       "kind": "class",
-      "declarationSha256": "09529b34236b6f35e80c2880965bd9e6eadf0be7f16282268942007b748a9379"
+      "declarationSha256": "dd7eb9590461a1890569429fc0118e30a9b7afb9acf6938b226712d9d6e9511e"
     },
     "IrisStyledRange": {
       "kind": "class",
-      "declarationSha256": "4673b66f59a0dfe4fbbaf2f3d7b55b8001ac6ea6038400068a42b149315d8b9a"
+      "declarationSha256": "051956037d7d6f2be5415a31f6813522c9781fd2d190f3daa2107e220aa28523"
     },
     "IrisSubterrainFamily": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "fecf1d627bdf738768aeccec04704890aaf9ce851227f385d03b6451ef2dd984"
     },
     "IrisSubterrainFeature": {
       "kind": "class",
-      "declarationSha256": "5c39952ef50600808212dfdef5995aee9b63020c69e36c810a8a13939a42f0d2"
+      "declarationSha256": "d915b4257a9bd42921a54b0296294a6137f83defcc6bd8ca61fae3c4abb23691"
     },
     "IrisSubterrainFluid": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "77f531d1215dcca86b44941e074df9103f677cddfccb697c0809ecb6c8b36276"
+    },
+    "IrisSurface": {
+      "kind": "enum",
+      "declarationSha256": "6e106ea2ddf0ab31b8a6d5276dfe0a17414f442dcf12b1568794ad1a30fcdb79"
     },
     "IrisSurfaceLayerFallback": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "2f4cf89879bd162d6e225524a5aa443d1802b52b9a52df332ac507dcd866c60c"
     },
     "IrisSurfacePoolConfig": {
       "kind": "class",
-      "declarationSha256": "da6bbe332444d431e9bbf1fa3467b7acfc598eed2689c473bc509a647afb31cf"
+      "declarationSha256": "1a07774435b58bcaa9b38fc67d81591cc0423f8a43f538d862b85a2823b54d9e"
     },
     "IrisSurfaceRiverBankConfig": {
       "kind": "class",
-      "declarationSha256": "ff89b928087b635ca54769e96fde15d14065340ea7ec3f06c67e17ba41ba3c6a"
+      "declarationSha256": "2141b14e95e9e16910153fbefa9d3d22543c4f5cf022c89e2e86618b53737e6a"
     },
     "IrisSurfaceRiverBedConfig": {
       "kind": "class",
-      "declarationSha256": "1ce0ac576dbbb73a246006c8677ef46f68774b88f39c3842d014ae3c111e928e"
+      "declarationSha256": "8a10ab7417e5616024b49d6e3dafbb82e09314076395403f303dfc7c061d7706"
     },
     "IrisSurfaceRiverChannelConfig": {
       "kind": "class",
-      "declarationSha256": "8f5b75952ea158525ae1599a2085445de5e681016d8d8e50d3139b228133c4d5"
+      "declarationSha256": "fb422c51dee60beed8db7adfbdec30bab9b39872ba91fcdaee64d6b2e5fa6bc5"
     },
     "IrisSurfaceRiverConfig": {
       "kind": "class",
-      "declarationSha256": "18a5d126bc85e52bb4095059fceaf669fb5ce246d8c43af21818353526432fb8"
+      "declarationSha256": "5a74f59d074cbb21f47469b36933c8761bf72f3dbe7f52e16349014153aef45b"
     },
     "IrisSurfaceRiverErosionConfig": {
       "kind": "class",
-      "declarationSha256": "cbbcc912903c2dae80461137d429bc9688b52d309bc7ac149cde8995ef6fa310"
+      "declarationSha256": "2c84b9ffe4a6d92df0800389668bd7350a4dc7cb781593cdd5190ca605f2e880"
     },
     "IrisSurfaceRiverFlowConfig": {
       "kind": "class",
-      "declarationSha256": "4af188fafa17424d174e9a343c794d6606f3c15b3ca161224b8d72ebbfcffca4"
+      "declarationSha256": "8bb23997ad66b92e1bf88932bb5d93ccf6f0ea3a787dd6fc441967311e3ab280"
     },
     "IrisSurfaceRiverPondConfig": {
       "kind": "class",
-      "declarationSha256": "2113138188563fec7f258fd34649cebbc3e5bda073a7be8306a6f9490caf1d09"
+      "declarationSha256": "cf6bbb88221c9b1145f348729c23f18651057776acd61afb666e95e22fa940d9"
     },
     "IrisSurfaceRiverPondsConfig": {
       "kind": "class",
-      "declarationSha256": "e622449fe8840155bbdddd32db3f23a0836cd83b932a7f30960b4faa92ed6d97"
+      "declarationSha256": "36a87620d3920e64eb5c5f0249517bd946e010f08e63188c42ad7afe844933c8"
     },
     "IrisSurfaceRiverShapeConfig": {
       "kind": "class",
-      "declarationSha256": "065150f919e8a5bd132985c8a9b2c1881232376c8a87a6144690cf74117146df"
+      "declarationSha256": "f5966184e2a0e5f26fa94a5441aa083698f78f92a7eae523ff493baaeadb9edc"
     },
     "IrisSurfaceRiverSourceConfig": {
       "kind": "class",
-      "declarationSha256": "157dabbeb055e2c095af2aed3a7718f69b5250ab9b5cb7d1514d31b1073d3dd0"
+      "declarationSha256": "e78892b8d3784d71874536da506cc8a18ec02741354dd5306c41a69e3273d91a"
     },
     "IrisTerrain3D": {
       "kind": "class",
-      "declarationSha256": "c93f0691b2dd037a06517293827503ee8056e8502f519f73c2dc6ef12241224f"
+      "declarationSha256": "e8103db80392286ccc1f3d6c6e44e6d9bc08e8f9f99f0308ba172395645b4c34"
     },
     "IrisTerrainTransform": {
       "kind": "class",
-      "declarationSha256": "07a8b7a29164218270f2470f6ae477e179081e02f311a813e6a97124a29bbce6"
+      "declarationSha256": "9d2425d3b5d770b3bd060f85616bb282ac58f6be7ff8026d5ad6b284cb2b2b20"
     },
     "IrisTimeBlock": {
       "kind": "class",
-      "declarationSha256": "e3a64ca52d33381bad53b932753a73fb4b5459acf8ed303faca1793bb7fadce6"
+      "declarationSha256": "128d9724a3686a5a09f83e55b536a091602afdffa7e7a9925df0a2b6cc536f6f"
     },
     "IrisTree": {
       "kind": "class",
-      "declarationSha256": "fa93692d4363e5055457681ad519e416e61f00203cfd232436520c3c1b0eb0db"
+      "declarationSha256": "4eda68afe193049aa473ade9c66f4e6f1d03e1b84a313b7bde4fa52eb3d2e99c"
     },
     "IrisTreeAzimuthMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "e55405a18bddd90e56d715a77f0a246bcec12664f0bb71a719c9d169cb988c50"
     },
     "IrisTreeBranchProbability": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "2498cf005d7948130e523da86d354c27e5419e1f1f7013f42331740153020b61"
     },
     "IrisTreeBranches": {
       "kind": "class",
-      "declarationSha256": "0040e9aa509b120fac62cc6eb37a527bcd82318c340ae612b7719f0cce662368"
+      "declarationSha256": "ac10471c42103ef1587e88ad48e02f8fcb52ea9c7287b8f01264a52026ddc174"
     },
     "IrisTreeCanopy": {
       "kind": "class",
-      "declarationSha256": "26630484805989f6e3d4394bb8c5c323ebd2faca963501d021b9653e8b4a0daa"
+      "declarationSha256": "43ffb8a4ac53c472d7496c28d81bce5df5d2b7cbbe74a025031fd256a0d4cadf"
     },
     "IrisTreeDecorator": {
       "kind": "class",
-      "declarationSha256": "eebf8fc14c8631346245c53849b052d1380942dd0bdfbd4cbf81545263bb8260"
+      "declarationSha256": "d5317f75951a1093d016df1218dd8b8b6bd44de4a3491dabbbee24ffb6a15fc7"
     },
     "IrisTreeDecoratorTarget": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "1295df82e79c0fb8399f485799b0f6afe3be6c2ea8023a31b6d543d3ea20d34b"
     },
     "IrisTreeFunction": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "2f4b1f7070bd6ed14e92bbc85f288df258c7c78bc6ff368ddc3d227ef3676202"
     },
     "IrisTreeLayer": {
       "kind": "class",
-      "declarationSha256": "30be7029e276adb8b1672858f07aa7db9f1e2a5c594a13a25a531d5fedae5e45"
+      "declarationSha256": "526098101e09e52fee064e7e80bc90e94f6ab0154c00a81df938e541d59f71bb"
     },
     "IrisTreeLeafMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "e7144b8fc4485cb3fad47f383629bc75a314ca4f5fe9209113ef8aee84b4efb5"
     },
     "IrisTreeModes": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "ae86e8712844a1e4182c012982003d6217dba1de99e94c98d03f66e47cf55f6f"
     },
     "IrisTreeProfile": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "c85dfa278545b7d848dfd9b510c2785cea255d621460a82ab5608694cf63c1a1"
     },
     "IrisTreeRootStyle": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "8bf4c72762a79b97ad910e7c676677603580b1c66d1732ebfd64a952c913cfa1"
     },
     "IrisTreeSecondaryLeaf": {
       "kind": "class",
-      "declarationSha256": "a882549f10b7539acd5e3bb4d54debd150194808d18c684e285408cf8a600c5c"
+      "declarationSha256": "4f4b20e5ac7d8c090bdc4f64d211b418503c3020c4c53805ee25bc4873dee80f"
     },
     "IrisTreeSettings": {
       "kind": "class",
-      "declarationSha256": "a6d77117dec5513b040dffe1fea445b9c0fce7476ec411fc6778c79ea9645221"
+      "declarationSha256": "3a0fc7c8988ea812f7f807a0791a2ba617046b71ebff73ce6224ac1dbab14185"
     },
     "IrisTreeSize": {
       "kind": "class",
-      "declarationSha256": "dfc6197c433125d8911894fc9cdbabe30f5ccc932846e7d141d8e159e3e566c1"
+      "declarationSha256": "aaac8781339107c3bd86401bdff5f2835278383b8bd48b6c603da77d2eaf4d35"
     },
     "IrisTreeSubBranches": {
       "kind": "class",
-      "declarationSha256": "d23422ab4dc8614fc7d6879d03f86d9d291c47fbaa42832ad7d36f8c75a72508"
+      "declarationSha256": "62266639dde2c2ff4f944968e97ace6e67511ab11654697ff8e3761f5123f955"
     },
     "IrisUndergroundRiverConfig": {
       "kind": "class",
-      "declarationSha256": "88e22c8fc73e41473759ccbf98fe3b65a0c5328386f7437c2506c31bbd9a1598"
+      "declarationSha256": "2bf659de0fcf2440aa933b921b9c7b715d34c69411852ae8336df3234930e4b3"
     },
     "IrisUndergroundRiverSourceConfig": {
       "kind": "class",
-      "declarationSha256": "05a20f46e5036f2af55313f3bd1cf3dedbbe55eb5e8af8e2eced6954124d2952"
+      "declarationSha256": "7d4d98910489c04356440e5f38b0d4ee2fb909f66b926e386e0f8f8545d091d5"
     },
     "IrisVacuumSettings": {
       "kind": "class",
-      "declarationSha256": "5e133652f97df9ae0c6f40295765812ac1fb97d8dac460fc07274473ad04d509"
+      "declarationSha256": "93df150f0eb22f7458817762e9bdd447b29cd4c19e4664c4e34d58583f9b421a"
     },
     "IrisVanillaStructureAdjustment": {
       "kind": "class",
-      "declarationSha256": "8421d4c820727b468a743722fa13d0a3c030cb5c72e5222cbac0a577bf10af5b"
+      "declarationSha256": "3e39099b8d49ceb249435ea726785a6b53668ad28d6a9b755ab766ff2f923546"
     },
     "IrisWeather": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "360eb3af54ecfbc011741a559c9dc42c1ca6eec2c3acdfa928319439a9940807"
     },
     "IrisWorldBoundary": {
       "kind": "class",
-      "declarationSha256": "232472951b94632d2b1787b8a4549ae4f7dd6ee8506317c1121ed25d15a9c914"
+      "declarationSha256": "6eed486a0ccaf6ab7dbd4397909b39ae1eb904274e009220ae0be258f25d1108"
     },
     "IrisWorldBoundaryCenter": {
       "kind": "class",
-      "declarationSha256": "cfeb7002385cb329db35e42d6590551fbf424fb324089f203513b779181f7739"
+      "declarationSha256": "b5eaa430be73416c4cfa6af31850c4902babec7c72f28658dded83684963d68d"
     },
     "JigsawJoint": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "5272ffdc4ec41cae511a4a888bed821e902ac55901c7068fe3ed299a4840de25"
     },
     "MantleFlag": {
       "kind": "interface",
-      "declarationSha256": "03d632f55560262f6bf9b389affe6bcb527f7c2db8f2e190598ad224fbcff9f2"
+      "declarationSha256": "e39afed734153f8833bc92d9363123a6dc880904dcd8094d7f50ca7f7fa554d2"
     },
     "NativeStructureSuppression": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "3d578e68fda3da11db040c8b4147f1841162befbee962f0887ab5488a74ce2fc"
     },
     "NoiseStyle": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "9919872f72a6b150d0afa7bc2e61857cdd81f95602e291f2af43619fc11d865e"
     },
     "ObjectPlaceMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "2fd90e597c6316957d5774572a0b44769e742778911d4704a24e2648fa8dc2bf"
     },
     "OverrideMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "f1d3c0ca36d424da3c8bc8aaf4fa3a968fe22b5e049cca731893bd4ca7f82b5f"
     },
     "StructureCarveShape": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "5e73c388f2bd2076d9e3cbfc98422807589dce9c55295d931bd861a3154149a0"
     },
     "StructureDistribution": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "b398d98f44490f55977c18b844c081b1954ee376cace19c334219dbf57bfb054"
     },
     "StructureTerrainMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "b8879884af54cf052b5b677f5f8b294fa38c0b9c64d4b6d1e62b81da6a2034ef"
     },
     "StudioMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "372922bbbb2c934b14a6bdc1cae33840630b843050f8a632dc18dcf411f6eb91"
     },
     "TopShapeMode": {
       "kind": "enum",
-      "declarationSha256": "fa74fbd2df9214aab324ffd17549c1d0f2fae43c9c69b4e739ff5377bca39300"
+      "declarationSha256": "9de78318d13585ef1f6d7464c3ef52dace7911827bee304ce025fd600a588246"
     }
   },
   "files": {
@@ -889,10 +957,13 @@
     "IrisDimensionStackBlend": "generation/terrain/IrisDimensionStackBlend.java",
     "IrisDimensionTypeOptions": "generation/terrain/IrisDimensionTypeOptions.java",
     "IrisDirection": "pack/value/IrisDirection.java",
+    "IrisDuration": "pack/value/IrisDuration.java",
     "IrisEffect": "world/entity/IrisEffect.java",
     "IrisEnchantment": "world/entity/IrisEnchantment.java",
     "IrisEngineStreamType": "generation/runtime/IrisEngineStreamType.java",
     "IrisEngineValueType": "generation/runtime/IrisEngineValueType.java",
+    "IrisEntity": "world/entity/IrisEntity.java",
+    "IrisEntitySpawn": "world/entity/IrisEntitySpawn.java",
     "IrisEnvironment": "world/IrisEnvironment.java",
     "IrisExpression": "generation/noise/IrisExpression.java",
     "IrisExpressionFunction": "generation/noise/IrisExpressionFunction.java",
@@ -943,7 +1014,17 @@
     "IrisLoot": "world/loot/IrisLoot.java",
     "IrisLootMode": "world/loot/IrisLootMode.java",
     "IrisLootReference": "world/loot/IrisLootReference.java",
+    "IrisLootTable": "world/loot/IrisLootTable.java",
+    "IrisMarker": "world/entity/IrisMarker.java",
     "IrisMaterialPalette": "generation/terrain/IrisMaterialPalette.java",
+    "IrisMod": "pack/mod/IrisMod.java",
+    "IrisModBiomeInjector": "pack/mod/IrisModBiomeInjector.java",
+    "IrisModBiomeReplacer": "pack/mod/IrisModBiomeReplacer.java",
+    "IrisModNoiseStyleReplacer": "pack/mod/IrisModNoiseStyleReplacer.java",
+    "IrisModObjectPlacementBiomeInjector": "pack/mod/IrisModObjectPlacementBiomeInjector.java",
+    "IrisModObjectPlacementRegionInjector": "pack/mod/IrisModObjectPlacementRegionInjector.java",
+    "IrisModObjectReplacer": "pack/mod/IrisModObjectReplacer.java",
+    "IrisModRegionReplacer": "pack/mod/IrisModRegionReplacer.java",
     "IrisNativeStructure": "structure/nativegen/IrisNativeStructure.java",
     "IrisNoiseGenerator": "generation/noise/IrisNoiseGenerator.java",
     "IrisObjectLimit": "structure/object/IrisObjectLimit.java",
@@ -963,6 +1044,7 @@
     "IrisProceduralObjects": "generation/decoration/IrisProceduralObjects.java",
     "IrisProceduralTree": "generation/decoration/tree/IrisProceduralTree.java",
     "IrisRange": "pack/value/IrisRange.java",
+    "IrisRate": "pack/value/IrisRate.java",
     "IrisRegion": "generation/terrain/IrisRegion.java",
     "IrisRegistrant": "pack/loading/IrisRegistrant.java",
     "IrisRiverBank3DConfig": "generation/hydrology/IrisRiverBank3DConfig.java",
@@ -991,6 +1073,8 @@
     "IrisSeaCaveConfig": "generation/hydrology/IrisSeaCaveConfig.java",
     "IrisShapedGeneratorStyle": "generation/noise/IrisShapedGeneratorStyle.java",
     "IrisSlopeClip": "generation/terrain/IrisSlopeClip.java",
+    "IrisSpawnGroup": "world/entity/IrisSpawnGroup.java",
+    "IrisSpawner": "world/entity/IrisSpawner.java",
     "IrisStaticObject": "structure/object/IrisStaticObject.java",
     "IrisStaticObjectRotation": "structure/object/IrisStaticObjectRotation.java",
     "IrisStiltSettings": "generation/decoration/IrisStiltSettings.java",
@@ -1005,6 +1089,7 @@
     "IrisSubterrainFamily": "generation/subterrain/IrisSubterrainFamily.java",
     "IrisSubterrainFeature": "generation/subterrain/IrisSubterrainFeature.java",
     "IrisSubterrainFluid": "generation/subterrain/IrisSubterrainFluid.java",
+    "IrisSurface": "generation/decoration/IrisSurface.java",
     "IrisSurfaceLayerFallback": "generation/biome/IrisSurfaceLayerFallback.java",
     "IrisSurfacePoolConfig": "generation/hydrology/IrisSurfacePoolConfig.java",
     "IrisSurfaceRiverBankConfig": "generation/hydrology/IrisSurfaceRiverBankConfig.java",
