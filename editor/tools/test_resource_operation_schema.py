@@ -5,6 +5,10 @@ import sys
 import tempfile
 from resource_operation_schema import FILES, extract, source_path
 
+def write_source(path, text):
+    # Preserve pinned UTF-8/newlines on Windows too; text-mode CRLF conversion changes Java text blocks.
+    path.write_bytes(text.encode('utf-8'))
+
 root = Path(sys.argv[1])
 values, evidence = extract(root)
 manifest = json.loads(Path('editor/policy/resource-operation-sources.json').read_text())
@@ -84,8 +88,9 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     sources = {}
     for name, relative in FILES.items():
         path = source_path(root, name, relative)
-        sources[name] = path.read_text()
-        (fixture / (name + '.java')).write_text(sources[name])
+        sources[name] = path.read_bytes().decode('utf-8')
+        write_source(fixture / (name + '.java'), sources[name])
+    assert extract(fixture)[1] == manifest['sources'], 'Mutation fixture must start byte-exact on every platform'
     for name, old, new in [
         ('IrisRegistrant', 'private transient String loadKey;', 'private String loadKey;'),
         ('IrisRegistrant', 'private transient String loadKey;', 'protected String loadKey;'),
@@ -121,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     ]:
         assert old in sources[name], old
         changed = fixture / (name + '.java')
-        changed.write_text(sources[name].replace(old, new))
+        write_source(changed, sources[name].replace(old, new))
         try:
             extract(fixture)
         except (AssertionError, ValueError):
@@ -129,21 +134,21 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
         else:
             raise AssertionError('Accepted unreviewed ownership/default/inheritance drift: ' + old)
         finally:
-            changed.write_text(sources[name])
+            write_source(changed, sources[name])
     # Even source changes outside parsed declarations are bound to the reviewed loader evidence.
     loader = fixture / 'ResourceLoader.java'
-    loader.write_text(sources['ResourceLoader'].replace('candidate.isFile()', 'candidate.exists()'))
+    write_source(loader, sources['ResourceLoader'].replace('candidate.isFile()', 'candidate.exists()'))
     assert extract(fixture)[1] != manifest['sources']
-    loader.write_text(sources['ResourceLoader'])
+    write_source(loader, sources['ResourceLoader'])
     assert '(x, z) -> regionStream.get(x, z).getLoadKey()' in sources['IrisComplex']
     assert 'IrisBiome emptyBiome = new IrisBiome().setInferredType(InferredType.CAVE);' in sources['IrisComplex']
     assert '.onNull(emptyBiome)' in sources['IrisComplex']
     complex_source=fixture/'IrisComplex.java'
-    complex_source.write_text(sources['IrisComplex'].replace('(x, z) -> regionStream.get(x, z).getLoadKey()', '(x, z) -> regionStream.get(x, z).getName()'))
+    write_source(complex_source, sources['IrisComplex'].replace('(x, z) -> regionStream.get(x, z).getLoadKey()', '(x, z) -> regionStream.get(x, z).getName()'))
     assert extract(fixture)[1]['generation/runtime/IrisComplex.java'] != manifest['sources']['generation/runtime/IrisComplex.java']
     assert "return trimmed.indexOf(':') >= 0 ? trimmed : \"minecraft:\" + trimmed;" in sources['IrisBiomeDerivatives']
     derivative_source=fixture/'IrisBiomeDerivatives.java'
-    derivative_source.write_text(sources['IrisBiomeDerivatives'].replace('String trimmed = key.trim();','String trimmed = key.toLowerCase();'))
+    write_source(derivative_source, sources['IrisBiomeDerivatives'].replace('String trimmed = key.trim();','String trimmed = key.toLowerCase();'))
     assert extract(fixture)[1]['generation/biome/IrisBiomeDerivatives.java'] != manifest['sources']['generation/biome/IrisBiomeDerivatives.java']
     cave_source=fixture/'StructureCaveAnchorResolver.java'
     assert 'normalizedActual.endsWith(":" + normalizedAllowed)' in sources['StructureCaveAnchorResolver']
@@ -151,6 +156,6 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     assert 'StructureCaveAnchorResolver.resolve(' in sources['IrisStructureLocator']
     assert 'default IrisBiome getCaveOrMantleBiome(' in sources['Engine']
     assert 'return Engine.super.getCaveOrMantleBiome(x, y, z);' in sources['IrisEngine']
-    cave_source.write_text(sources['StructureCaveAnchorResolver'].replace('normalizedActual.equals(normalizedAllowed)','normalizedActual.startsWith(normalizedAllowed)'))
+    write_source(cave_source, sources['StructureCaveAnchorResolver'].replace('normalizedActual.equals(normalizedAllowed)','normalizedActual.startsWith(normalizedAllowed)'))
     assert extract(fixture)[1]['structure/placement/StructureCaveAnchorResolver.java'] != manifest['sources']['structure/placement/StructureCaveAnchorResolver.java']
 print('PASS: ten-target/fifteen-owner/typed-snippet inherited/nested resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')
