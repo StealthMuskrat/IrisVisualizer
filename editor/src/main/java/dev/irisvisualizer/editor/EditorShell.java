@@ -19,6 +19,15 @@ final class EditorShell {
     /** Preferences live for this editor session only. Resizing never captures workspace data. */
     static final class State {
         private float resourceFraction=Float.NaN,inspectorFraction=Float.NaN;
+        Layout layout(float width,float height,float menuHeight,float displayScale){
+            EditorDisplayScale.validate(displayScale);validate(width,height,menuHeight);
+            var base=layout(width/displayScale,height/displayScale,menuHeight/displayScale);
+            return new Layout(scaled(base.resources(),displayScale),scaled(base.visualization(),displayScale),scaled(base.inspector(),displayScale));
+        }
+        boolean resizable(float width,float displayScale){EditorDisplayScale.validate(displayScale);return resizable(width/displayScale);}
+        void move(Divider divider,float delta,float width,float height,float menuHeight,float displayScale){
+            EditorDisplayScale.validate(displayScale);move(divider,delta/displayScale,width/displayScale,height/displayScale,menuHeight/displayScale);
+        }
         Layout layout(float width,float height,float menuHeight){
             validate(width,height,menuHeight);
             float left=Float.isNaN(resourceFraction)?Math.min(320,width*.24f):width*resourceFraction;
@@ -57,6 +66,8 @@ final class EditorShell {
         if(!Float.isFinite(width) || width<0)throw new IllegalArgumentException("Invalid preview toolbar width");
         return width>=680?Toolbar.ROW:width>=360?Toolbar.COMPACT:Toolbar.STACKED;
     }
+    static Toolbar toolbar(float width,float displayScale){EditorDisplayScale.validate(displayScale);return toolbar(width/displayScale);}
+    private static Rect scaled(Rect rect,float scale){return new Rect(rect.x()*scale,rect.y()*scale,rect.width()*scale,rect.height()*scale);}
     private static void validate(float width,float height,float menuHeight){
         if(!Float.isFinite(width) || !Float.isFinite(height) || !Float.isFinite(menuHeight) || width<0 || height<0 || menuHeight<0)throw new IllegalArgumentException("Invalid desktop dimensions");
     }

@@ -163,6 +163,7 @@ public final class WorkspaceTests {
    SharedSourceIndexTests.run(temp);
    EditorShellPreviewTests.run(temp);
    EditorShellLayoutTests.run();
+   EditorDisplayScaleTests.run();
    PreviewFramingTests.run(temp);
    PreviewIsolationTests.run(temp);
    PreviewDimensionContextTests.run(temp);

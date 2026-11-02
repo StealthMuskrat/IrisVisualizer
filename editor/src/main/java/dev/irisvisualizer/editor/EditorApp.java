@@ -37,6 +37,7 @@ public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
     private final EditorShell.State shellLayout=new EditorShell.State();
+    private final EditorDisplayScale displayScale=new EditorDisplayScale();
     private EditorShell.Panel shellFocused=EditorShell.Panel.RESOURCES,shellFocusRequest;
     private final PreviewSession previewSession=new PreviewSession();
     private final PreviewDimensionContext previewDimensionContext=new PreviewDimensionContext();
@@ -254,26 +255,35 @@ public final class EditorApp extends Application {
             ImGui.textUnformatted(String.format(java.util.Locale.ROOT,"%.2f%% (%s)",100*imageViewport.scale(),imageViewport.fitting() ? "fit" : "manual"));
         }
     }
+    private float ui(float units){return units*displayScale.factor();}
+    private void initialWindowSize(float width,float height){ImGui.setNextWindowSize(Math.max(1,Math.min(ui(width),ImGui.getIO().getDisplaySizeX()-ui(32))),Math.max(1,Math.min(ui(height),ImGui.getIO().getDisplaySizeY()-ui(32))),ImGuiCond.FirstUseEver);}
     private static void positionShell(EditorShell.Rect area){ImGui.setNextWindowPos(area.x(),area.y());ImGui.setNextWindowSize(Math.max(1,area.width()),Math.max(1,area.height()));}
     private void beginShellPanel(EditorShell.Panel panel,EditorShell.Rect area){
         positionShell(area);
         if(shellFocusRequest==panel){ImGui.setNextWindowFocus();shellFocusRequest=null;}
         float minimum=switch(panel){case RESOURCES->EditorShell.MIN_RESOURCES;case VISUALIZATION->EditorShell.MIN_VISUALIZATION;case INSPECTOR->EditorShell.MIN_INSPECTOR;};
         ImGui.pushStyleVar(ImGuiStyleVar.WindowMinSize,1,1);
-        ImGui.begin(panel.window,SHELL_FLAGS|(area.width()<minimum?ImGuiWindowFlags.HorizontalScrollbar:0));
+        ImGui.begin(panel.window,SHELL_FLAGS|(area.width()<ui(minimum)?ImGuiWindowFlags.HorizontalScrollbar:0));
         ImGui.popStyleVar();
         if(ImGui.isWindowFocused(ImGuiFocusedFlags.RootAndChildWindows))shellFocused=panel;
     }
     private void drawLayoutMenu(float menuHeight){
         if(!ImGui.beginMenu("Layout"))return;
         float width=ImGui.getIO().getDisplaySizeX(),height=ImGui.getIO().getDisplaySizeY();
-        ImGui.beginDisabled(!shellLayout.resizable(width));
-        if(ImGui.menuItem("Widen resources"))shellLayout.move(EditorShell.Divider.RESOURCES,32,width,height,menuHeight);
-        if(ImGui.menuItem("Narrow resources"))shellLayout.move(EditorShell.Divider.RESOURCES,-32,width,height,menuHeight);
-        if(ImGui.menuItem("Widen resource editor"))shellLayout.move(EditorShell.Divider.INSPECTOR,-32,width,height,menuHeight);
-        if(ImGui.menuItem("Narrow resource editor"))shellLayout.move(EditorShell.Divider.INSPECTOR,32,width,height,menuHeight);
+        ImGui.beginDisabled(!shellLayout.resizable(width,displayScale.factor()));
+        if(ImGui.menuItem("Widen resources"))shellLayout.move(EditorShell.Divider.RESOURCES,ui(32),width,height,menuHeight,displayScale.factor());
+        if(ImGui.menuItem("Narrow resources"))shellLayout.move(EditorShell.Divider.RESOURCES,ui(-32),width,height,menuHeight,displayScale.factor());
+        if(ImGui.menuItem("Widen resource editor"))shellLayout.move(EditorShell.Divider.INSPECTOR,ui(-32),width,height,menuHeight,displayScale.factor());
+        if(ImGui.menuItem("Narrow resource editor"))shellLayout.move(EditorShell.Divider.INSPECTOR,ui(32),width,height,menuHeight,displayScale.factor());
         ImGui.endDisabled();
         if(ImGui.menuItem("Reset panel widths"))shellLayout.reset();
+        if(ImGui.beginMenu("Display scale")){
+            for(var choice:EditorDisplayScale.Choice.values()){
+                String label=choice==EditorDisplayScale.Choice.SYSTEM?String.format(java.util.Locale.ROOT,"System display scale (%.0f%%)",displayScale.monitor()*100):choice.label;
+                if(ImGui.menuItem(label,"",displayScale.choice()==choice))displayScale.choose(choice);
+            }
+            ImGui.textDisabled("Display preference for this session.");ImGui.endMenu();
+        }
         ImGui.separator();
         if(ImGui.menuItem("Focus resources"))shellFocusRequest=EditorShell.Panel.RESOURCES;
         if(ImGui.menuItem("Focus visualization"))shellFocusRequest=EditorShell.Panel.VISUALIZATION;
@@ -283,24 +293,24 @@ public final class EditorApp extends Application {
     }
     private void drawShellDividers(EditorShell.Layout layout,float menuHeight){
         float width=ImGui.getIO().getDisplaySizeX(),height=ImGui.getIO().getDisplaySizeY();
-        if(!shellLayout.resizable(width) || layout.resources().height()<1)return;
+        if(!shellLayout.resizable(width,displayScale.factor()) || layout.resources().height()<1)return;
         drawShellDivider(EditorShell.Divider.RESOURCES,layout.visualization().x(),layout.resources().y(),layout.resources().height(),width,height,menuHeight);
         drawShellDivider(EditorShell.Divider.INSPECTOR,layout.inspector().x(),layout.resources().y(),layout.resources().height(),width,height,menuHeight);
     }
     private void drawShellDivider(EditorShell.Divider divider,float x,float y,float body,float width,float height,float menuHeight){
         ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding,0,0);
         ImGui.pushStyleVar(ImGuiStyleVar.WindowMinSize,1,1);
-        ImGui.setNextWindowPos(x-3,y);ImGui.setNextWindowSize(6,body);
+        ImGui.setNextWindowPos(x-ui(3),y);ImGui.setNextWindowSize(ui(6),body);
         int flags=SHELL_FLAGS|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse|ImGuiWindowFlags.NoBackground|ImGuiWindowFlags.NoFocusOnAppearing|ImGuiWindowFlags.NoNav;
         if(ImGui.begin("Panel divider##"+divider,flags)){
-            ImGui.invisibleButton("Resize panel",6,body);
+            ImGui.invisibleButton("Resize panel",ui(6),body);
             boolean hovered=ImGui.isItemHovered(),active=ImGui.isItemActive();
             if(hovered || active){
                 ImGui.setMouseCursor(ImGuiMouseCursor.ResizeEW);
-                ImGui.getWindowDrawList().addLine(x,y,x,y+body,active?0xff999999:0xffcccccc,1);
+                ImGui.getWindowDrawList().addLine(x,y,x,y+body,active?0xff999999:0xffcccccc,ui(1));
             }
             if(hovered && ImGui.isMouseDoubleClicked(0))shellLayout.reset();
-            else if(active && ImGui.isMouseDragging(0))shellLayout.move(divider,ImGui.getIO().getMouseDeltaX(),width,height,menuHeight);
+            else if(active && ImGui.isMouseDragging(0))shellLayout.move(divider,ImGui.getIO().getMouseDeltaX(),width,height,menuHeight,displayScale.factor());
             if(hovered && !active)ImGui.setTooltip("Drag to resize. Double-click to reset widths. Keyboard controls: Workspace > Layout.");
         }
         ImGui.end();ImGui.popStyleVar(2);
@@ -332,13 +342,13 @@ public final class EditorApp extends Application {
             boolean apply;
             if(map){
                 ImGui.textUnformatted(PreviewFraming.MAP_SAMPLES+" × "+PreviewFraming.MAP_SAMPLES+" samples");
-                ImGui.setNextItemWidth(140);apply=ImGui.inputText("Blocks per sample",previewMapScale,ImGuiInputTextFlags.EnterReturnsTrue);
+                ImGui.setNextItemWidth(ui(140));apply=ImGui.inputText("Blocks per sample",previewMapScale,ImGuiInputTextFlags.EnterReturnsTrue);
                 if(ImGui.isItemHovered())ImGui.setTooltip("World-space distance between map samples. X/Z mark the first sample; scale does not edit generation settings.");
                 apply|=ImGui.button("Apply map scale");
             }else{
                 ImGui.textWrapped(context.report()==null?"Full configured dimension height (unresolved)":"Full configured height: "+context.report().height().label());
-                ImGui.setNextItemWidth(100);apply=ImGui.inputText("Width (blocks)",previewAreaWidth,ImGuiInputTextFlags.EnterReturnsTrue);
-                ImGui.setNextItemWidth(100);apply|=ImGui.inputText("Depth (blocks)",previewAreaDepth,ImGuiInputTextFlags.EnterReturnsTrue);
+                ImGui.setNextItemWidth(ui(100));apply=ImGui.inputText("Width (blocks)",previewAreaWidth,ImGuiInputTextFlags.EnterReturnsTrue);
+                ImGui.setNextItemWidth(ui(100));apply|=ImGui.inputText("Depth (blocks)",previewAreaDepth,ImGuiInputTextFlags.EnterReturnsTrue);
                 apply|=ImGui.button("Apply terrain area");
             }
             if(apply)try{view=map?previewSession.mapScale(previewMapScale.get()):previewSession.terrainArea(previewAreaWidth.get(),previewAreaDepth.get());bindPreviewSettings(view);previewFramingError=null;}catch(IllegalArgumentException invalid){previewFramingError=invalid.getMessage();}
@@ -373,12 +383,12 @@ public final class EditorApp extends Application {
     private PreviewSession.View drawPreviewLocation(PreviewSession.View view){
         if(!view.contextual()){ImGui.textDisabled(view.kind().label);return view;}
         ImGui.beginDisabled(view.dimension()==null);
-        float width=Math.max(0,ImGui.getContentRegionAvailX());boolean row=width>=350,paired=width>=160;
-        ImGui.setNextItemWidth(row?100:Math.max(1,width-40));
+        float width=Math.max(0,ImGui.getContentRegionAvailX());boolean row=width>=ui(350),paired=width>=ui(160);
+        ImGui.setNextItemWidth(row?ui(100):Math.max(1,width-ui(40)));
         boolean apply=ImGui.inputText("Seed##preview",previewSeed,ImGuiInputTextFlags.EnterReturnsTrue);
         if(ImGui.isItemHovered())ImGui.setTooltip("Signed 64-bit preview seed. X/Z mark the first sample or terrain block. Press Enter to apply; pack JSON is unchanged.");
         if(row)ImGui.sameLine();
-        float coordinateWidth=row?55:paired?Math.max(1,(width-48)/2):Math.max(1,width-20);
+        float coordinateWidth=row?ui(55):paired?Math.max(1,(width-ui(48))/2):Math.max(1,width-ui(20));
         ImGui.setNextItemWidth(coordinateWidth);apply|=ImGui.inputText("X##preview",previewX,ImGuiInputTextFlags.EnterReturnsTrue);
         if(paired)ImGui.sameLine();
         ImGui.setNextItemWidth(coordinateWidth);apply|=ImGui.inputText("Z##preview",previewZ,ImGuiInputTextFlags.EnterReturnsTrue);
@@ -396,15 +406,16 @@ public final class EditorApp extends Application {
         boolean biome=view.kind()==PreviewSession.Kind.BIOME;
         String isolated=biome?"Isolated biome":"Isolated region";
         ImGui.beginDisabled(view.dimension()==null);
-        ImGui.setNextItemWidth(Math.max(1,Math.min(220,ImGui.getContentRegionAvailX()-60)));
+        ImGui.setNextItemWidth(Math.max(1,Math.min(ui(220),ImGui.getContentRegionAvailX()-ui(60))));
         if(ImGui.beginCombo("Placement",view.placement()==PreviewIsolation.Placement.ISOLATED?isolated:"Dimension settings")){
             if(ImGui.selectable(isolated,view.placement()==PreviewIsolation.Placement.ISOLATED))view=previewSession.placement(PreviewIsolation.Placement.ISOLATED);
             if(ImGui.selectable("Dimension settings",view.placement()==PreviewIsolation.Placement.DIMENSION_SETTINGS))view=previewSession.placement(PreviewIsolation.Placement.DIMENSION_SETTINGS);
             ImGui.endCombo();
         }
         ImGui.endDisabled();
-        ImGui.textDisabled(view.placement()==PreviewIsolation.Placement.ISOLATED?(biome?"Native focus: LAND role (details)":"Native focus: region distribution (details)"):"Stored dimension focus retained (details)");
+        if(ImGui.smallButton((view.placement()==PreviewIsolation.Placement.ISOLATED?(biome?"Native focus: LAND":"Native focus: region"):"Stored dimension focus")+"##placement-details"))ImGui.openPopup("Native focus details");
         if(ImGui.isItemHovered())ImGui.setTooltip(PreviewIsolation.help(biome,view.placement()));
+        if(ImGui.beginPopup("Native focus details")){ImGui.pushTextWrapPos(ImGui.getCursorPosX()+Math.max(1,Math.min(ui(360),ImGui.getIO().getDisplaySizeX()-ui(32))));ImGui.textWrapped(PreviewIsolation.help(biome,view.placement()));ImGui.popTextWrapPos();ImGui.endPopup();}
         return view;
     }
     private void drawPreviewHeight(PreviewDimensionContext.Snapshot context){
@@ -412,6 +423,8 @@ public final class EditorApp extends Application {
         else if(context.phase()==PreviewDimensionContext.Phase.READY){
             var height=context.report().height();ImGui.textWrapped(height.label());
             if(ImGui.isItemHovered())ImGui.setTooltip(height.provenance()+" Applied pack values only; pending Inspector edits are excluded. This does not validate dependencies, borrowed dimension types or native generation readiness.");
+            if(ImGui.smallButton("Height details"))ImGui.openPopup("Dimension height details");
+            if(ImGui.beginPopup("Dimension height details")){ImGui.pushTextWrapPos(ImGui.getCursorPosX()+Math.max(1,Math.min(ui(360),ImGui.getIO().getDisplaySizeX()-ui(32))));ImGui.textWrapped(height.provenance()+" Applied pack values only; pending Inspector edits are excluded. This does not validate dependencies, borrowed dimension types or native generation readiness.");ImGui.popTextWrapPos();ImGui.endPopup();}
             if(height.problem()!=null)ImGui.textWrapped("Preview height: "+height.problem());
         }else if(context.phase()==PreviewDimensionContext.Phase.FAILED){
             ImGui.textWrapped("Preview height: "+context.error());
@@ -421,15 +434,15 @@ public final class EditorApp extends Application {
     private void drawPreviewPanel(){
         var view=previewSession.select(workspace,selected);bindPreviewSettings(view);
         if(!view.image()){var imageState=imageLoader.select(workspace,selected);if(imageRequest!=imageState.request()){clearImage();imageRequest=imageState.request();imageUploadAttempted=false;}}
-        var toolbar=EditorShell.toolbar(Math.max(0,ImGui.getContentRegionAvailX()));
+        var toolbar=EditorShell.toolbar(Math.max(0,ImGui.getContentRegionAvailX()),displayScale.factor());
         if(toolbar==EditorShell.Toolbar.ROW){
             if(ImGui.beginTable("Preview toolbar",3,ImGuiTableFlags.SizingStretchProp)){
-                ImGui.tableSetupColumn("Mode",ImGuiTableColumnFlags.WidthFixed,100);ImGui.tableSetupColumn("Location",ImGuiTableColumnFlags.WidthStretch);ImGui.tableSetupColumn("Update",ImGuiTableColumnFlags.WidthFixed,184);
+                ImGui.tableSetupColumn("Mode",ImGuiTableColumnFlags.WidthFixed,ui(100));ImGui.tableSetupColumn("Location",ImGuiTableColumnFlags.WidthStretch);ImGui.tableSetupColumn("Update",ImGuiTableColumnFlags.WidthFixed,ui(184));
                 ImGui.tableNextRow();ImGui.tableNextColumn();view=drawPreviewModes(view);ImGui.tableNextColumn();view=drawPreviewLocation(view);ImGui.tableNextColumn();drawPreviewUpdate(view);ImGui.endTable();
             }
         }else if(toolbar==EditorShell.Toolbar.COMPACT){
             if(ImGui.beginTable("Compact preview toolbar",2,ImGuiTableFlags.SizingStretchProp)){
-                ImGui.tableSetupColumn("Mode",ImGuiTableColumnFlags.WidthStretch);ImGui.tableSetupColumn("Update",ImGuiTableColumnFlags.WidthFixed,184);
+                ImGui.tableSetupColumn("Mode",ImGuiTableColumnFlags.WidthStretch);ImGui.tableSetupColumn("Update",ImGuiTableColumnFlags.WidthFixed,ui(184));
                 ImGui.tableNextRow();ImGui.tableNextColumn();view=drawPreviewModes(view);ImGui.tableNextColumn();drawPreviewUpdate(view);ImGui.endTable();
             }
             view=drawPreviewLocation(view);
@@ -460,7 +473,7 @@ public final class EditorApp extends Application {
     }
     private void drawImageStatistics(AssetImage.Decoded image) {
         if(focusImageStatistics) { ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusImageStatistics=false; }
-        ImGui.setNextWindowSize(620,680,ImGuiCond.FirstUseEver);
+        initialWindowSize(620,680);
         if(!ImGui.begin("Decoded image pixel statistics")) { ImGui.end();return; }
         if(ImGui.button("Hide pixel statistics")) { showImageStatistics=false;ImGui.end();return; }
         if(image==null) { ImGui.textWrapped("Select a supported image and wait for its decoded view before choosing a pixel region. Previous analysis is invalidated when the selected image changes.");ImGui.end();return; }
@@ -491,7 +504,7 @@ public final class EditorApp extends Application {
         ImGui.textWrapped("Read-only first-frame image data only. The existing 16 MiB encoded / 4-megapixel image limits apply. No image is rewritten, and no native image-map sampling, terrain or object preview is calculated. Hiding retains unchanged work; Cancel/clear and image changes discard it.");
         ImGui.end();
     }
-    private boolean styled, closeRequested;
+    private boolean closeRequested;
     private final ImString filter = new ImString(256);
     private final ResourceBrowser.Cache resourceBrowser=new ResourceBrowser.Cache();
     private ResourceFinder.Family browserFamily=ResourceFinder.Family.ALL;
@@ -566,10 +579,23 @@ public final class EditorApp extends Application {
     private String jsonFindError,jsonPreviousFind="";
     @Override protected void preRun() {
         long handle = ((WindowGlfw) getWindow()).getHandle();
+        displayScale.update(imgui.glfw.ImGuiImplGlfw.getContentScaleForWindow(handle));applyUiStyle();
         glfwSetWindowCloseCallback(handle, window -> {
             glfwSetWindowShouldClose(window, false);
             closeRequested = true;
         });
+    }
+    /** Use native dynamic font scaling; framebuffer sizing remains owned by the GLFW backend. */
+    private void applyUiStyle(){
+        var io=ImGui.getIO();io.addConfigFlags(ImGuiConfigFlags.NavEnableKeyboard);io.setConfigDpiScaleFonts(false);
+        ImGui.styleColorsLight();var style=ImGui.getStyle();style.setFontScaleMain(1);style.setFontScaleDpi(displayScale.factor());
+        style.setWindowRounding(0);style.setWindowBorderSize(0);style.setChildBorderSize(0);
+        style.setWindowPadding(ui(10),ui(10));style.setFramePadding(ui(4),ui(3));style.setItemSpacing(ui(8),ui(4));style.setItemInnerSpacing(ui(4),ui(4));style.setCellPadding(ui(4),ui(2));
+        style.setIndentSpacing(ui(21));style.setScrollbarSize(ui(14));style.setGrabMinSize(ui(12));style.setWindowMinSize(ui(32),ui(32));style.setMouseCursorScale(displayScale.factor());
+        style.setColor(ImGuiCol.WindowBg,1f,1f,1f,1f);style.setColor(ImGuiCol.ChildBg,1f,1f,1f,1f);
+    }
+    @Override protected void postProcess(){
+        if(displayScale.update(imgui.glfw.ImGuiImplGlfw.getContentScaleForWindow(((WindowGlfw)getWindow()).getHandle())))applyUiStyle();
     }
     private final InspectorDrafts drafts = new InspectorDrafts();
     private boolean showAppliedHistory;
@@ -603,7 +629,6 @@ public final class EditorApp extends Application {
         pollJsonSourceReview();
         updateSourceMatchFocus();
 
-        if (!styled) { ImGui.getIO().addConfigFlags(ImGuiConfigFlags.NavEnableKeyboard);ImGui.styleColorsLight();var style=ImGui.getStyle();style.setWindowRounding(0);style.setWindowBorderSize(0);style.setChildBorderSize(0);style.setWindowPadding(10,10);style.setColor(ImGuiCol.WindowBg,1f,1f,1f,1f);style.setColor(ImGuiCol.ChildBg,1f,1f,1f,1f);styled = true; }
         var shellIo=ImGui.getIO();
         if(!shellIo.getKeyCtrl() && !shellIo.getKeyAlt() && !shellIo.getKeySuper() && !ImGui.isPopupOpen("",ImGuiPopupFlags.AnyPopup) && ImGui.isKeyPressed(ImGuiKey.F6,false)) shellFocusRequest=shellFocused.next(shellIo.getKeyShift());
         float menuHeight=ImGui.getFrameHeight();
@@ -676,7 +701,7 @@ public final class EditorApp extends Application {
             if (drafts.any()) ImGui.text("Unapplied text: " + drafts.count());
             ImGui.endMainMenuBar();
         }
-        var layout=shellLayout.layout(ImGui.getIO().getDisplaySizeX(),ImGui.getIO().getDisplaySizeY(),menuHeight);
+        var layout=shellLayout.layout(ImGui.getIO().getDisplaySizeX(),ImGui.getIO().getDisplaySizeY(),menuHeight,displayScale.factor());
         beginShellPanel(EditorShell.Panel.RESOURCES,layout.resources());ImGui.textUnformatted("Resources");ImGui.separator();
         ImGui.inputText("Search", filter);
         if (ImGui.beginCombo("Resource family",browserFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==browserFamily)) browserFamily=family;ImGui.endCombo(); }
@@ -696,7 +721,7 @@ public final class EditorApp extends Application {
             if(query.searching())ImGui.textWrapped("Search expands matching ancestors. Clear the search to collapse folders.");
             if(page.rows().isEmpty())ImGui.textWrapped(workspace.paths().isEmpty() && workspace.directories().isEmpty() ? "No resources. Open a pack folder or import a ZIP." : "No matching resources.");
             if(!page.rows().isEmpty() && page.rows().getFirst().depth()>0){String path=page.rows().getFirst().path();ImGui.textWrapped("Page starts inside "+InspectorText.label(path.substring(0,path.lastIndexOf('/')),256));}
-            boolean drawRows=ImGui.beginChild("Resource hierarchy rows",0,Math.max(80,ImGui.getContentRegionAvailY()-60),false);
+            boolean drawRows=ImGui.beginChild("Resource hierarchy rows",0,Math.max(ui(80),ImGui.getContentRegionAvailY()-ui(60)),false);
             try{if(browserResetScroll){ImGui.setScrollY(0);browserResetScroll=false;}if(drawRows)drawResources(page,query);}finally{ImGui.endChild();}
         }catch(IllegalArgumentException invalid){ImGui.textWrapped(invalid.getMessage());}
         if (selectedFolder!=null && workspace.directories().contains(selectedFolder) && ImGui.isWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) && !ImGui.getIO().getWantTextInput()) {
@@ -6636,7 +6661,7 @@ public final class EditorApp extends Application {
     }
     private void prepareResourceOperation(){try{resourceOperation.start(workspace,resourceOperationMode,resourceOperationPath,resourceOperationValue.get());resourceOperationAcknowledgement=null;resourceOperationError=null;}catch(Exception failure){resourceOperationError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"Resource operation failed"),512);}}
     private void drawResourceOperation(){
-        if(focusResourceOperation){ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusResourceOperation=false;}ImGui.setNextWindowSize(740,620,ImGuiCond.FirstUseEver);if(!ImGui.begin("Review resource operation")){ImGui.end();return;}
+        if(focusResourceOperation){ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusResourceOperation=false;}initialWindowSize(740,620);if(!ImGui.begin("Review resource operation")){ImGui.end();return;}
         if(ImGui.button("Close resource operation")){resourceOperation.clear();showResourceOperation=false;ImGui.end();return;}ImGui.sameLine();if(ImGui.button("Cancel / clear resource review")){resourceOperation.clear();resourceOperationAcknowledgement=null;}
         if(resourceOperationPath!=null)ImGui.textWrapped(resourceOperationMode+": "+InspectorText.label(resourceOperationPath,1024));
         if(resourceOperationMode!=ResourceOperation.Mode.DELETE && ImGui.inputText(resourceOperationMode==ResourceOperation.Mode.RENAME?"New name (without extension)":"Existing destination folder",resourceOperationValue)){resourceOperation.clear();resourceOperationAcknowledgement=null;}
@@ -6679,7 +6704,7 @@ public final class EditorApp extends Application {
     }
     private void drawFolderOperation() {
         if(focusFolderOperation) {ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusFolderOperation=false;}
-        ImGui.setNextWindowSize(640,440,ImGuiCond.FirstUseEver);if(!ImGui.begin("Review empty-folder operation")) {ImGui.end();return;}
+        initialWindowSize(640,440);if(!ImGui.begin("Review empty-folder operation")) {ImGui.end();return;}
         if(ImGui.button("Hide folder review")) {showFolderOperation=false;ImGui.end();return;}
         ImGui.textWrapped("Review one empty-folder change, then Apply in memory. Resource selection, inspector drafts and bytes stay intact. Save applies folder changes to disk separately.");
         if(folderOperationMode==null)ImGui.textWrapped("Ctrl-middle-click a supported folder to create a subfolder, or use an empty leaf folder's context menu, F2 or Delete.");
@@ -6865,7 +6890,7 @@ public final class EditorApp extends Application {
     }
     private void drawResourceAddition() {
         if(focusResourceAddition) { ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusResourceAddition=false; }
-        ImGui.setNextWindowSize(680,620,ImGuiCond.FirstUseEver);if(!ImGui.begin("Review resource creation / duplication")) { ImGui.end();return; }
+        initialWindowSize(680,620);if(!ImGui.begin("Review resource creation / duplication")) { ImGui.end();return; }
         if(ImGui.button("Hide resource review")) { showResourceAddition=false;ImGui.end();return; }
         ImGui.textWrapped("Prepare a definition or byte-exact duplicate, review its pinned destination and digest, then Apply in memory. Preparation leaves selection, drafts, applied history and disk unchanged. Save remains separate.");
         if(resourceAdditionMode==null)ImGui.textWrapped("Use a Resource > New definition command, Ctrl-right-click a resource folder, or Ctrl-click a supported file to choose what to review.");
@@ -7387,7 +7412,7 @@ public final class EditorApp extends Application {
     }
     private void drawCommandPalette() {
         if (focusCommandPalette) { ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false); }
-        ImGui.setNextWindowSize(680,560,ImGuiCond.FirstUseEver);
+        initialWindowSize(680,560);
         if (!ImGui.begin("Command palette")) { ImGui.end();return; }
         if (ImGui.button("Close command palette")) { showCommandPalette=false;focusCommandPalette=false;ImGui.end();return; }
         if (focusCommandPalette) { ImGui.setKeyboardFocusHere();focusCommandPalette=false; }
@@ -7435,7 +7460,7 @@ public final class EditorApp extends Application {
     }
     private void drawFileComparison() {
         if(focusFileComparison){ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusFileComparison=false;}
-        ImGui.setNextWindowSize(780,650,ImGuiCond.FirstUseEver);if(!ImGui.begin("Disk / applied file comparison")){ImGui.end();return;}
+        initialWindowSize(780,650);if(!ImGui.begin("Disk / applied file comparison")){ImGui.end();return;}
         if(ImGui.button("Hide file comparison")){showFileComparison=false;ImGui.end();return;}
         ImGui.textWrapped("Read-only, point-in-time disk bytes versus applied in-memory bytes. This review never writes, merges, restores or authorizes Save. External changes require explicit Refresh; Save repeats its independent checks.");
         var state=fileComparison.poll(workspace);
@@ -7483,7 +7508,7 @@ public final class EditorApp extends Application {
     }
     private void drawByteInspection() {
         if(focusByteInspection){ImGui.setNextWindowFocus();ImGui.setNextWindowCollapsed(false);focusByteInspection=false;}
-        ImGui.setNextWindowSize(780,620,ImGuiCond.FirstUseEver);if(!ImGui.begin("Read-only applied file bytes")){ImGui.end();return;}
+        initialWindowSize(780,620);if(!ImGui.begin("Read-only applied file bytes")){ImGui.end();return;}
         if(ImGui.button("Hide byte inspection")){showByteInspection=false;ImGui.end();return;}
         ImGui.textWrapped("Inspect applied in-memory file bytes without interpreting their format. Hex offsets are zero-based; ASCII shows 20–7E and uses . for other bytes. This does not load external disk changes or enable native previews.");
         ImGui.beginDisabled(selected==null);if(ImGui.button("Inspect / refresh selected file"))inspectSelectedBytes();ImGui.endDisabled();ImGui.sameLine();if(ImGui.button("Cancel / clear byte inspection")){byteInspection.clear();byteInspectionError=null;}

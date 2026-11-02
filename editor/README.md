@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+Workspace > Layout > Display scale follows Windows by default or accepts an absolute 100–200% scale for this session. Text, shell/divider dimensions, preview controls and initial review-window sizes scale together; panel-width preferences survive moving between displays. Focus summary and Height details buttons open keyboard-accessible explanations. F6/Shift+F6 still cycle panels; Layout provides keyboard width/reset actions. These preferences never enter pack files.
+
 Object rename/move now maintains canonical allowedCollisions/forbiddenCollisions keys using Iris's exact loaded-key comparison. This also covers shared placement snippets and required reference maintenance in read-only owners. Aliases, newly captured names, unsupported spellings and native procedural/ collision-marker identities remain guarded. Collision field help explains exact matching and allowed-over-forbidden precedence; object bytes remain opaque. Save remains explicit after resource Apply.
 
 Contextual previews show the selected dimension's full applied Y range and block count. Hover the height readout for stored/default provenance and exclusive-maximum semantics. Height metadata loads in the background and refreshes after applied dimension edits or Undo; pending Inspector drafts are excluded. Unsupported/null/fractional height data and metadata limits report errors without assuming a replacement range or blocking Save/Export. A failed read can be retried explicitly. This readout does not certify dependencies, dimension-type registry compatibility or native preview readiness.
