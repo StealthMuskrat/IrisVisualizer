@@ -724,14 +724,7 @@ public final class EditorApp extends Application {
             boolean drawRows=ImGui.beginChild("Resource hierarchy rows",0,Math.max(ui(80),ImGui.getContentRegionAvailY()-ui(60)),false);
             try{if(browserResetScroll){ImGui.setScrollY(0);browserResetScroll=false;}if(drawRows)drawResources(page,query);}finally{ImGui.endChild();}
         }catch(IllegalArgumentException invalid){ImGui.textWrapped(invalid.getMessage());}
-        if (selectedFolder!=null && workspace.directories().contains(selectedFolder) && ImGui.isWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) && !ImGui.getIO().getWantTextInput()) {
-            if (ImGui.isKeyPressed(ImGuiKey.F2,false)) queueFolderAction(selectedFolder,"Rename");
-            if (ImGui.isKeyPressed(ImGuiKey.Delete,false)) queueFolderAction(selectedFolder,"Delete");
-        }
-        if(selectedFolder==null && selected!=null && ImGui.isWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) && !ImGui.getIO().getWantTextInput() && !ImGui.getIO().getKeyCtrl() && !ImGui.getIO().getKeyAlt() && !ImGui.getIO().getKeySuper() && !ImGui.getIO().getKeyShift()){
-            if(ImGui.isKeyPressed(ImGuiKey.F2,false))openResourceOperation(ResourceOperation.Mode.RENAME,selected,null);if(ImGui.isKeyPressed(ImGuiKey.Delete,false))openResourceOperation(ResourceOperation.Mode.DELETE,selected,null);
-        }
-        ImGui.textWrapped("F2: rename; Delete: delete; drag a resource to move within its base folder. Operations require a reference-safe review.");
+        ImGui.textWrapped("Focus a row: F2 rename, Delete delete, Menu / Shift+F10 actions; Enter toggles a folder. Drag a resource to move within its base folder. Operations require a reference-safe review.");
         ImGui.end();
         beginShellPanel(EditorShell.Panel.VISUALIZATION,layout.visualization());drawPreviewPanel();ImGui.end();
         beginShellPanel(EditorShell.Panel.INSPECTOR,layout.inspector());ImGui.textUnformatted("Resource editor");ImGui.separator();
@@ -6626,33 +6619,78 @@ public final class EditorApp extends Application {
     }
     private void drawResources(ResourceBrowser.Page page,ResourceBrowser.Query query) {
         String toggle=null;
+        var io=ImGui.getIO();var modifiers=new ResourceBrowserCommands.Modifiers(io.getKeyCtrl(),io.getKeyShift(),io.getKeyAlt(),io.getKeySuper());
+        var pressed=java.util.EnumSet.noneOf(ResourceBrowserCommands.Key.class);
+        for(var key:ResourceBrowserCommands.Key.values()){
+            int nativeKey=switch(key){case MENU->ImGuiKey.Menu;case F10->ImGuiKey.F10;case F2->ImGuiKey.F2;case DELETE->ImGuiKey.Delete;case ENTER->ImGuiKey.Enter;};
+            if(ImGui.isKeyPressed(nativeKey,false) || key==ResourceBrowserCommands.Key.ENTER && ImGui.isKeyPressed(ImGuiKey.KeypadEnter,false))pressed.add(key);
+        }
         for (var row : page.rows()) {
-            ImGui.pushID(row.path().replace("#","\\u0023"));float indent=Math.min(row.depth(),8)*12f;if(indent>0)ImGui.indent(indent);
+            ImGui.pushID(row.path().replace("#","\\u0023"));float indent=ui(Math.min(row.depth(),8)*12f);if(indent>0)ImGui.indent(indent);
             if(row.folder()){
                 ImGui.beginDisabled(query.searching());if(ImGui.arrowButton("expand-folder",row.expanded() ? ImGuiDir.Down : ImGuiDir.Right)){toggle=row.path();selectedFolder=row.path();}ImGui.endDisabled();ImGui.sameLine();
             }
             String label=InspectorText.label(row.name(),256).replace("#","\\u0023")+(row.changed() ? " *" : "")+(row.folder() ? "/" : "");
-            boolean clicked=ImGui.selectable(label,row.path().equals(row.folder() ? selectedFolder : selected));
-            if(ImGui.isItemHovered())ImGui.setTooltip(InspectorText.label(row.path(),16384)+(row.depth()>8 ? "\nDepth: "+row.depth() : ""));
+            boolean clicked=ImGui.selectable(label,row.folder()?row.path().equals(selectedFolder):selectedFolder==null && row.path().equals(selected));
+            boolean hovered=ImGui.isItemHovered(),popup=ImGui.isPopupOpen("",ImGuiPopupFlags.AnyPopup),dragging=ImGui.isMouseDragging(0);
+            boolean otherItemActive=ImGui.isAnyItemActive() && !ImGui.isItemActive(),pointerOwned=ImGui.isMouseDown(0) || ImGui.isMouseDown(1) || ImGui.isMouseDown(2);
+            var action=ResourceBrowserCommands.keyboard(new ResourceBrowserCommands.Input(ImGui.isItemFocused() && ImGui.isWindowFocused(),io.getWantTextInput() || otherItemActive,popup,dragging || pointerOwned,modifiers,pressed),row.folder());
+            if(action==null && clicked){
+                // Keyboard activation may select, but Ctrl+Enter must never masquerade as a Ctrl-click duplicate.
+                if(modifiers.plain())action=ResourceBrowserCommands.pointer(modifiers,ResourceBrowserCommands.Button.LEFT,row.folder(),popup,dragging);
+                else if(ImGui.isMouseReleased(0))action=ResourceBrowserCommands.pointer(modifiers,ResourceBrowserCommands.Button.LEFT,row.folder(),popup,dragging);
+            }
+            if(action==null && hovered){
+                if(ImGui.isMouseReleased(1) && modifiers.plain())action=ResourceBrowserCommands.pointer(modifiers,ResourceBrowserCommands.Button.RIGHT,row.folder(),popup,dragging);
+                else if(ImGui.isItemClicked(1) && modifiers.controlOnly())action=ResourceBrowserCommands.pointer(modifiers,ResourceBrowserCommands.Button.RIGHT,row.folder(),popup,dragging);
+                else if(ImGui.isItemClicked(2))action=ResourceBrowserCommands.pointer(modifiers,ResourceBrowserCommands.Button.MIDDLE,row.folder(),popup,dragging);
+            }
+            if(hovered)ImGui.setTooltip(InspectorText.label(row.path(),16384)+(row.depth()>8 ? "\nDepth: "+row.depth() : ""));
             if (row.folder()) {
                 if(ImGui.beginDragDropTarget()){ResourceDrag payload=ImGui.acceptDragDropPayload("IRIS_RESOURCE",ResourceDrag.class);if(payload!=null){if(payload.owner()!=workspace || payload.revision()!=workspace.resourceRevision())error="Resource drag is stale; drag the current resource again.";else openResourceOperation(ResourceOperation.Mode.MOVE,payload.path(),row.path());}ImGui.endDragDropTarget();}
-                if (!ImGui.getIO().getKeyCtrl() && clicked) selectedFolder=row.path();
-                boolean createChild=ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(2),createHere=ImGui.getIO().getKeyCtrl() && ImGui.isItemClicked(1);
-                if (!ImGui.getIO().getKeyCtrl() && ImGui.beginPopupContextItem("Folder operations")) {
-                    ImGui.beginDisabled(!workspace.editableEmptyFolder(row.path()));
-                    for (String action : List.of("Rename","Move","Delete")) if (ImGui.menuItem(action+" empty folder")) queueFolderAction(row.path(),action);
-                    ImGui.endDisabled();ImGui.textWrapped("Only empty leaf subfolders in supported resource families can be changed.");ImGui.endPopup();
-                }
-                if (createChild) createSubfolder(row.path());else if (createHere) createResource(row.path());
             } else {
                 if(ResourceTypes.fileFamily(row.path())!=null && ImGui.beginDragDropSource()){ImGui.setDragDropPayload("IRIS_RESOURCE",new ResourceDrag(workspace,row.path(),workspace.resourceRevision()));ImGui.textUnformatted(InspectorText.label(row.path(),256));ImGui.endDragDropSource();}
-                if(!ImGui.getIO().getKeyCtrl() && ImGui.beginPopupContextItem("Resource operations")){ImGui.beginDisabled(ResourceTypes.fileFamily(row.path())==null);for(var mode:ResourceOperation.Mode.values())if(ImGui.menuItem(mode+" resource"))openResourceOperation(mode,row.path(),null);ImGui.endDisabled();ImGui.endPopup();}
                 if(browserScroll && row.path().equals(selected)){ImGui.setScrollHereY();browserScroll=false;}
-                if(clicked){selectedFolder=null;if(ImGui.getIO().getKeyCtrl())duplicateResource(row.path());else if(!row.path().equals(selected))selectResource(row.path());}
             }
+            if(action==ResourceBrowserCommands.Action.TOGGLE){toggle=row.path();selectedFolder=row.path();}else if(action!=null)dispatchBrowserAction(action,row);
+            drawBrowserRowMenu(row,query);
             if(indent>0)ImGui.unindent(indent);ImGui.popID();
         }
         if(toggle!=null)resourceBrowser.toggle(workspace,query,toggle);
+    }
+    private void dispatchBrowserAction(ResourceBrowserCommands.Action action,ResourceBrowser.Row row){
+        switch(action){
+            case SELECT->{if(row.folder())selectedFolder=row.path();else{selectedFolder=null;if(!row.path().equals(selected))selectResource(row.path());}}
+            case CONTEXT->ImGui.openPopup("Browser row actions");
+            case DUPLICATE->duplicateResource(row.path());
+            case CREATE_RESOURCE->createResource(row.path());
+            case CREATE_SUBFOLDER->createSubfolder(row.path());
+            case RENAME,DELETE->{
+                if(row.folder()){if(workspace.editableEmptyFolder(row.path()))queueFolderAction(row.path(),action==ResourceBrowserCommands.Action.RENAME?"Rename":"Delete");}
+                else if(ResourceTypes.fileFamily(row.path())!=null)openResourceOperation(action==ResourceBrowserCommands.Action.RENAME?ResourceOperation.Mode.RENAME:ResourceOperation.Mode.DELETE,row.path(),null);
+            }
+            case TOGGLE->throw new IllegalArgumentException("Expansion belongs to the browser cache");
+        }
+    }
+    private void drawBrowserRowMenu(ResourceBrowser.Row row,ResourceBrowser.Query query){
+        if(!ImGui.beginPopup("Browser row actions"))return;
+        ImGui.textWrapped(InspectorText.label(row.path(),512));ImGui.separator();
+        if(row.folder()){
+            ImGui.beginDisabled(query.searching());if(ImGui.menuItem(row.expanded()?"Collapse folder":"Expand folder"))resourceBrowser.toggle(workspace,query,row.path());ImGui.endDisabled();
+            boolean create=true;try{ResourceCreation.base(row.path());}catch(java.io.IOException unsupported){create=false;}
+            ImGui.beginDisabled(!create);if(ImGui.menuItem("Create resource here"))createResource(row.path());ImGui.endDisabled();
+            ImGui.beginDisabled(!ResourceTypes.folderFamily(row.path()));if(ImGui.menuItem("Create subfolder here"))createSubfolder(row.path());ImGui.endDisabled();
+            ImGui.separator();ImGui.beginDisabled(!workspace.editableEmptyFolder(row.path()));
+            for(String operation:List.of("Rename","Move","Delete"))if(ImGui.menuItem(operation+" empty folder"))queueFolderAction(row.path(),operation);
+            ImGui.endDisabled();ImGui.textWrapped("Only empty leaf subfolders in supported resource families can be renamed, moved or deleted.");
+        }else{
+            if(ImGui.menuItem("Open resource"))dispatchBrowserAction(ResourceBrowserCommands.Action.SELECT,row);
+            ImGui.beginDisabled(ResourceTypes.fileFamily(row.path())==null);
+            if(ImGui.menuItem("Duplicate resource"))duplicateResource(row.path());
+            for(var mode:ResourceOperation.Mode.values())if(ImGui.menuItem(mode+" resource"))openResourceOperation(mode,row.path(),null);
+            ImGui.endDisabled();if(ResourceTypes.fileFamily(row.path())==null)ImGui.textWrapped("This resource is read-only. It can still be opened and inspected.");
+        }
+        ImGui.endPopup();
     }
     private void openResourceOperation(ResourceOperation.Mode mode,String path,String value){
         resourceOperation.clear();resourceOperationMode=mode;resourceOperationPath=path;resourceOperationAcknowledgement=null;resourceOperationError=null;showResourceOperation=true;focusResourceOperation=true;
@@ -6944,6 +6982,7 @@ public final class EditorApp extends Application {
     }
     private void revealSelectedResource() {
         if (selected==null) return;
+        selectedFolder=null;
         if (!browserFamily.matches(selected)) browserFamily=ResourceFinder.Family.ALL;
         if (browserChangedOnly && !workspace.changed(selected)) browserChangedOnly=false;
         try {if(!selected.toLowerCase(java.util.Locale.ROOT).contains(new ResourceBrowser.Query(filter.get(),browserFamily,browserChangedOnly).text()))filter.set("");}catch(IllegalArgumentException invalid){filter.set("");}
