@@ -80,6 +80,8 @@ public final class PackWorkspace implements PackResourceView {
     DefinitionAuditSource captureDefinitionAudit(DefinitionAuditSource.Family family) { return DefinitionAuditSource.pin(files,family); }
     /** Selected source bytes are immutable by ownership; no payload copy or parsing on the UI thread. */
     JsonSourceReview.Source captureJsonSource(String path,SourceMatch.Location location) { return new JsonSourceReview.Source(path,path==null?null:files.get(path),location); }
+    /** Borrow one private immutable applied array; the worker never receives this workspace. */
+    PreviewDimensionContext.Source capturePreviewDimension(String path) { return new PreviewDimensionContext.Source(path,contentRevision(path),files.get(path)); }
     /** Search membership is frozen from the current changed set; the source retains neither it nor this workspace. */
     TextSearchSource captureTextSearch(WorkspaceTextSearch.Query query) { return TextSearchSource.pin(files,query,changed::contains); }
     /** Bounded worker sources borrow only private immutable applied arrays; UI capture copies metadata. */

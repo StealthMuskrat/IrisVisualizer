@@ -164,6 +164,7 @@ public final class WorkspaceTests {
    EditorShellLayoutTests.run();
    PreviewFramingTests.run(temp);
    PreviewIsolationTests.run(temp);
+   PreviewDimensionContextTests.run(temp);
    JsonSourceStageTests.run(temp);
    SourceMatchTests.run(temp);
    ReadOnlyPolicyTests.run(temp);

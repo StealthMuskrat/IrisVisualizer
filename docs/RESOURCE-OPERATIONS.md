@@ -35,7 +35,7 @@ Unknown JSON owners or snippet kinds, unknown model fields (including names that
 
 The model catalog and declaration fingerprints live in `editor/policy/resource-operation-models.json`; exact source hashes and dependency revisions live in `editor/policy/resource-operation-sources.json`. `resource_operation_schema.py` generates the runtime properties from those pinned declarations and explicitly audited reference/default rules. Restricted initializer interpretation handles reviewed constructor/list/palette/style forms and emits family blockers for unfamiliar resource-bearing defaults. It never runs Java or materializes defaults in pack JSON.
 
-The expanded regression cases are prepared but deferred. All 373 editor/test Java sources compile with Java 25. No regression suites, source-drift tests, GitHub workflows or interactive GUI checks have run for this expansion. UI implementation is still in progress; unsupported previews remain disabled and renderer work has not begun.
+The expanded regression cases are prepared but deferred. All 375 editor/test Java sources compile with Java 25. No regression suites, source-drift tests, GitHub workflows or interactive GUI checks have run for this expansion. UI implementation is still in progress; unsupported previews remain disabled and renderer work has not begun.
 
 
 The pinned Overworld source inventory contains 3,439 JSON files and 504 snippet files. Its observed JSON owner directories and snippet kinds motivated this expansion; complete pack operations, editing coverage, round trips and GUI behavior remain unverified until end-of-UI validation. This inventory is source inspection, not a test execution.

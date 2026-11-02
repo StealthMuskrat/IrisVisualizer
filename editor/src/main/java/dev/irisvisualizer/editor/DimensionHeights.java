@@ -38,6 +38,24 @@ public final class DimensionHeights {
         if (span<Integer.parseInt(DATA.getProperty("span.minimum")) || span>Integer.parseInt(DATA.getProperty("span.maximum")) || span%step!=0) throw new IllegalArgumentException("Dimension span violates native bounds/alignment");
         int logical=logicalHeight(document);if (logical<0 || logical>span) throw new IllegalArgumentException("Read-only logicalHeight must be nonnegative and no greater than the dimension span");
     }
+    /** Read-only request metadata, not native readiness or registry/dependency validation. */
+    record PreviewRange(int minimum,int maximum,boolean contextDefault,boolean minimumDefault,boolean maximumDefault,String problem) {
+        long span(){return (long)maximum-minimum;}
+        String label(){return maximum<=minimum?"Configured height: min "+minimum+", max "+maximum+" (invalid span)":"Y "+minimum+" through "+((long)maximum-1)+" ("+span()+" blocks)";}
+        String provenance(){return contextDefault?"Absent dimensionHeight: dimension defaults; no fields inserted.":"dimensionHeight.min: "+(minimumDefault?"range-member default":"stored")+"; dimensionHeight.max: "+(maximumDefault?"range-member default":"stored")+". Maximum Y is exclusive; no height is truncated.";}
+    }
+    static PreviewRange previewRange(LosslessJson document){
+        String token=document.token("dimensionHeight");
+        if("null".equals(token))throw new IllegalArgumentException("dimensionHeight is explicitly null; preview height is unresolved. The stored value is preserved.");
+        var range=object(document);boolean context=range==null;
+        boolean minDefault=context || range.token("min")==null,maxDefault=context || range.token("max")==null;
+        String min=context?defaultBound("min",true):minDefault?defaultBound("min",false):range.token("min");
+        String max=context?defaultBound("max",true):maxDefault?defaultBound("max",false):range.token("max");
+        if(!LosslessJson.numericToken(min) || !LosslessJson.numericToken(max))throw new IllegalArgumentException("dimensionHeight.min/max must be exact signed 32-bit integers for this preview; unsupported values are preserved.");
+        int minimum=exact(min),maximum=exact(max);String problem=null;
+        try{validate(document,minimum,maximum);}catch(IllegalArgumentException invalid){problem=invalid.getMessage();}
+        return new PreviewRange(minimum,maximum,context,minDefault,maxDefault,problem);
+    }
     private static byte[] write(LosslessJson range,String field,int value) { return range.token(field)==null ? range.enable(field,Integer.toString(value)) : range.number(field,value); }
     public static byte[] enable(String path,byte[] original) { return create(path,original,defaultBound("min",true),defaultBound("max",true)); }
     public static byte[] create(String path,byte[] original,String minimum,String maximum) {
