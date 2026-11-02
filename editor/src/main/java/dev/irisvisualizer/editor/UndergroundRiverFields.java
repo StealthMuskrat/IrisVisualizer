@@ -36,6 +36,7 @@ public final class UndergroundRiverFields {
         if (!fields(sources).contains(field)) throw new IllegalArgumentException("Underground-river field is read-only");
         String token=DATA.getProperty(prefix(sources,field)+".default"); return booleanField(sources,field) ? token : new BigDecimal(token).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(boolean sources,String field) { return NumericBounds.from(DATA,prefix(sources,field)); }
     public static String constraints(boolean sources,String field) { String p=prefix(sources,field); return (integer(sources,field) ? "Signed 32-bit integer" : "Finite number")+", minimum "+DATA.getProperty(p+".minimum")+", maximum "+DATA.getProperty(p+".maximum"); }
     public static String draftPrefix(boolean sources) { return "hydrology#rivers.underground."+(sources ? "sources." : ""); }
     static byte[] editUnderground(byte[] original,Function<LosslessJson,byte[]> action) { return HydrologyFields.editRivers(original,rivers -> rivers.objectEdit("underground",action,false)); }

@@ -34,6 +34,7 @@ public final class DepositGenerators {
     public static String listPrefix(String base) { if (base==null || !OreGenerators.CONTEXTS.contains(base)) throw new IllegalArgumentException("Unsupported deposit owner");return "depositGenerators#"+base+"."; }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description",""); }
     public static String defaultToken(String field) { field(field);return DATA.getProperty(field+".default"); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { field(field);if (DATA.getProperty(field+".minimum")==null) throw new IllegalArgumentException("Not a numeric deposit field");return (integer(field) ? "Exact signed 32-bit integer" : "Finite number")+", minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum"); }
     public static boolean integer(String field) { field(field);return "int".equals(DATA.getProperty(field+".type")); }
     public static List<String> choices(String field) { if (field==null || !ENUMS.contains(field)) throw new IllegalArgumentException("Select a deposit enum");return List.of(DATA.getProperty(field+".choices").split(",")); }

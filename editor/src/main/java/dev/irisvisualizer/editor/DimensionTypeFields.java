@@ -30,6 +30,7 @@ public final class DimensionTypeFields {
     public static List<String> stateChoices() { return List.of(DATA.getProperty("states").split(",")); }
     public static List<String> environments() { return List.of(DATA.getProperty("environments").split(",")); }
     public static String defaultToken(String field) { if (field==null || !EDITABLE.contains(field) && !ROOT_FIELDS.contains(field)) throw new IllegalArgumentException("Unsupported dimension-type field");return DATA.getProperty(field+".default"); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.of(field.equals("fixedTime") ? "long" : field.equals("cloudHeight") || field.equals("monsterSpawnBlockLightLimit") ? "int" : "double",DATA.getProperty(field+".minimum"),DATA.getProperty(field+".maximum")); }
     public static String constraints(String field) {
         number(field);return "Use -1 to inherit the base dimension; otherwise "+(field.equals("fixedTime") || field.equals("cloudHeight") || field.equals("monsterSpawnBlockLightLimit") ? "exact integers" : "finite numbers")+" from "+DATA.getProperty(field+".minimum")+" to "+DATA.getProperty(field+".maximum")+".";
     }

@@ -27,6 +27,7 @@ public final class WorldBoundaryFields {
         if (!SCALARS.contains(field) && !List.of("center.x","center.z").contains(field)) throw new IllegalArgumentException("Unsupported border field");
         return DATA.getProperty(field+".default");
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) {
         if (!SCALARS.contains(field) && !List.of("center.x","center.z").contains(field)) throw new IllegalArgumentException("Unsupported border field");
         return (field.equals("warningDistance") ? "Exact integer" : "Finite number")+"; minimum "+DATA.getProperty(field+".minimum")+(DATA.getProperty(field+".maximum")==null ? "." : ", maximum "+DATA.getProperty(field+".maximum")+".");

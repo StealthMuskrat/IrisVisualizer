@@ -37,6 +37,7 @@ public final class ProceduralObjects {
     public static String choiceHelp(String field,String choice) { return DATA.getProperty(field+"."+choice+".description",""); }
     public static String choiceHelp(String kind,String field,String choice) { return ProceduralShapes.handles(kind,field) ? ProceduralShapes.choiceHelp(kind,field,choice) : choiceHelp(field,choice); }
     static String property(String kind,String field,String key) { field(kind,field);return ProceduralShapes.handles(kind,field) ? ProceduralShapes.property(kind,field,key) : DATA.getProperty(kind+"."+field+"."+key); }
+    public static NumericBounds numericBounds(String kind,String field) { return NumericBounds.of(type(kind,field),property(kind,field,"minimum"),property(kind,field,"maximum")); }
     public static String constraints(String kind,String field) { String t=type(kind,field),min=property(kind,field,"minimum"),max=property(kind,field,"maximum");return (t.equals("long") ? "Exact signed 64-bit integer" : t.equals("int") ? "Exact signed 32-bit integer" : "Finite number")+(min!=null ? "; minimum "+min : "")+(max!=null ? "; maximum "+max : ""); }
 
     static LosslessJson object(LosslessJson root) { String token=root.token("proceduralObjects");return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }

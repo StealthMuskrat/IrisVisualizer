@@ -76,6 +76,7 @@ public final class SubterrainFeatures {
         try { var decimal=new BigDecimal(input);value=DATA.getProperty(field+".type").equals("int") ? decimal.intValueExact() : decimal.doubleValue(); } catch (NumberFormatException | ArithmeticException | NullPointerException invalid) { throw new IllegalArgumentException("Enter a finite number or exact signed 32-bit integer",invalid); }
         String min=DATA.getProperty(field+".minimum"),max=DATA.getProperty(field+".maximum");if (!Double.isFinite(value) || min!=null && value<Double.parseDouble(min) || max!=null && value>Double.parseDouble(max)) throw new IllegalArgumentException(constraints(field));return value;
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { if (!NUMBERS.contains(field)) throw new IllegalArgumentException("Unsupported feature scalar");String min=DATA.getProperty(field+".minimum"),max=DATA.getProperty(field+".maximum");return (DATA.getProperty(field+".type").equals("int") ? "Exact signed 32-bit integer" : "Finite number")+(min==null ? "" : "; minimum "+min)+(max==null ? "" : "; maximum "+max); }
     static boolean numericSupported(LosslessJson entry,String field) {
         if (!NUMBERS.contains(field)) return false;String token=entry.token(field);if (token==null) return true;

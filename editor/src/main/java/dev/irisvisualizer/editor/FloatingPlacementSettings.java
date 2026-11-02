@@ -35,6 +35,7 @@ public final class FloatingPlacementSettings {
     public static List<String> interpolations() { return List.of(DATA.getProperty("scale.interpolation.choices").split(",")); }
     public static String interpolationHelp(String choice) { if (!interpolations().contains(choice)) throw new IllegalArgumentException("Unknown interpolation");return DATA.getProperty("scale.interpolation."+choice+".description",""); }
     private static void scaleField(String value) { if (value==null || !SCALE_FIELDS.contains(value)) throw new IllegalArgumentException("Unsupported scale field"); }
+    public static NumericBounds scaleBounds(String field) { return NumericBounds.of(field.equals("variations") ? "int" : "double",DATA.getProperty("scale."+field+".minimum"),DATA.getProperty("scale."+field+".maximum")); }
     public static String scaleConstraints(String member) { scaleField(member);return (member.equals("variations") ? "Exact integer" : "Finite number")+", minimum "+DATA.getProperty("scale."+member+".minimum")+", maximum "+DATA.getProperty("scale."+member+".maximum"); }
     static LosslessJson object(LosslessJson placement,String field) { field(field);String token=placement.token(field);return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     static byte[] editPlacement(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return FloatingObjectPlacements.editPlacement(original,context.entry(),context.list(),context.placement(),action); }

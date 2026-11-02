@@ -29,6 +29,7 @@ public final class StructurePlacements {
     public static String defaultToken(String field) { String value=DATA.getProperty(field+".default");if (value==null) throw new IllegalArgumentException("Unsupported placement field");return value; }
     public static List<String> choices(String field) { if (field==null || !ENUMS.contains(field)) throw new IllegalArgumentException("Unsupported placement enum");return List.of(DATA.getProperty(field+".choices").split(",")); }
     public static String choiceHelp(String field,String choice) { return DATA.getProperty(field+"."+choice+".description",""); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { return ("int".equals(DATA.getProperty(field+".type")) ? "Exact integer " : "Finite number ")+DATA.getProperty(field+".minimum")+".."+DATA.getProperty(field+".maximum")+"."; }
     static List<LosslessJson> entries(LosslessJson root) { return root.token("structures")==null ? null : root.objectArray("structures"); }
     static byte[] edit(byte[] original,int index,Function<LosslessJson,byte[]> operation) { var root=new LosslessJson(original);var entries=entries(root);if (entries==null) throw new IllegalArgumentException("Create a placement first");limit(entries.size(),false);return root.objectArrayEdit("structures",index,operation); }

@@ -55,6 +55,7 @@ public final class RiverGeometryFields {
         if (!fields(section).contains(field)) throw new IllegalArgumentException("Geometry field is read-only");
         String token=DEFINITIONS.getProperty(section+"."+field+".default"); return nullable(section,field) ? token : new BigDecimal(token).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(String section,String field) { return NumericBounds.from(DEFINITIONS,section+"."+field); }
     public static String constraints(String section, String field) {
         String prefix=section+"."+field, min=DEFINITIONS.getProperty(prefix+".minimum"), max=DEFINITIONS.getProperty(prefix+".maximum");
         return (integer(section,field) ? "Signed 32-bit integer" : "Finite number")+(min==null ? "" : ", minimum "+min)+(max==null ? "" : ", maximum "+max);

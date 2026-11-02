@@ -27,6 +27,7 @@ public final class SurfacePools {
     public static String description() { return DATA.getProperty("list.description",""); }
     public static String help(String field) { if (!EDITABLE.contains(field)) throw new IllegalArgumentException("Pool field is read-only");return DATA.getProperty(field+".description",""); }
     public static String defaultToken(String field) { if (!List.of("density","spacing","depth","minimumRadius","maximumRadius").contains(field)) throw new IllegalArgumentException("Unsupported pool scalar");return new BigDecimal(DATA.getProperty(field+".default")).stripTrailingZeros().toPlainString(); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { defaultToken(field);return (field.equals("density") ? "Finite number" : "Exact integer")+", minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum"); }
     public static String draftPrefix() { return "hydrology#surfacePools#"; }
     public static String poolPrefix(int index) { if (index<0) throw new IllegalArgumentException("Select a pool");return draftPrefix()+index+"."; }

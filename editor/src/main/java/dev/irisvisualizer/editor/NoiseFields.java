@@ -42,6 +42,7 @@ public final class NoiseFields {
     }
     public static boolean booleanField(String field) { return "boolean".equals(DEFINITIONS.getProperty(field + ".type")); }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         if ("long".equals(DEFINITIONS.getProperty(field + ".type"))) return "Signed 64-bit integer (exact)";
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");

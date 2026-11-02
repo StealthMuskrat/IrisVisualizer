@@ -45,6 +45,7 @@ public final class BiomeDecorators {
     public static String defaultBlock() { return DATA.getProperty("palette.defaultBlock"); }
     public static String styleDefault() { return DATA.getProperty("style.default"); }
     public static List<String> parts() { return List.of(DATA.getProperty("partOf.choices").split(",")); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.of(field.equals("absoluteMaxStack") ? "int" : "double",DATA.getProperty(field+".minimum"),DATA.getProperty(field+".maximum")); }
     public static String constraints(String name) { field(name);return (name.equals("absoluteMaxStack") ? "Editor subset: exact integer" : "Finite number")+", "+DATA.getProperty(name+".minimum")+".."+DATA.getProperty(name+".maximum"); }
     static List<LosslessJson> entries(LosslessJson root) { return root.token("decorators")==null ? null : root.objectArray("decorators"); }
     static byte[] editEntry(byte[] original,Context context,Function<LosslessJson,byte[]> action) { return new LosslessJson(original).objectArrayEdit("decorators",context.index(),action); }

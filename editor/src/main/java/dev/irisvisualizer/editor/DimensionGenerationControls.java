@@ -28,6 +28,7 @@ public final class DimensionGenerationControls {
     public static List<String> modes() { return List.of(DATA.getProperty("modes").split(",")); }
     public static List<String> studioModes() { return List.of(DATA.getProperty("studioModes").split(",")); }
     public static String choiceHelp(boolean studio,String choice) { return DATA.getProperty((studio ? "studio." : "mode.")+choice+".description",""); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { if (!NUMBERS.contains(field)) throw new IllegalArgumentException("Unsupported generation integer");return "Exact integer "+DATA.getProperty(field+".minimum")+".."+DATA.getProperty(field+".maximum")+"."; }
     static LosslessJson mode(LosslessJson root) { String token=root.token("mode");return token==null ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     public static String modeType(LosslessJson root) { var object=mode(root);String value=object==null ? null : object.stringToken("type");return value==null ? defaultToken("type") : value; }

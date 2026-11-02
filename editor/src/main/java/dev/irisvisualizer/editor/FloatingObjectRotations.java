@@ -36,6 +36,7 @@ public final class FloatingObjectRotations {
     public static String axisDefault(String value) { axisField(value);return DATA.getProperty("axis."+value+".default"); }
     public static String rotationDefault() { return DATA.getProperty("rotation.enabled.default"); }
     public static String creationToken(String value) { axis(value);return DATA.getProperty("rotation."+value+".default"); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.of("double",DATA.getProperty("axis."+field+".minimum"),DATA.getProperty("axis."+field+".maximum")); }
     public static String constraints(String value) { axisField(value);if (value.equals("enabled")) return "Boolean";return "Finite degrees, minimum "+DATA.getProperty("axis."+value+".minimum")+", maximum "+DATA.getProperty("axis."+value+".maximum"); }
     static LosslessJson object(LosslessJson placement) { String token=placement.token("rotation");return token==null ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     static LosslessJson axisObject(LosslessJson rotation,String value) { axis(value);String token=rotation.token(value);return token==null ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }

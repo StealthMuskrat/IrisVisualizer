@@ -39,6 +39,7 @@ public final class HydrologyFields {
         String token=DEFINITIONS.getProperty("routing."+field+".default");
         return routingBoolean(field) ? token : new BigDecimal(token).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,"routing."+field); }
     public static String constraints(String field) {
         String prefix="routing."+field, min=DEFINITIONS.getProperty(prefix+".minimum"), max=DEFINITIONS.getProperty(prefix+".maximum");
         return ("int".equals(DEFINITIONS.getProperty(prefix+".type")) ? "Signed 32-bit integer" : "Finite number")+(min==null ? "" : ", minimum "+min)+(max==null ? "" : ", maximum "+max);

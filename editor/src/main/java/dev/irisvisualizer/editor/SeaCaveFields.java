@@ -26,6 +26,7 @@ public final class SeaCaveFields {
     public static boolean booleanField(String field) { return "boolean".equals(DATA.getProperty(field+".type")); }
     public static boolean integer(String field) { return "int".equals(DATA.getProperty(field+".type")); }
     public static String defaultToken(String field) { field(field); String value=DATA.getProperty(field+".default"); return booleanField(field) ? value : new BigDecimal(value).stripTrailingZeros().toPlainString(); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { field(field); return (integer(field) ? "Signed 32-bit integer" : "Finite number")+", minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum")+(field.equals("minimumSpacing") ? "; at least twice coastal horizontalRadius" : ""); }
     public static String draftPrefix() { return "hydrology#rivers.grottos.coastal.seaCaves."; }
     public static String creationDraftKey() { return draftPrefix()+"createSpacing"; }

@@ -46,6 +46,7 @@ public final class RiverPolicyFields {
         return List.of(DEFINITIONS.getProperty(field + ".choices", "").split(","));
     }
     public static String choiceDescription(String field, String choice) { return DEFINITIONS.getProperty(field + "." + choice + ".description", ""); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
         return (integerField(field) ? "Signed 32-bit integer" : "Finite number") + (min == null ? "" : ", minimum " + min) + (max == null ? "" : ", maximum " + max);

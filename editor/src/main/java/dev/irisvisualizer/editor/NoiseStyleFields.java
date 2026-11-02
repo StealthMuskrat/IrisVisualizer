@@ -203,6 +203,7 @@ public final class NoiseStyleFields {
         return contextDefault(target)+(override==null ? "" : ", zoom "+override);
     }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
+    public static NumericBounds numericBounds(Target target,String field) { return NumericBounds.of("double",bound(target,field,"minimum"),bound(target,field,"maximum")); }
     public static String constraints(String field) {
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
         return "Finite number" + (min == null ? "" : ", minimum " + min) + (max == null ? "" : ", maximum " + max)

@@ -28,6 +28,7 @@ public final class FloatingBiomes {
     public static String description() { return DATA.getProperty("list.description",""); }
     public static String help(String value) { field(value,EDITABLE);return DATA.getProperty(value+".description",""); }
     public static String defaultToken(String value) { field(value,EDITABLE);return DATA.getProperty(value+".default"); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String value) { field(value,SCALARS);return (integer(value) ? "Exact integer" : "Finite number")+", minimum "+DATA.getProperty(value+".minimum")+", maximum "+DATA.getProperty(value+".maximum"); }
     public static String prefix() { return "floatingBiomes#"; }
     public static String entryPrefix(int index) { if (index<0) throw new IllegalArgumentException("Select an entry");return prefix()+index+"."; }

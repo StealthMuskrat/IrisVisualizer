@@ -37,6 +37,7 @@ public final class CaveProfileFields {
         String token=DEFINITIONS.getProperty(field+".default");
         return booleanField(field) ? token : new java.math.BigDecimal(token).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         String min=DEFINITIONS.getProperty(field+".minimum"),max=DEFINITIONS.getProperty(field+".maximum");
         return ("int".equals(DEFINITIONS.getProperty(field+".type")) ? "Signed 32-bit integer" : "Finite number")

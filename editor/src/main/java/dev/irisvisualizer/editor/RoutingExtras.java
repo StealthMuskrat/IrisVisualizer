@@ -46,6 +46,7 @@ public final class RoutingExtras {
         try { return new BigDecimal(token).compareTo(new BigDecimal(option))==0; }
         catch (NumberFormatException mismatch) { return false; }
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         String min=DEFINITIONS.getProperty(field+".minimum"), max=DEFINITIONS.getProperty(field+".maximum");
         return ("int".equals(DEFINITIONS.getProperty(field+".type")) ? "Signed 32-bit integer" : "Finite number")+(min==null ? "" : ", minimum "+min)+(max==null ? "" : ", maximum "+max)+(field.equals("sampleSpacing") ? "; power of two" : "");

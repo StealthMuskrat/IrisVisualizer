@@ -29,6 +29,7 @@ public final class DeepFluids {
     public static String help(String field) { if (!EDITABLE.contains(field)) throw new IllegalArgumentException("Deep-fluid field is read-only");return DATA.getProperty(field+".description",""); }
     public static String defaultToken(String field) { if (!SCALARS.contains(field) && !GEOMETRY.contains(field)) throw new IllegalArgumentException("Unsupported deep-fluid scalar");String value=DATA.getProperty(field+".default");return booleanField(field) ? value : new BigDecimal(value).stripTrailingZeros().toPlainString(); }
     public static boolean booleanField(String field) { return List.of("containedPools","shortChannels").contains(field); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { defaultToken(field);return (field.equals("density") ? "Finite number" : "Exact integer")+", minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum"); }
     public static String draftPrefix() { return "hydrology#deepFluids#"; }
     public static String systemPrefix(int index) { if (index<0) throw new IllegalArgumentException("Select a deep-fluid system");return draftPrefix()+index+"."; }

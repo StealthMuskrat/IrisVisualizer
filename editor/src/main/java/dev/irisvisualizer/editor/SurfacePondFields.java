@@ -44,6 +44,7 @@ public final class SurfacePondFields {
         context(context); field(field); return DATA.getProperty(context+"."+field+".default");
     }
     private static String createToken(String context) { return DATA.getProperty(context+".createToken"); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) { field(field); return "Signed 32-bit integer, minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum"); }
     public static String draftPrefix(String context) { context(context); return "hydrology#rivers.surface.ponds."+context+"."; }
     public static byte[] enableContainer(String path,byte[] original) {

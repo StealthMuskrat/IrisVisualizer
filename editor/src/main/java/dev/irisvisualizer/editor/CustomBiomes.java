@@ -39,6 +39,7 @@ public final class CustomBiomes {
     public static String help(Context context,String field) { field(context,field);return DATA.getProperty(context.group()+"."+field+".description",""); }
     public static String defaultToken(Context context,String field) { field(context,field);return DATA.getProperty(context.group()+"."+field+".default"); }
     public static List<String> choices(Context context,String field) { field(context,field);String value=DATA.getProperty(context.group()+"."+field+".choices");return value==null ? List.of() : List.of(value.split(",")); }
+    public static NumericBounds numericBounds(Context context,String field) { return NumericBounds.from(DATA,context.group()+"."+field); }
     public static String constraints(Context context,String field) {
         field(context,field);String key=context.group()+"."+field;
         return (DATA.getProperty(key+".type").equals("int") ? "Exact signed 32-bit integer" : "Finite number")+"; "+DATA.getProperty(key+".minimum")+".."+DATA.getProperty(key+".maximum");

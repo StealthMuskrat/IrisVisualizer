@@ -46,6 +46,7 @@ public final class GrottoFields {
         String value=DATA.getProperty(prefix(section,field)+".default");
         return booleanField(section,field) || enumField(section,field) || nullable(section,field) ? value : new BigDecimal(value).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(String section,String field) { return NumericBounds.from(DATA,prefix(section,field)); }
     public static String constraints(String section,String field) {
         String p=prefix(section,field);
         return (integer(section,field) ? "Signed 32-bit integer" : "Finite number")+", minimum "+DATA.getProperty(p+".minimum")+", maximum "+DATA.getProperty(p+".maximum");

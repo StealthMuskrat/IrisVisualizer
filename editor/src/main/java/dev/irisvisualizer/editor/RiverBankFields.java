@@ -34,6 +34,7 @@ public final class RiverBankFields {
         String token=DATA.getProperty(field+".default");
         return booleanField(field) ? token : new BigDecimal(token).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) {
         if (field.equals("seed")) return "Signed 64-bit integer (exact)";
         return (field.equals("maximumOverhang") ? "Signed 32-bit integer" : "Finite number")+", minimum "+DATA.getProperty(field+".minimum")+", maximum "+DATA.getProperty(field+".maximum");

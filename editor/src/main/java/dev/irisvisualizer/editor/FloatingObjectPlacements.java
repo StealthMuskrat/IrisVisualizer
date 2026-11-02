@@ -57,6 +57,7 @@ public final class FloatingObjectPlacements {
     public static String listHelp(String list) { collection(list);if (list.equals("objects")) return BiomeObjectPlacements.description();return list.equals("floatingObjects") ? "Placements attempted through the floating-object path. The pinned renderer preserves their configured mode; select FLOATING for free-air placement." : DATA.getProperty(list+".description",""); }
     public static String listHelp(int entry,String list) { if (!validCollection(entry,list)) throw new IllegalArgumentException("Select an object collection");return entry==REGION_ROOT ? RegionObjectPlacements.description() : listHelp(list); }
     public static String defaultToken(String value) { field(value,EDITABLE);return DATA.getProperty(value+".default"); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String value) { field(value,SCALARS);return (value.equals("density") ? "Exact integer" : "Finite number")+", minimum "+DATA.getProperty(value+".minimum")+", maximum "+DATA.getProperty(value+".maximum"); }
     public static List<String> modes() { return List.of(DATA.getProperty("mode.choices").split(",")); }
     public static String modeHelp(String value) { if (value==null || !modes().contains(value)) throw new IllegalArgumentException("Unknown placement mode");return DATA.getProperty("mode."+value+".description",""); }

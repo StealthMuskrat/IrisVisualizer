@@ -45,6 +45,7 @@ public final class CaveModules {
         String token = DEFINITIONS.getProperty(field + ".default");
         return booleanField(field) ? token : new BigDecimal(token).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
         return "Finite number" + (min == null ? "" : ", minimum " + min) + (max == null ? "" : ", maximum " + max);

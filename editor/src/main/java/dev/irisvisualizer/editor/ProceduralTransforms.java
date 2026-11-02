@@ -24,6 +24,7 @@ public final class ProceduralTransforms {
     public static String help(String scope,String field) { return property(scope,field,"description"); }
     public static String type(String scope,String field) { return property(scope,field,"type"); }
     public static String defaultValue(String scope,String field) { return property(scope,field,"default"); }
+    public static NumericBounds numericBounds(String scope,String field) { return NumericBounds.of(type(scope,field),property(scope,field,"minimum"),property(scope,field,"maximum")); }
     public static String constraints(String scope,String field) { return (type(scope,field).equals("int") ? "Exact signed 32-bit integer " : "Finite number ")+property(scope,field,"minimum")+".."+property(scope,field,"maximum"); }
     public static boolean paired(String scope,String field) { scope(scope);return scope.equals("clamp") ? List.of("minimumHeight","maximumHeight").contains(field) : scope.startsWith("rotation.") && List.of("min","max").contains(field); }
     public static List<String> rangeFields(String scope) { scope(scope);if (scope.equals("clamp")) return List.of("minimumHeight","maximumHeight");if (scope.startsWith("rotation.")) return List.of("min","max");throw new IllegalArgumentException("Select a height or angle range"); }

@@ -19,6 +19,7 @@ public final class RegionFields {
     }
     public static boolean arrayField(String field) { return "biomeArray".equals(DEFINITIONS.getProperty(field + ".type")); }
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         return "Minimum " + DEFINITIONS.getProperty(field + ".minimum")
                 + (DEFINITIONS.containsKey(field + ".maximum") ? ", maximum " + DEFINITIONS.getProperty(field + ".maximum") : "");

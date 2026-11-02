@@ -21,6 +21,7 @@ public final class BiomeFields {
     public static String description(String field) { return DEFINITIONS.getProperty(field + ".description", ""); }
     public static double min(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".minimum", "-Infinity")); }
     public static double max(String field) { return Double.parseDouble(DEFINITIONS.getProperty(field + ".maximum", "Infinity")); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         String min = DEFINITIONS.getProperty(field + ".minimum"), max = DEFINITIONS.getProperty(field + ".maximum");
         return ("int".equals(DEFINITIONS.getProperty(field + ".type")) ? "Signed 32-bit integer" : "Finite number")

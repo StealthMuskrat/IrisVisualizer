@@ -45,6 +45,7 @@ public final class ImageMapDefinitions {
     public static byte[] setFallbackTarget(String path,byte[] original,String value) { authorize(path);if (value==null) throw new IllegalArgumentException("Use a string target; empty restores an unset target");return put(new LosslessJson(original),"fallbackTarget",value); }
     public static byte[] setChoice(String path,byte[] original,String field,String value) { authorize(path);if (value==null || !choices(field).contains(value)) throw new IllegalArgumentException("Choose a pinned image-map enum value");return put(new LosslessJson(original),field,value); }
     public static byte[] setToggle(String path,byte[] original,String field,boolean value) { authorize(path);if (!TOGGLES.contains(field)) throw new IllegalArgumentException("Unsupported image-map toggle");var root=new LosslessJson(original);return root.token(field)==null ? root.enable(field,Boolean.toString(value)) : root.bool(field,value); }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DATA,field); }
     public static String constraints(String field) {
         if (!NUMBERS.contains(field)) throw new IllegalArgumentException("Unsupported numeric field");String low=DATA.getProperty(field+".minimum"),high=DATA.getProperty(field+".maximum");
         return (field.equals("smoothingRadius") ? "Exact signed 32-bit integer" : "Finite number")+(low==null ? "" : "; minimum "+low)+(high==null ? "" : "; maximum "+high);

@@ -37,6 +37,7 @@ public final class Terrain3DFields {
         String token = DEFINITIONS.getProperty(field+".default");
         return booleanField(field) ? token : new java.math.BigDecimal(token).stripTrailingZeros().toPlainString();
     }
+    public static NumericBounds numericBounds(String field) { return NumericBounds.from(DEFINITIONS,field); }
     public static String constraints(String field) {
         if ("long".equals(DEFINITIONS.getProperty(field+".type"))) return "Signed 64-bit integer (exact)";
         return "Finite number, minimum "+DEFINITIONS.getProperty(field+".minimum")+", maximum "+DEFINITIONS.getProperty(field+".maximum");

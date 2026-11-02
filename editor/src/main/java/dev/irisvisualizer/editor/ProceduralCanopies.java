@@ -37,6 +37,7 @@ public final class ProceduralCanopies {
     public static String defaultValue(Context c,String field) { scalar(c,field);return property(c,field,"default"); }
     public static List<String> choices(Context c,String field) { scalar(c,field);String items=property(c,field,"choices");return items==null ? List.of() : List.of(items.split(",")); }
     public static String choiceHelp(Context c,String field,String choice) { return property(c,field,choice+".description"); }
+    public static NumericBounds numericBounds(Context context,String field) { return NumericBounds.of(type(context,field),property(context,field,"minimum"),property(context,field,"maximum")); }
     public static String constraints(Context c,String field) { String min=property(c,field,"minimum"),max=property(c,field,"maximum");return (type(c,field).equals("int") ? "Exact signed 32-bit integer" : "Finite number")+(min==null ? "" : "; minimum "+min)+(max==null ? "" : "; maximum "+max); }
     private static LosslessJson inline(LosslessJson parent,String member) { String token=parent.token(member);return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
     private static LosslessJson parent(LosslessJson entry,Context c) { String[] parts=c.scope().split("\\.");LosslessJson current=entry;for (int i=0;i<parts.length-1;i++) { current=inline(current,parts[i]);if (current==null) throw new IllegalArgumentException("Enable each inline canopy ancestor first"); }return current; }

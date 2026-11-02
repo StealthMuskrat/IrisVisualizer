@@ -34,6 +34,7 @@ public final class FloatingPlacementDeformation {
     public static String help(String object) { objectField(object);return DATA.getProperty(object+".description",""); }
     public static String help(String object,String field) { member(object,field);return DATA.getProperty(object+"."+field+".description",""); }
     public static String defaultToken(String object,String field) { member(object,field);return DATA.getProperty(object+"."+field+".default"); }
+    public static NumericBounds numericBounds(String object,String field) { return NumericBounds.from(DATA,object+"."+field); }
     public static String constraints(String object,String field) { scalar(object,field);String key=object+"."+field;return (DATA.getProperty(key+".type").equals("int") ? "Exact integer" : "Finite number")+", minimum "+DATA.getProperty(key+".minimum")+", maximum "+DATA.getProperty(key+".maximum"); }
     private static void scalar(String object,String field) { member(object,field);if (field.equals("exclude")) throw new IllegalArgumentException("Use the material exclusion list"); }
     static LosslessJson object(LosslessJson placement,String field) { objectField(field);String token=placement.token(field);return token==null || token.equals("null") ? null : new LosslessJson(token.getBytes(StandardCharsets.UTF_8)); }
