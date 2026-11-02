@@ -71,7 +71,7 @@ final class ResourceOperation {
         return SCHEMA.getProperty("owner."+family);
     }
     static String ownerDescriptor(String path){String metadata=SCHEMA.getProperty("metadata."+path);if(metadata!=null)return metadata;String model=ownerModel(path);return model==null?null:"object:"+model;}
-    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Canonical region/deposit filters, normalized local cave-biome selectors and unambiguous carving fallback links are maintained; ambiguous identities and affected qualified cave lookups remain blocked. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
+    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Canonical region/deposit filters, normalized local cave-biome selectors, exact object-collision comparisons and unambiguous carving fallback links are maintained; ambiguous identities, procedural collision-marker namespaces and affected qualified cave lookups remain blocked. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
     static void check(BooleanSupplier cancelled){if(cancelled.getAsBoolean() || Thread.currentThread().isInterrupted())throw new CancellationException("Resource operation review cancelled");}
     private static byte[] copy(byte[] owned,BooleanSupplier cancelled){var bytes=new byte[owned.length];for(int i=0;i<bytes.length;i+=65536){check(cancelled);System.arraycopy(owned,i,bytes,i,Math.min(65536,bytes.length-i));}check(cancelled);return bytes;}
     private record Rewrite(JsonStructure.Node node,String value){}
@@ -207,7 +207,14 @@ final class ResourceOperation {
         void exactKey(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String family){
             if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Exact resource-name comparison is not a plain string.");return;}
             if(!affected(family))return;
-            String value=string(document,node),resolved=resolver.resolve(family,value);
+            String value=string(document,node);
+            if(family.equals("objects")){
+                if(value.isBlank())return;
+                if(key(source.plan.source()).startsWith("procedural/") || source.plan.target()!=null && key(source.plan.target()).startsWith("procedural/")){
+                    issue(path,pointer,"Native collision markers reserve procedural/ identities. This operation could change whether a placed object participates in collision comparisons; operation blocked.");return;
+                }
+            }
+            String resolved=resolver.resolve(family,value);
             if(source.plan.source().equals(resolved) && !value.equals(key(source.plan.source())))issue(path,pointer,"Exact comparison uses a noncanonical loader alias; rewriting it could change string matching. Set an explicit canonical key before this operation.");
             int before=refs.size();reference(path,document,node,pointer,family,value,false);
             if(refs.size()>before)exactComparisons.add(refs.getLast());

@@ -245,7 +245,10 @@
     "structure/placement/StructureCaveAnchorResolver.java": "e3b1ca03a4f3890cccdcafd292dd55fd14f66006ddadd30e35d5462e5d97a906",
     "structure/placement/IrisStructureLocator.java": "999bab1891a169ec1be18174fbf2ffd46031ff2ec4676bd873fec7cf9e04e86a",
     "generation/runtime/Engine.java": "41f671246c40e538791b26e69c43538a07c10e07b28a655ae034eaf7b53a6019",
-    "generation/runtime/IrisEngine.java": "986cdf67d7d024797915238458fb503a531e74c6dee81460f1aae498d56677b5"
+    "generation/runtime/IrisEngine.java": "986cdf67d7d024797915238458fb503a531e74c6dee81460f1aae498d56677b5",
+    "structure/placement/StructurePlacementMarker.java": "972347a91ac53f68e515cb7ee9dfbc818926e3c4b2348ef5e1e7a65b018ba314",
+    "structure/placement/PlacedObject.java": "a1b7c1e6589dfd5778d7eabda631beb7d1c85d926e7240552a806ec504c6d956",
+    "generation/mantle/MantleObjectComponent.java": "3da3ee187aa85a08f7aabd9cf3436681c85cc3785f60cc1295bc4ac19ccf4d78"
   },
   "volmlibRevision": "210705c5ab1321dc74b86b48457fd6d5e0452944"
 }

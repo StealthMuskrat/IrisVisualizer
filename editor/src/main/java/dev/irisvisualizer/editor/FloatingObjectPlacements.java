@@ -53,7 +53,7 @@ public final class FloatingObjectPlacements {
         } catch (NumberFormatException invalid) { return null; }
         return null;
     }
-    public static String help(String value) { field(value,EDITABLE);return DATA.getProperty(value+".description",""); }
+    public static String help(String value) { field(value,EDITABLE);return DATA.getProperty(value+".description","")+(value.equals("allowedCollisions") || value.equals("forbiddenCollisions")?" Native collision matching uses exact, case-sensitive loaded object keys; allowed entries override forbidden entries. Procedural marker identities are excluded. Canonical references follow file rename/move; aliases and uncertain marker identities can block those operations.":""); }
     public static String listHelp(String list) { collection(list);if (list.equals("objects")) return BiomeObjectPlacements.description();return list.equals("floatingObjects") ? "Placements attempted through the floating-object path. The pinned renderer preserves their configured mode; select FLOATING for free-air placement." : DATA.getProperty(list+".description",""); }
     public static String listHelp(int entry,String list) { if (!validCollection(entry,list)) throw new IllegalArgumentException("Select an object collection");return entry==REGION_ROOT ? RegionObjectPlacements.description() : listHelp(list); }
     public static String defaultToken(String value) { field(value,EDITABLE);return DATA.getProperty(value+".default"); }

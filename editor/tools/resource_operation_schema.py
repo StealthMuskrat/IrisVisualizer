@@ -34,8 +34,8 @@ OVERRIDES = {
  'IrisDepositGenerator.includedBiomes':'list:dual-deposit:biomes',
  'IrisDepositGenerator.excludedBiomes':'list:dual-deposit:biomes',
  'IrisStructurePlacement.caveBiomes':'list:cave-match:biomes',
- 'IrisObjectPlacement.allowedCollisions':'list:guard:objects',
- 'IrisObjectPlacement.forbiddenCollisions':'list:guard:objects',
+ 'IrisObjectPlacement.allowedCollisions':'list:exact-key:objects',
+ 'IrisObjectPlacement.forbiddenCollisions':'list:exact-key:objects',
 }
 FOREIGN_REFS = set(READ_ONLY_ROOTS.values())
 NUMBERS = {'int','long','double','float','Integer','Long','Double','Float','short','byte','Short','Byte'}
@@ -142,8 +142,30 @@ def evaluate(expression,kind,potential):
   tail=tail[ts[end].end:]
  return value
 
+def audit_object_collision_context(texts):
+ """Bind exact comparisons to loaded marker identities, never arbitrary matching pack strings."""
+ def require(name,*contracts):
+  source=compact(texts[name])
+  for contract in contracts:assert compact(contract) in source,'Changed object collision consumer: '+name+' '+contract
+ require('IrisObjectPlacementRunner','PlacedObject p = engine.resolveObjectPlacementMarker(i, k, placementMarker);',
+         'IrisObject o = p.getObject();','String key = o.getLoadKey();',
+         'if (config.getForbiddenCollisions().contains(key) && !config.getAllowedCollisions().contains(key)) { return -1; }')
+ require('Engine','StructurePlacementMarker.Decoded marker = StructurePlacementMarker.decode(objectAt);',
+         'String object = marker.objectKey();','if (object.startsWith("procedural/")) { return null; }',
+         'return new PlacedObject(null, getData().getObjectLoader().load(object), id, x, z);')
+ require('ObjectResourceLoader','t.setLoadKey(name);',
+         'private IrisObject loadRaw(String name) { File file = resolveFile(name, ".iob"); return file == null ? null : loadFile(file, name); }')
+ require('MantleObjectComponent','String key = object == null ? null : object.getLoadKey();','return key + "@" + id;')
+ require('PlacedObject','@AllArgsConstructor','private IrisObjectPlacement placement;','private IrisObject object;','private int id;','private int xx;','private int zz;')
+ require('StructurePlacementMarker','int separator = marker.indexOf(\'@\');',
+         'if (separator <= 0 || separator != marker.lastIndexOf(\'@\') || separator == marker.length() - 1) { return null; }',
+         'String objectKey = marker.substring(0, separator);',
+         'return new Decoded(objectKey, Integer.parseInt(marker.substring(separator + 1)), null);',
+         'return new Decoded(objectKey, placementId, structureKey);')
+
 def extract(root):
  catalog=load_inventory(root);models,texts,evidence=catalog.models,catalog.texts,catalog.evidence
+ audit_object_collision_context(texts)
  for name,model in models.items():assert not model.custom_noarg,'Custom no-arg constructor needs explicit default policy: '+name
  fields=catalog.fields
  result={'root.'+family:model for family,model in ROOTS.items()} | {'owner.'+family:model for family,model in OWNERS.items()} | {'metadata.'+path:kind for path,kind in METADATA.items()};definitions={}
@@ -160,6 +182,7 @@ def extract(root):
  default_derivative=json.loads(compact(derivative))
  assert isinstance(default_derivative,str) and re.fullmatch(r'[A-Za-z0-9:/_.-]+',default_derivative),'Unreviewed biome derivative default'
  result['context.biome.derivative.default']=default_derivative
+ result['context.objectCollision.policy']='exactLoadKeyWithProceduralGuard'
  potential={name:set() for name in MODELS}
  while True:
   next_={n:set().union(*(families(k,potential) for _,k in fs.values())) for n,fs in definitions.items()}

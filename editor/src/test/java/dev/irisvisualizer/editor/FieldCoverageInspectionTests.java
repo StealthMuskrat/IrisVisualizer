@@ -9,7 +9,7 @@ import java.util.Map;
 final class FieldCoverageInspectionTests {
     private static void check(boolean value,String reason){ResourceOperationTests.check(value,reason);}
     static void run(Path temp)throws Exception{
-        var total=FieldCoverage.summary();check(total.fields()==1462 && total.models()==150 && total.sources()==244,"one complete pinned model graph backs the report");
+        var total=FieldCoverage.summary();check(total.fields()==1462 && total.models()==150 && total.sources()==247,"one complete pinned model graph backs the report");
         check(total.generation()==1237 && total.implemented()==1237 && total.readOnly()==196 && total.unclassified()==29 && total.missingPolicies()==0,"policy totals distinguish implemented controls, reviewed read-only fields and unresolved recipe scope");
         check(FieldCoverage.fields("treeSettings").size()==2 && FieldCoverage.fields("treeSettings").stream().allMatch(f->f.classification().equals("read-only") && !f.implemented()),"package-private tree-growth settings inventoried without authoring authority");
         check(FieldCoverage.fields("mod").stream().filter(f->f.classification().equals("unclassified")).count()==14,"modification recipe fields are explicitly pending rather than guessed generation/non-generation");

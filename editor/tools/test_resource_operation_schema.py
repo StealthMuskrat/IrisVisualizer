@@ -43,6 +43,9 @@ assert values['snippet.style'] == 'IrisGeneratorStyle'
 assert values['IrisGeneratorStyle.snippet'] == 'style'
 assert values['snippet.object-block-replacer'] == 'IrisObjectReplace'
 assert values['IrisMod.forDimension'] == 'guard:dimensions'
+assert values['IrisObjectPlacement.allowedCollisions'] == 'list:exact-key:objects'
+assert values['IrisObjectPlacement.forbiddenCollisions'] == 'list:exact-key:objects'
+assert values['context.objectCollision.policy'] == 'exactLoadKeyWithProceduralGuard'
 assert values['IrisMod.removeObjects'] == 'list:guard:objects'
 assert values['IrisModObjectPlacementRegionInjector.biome'] == 'guard:regions'
 assert values['IrisMod.blockReplacers'] == 'list:object:IrisObjectReplace'
@@ -102,6 +105,13 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
         ('IrisImageMapBinding', '@RegistryListResource(IrisImageMap.class)', ''),
         ('IrisGeneratorStyle', '@Snippet("style")', '@Snippet("other")'),
         ('IrisLootTable', 'return "loot";', 'return "loots";'),
+        ('IrisObjectPlacementRunner', 'config.getForbiddenCollisions().contains(key) && !config.getAllowedCollisions().contains(key)', 'config.getForbiddenCollisions().contains(key) || !config.getAllowedCollisions().contains(key)'),
+        ('IrisObjectPlacementRunner', 'String key = o.getLoadKey();', 'String key = o.getTypeName();'),
+        ('Engine', 'object.startsWith("procedural/")', 'object.startsWith("generated/")'),
+        ('ObjectResourceLoader', 't.setLoadKey(name);', 't.setLoadKey(name.toLowerCase());'),
+        ('MantleObjectComponent', 'return key + "@" + id;', 'return key.trim() + "@" + id;'),
+        ('PlacedObject', 'private IrisObject object;', 'private String object;'),
+        ('StructurePlacementMarker', 'String objectKey = marker.substring(0, separator);', 'String objectKey = marker.substring(0, separator).trim();'),
     ]:
         assert old in sources[name], old
         changed = fixture / (name + '.java')
