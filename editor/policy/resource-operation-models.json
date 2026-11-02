@@ -921,6 +921,7 @@
     "IrisBiomeCustomPrecipType": "generation/biome/IrisBiomeCustomPrecipType.java",
     "IrisBiomeCustomSpawn": "generation/biome/IrisBiomeCustomSpawn.java",
     "IrisBiomeCustomSpawnType": "generation/biome/IrisBiomeCustomSpawnType.java",
+    "IrisBiomeDerivatives": "generation/biome/IrisBiomeDerivatives.java",
     "IrisBiomeGeneratorLink": "generation/biome/IrisBiomeGeneratorLink.java",
     "IrisBiomePaletteLayer": "generation/biome/IrisBiomePaletteLayer.java",
     "IrisBlockData": "generation/block/IrisBlockData.java",

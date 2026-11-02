@@ -73,8 +73,8 @@ final class ResourceOperationCoreOwnersTests {
         var sentinel=PackWorkspace.newPack(Map.of("dimensions/a.json",bytes("{\"upperDimension\":\"upper\"}"),"dimensions/upper.json",bytes("{}")));
         check(!rename(sentinel,"dimensions/upper.json","none").report.permitted(),"rename cannot turn active legacy dimension link into none sentinel");
         for(String field:List.of("\"deposits\":[{\"includedBiomes\":[\"forest\"]}]","\"structures\":[{\"caveBiomes\":[\"forest\"]}]")){
-            var guarded=PackWorkspace.newPack(Map.of("biomes/forest.json",bytes("{"+field+"}"),"objects/unused.iob",new byte[]{1}));
-            check(!rename(guarded,"biomes/forest.json","other").report.permitted(),"nonempty dual-domain/prefix biome comparisons stay guarded");
+            var guarded=PackWorkspace.newPack(Map.of("biomes/forest.json",bytes("{\"derivative\":\"minecraft:forest\","+field+"}"),"objects/unused.iob",new byte[]{1}));
+            check(!rename(guarded,"biomes/forest.json","other").report.permitted(),"ambiguous derivative/prefix biome comparisons stay guarded");
             check(rename(guarded,"objects/unused.iob","other").report.permitted(),"family guard does not block unrelated object maintenance");
         }
         var provider=PackWorkspace.newPack(Map.of("dimensions/a.json",bytes("{\"terrainTransform\":{\"id\":\"external\",\"version\":\"1\",\"settings\":{\"possibleResource\":\"shape\"}}}"),"objects/shape.iob",new byte[]{1}));

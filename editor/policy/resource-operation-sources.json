@@ -240,7 +240,8 @@
     "@volmlib/util/structure/StructureTerrainMode.java": "3aa3e92ab48528c134290ec6e684a16bb44b4300f07881d1afd0fe908d7090a0",
     "studio/StudioMode.java": "35417525ae457530785e3540f56839a18999903063f28f3a733d0c35d754b634",
     "generation/subterrain/SubterrainPlanner.java": "97f99ddacf3acb14dfd10f549a53cf3468e1ae8eff6483b93404eb134344460e",
-    "generation/biome/TopShapeMode.java": "9c2a129fe10c42236ac9824a8716aa18bde00c02bf2c850689f3451ebd0884ae"
+    "generation/biome/TopShapeMode.java": "9c2a129fe10c42236ac9824a8716aa18bde00c02bf2c850689f3451ebd0884ae",
+    "generation/biome/IrisBiomeDerivatives.java": "89b026f18e56e7d9570a5727bd5813cc32d397b25b9c2037bcfeaf1458ace8ea"
   },
   "volmlibRevision": "210705c5ab1321dc74b86b48457fd6d5e0452944"
 }

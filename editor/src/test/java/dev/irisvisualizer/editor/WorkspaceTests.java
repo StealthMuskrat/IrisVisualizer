@@ -141,6 +141,7 @@ public final class WorkspaceTests {
         ResourceOperationSnippetTests.run(temp);
         FieldCoverageInspectionTests.run(temp);
         ResourceOperationContextTests.run(temp);
+        ResourceOperationDepositTests.run(temp);
         NumericBoundsTests.run();
         NumericChoicesTests.run();
    EmptyFolderTests.run(temp);

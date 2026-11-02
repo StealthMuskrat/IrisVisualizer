@@ -71,14 +71,18 @@ final class ResourceOperation {
         return SCHEMA.getProperty("owner."+family);
     }
     static String ownerDescriptor(String path){String metadata=SCHEMA.getProperty("metadata."+path);if(metadata!=null)return metadata;String model=ownerModel(path);return model==null?null:"object:"+model;}
-    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Canonical exact region filters and unambiguous carving fallback links are maintained. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
+    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Canonical exact region/deposit biome filters and unambiguous carving fallback links are maintained; ambiguous derivative identities remain blocked. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
     static void check(BooleanSupplier cancelled){if(cancelled.getAsBoolean() || Thread.currentThread().isInterrupted())throw new CancellationException("Resource operation review cancelled");}
     private static byte[] copy(byte[] owned,BooleanSupplier cancelled){var bytes=new byte[owned.length];for(int i=0;i<bytes.length;i+=65536){check(cancelled);System.arraycopy(owned,i,bytes,i,Math.min(65536,bytes.length-i));}check(cancelled);return bytes;}
     private record Rewrite(JsonStructure.Node node,String value){}
     private record ReservedKey(String path,String pointer,String family){}
     private static final class Scan {
         final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<Rewrite>> rewrites=new TreeMap<>();final Map<String,Set<String>> imageMapUses=new TreeMap<>();final List<Reference> categoricalBiomes=new ArrayList<>();final Map<String,Set<String>> snippetEdges=new TreeMap<>();final Set<Reference> exactComparisons=new HashSet<>();final List<ReservedKey> reservedKeys=new ArrayList<>();final Set<String> carvingIds=new HashSet<>();int omitted,inspected,snippetLinks,symbolicCharacters;boolean incompleteCarvingIds;
-        Scan(Source source,BooleanSupplier cancelled){this.source=source;this.cancelled=cancelled;resolver=new Resolver(source.paths,cancelled);issues.addAll(source.issues);}
+        Scan(Source source,BooleanSupplier cancelled){
+            this.source=source;this.cancelled=cancelled;resolver=new Resolver(source.paths,cancelled);issues.addAll(source.issues);
+            // IrisComplex also constructs a default empty cave biome, outside the pack documents.
+            if(affected("biomes"))depositDerivative(Objects.requireNonNull(SCHEMA.getProperty("context.biome.derivative.default"),"Missing pinned biome derivative default"));
+        }
         void issue(String path,String pointer,String detail){if(issues.size()<MAX_ISSUES)issues.add(new Issue(path,pointer,detail));else omitted++;}
         String string(JsonStructure.Snapshot snapshot,JsonStructure.Node node){return new LosslessJson(("{\"x\":"+snapshot.source().substring(node.start(),node.end())+"}").getBytes(StandardCharsets.UTF_8)).stringToken("x");}
         void reference(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer,String family,String key,boolean implicit){
@@ -133,13 +137,19 @@ final class ResourceOperation {
             return null;
         }
         void mapUse(String map,String application){if(!Set.of("BIOME","REGION","SURFACE_BLOCK","TERRAIN_HEIGHT","MASK","CUSTOM","SCALAR").contains(application))application="UNKNOWN";String resolved=resolver.resolve("image-maps",map);if(resolved!=null)imageMapUses.computeIfAbsent(resolved,p->new TreeSet<>()).add(application);}
-        // Frozen owners contribute binding roles, scalar map consumers and carving IDs before reference classification.
+        // Frozen owners contribute binding roles, carving IDs and derivative collisions before classification.
         void collectContexts(String path,JsonStructure.Snapshot document,int id,String type){
             check(cancelled);var current=document.node(id);
             if(current.kind()==JsonStructure.Kind.NULL)return;
             if(type.startsWith("list:") && current.kind()==JsonStructure.Kind.ARRAY){for(int child:current.children())collectContexts(path,document,child,type.substring(5));return;}
             if(!type.startsWith("object:") || current.kind()!=JsonStructure.Kind.OBJECT)return;
             String model=type.substring(7);
+            if(model.equals("IrisBiome") && affected("biomes")){
+                var derivative=member(document,current,"derivative");var vanilla=member(document,current,"vanillaDerivative");
+                if(derivative==null)depositDerivative(Objects.requireNonNull(SCHEMA.getProperty("context.biome.derivative.default"),"Missing pinned biome derivative default"));
+                else if(derivative.kind()==JsonStructure.Kind.STRING)depositDerivative(string(document,derivative));
+                if(vanilla!=null && vanilla.kind()==JsonStructure.Kind.STRING)depositDerivative(string(document,vanilla));
+            }
             if(model.equals("IrisDimensionCarvingEntry") && affected("biomes") && !incompleteCarvingIds){
                 var identifier=member(document,current,"id");
                 if(identifier!=null && identifier.kind()==JsonStructure.Kind.STRING){
@@ -206,6 +216,33 @@ final class ResourceOperation {
             String oldKey=key(source.plan.source());boolean alias=false;
             for(var ref:refs){check(cancelled);if(source.plan.source().equals(ref.resolved()) && !exactComparisons.contains(ref) && !oldKey.equals(ref.key())){alias=true;break;}}
             if(alias)for(var ref:exactComparisons){check(cancelled);if(source.plan.source().equals(ref.resolved()))issue(ref.path(),ref.pointer(),"Incoming loader aliases would collapse to one replacement key and change an exact resource-name comparison; operation blocked.");}
+        }
+        // Only the source and destination identities can collide with a rewritten deposit selector.
+        // Store at most two collisions rather than retaining an unbounded derivative-ID catalog.
+        final Set<String> depositDerivativeCollisions=new HashSet<>();
+        final Set<Reference> depositComparisons=new HashSet<>();
+        void depositDerivative(String value){
+            if(value==null || value.isBlank())return;
+            String normalized=value.trim();if(normalized.indexOf(':')<0)normalized="minecraft:"+normalized;
+            if(normalized.equals("minecraft:"+key(source.plan.source())) || source.plan.target()!=null && normalized.equals("minecraft:"+key(source.plan.target())))depositDerivativeCollisions.add(normalized);
+        }
+        void deposit(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer){
+            if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Deposit biome-or-derivative comparison is not a plain string.");return;}
+            if(!affected("biomes"))return;
+            String value=string(document,node);
+            // The native comparison does not trim selectors. Namespaced/unsafe file spellings
+            // cannot equal a certified resource load key, and retain their derivative meaning.
+            if(value.isEmpty() || value.indexOf(':')>=0 || !value.equals(value.strip()) || !ResourceTypes.referenceKey(value) || !value.matches("[A-Za-z0-9_./-]+"))return;
+            int before=refs.size();exactKey(path,document,node,pointer,"biomes");
+            if(refs.size()>before)depositComparisons.add(refs.getLast());
+        }
+        void checkDepositComparisons(){
+            if(source.plan.mode()==Mode.DELETE || depositComparisons.isEmpty())return;
+            String replacement="minecraft:"+key(source.plan.target());
+            for(var reference:depositComparisons){
+                check(cancelled);if(!source.plan.source().equals(reference.resolved()))continue;
+                if(depositDerivativeCollisions.contains("minecraft:"+reference.key()) || depositDerivativeCollisions.contains(replacement))issue(reference.path(),reference.pointer(),"Deposit selector also has an existing or replacement derivative identity; rewriting it could change biome filtering. Use an unambiguous selector before this operation.");
+            }
         }
         void dualCarving(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer){
             if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Carving entry-or-biome reference is not a plain string.");return;}
@@ -303,6 +340,7 @@ final class ResourceOperation {
             }
             if(type.startsWith("exact-key:")){exactKey(path,document,node,pointer,type.substring(10));return;}
             if(type.equals("dual-carving:biomes")){dualCarving(path,document,node,pointer);return;}
+            if(type.equals("dual-deposit:biomes")){deposit(path,document,node,pointer);return;}
             if(type.startsWith("guard:")){
                 if(node.kind()!=JsonStructure.Kind.STRING)issue(path,pointer,"Runtime-comparison reference is not a plain string.");
                 else if(affected(type.substring(6)) && !string(document,node).isBlank())issue(path,pointer,"Runtime comparison, prefix or dual-domain reference is not certified for this resource family; operation blocked.");
@@ -364,7 +402,7 @@ final class ResourceOperation {
             for(var row:scan.documents.entrySet()){
                 check(cancelled);scan.node(row.getKey(),row.getValue(),0,ownerDescriptor(row.getKey()),"");
             }
-            scan.checkSnippetGraph();scan.checkCategoricalComparisons();scan.checkExactComparisons();
+            scan.checkSnippetGraph();scan.checkCategoricalComparisons();scan.checkExactComparisons();scan.checkDepositComparisons();
             var resulting=new TreeSet<>(source.paths);resulting.remove(source.plan.source());if(source.plan.target()!=null)resulting.add(source.plan.target());
             var nextResolver=new Resolver(resulting,cancelled);scan.checkReservedKeys(nextResolver);if(source.plan.mode()!=Mode.DELETE)for(var reference:scan.refs){String expected=Objects.equals(reference.resolved(),source.plan.source())?source.plan.target():reference.resolved();String next=nextResolver.resolve(reference.family(),reference.replacement()==null?reference.key():reference.replacement());if(!Objects.equals(next,expected))scan.issue(reference.path(),reference.pointer(),"Operation would change another reference's resolution, including an unresolved or dotted-prefix alias.");}
         }

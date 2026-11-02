@@ -65,7 +65,9 @@ assert values['IrisStructurePlacement.structures'] == 'list:ref:structures'
 assert values['IrisStructurePlacement.caveBiomes'] == 'list:guard:biomes'
 assert values['IrisSubterrainFeature.allowedRegions'] == 'list:exact-key:regions'
 assert values['IrisFloatingChildBiomes.carving'] == 'dual-carving:biomes'
-assert values['IrisDepositGenerator.includedBiomes'] == 'list:guard:biomes'
+assert values['IrisDepositGenerator.includedBiomes'] == 'list:dual-deposit:biomes'
+assert values['IrisDepositGenerator.excludedBiomes'] == 'list:dual-deposit:biomes'
+assert values['context.biome.derivative.default'] == 'minecraft:the_void'
 assert values['IrisImageMapMask.map'] == 'string' # named binding, not a resource key
 assert values['IrisLoot.customNbt'] == 'opaque-object'
 assert values['IrisDimension.terrainTransform'] == 'unsupported:external-terrain-transform'
@@ -118,7 +120,13 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     assert extract(fixture)[1] != manifest['sources']
     loader.write_text(sources['ResourceLoader'])
     assert '(x, z) -> regionStream.get(x, z).getLoadKey()' in sources['IrisComplex']
+    assert 'IrisBiome emptyBiome = new IrisBiome().setInferredType(InferredType.CAVE);' in sources['IrisComplex']
+    assert '.onNull(emptyBiome)' in sources['IrisComplex']
     complex_source=fixture/'IrisComplex.java'
     complex_source.write_text(sources['IrisComplex'].replace('(x, z) -> regionStream.get(x, z).getLoadKey()', '(x, z) -> regionStream.get(x, z).getName()'))
     assert extract(fixture)[1]['generation/runtime/IrisComplex.java'] != manifest['sources']['generation/runtime/IrisComplex.java']
+    assert "return trimmed.indexOf(':') >= 0 ? trimmed : \"minecraft:\" + trimmed;" in sources['IrisBiomeDerivatives']
+    derivative_source=fixture/'IrisBiomeDerivatives.java'
+    derivative_source.write_text(sources['IrisBiomeDerivatives'].replace('String trimmed = key.trim();','String trimmed = key.toLowerCase();'))
+    assert extract(fixture)[1]['generation/biome/IrisBiomeDerivatives.java'] != manifest['sources']['generation/biome/IrisBiomeDerivatives.java']
 print('PASS: ten-target/fifteen-owner/typed-snippet inherited/nested resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')

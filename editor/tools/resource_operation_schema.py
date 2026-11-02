@@ -28,11 +28,11 @@ OVERRIDES = {
  'IrisImageMapBinding.map':'trimmed-ref:image-maps',
  'IrisStructurePlacement.structures':'list:ref:structures',
  # These are runtime comparisons/dual-domain values, not ordinary loader lookups.
- # A nonempty occurrence blocks the affected target family until its complete semantics are certified.
+ # Each comparison needs a consumer-specific rule; uncertified cases retain family guards.
  'IrisFloatingChildBiomes.carving':'dual-carving:biomes',
  'IrisSubterrainFeature.allowedRegions':'list:exact-key:regions',
- 'IrisDepositGenerator.includedBiomes':'list:guard:biomes',
- 'IrisDepositGenerator.excludedBiomes':'list:guard:biomes',
+ 'IrisDepositGenerator.includedBiomes':'list:dual-deposit:biomes',
+ 'IrisDepositGenerator.excludedBiomes':'list:dual-deposit:biomes',
  'IrisStructurePlacement.caveBiomes':'list:guard:biomes',
  'IrisObjectPlacement.allowedCollisions':'list:guard:objects',
  'IrisObjectPlacement.forbiddenCollisions':'list:guard:objects',
@@ -73,7 +73,7 @@ def descriptor(owner,field,texts):
 def families(kind,potential):
  while kind.startswith(('list:','map:')):kind=kind.split(':',1)[1]
  if kind=='block-ref':return {'blocks'}
- if kind.startswith(('ref:','fallback-ref:','sentinel-ref:','reserved-ref:','trimmed-ref:','exact-key:','dual-carving:')):
+ if kind.startswith(('ref:','fallback-ref:','sentinel-ref:','reserved-ref:','trimmed-ref:','exact-key:','dual-carving:','dual-deposit:')):
   return {kind.split(':',1)[1].split('|',1)[0]}
  if kind.startswith(('guard:','context-')):return set(kind.split(':',1)[1].split(','))
  if kind.startswith('object:'):return potential[kind[7:]]
@@ -155,6 +155,11 @@ def extract(root):
    kind=descriptor(owner,f,texts);definitions[name][field]=(f,kind)
    result[name+'.'+field]=kind
   result[name+'.fields']=','.join(definitions[name])
+ # IrisBiome's absent derivative stays a native default, never an inserted JSON field.
+ derivative=definitions['IrisBiome']['derivative'][0].default
+ default_derivative=json.loads(compact(derivative))
+ assert isinstance(default_derivative,str) and re.fullmatch(r'[A-Za-z0-9:/_.-]+',default_derivative),'Unreviewed biome derivative default'
+ result['context.biome.derivative.default']=default_derivative
  potential={name:set() for name in MODELS}
  while True:
   next_={n:set().union(*(families(k,potential) for _,k in fs.values())) for n,fs in definitions.items()}
@@ -184,7 +189,7 @@ def extract(root):
    if kind.startswith('fallback-ref:') and not value.strip():value=kind.split('|',1)[1]
    if not value or (kind.startswith('sentinel-ref:') and value.lower()==kind.split('|',1)[1]):return []
    return [(family,pointer,value)]
-  if kind.startswith(('context-','guard:','exact-key:','dual-carving:')) and value:raise UnresolvedDefault('Context-dependent default')
+  if kind.startswith(('context-','guard:','exact-key:','dual-carving:','dual-deposit:')) and value:raise UnresolvedDefault('Context-dependent default')
   if kind.startswith('unsupported:'):raise UnresolvedDefault('Unsupported default type')
   return []
  for name,fs in definitions.items():
