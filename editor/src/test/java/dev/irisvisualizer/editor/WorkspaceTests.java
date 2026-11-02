@@ -162,6 +162,7 @@ public final class WorkspaceTests {
    SharedSourceIndexTests.run(temp);
    EditorShellPreviewTests.run(temp);
    EditorShellLayoutTests.run();
+   PreviewFramingTests.run(temp);
    JsonSourceStageTests.run(temp);
    SourceMatchTests.run(temp);
    ReadOnlyPolicyTests.run(temp);

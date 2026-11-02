@@ -42,9 +42,13 @@ public final class EditorApp extends Application {
     private final ReferenceChoices.View previewContextPages=new ReferenceChoices.View();
     private final ImString previewContextFilter=new ImString(1024),previewContextJump=new ImString("1",32);
     private final ImString previewSeed=new ImString("0",64),previewX=new ImString("0",32),previewZ=new ImString("0",32);
+    private final ImString previewMapScale=new ImString("1",128),previewAreaWidth=new ImString("128",32),previewAreaDepth=new ImString("128",32);
     private PackWorkspace previewBufferedOwner;
     private String previewBufferedDimension,previewSettingsError;private int previewContextPage;
     private PreviewSession.Coordinates previewBufferedCoordinates;
+    private PreviewFraming previewBufferedFraming;
+    private PreviewSession.Mode previewBufferedMode;
+    private String previewFramingError;
     private static final int SHELL_FLAGS=ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoMove|ImGuiWindowFlags.NoResize|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoSavedSettings|ImGuiWindowFlags.NoBringToFrontOnFocus;
     private final EditorCommands.Queue editorCommands=new EditorCommands.Queue();
     private boolean focusQuickOpen,focusTextSearch;
@@ -306,10 +310,52 @@ public final class EditorApp extends Application {
         if(ImGui.getContentRegionAvailX()<needed)ImGui.newLine();
     }
     private void bindPreviewSettings(PreviewSession.View view){
-        if(previewBufferedOwner!=workspace || !java.util.Objects.equals(previewBufferedDimension,view.dimension()) || !java.util.Objects.equals(previewBufferedCoordinates,view.coordinates())){
-            if(previewBufferedOwner!=workspace){previewContextFilter.set("");previewContextPage=0;previewContextJump.set("1");}
-            previewBufferedOwner=workspace;previewBufferedDimension=view.dimension();previewBufferedCoordinates=view.coordinates();previewSeed.set(Long.toString(view.coordinates().seed()));previewX.set(Integer.toString(view.coordinates().x()));previewZ.set(Integer.toString(view.coordinates().z()));previewSettingsError=null;
+        boolean context=previewBufferedOwner!=workspace || !java.util.Objects.equals(previewBufferedDimension,view.dimension());
+        if(previewBufferedOwner!=workspace){previewContextFilter.set("");previewContextPage=0;previewContextJump.set("1");}
+        if(context || !java.util.Objects.equals(previewBufferedCoordinates,view.coordinates())){
+            previewSeed.set(Long.toString(view.coordinates().seed()));previewX.set(Integer.toString(view.coordinates().x()));previewZ.set(Integer.toString(view.coordinates().z()));previewSettingsError=null;
         }
+        if(context || previewBufferedFraming==null || previewBufferedFraming.blocksPerSample()!=view.framing().blocksPerSample())previewMapScale.set(Double.toString(view.framing().blocksPerSample()));
+        if(context || previewBufferedFraming==null || previewBufferedFraming.width()!=view.framing().width() || previewBufferedFraming.depth()!=view.framing().depth()){
+            previewAreaWidth.set(Integer.toString(view.framing().width()));previewAreaDepth.set(Integer.toString(view.framing().depth()));
+        }
+        if(context || previewBufferedMode!=view.mode())previewFramingError=null;
+        previewBufferedOwner=workspace;previewBufferedDimension=view.dimension();previewBufferedCoordinates=view.coordinates();previewBufferedFraming=view.framing();previewBufferedMode=view.mode();
+    }
+    private PreviewSession.View drawPreviewFraming(PreviewSession.View view){
+        if(!view.framingAvailable())return view;
+        if(ImGui.button("Area / scale"))ImGui.openPopup("Preview area settings");
+        if(ImGui.beginPopup("Preview area settings")){
+            boolean map=view.mode()==PreviewSession.Mode.TWO_D;
+            ImGui.beginDisabled(view.dimension()==null);
+            boolean apply;
+            if(map){
+                ImGui.textUnformatted(PreviewFraming.MAP_SAMPLES+" × "+PreviewFraming.MAP_SAMPLES+" samples");
+                ImGui.setNextItemWidth(140);apply=ImGui.inputText("Blocks per sample",previewMapScale,ImGuiInputTextFlags.EnterReturnsTrue);
+                if(ImGui.isItemHovered())ImGui.setTooltip("World-space distance between map samples. X/Z mark the first sample; scale does not edit generation settings.");
+                apply|=ImGui.button("Apply map scale");
+            }else{
+                ImGui.textUnformatted("Full configured dimension height");
+                ImGui.setNextItemWidth(100);apply=ImGui.inputText("Width (blocks)",previewAreaWidth,ImGuiInputTextFlags.EnterReturnsTrue);
+                ImGui.setNextItemWidth(100);apply|=ImGui.inputText("Depth (blocks)",previewAreaDepth,ImGuiInputTextFlags.EnterReturnsTrue);
+                apply|=ImGui.button("Apply terrain area");
+            }
+            if(apply)try{view=map?previewSession.mapScale(previewMapScale.get()):previewSession.terrainArea(previewAreaWidth.get(),previewAreaDepth.get());bindPreviewSettings(view);previewFramingError=null;}catch(IllegalArgumentException invalid){previewFramingError=invalid.getMessage();}
+            if(ImGui.button(map?"Reset map scale (1)":"Reset terrain area (128 × 128)")){
+                try{
+                    view=previewSession.resetFraming();bindPreviewSettings(view);previewFramingError=null;
+                    if(map)previewMapScale.set(Double.toString(view.framing().blocksPerSample()));
+                    else{previewAreaWidth.set(Integer.toString(view.framing().width()));previewAreaDepth.set(Integer.toString(view.framing().depth()));}
+                }catch(IllegalArgumentException invalid){previewFramingError=invalid.getMessage();}
+            }
+            ImGui.endDisabled();
+            if(view.dimension()==null)ImGui.textWrapped("Choose a dimension context first.");
+            if(previewFramingError!=null)ImGui.textWrapped(previewFramingError);
+            if(view.framingProblem()!=null)ImGui.textWrapped(view.framingProblem());
+            ImGui.textDisabled("X/Z mark the first sample or terrain block.");
+            ImGui.endPopup();
+        }
+        return view;
     }
     private PreviewSession.View drawPreviewModes(PreviewSession.View view){
         if(ImGui.beginTabBar("Preview modes")){
@@ -320,6 +366,7 @@ public final class EditorApp extends Application {
             }
             ImGui.endTabBar();
         }
+        bindPreviewSettings(view);
         return view;
     }
     private PreviewSession.View drawPreviewLocation(PreviewSession.View view){
@@ -328,7 +375,7 @@ public final class EditorApp extends Application {
         float width=Math.max(0,ImGui.getContentRegionAvailX());boolean row=width>=350,paired=width>=160;
         ImGui.setNextItemWidth(row?100:Math.max(1,width-40));
         boolean apply=ImGui.inputText("Seed##preview",previewSeed,ImGuiInputTextFlags.EnterReturnsTrue);
-        if(ImGui.isItemHovered())ImGui.setTooltip("Signed 64-bit preview seed. Press Enter to apply preview settings; pack JSON is unchanged.");
+        if(ImGui.isItemHovered())ImGui.setTooltip("Signed 64-bit preview seed. X/Z mark the first sample or terrain block. Press Enter to apply; pack JSON is unchanged.");
         if(row)ImGui.sameLine();
         float coordinateWidth=row?55:paired?Math.max(1,(width-48)/2):Math.max(1,width-20);
         ImGui.setNextItemWidth(coordinateWidth);apply|=ImGui.inputText("X##preview",previewX,ImGuiInputTextFlags.EnterReturnsTrue);
@@ -370,6 +417,7 @@ public final class EditorApp extends Application {
             if(view.kind()==PreviewSession.Kind.BIOME || view.kind()==PreviewSession.Kind.REGION)ImGui.textDisabled("Isolated "+view.kind().label.toLowerCase(java.util.Locale.ROOT)+" context requested; no preview generated.");
         }
         if(previewSettingsError!=null)ImGui.textWrapped(previewSettingsError);
+        view=drawPreviewFraming(view);
         ImGui.separator();
         if(view.image())drawImageAsset();
         else{ImGui.textUnformatted(view.kind().title(view.mode())==null?"Visualization":view.kind().title(view.mode()));ImGui.textWrapped(view.unavailable());}
@@ -6580,7 +6628,7 @@ public final class EditorApp extends Application {
         ImGui.textWrapped(ResourceOperation.scopeDescription());ImGui.end();
     }
     private void finishResourceOperation(){long request=pendingResourceOperation;var owner=pendingResourceOperationOwner;pendingResourceOperation=-1;pendingResourceOperationOwner=null;if(request<0)return;
-        try{if(owner!=workspace)throw new java.io.IOException("Workspace changed after resource Apply");var state=resourceOperation.poll(workspace);String source=state.report()==null?null:state.report().plan().source();transition(false,()->{String target=resourceOperation.apply(workspace,request,resourceOperationAcknowledgement);if(java.util.Objects.equals(selected,source))selected=target;filter.set("");resourceNavigation.clear();error=null;});resourceOperationAcknowledgement=null;resourceOperationError=null;}
+        try{if(owner!=workspace)throw new java.io.IOException("Workspace changed after resource Apply");var state=resourceOperation.poll(workspace);String source=state.report()==null?null:state.report().plan().source();transition(false,()->{String target=resourceOperation.apply(workspace,request,resourceOperationAcknowledgement);previewSession.resourceApplied(workspace,source,target);if(java.util.Objects.equals(selected,source))selected=target;filter.set("");resourceNavigation.clear();error=null;});resourceOperationAcknowledgement=null;resourceOperationError=null;}
         catch(Exception failure){resourceOperationError=InspectorText.label(java.util.Objects.toString(failure.getMessage(),"Resource operation failed"),512);}
     }
     private void queueFolderAction(String path,String action) { pendingFolderPath=path;pendingFolderAction=action; }
@@ -6836,7 +6884,7 @@ public final class EditorApp extends Application {
     private boolean transition(boolean replaceWorkspace, InspectorDrafts.Change change) throws java.io.IOException {
         PackWorkspace previous=workspace;
         boolean committed = drafts.transition(replaceWorkspace ? this::replaceAllowed : this::discardDraftsAllowed, change);
-        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { resourceOperation.clear();showResourceOperation=false;resourceOperationPath=null;resourceOperationMode=null;resourceOperationAcknowledgement=null;resourceOperationError=null;pendingResourceOperation=-1;pendingResourceOperationOwner=null;previewSession.clear();previewContextPages.clear();previewContextFilter.set("");previewContextPage=0;previewContextJump.set("1");previewBufferedDimension=null;previewBufferedCoordinates=null;previewSettingsError=null;selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;referenceInspection.clear();clearReferenceInspectionResult();referenceInspectionQuery.set("");referenceInspectionState=ReferenceInspection.StateFilter.ALL;referenceInspectionError=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();authoringReferences.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();aliasAuditReview.clear();expressionAuditReview.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceReview.clear();jsonActiveReport=null;pendingJsonMatch=null;jsonSourcePaused=false;showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false;resourceBrowser.clear();browserOwner=null;browserQuery=null;browserPage=0;browserPageJump.set("1");browserReveal=true;browserScroll=false;browserResetScroll=true; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
+        if (committed) { values.clear(); riverCatalogDimension=null;if (replaceWorkspace) { resourceOperation.clear();showResourceOperation=false;resourceOperationPath=null;resourceOperationMode=null;resourceOperationAcknowledgement=null;resourceOperationError=null;pendingResourceOperation=-1;pendingResourceOperationOwner=null;previewSession.clear();previewContextPages.clear();previewContextFilter.set("");previewContextPage=0;previewContextJump.set("1");previewBufferedOwner=null;previewBufferedDimension=null;previewBufferedCoordinates=null;previewBufferedFraming=null;previewBufferedMode=null;previewSettingsError=null;previewFramingError=null;selectedFolder=null;pendingFolderPath=null;pendingFolderAction=null;referenceInspection.clear();clearReferenceInspectionResult();referenceInspectionQuery.set("");referenceInspectionState=ReferenceInspection.StateFilter.ALL;referenceInspectionError=null;clearReferenceChoiceViews();creationDependencyView.clear();selectorCatalogs.clear();authoringReferences.clear();fileComparison.clear();showFileComparison=false;focusFileComparison=false;fileComparisonError=null;displayedFileComparison=null;comparisonBefore=comparisonAfter=comparisonLine=null;comparisonPage=0;comparisonSelected=comparisonBuffered=-1;byteInspection.clear();showByteInspection=false;focusByteInspection=false;byteInspectionError=null;byteInspectionOffset.set("0");resetFolderOperationReview();showFolderOperation=false;folderOperationMode=null;folderOperationPath=null;resourceAddition.clear();resourceAdditionChoicesOwner=null;resourceAdditionChoicesParent=null;resourceAdditionChoicesRevision=-1;resourceAdditionChoices=new ReferenceChoices.Catalog(List.of());showResourceAddition=false;resourceAdditionMode=null;resourceAdditionParent=resourceAdditionSource=resourceAdditionDependency=resourceAdditionError=null;resourceAdditionAcknowledgement=null;resourceAdditionReviewed=pendingResourceAddition=-1;pendingResourceAdditionOwner=null;assetBatchImport.clear();showAssetBatchImport=false;assetBatchReviewed=-1;assetBatchError=null;assetBatchAcknowledge=false;assetImport.clear();showAssetImport=false;assetImportReviewed=-1;assetImportError=null;assetImportAcknowledge=false;assetReplacement.clear();showAssetReplacement=false;assetReplacementAssessed=-1;assetReplacementError=null;assetReplacementAllowUnrecorded=false;structureThemeReferences.clear();showStructureThemeReview=false;clearThemeReviewView();themeReviewKey.set("");themeReviewFilter.set("");themeReviewError=null;blockFallbackAudits.clear();clearFallbackOverlapView();fallbackOverlapQuery.set("");fallbackCurrentDimensionOnly=false;blockAliasAudits.clear();expressionAudits.clear();aliasAuditReview.clear();expressionAuditReview.clear();jigsawPoolCatalog.clear();jigsawPieceObjects.clear();structurePools.clear();structurePoolFilter.set("");previous.clearHistory();editReviews.clear();reviewedWorkspace=null;reviewedHistoryId=-1;reviewedComparison=null;reviewedBefore=null;reviewedAfter=null;editDiffs.clear();reviewedDiff=null;diffPage=0;diffSelected=-1;diffBufferedRow=-1;diffLineText=null;resourceNavigation.clear();navigationHistory.reset(workspace,selected,filter.get());clearSourceMatchFocus();jsonSourceReview.clear();jsonActiveReport=null;pendingJsonMatch=null;jsonSourcePaused=false;showJsonStructure=false;jsonActiveSnapshot=null;jsonTokenSnapshot=null;jsonWholePane.clear();jsonTokenPane.clear();jsonFocusWholeSource=false;jsonCurrentPointer=null;jsonPages.clear();jsonNode=0;jsonPage=0;jsonBufferedNode=-1;jsonFind.set("");jsonPointer.set("");jsonFindError=null;jsonPreviousFind="";clearLinkReviewPages();jigsawReview.clear();showJigsawReview=false;jigsawReviewRoot=null;jigsawReviewQuery.set("");jigsawReviewScope=JigsawDependencyReview.Scope.ALL;jigsawProblemsOnly=false;packReferenceReview.clear();showReferenceReview=false;referenceReviewQuery.set("");referenceReviewView=PackReferenceAudit.View.ALL;reviewIncomingOnly=false;referenceReviewPendingPath=null;referenceReviewPendingWorkspace=null;editorCommands.clear();focusQuickOpen=false;focusTextSearch=false;showCommandPalette=false;focusCommandPalette=false;commandQuery.set("");previousCommandQuery="";selectedCommand=null;pendingChanges.clear();pendingDiskReview.clear();changesDiskError=null;changesAttentionOnly=false;changesPage=changesDiskPage=0;changesPageJump.set("1");changesDiskPageJump.set("1");changesPagingQuery=null;changesPagingRequest=-1;showPendingChanges=false;changesQuery.set("");changesFilter=WorkspaceChanges.Filter.ALL;changesSelected=null;changesPendingPath=null;changesPendingWorkspace=null;textSearch.clear();activeTextQuery=null;textPageJump.set("1");textPageShownRequest=-1;showTextSearch=false;textQuery.set("");textFamily=ResourceFinder.Family.ALL;textChangedOnly=false;textSearchError=null;textPendingPath=null;textPendingWorkspace=null;quickFinder.clear();quickPage=0;quickShownRequest=-1;quickPageJump.set("1");showQuickOpen=false;quickQuery.set("");quickFamily=ResourceFinder.Family.ALL;quickChangedOnly=false;quickSelected=null;quickPendingPath=null;quickPendingWorkspace=null;browserFamily=ResourceFinder.Family.ALL;browserChangedOnly=false;resourceBrowser.clear();browserOwner=null;browserQuery=null;browserPage=0;browserPageJump.set("1");browserReveal=true;browserScroll=false;browserResetScroll=true; } else { revealSelectedResource();navigationHistory.observe(workspace,selected,filter.get()); } }
         return committed;
     }
     private void revealSelectedResource() {

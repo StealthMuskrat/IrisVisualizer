@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+The visualization panel's Area / scale popup stores preview framing per dimension. A 2D map keeps 512 × 512 samples with configurable blocks per sample (default 1); 3D terrain/noise requests default to 128 × 128 blocks over the full configured dimension height. X/Z identify the first sample or terrain block. Apply and reset affect only the current mode's framing, preserve the exact seed/location, and never modify pack files. Applied settings follow a dimension rename and are removed with its deletion. Coordinate overflow is reported without clipping. These controls describe a request; generation, rendering and automatic updates remain disabled until supported.
+
 Build with Gradle 9.5.1: `gradle -p editor workspaceTest run`.
 
 File > Open loads a folder and File > Import loads a ZIP in the background. Use Review > Open / Import progress to inspect the result, then choose Open loaded pack with workspace guards. Cancel and failed loading retain the current workspace and drafts. A completed load waits for explicit opening even while you edit, Save or use New. Opening uses the bytes already read; saving the current pack does not refresh them. Choose the source again to include newer disk changes. Imported ZIPs have no active save folder.
