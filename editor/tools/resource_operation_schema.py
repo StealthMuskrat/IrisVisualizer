@@ -1,20 +1,16 @@
 """Build a closed, source-bound reference schema; unknown shapes/defaults fail closed.
 The Java inventory is lexical. Only rules below authorize resource-reference semantics.
 """
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 import hashlib, json, re, sys
 from java_model_inventory import inventory, tokens, matching, annotation_arguments
 
-POLICY = json.loads((Path(__file__).resolve().parents[1]/'policy/resource-operation-models.json').read_text())
-FILES = POLICY['files']
-MODELS = {name for name, row in POLICY['classes'].items() if row['kind']=='class'}
-ENUMS = {name for name, row in POLICY['classes'].items() if row['kind']=='enum'}
-ROOTS = {'dimensions':'IrisDimension','regions':'IrisRegion','biomes':'IrisBiome',
-         'structures':'IrisStructure','jigsaw-pools':'IrisJigsawPool','jigsaw-pieces':'IrisJigsawPiece',
-         'generators':'IrisGenerator','expressions':'IrisExpression','image-maps':'IrisImageMap','blocks':'IrisBlockData'}
-READ_ONLY_ROOTS = {'loot':'IrisLootTable','spawners':'IrisSpawner','entities':'IrisEntity','markers':'IrisMarker','mods':'IrisMod'}
-OWNERS = ROOTS | READ_ONLY_ROOTS
+from iris_source_inventory import POLICY, FILES, MODELS, ENUMS, JSON_ROOTS, source_path, fingerprint, owner_folder, load_inventory
+
+READ_ONLY_ROOTS = {family:JSON_ROOTS[family] for family in ['loot','spawners','entities','markers','mods']}
+ROOTS = {family:model for family,model in JSON_ROOTS.items() if family not in READ_ONLY_ROOTS}
+OWNERS = JSON_ROOTS
 # Exact root ordering document, outside every loader/snippet root. Strings cannot encode typed pack lookups.
 METADATA = {'Schema.json':'list:string'}
 REFS = {model:family for family,model in ROOTS.items()} | {'IrisObject':'objects','IrisImage':'images'}
@@ -43,28 +39,6 @@ OVERRIDES = {
 }
 FOREIGN_REFS = set(READ_ONLY_ROOTS.values())
 NUMBERS = {'int','long','double','float','Integer','Long','Double','Float','short','byte','Short','Byte'}
-
-def source_path(root,name,relative):
- path=root/(name+'.java')
- if path.exists():return path
- if relative.startswith('@volmlib/'):
-  return root/'shared/src/main/java/art/arcane/volmlib'/relative.removeprefix('@volmlib/')
- return root/'core/src/main/java/art/arcane/iris'/relative
-
-def fingerprint(model):
- data={'kind':model.kind,'parent':model.parent,'customNoarg':model.custom_noarg,'annotations':model.annotations,'fields':[asdict(f) for f in model.fields]}
- return hashlib.sha256(json.dumps(data,sort_keys=True,separators=(',',':')).encode()).hexdigest()
-
-def owner_folder(text):
- """Bind the owner route to the actual literal loader folder getter, not a guessed plural."""
- items=tokens(text);found=[]
- for i,t in enumerate(items):
-  if i<1 or t.value!='getFolderName' or items[i-1].value!='String':continue
-  body=[v.value for v in items[i+1:i+8]]
-  if len(body)==7 and body[:4]==['(',')','{','return'] and body[5:]==[';','}']:
-   found.append(json.loads(body[4]))
- assert len(found)==1,'Unreviewed resource-owner folder getter'
- return found[0]
 
 def descriptor(owner,field,texts):
  qualified=owner+'.'+field.name
@@ -169,34 +143,11 @@ def evaluate(expression,kind,potential):
  return value
 
 def extract(root):
- texts={};evidence={};models={}
- for name,relative in FILES.items():
-  data=source_path(root,name,relative).read_bytes();texts[name]=data.decode();evidence[relative]=hashlib.sha256(data).hexdigest()
- for name,row in POLICY['classes'].items():
-  model=inventory(texts[name],name)
-  assert fingerprint(model)==row['declarationSha256'],'Changed serialized declaration/default/annotation: '+name
-  assert not model.custom_noarg,'Custom no-arg constructor needs explicit default policy: '+name
-  models[name]=model
- for family,model in OWNERS.items():assert owner_folder(texts[model])==family,'Changed resource-owner folder: '+model
- # Inherited members are inventoried with the same rules. Shadowing would make JSON/default semantics ambiguous.
- merged={}
- def fields(name,active=()):
-  assert name not in active,'Cyclic model inheritance'
-  if name not in merged:
-   m=models[name];inherited=fields(m.parent,active+(name,)).copy() if m.parent else {}
-   for f in m.fields:
-    assert f.name not in inherited,'Serialized field shadow: '+name+'.'+f.name
-    inherited[f.name]=(name,f)
-   merged[name]=inherited
-  return merged[name]
+ catalog=load_inventory(root);models,texts,evidence=catalog.models,catalog.texts,catalog.evidence
+ for name,model in models.items():assert not model.custom_noarg,'Custom no-arg constructor needs explicit default policy: '+name
+ fields=catalog.fields
  result={'root.'+family:model for family,model in ROOTS.items()} | {'owner.'+family:model for family,model in OWNERS.items()} | {'metadata.'+path:kind for path,kind in METADATA.items()};definitions={}
- for name in sorted(MODELS):
-  snippet=annotation_arguments(models[name].annotations,'Snippet')
-  if snippet is not None:
-   assert len(snippet)==1,'Unreviewed snippet annotation: '+name
-   label=json.loads(snippet[0]);assert re.fullmatch(r'[a-z0-9-]+',label),'Unsupported snippet kind'
-   assert 'snippet.'+label not in result,'Ambiguous snippet owner kind: '+label
-   result['snippet.'+label]=name;result[name+'.snippet']=label
+ for label,name in catalog.snippets().items():result['snippet.'+label]=name;result[name+'.snippet']=label
  for name in sorted(MODELS):
   definitions[name]={}
   for field,(owner,f) in fields(name).items():

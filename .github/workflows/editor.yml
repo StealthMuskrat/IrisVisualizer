@@ -1071,16 +1071,6 @@ jobs:
           python editor/tools/extract_jigsaw_connector_fields.py . generated-jigsaw-connector-fields.properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-jigsaw-connector-fields.properties).Hash -ne (Get-FileHash editor/src/main/resources/jigsaw-connector-fields.properties).Hash) { throw 'Pinned jigsaw connectors differ' }
-      - name: Audit pinned field coverage and editor classifications
-        shell: pwsh
-        run: |
-          python editor/tools/test_field_coverage.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python editor/tools/field_coverage.py . editor/policy/field-policy.json editor/src/main/java/dev/irisvisualizer/editor generated-coverage
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ((Get-FileHash generated-coverage/field-coverage.properties).Hash -ne (Get-FileHash editor/src/main/resources/field-coverage.properties).Hash) { throw 'Coverage metadata differs' }
-          if ((Get-FileHash generated-coverage/coverage-report.md).Hash -ne (Get-FileHash editor/coverage-report.md).Hash) { throw 'Coverage report differs' }
-          Get-Content generated-coverage/coverage-report.md
       - name: Verify closed typed resource-operation schema
         shell: pwsh
         run: |
@@ -1103,6 +1093,20 @@ jobs:
           python editor/tools/resource_operation_schema.py . generated-resource-operation-schema.properties editor/policy/resource-operation-sources.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ((Get-FileHash generated-resource-operation-schema.properties).Hash -ne (Get-FileHash editor/src/main/resources/resource-operation-schema.properties).Hash) { throw 'Pinned resource-operation schema differs' }
+      - name: Audit pinned field coverage and editor classifications
+        shell: pwsh
+        run: |
+          python editor/tools/test_field_coverage.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/test_iris_source_inventory.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/test_field_coverage_generation.py .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python editor/tools/field_coverage.py . editor/policy/field-policy.json editor/src/main/java/dev/irisvisualizer/editor generated-coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash generated-coverage/field-coverage.properties).Hash -ne (Get-FileHash editor/src/main/resources/field-coverage.properties).Hash) { throw 'Coverage metadata differs' }
+          if ((Get-FileHash generated-coverage/coverage-report.md).Hash -ne (Get-FileHash editor/coverage-report.md).Hash) { throw 'Coverage report differs' }
+          Get-Content generated-coverage/coverage-report.md
       - name: Compile editor and verify workspace
         run: gradle -p editor --no-daemon workspaceTest classes
       - name: Build Windows x64 package

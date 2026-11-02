@@ -1,10 +1,12 @@
-"""Audit direct nonstatic/nontransient declarations in one hundred and nineteen pinned Iris classes.
-This is a bounded source inventory, not the complete inherited/generated Iris schema.
+"""Generate editor policy coverage from the shared pinned serialized model graph.
+Metadata never authorizes edits or gates Save/Export.
 """
 import hashlib
 import json
 import re
 import sys
+from iris_source_inventory import POLICY, FILES, MODELS, JSON_ROOTS, load_inventory, source_path
+from java_model_inventory import inventory, tokens
 from pathlib import Path
 
 SOURCES = {
@@ -129,15 +131,26 @@ SOURCES = {
  'worldBoundaryCenter': 'world/IrisWorldBoundaryCenter.java',
 }
 
-def declared_fields(text):
-    text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
-    pattern = r'^    private (?P<modifiers>(?:(?:static|final|transient|volatile) )*)(?P<type>[\w.$<>?,\[\] ]+?) (?P<name>\w+)\s*(?==|;)'
-    fields = {}
-    for match in re.finditer(pattern, text, re.MULTILINE):
-        modifiers = match.group('modifiers').split()
-        if 'static' not in modifiers and 'transient' not in modifiers:
-            fields[match.group('name')] = match.group('type')
-    return fields
+# Preserve stable UI group aliases while including every other nonempty model in the shared graph.
+CLASS_GROUPS = {Path(relative).stem:group for group,relative in SOURCES.items()}
+for _name in sorted(MODELS):
+    if _name in CLASS_GROUPS or _name=='IrisRegistrant':continue
+    _short=_name.removeprefix('Iris');_group=_short[0].lower()+_short[1:]
+    if _group in SOURCES:raise ValueError('Ambiguous field-policy group: '+_group)
+    SOURCES[_group]=FILES[_name];CLASS_GROUPS[_name]=_group
+
+def declared_fields(text,name=None):
+    if name is None:
+        items=tokens(text)
+        name=next((items[i+1].value for i,t in enumerate(items[:-1]) if t.value in {'class','enum','interface','record'} and (i==0 or items[i-1].value!='.')),None)
+    if name is None:raise ValueError('Missing Java declaration')
+    return {field.name:field.type for field in inventory(text,name).fields}
+
+def field_kind(kind):
+    array=re.fullmatch(r'KList<(.+)>',kind)
+    if array:return 'list:'+field_kind(array[1])
+    if kind.startswith('KMap<'):return 'map'
+    return 'object:'+kind if kind in MODELS else 'value'
 
 def editable(java_dir, name, allowlist='EDITABLE'):
     source = (java_dir / (name + '.java')).read_text()
@@ -147,6 +160,10 @@ def editable(java_dir, name, allowlist='EDITABLE'):
 
 def run(source_dir, policy_file, java_dir, output_dir):
     policy = json.loads(policy_file.read_text())
+    if not isinstance(policy,dict):raise ValueError('Policy must be a class-group object')
+    catalog=load_inventory(source_dir,verify_sources=True)
+    if catalog.models['IrisRegistrant'].fields:raise ValueError('New inherited registrant fields require an explicit policy group')
+    if set(policy)-set(SOURCES):raise ValueError('Policy has an unknown class group')
     ui = {group: editable(java_dir, cls) for group, cls in [('dimension', 'DimensionFields'), ('biome', 'BiomeFields'), ('generator', 'GeneratorFields'), ('region', 'RegionFields')]}
     implemented = {group: set(path for path in paths if '.' not in path) for group, paths in ui.items()}
     implemented['jigsawConnector'] = set(editable(java_dir, 'JigsawConnectors'))
@@ -372,32 +389,49 @@ def run(source_dir, policy_file, java_dir, output_dir):
     implemented['expression'] = set(editable(java_dir, 'ExpressionDefinitions', 'ROOT_FIELDS'))
     implemented['expressionVariable'] = set(editable(java_dir, 'ExpressionDefinitions', 'VARIABLE_FIELDS'))
     implemented['expressionFunction'] = set(editable(java_dir, 'ExpressionDefinitions', 'FUNCTION_FIELDS'))
-    properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f']
-    report = ['# Editor field coverage', '', 'Direct nonstatic/nontransient private fields in one hundred and nineteen pinned source classes only. This is not full schema coverage. Unclassified or unimplemented fields remain read-only; this audit never gates Save/Export.', '', '| Class | Declared | Classified | Implemented editable | Unclassified |', '| --- | ---: | ---: | ---: | ---: |']
-    details = []
-    for group, relative in SOURCES.items():
-        path = source_dir / Path(relative).name
-        if not path.exists(): path = source_dir / 'core/src/main/java/art/arcane/iris' / relative
-        raw = path.read_bytes(); fields = declared_fields(raw.decode('utf-8'))
-        if not fields: raise ValueError('Empty field inventory: ' + group)
-        rules = policy.get(group, {})
-        if set(rules) - set(fields): raise ValueError('Policy fields missing in source: ' + group + ' ' + str(set(rules) - set(fields)))
-        if implemented[group] - set(fields): raise ValueError('UI fields missing in source: ' + group)
-        for field in implemented[group]:
-            if rules.get(field, {}).get('classification') != 'generation': raise ValueError('Editable field lacks generation classification: ' + group + '.' + field)
-        properties += [group + '.sourceSha256=' + hashlib.sha256(raw).hexdigest(), group + '.fields=' + ','.join(sorted(fields))]
-        missing = sorted(set(fields) - set(rules))
-        report.append(f'| {group} | {len(fields)} | {len(rules)} | {len(implemented[group])} | {len(missing)} |')
-        details += ['', '## ' + group, '', 'Unclassified: ' + (', '.join('`' + field + '`' for field in missing) or 'none') + '.']
+    properties = ['irisRevision=c3359e0a16438b1bb8468901c6171dcefdf63f7f','groups='+','.join(SOURCES)]
+    evidence=hashlib.sha256(json.dumps(catalog.evidence,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    properties+=['inventory.sha256='+evidence,'inventory.models='+str(len(MODELS)),'inventory.sources='+str(len(FILES))]
+    report = ['# Editor field coverage', '', 'Serialized instance fields in the shared pinned JSON model graph, including inherited and package/protected/public/private declarations. Static/transient state and enum constants are excluded. This report grants no editing authority and never gates Save/Export. Implementation means a control exists in a supported context; it does not certify every ancestor, snippet or read-only resource context.', '', '| Class group | Declared | Generation | Implemented controls | Read-only | Unclassified |', '| --- | ---: | ---: | ---: | ---: | ---: |']
+    details=[];totals={'fields':0,'generation':0,'implemented':0,'read-only':0,'unclassified':0,'missingPolicies':0}
+    for group,relative in SOURCES.items():
+        name=Path(relative).stem;rows=catalog.fields(name);fields={field:declaration.type for field,(_,declaration) in rows.items()}
+        if not fields:raise ValueError('Empty field inventory: '+group)
+        rules=policy.get(group,{})
+        if not isinstance(rules,dict):raise ValueError('Policy group must contain field classifications: '+group)
+        for field,rule in rules.items():
+            if not isinstance(rule,dict) or set(rule)!={'classification','reason'} or rule.get('classification') not in ['generation','read-only','unclassified'] or not isinstance(rule.get('reason'),str) or not rule['reason'].strip():raise ValueError('Policy stores only nonempty classifications and reasons: '+group+'.'+field)
+        if set(rules)-set(fields):raise ValueError('Policy fields missing in source: '+group+' '+str(set(rules)-set(fields)))
+        authored=implemented.get(group,set())
+        if authored-set(fields):raise ValueError('UI fields missing in source: '+group)
+        for field in authored:
+            if rules.get(field,{}).get('classification')!='generation':raise ValueError('Editable field lacks generation classification: '+group+'.'+field)
+        raw=source_path(source_dir,name,relative).read_bytes()
+        properties += [group+'.sourceSha256='+hashlib.sha256(raw).hexdigest(),group+'.model='+name,group+'.fields='+','.join(sorted(fields)),'class.'+name+'.group='+group]
+        counts={'generation':0,'read-only':0,'unclassified':0};unclassified=[]
         for field in sorted(fields):
-            rule = rules.get(field, dict(classification='unclassified', reason='Awaiting audited classification and control coverage.'))
-            if rule['classification'] not in ['generation', 'read-only', 'unclassified'] or not rule.get('reason'): raise ValueError('Invalid policy rule')
-            prefix = group + '.' + field
-            reason = rule['reason'].replace('\\', '\\\\').replace('\n', '\\n')
-            properties += [prefix + '.classification=' + rule['classification'], prefix + '.reason=' + reason, prefix + '.implemented=' + str(field in implemented[group]).lower()]
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / 'field-coverage.properties').write_bytes(('\n'.join(properties) + '\n').encode('ascii'))
-    (output_dir / 'coverage-report.md').write_bytes(('\n'.join(report + details) + '\n').encode('utf-8'))
+            rule=rules.get(field,dict(classification='unclassified',reason='Awaiting audited classification and control coverage.'))
+            if set(rule)!={'classification','reason'} or rule['classification'] not in counts or not rule.get('reason'):raise ValueError('Policy stores classifications and reasons only: '+group+'.'+field)
+            counts[rule['classification']]+=1;totals['fields']+=1;totals[rule['classification']]+=1
+            if field in authored:totals['implemented']+=1
+            if field not in rules:totals['missingPolicies']+=1
+            if rule['classification']=='unclassified':unclassified.append(field)
+            prefix=group+'.'+field;owner,declaration=rows[field];reason=rule['reason'].replace('\\','\\\\').replace('\n','\\n')
+            properties += [prefix+'.classification='+rule['classification'],prefix+'.reason='+reason,prefix+'.implemented='+str(field in authored).lower(),prefix+'.kind='+field_kind(declaration.type),prefix+'.declaredBy='+owner]
+        report.append(f'| {group} | {len(fields)} | {counts["generation"]} | {len(authored)} | {counts["read-only"]} | {counts["unclassified"]} |')
+        details+=['','## '+group,'','Unclassified: '+(', '.join('`'+field+'`' for field in unclassified) or 'none')+'.']
+    for name in sorted(MODELS):
+        groups=[CLASS_GROUPS[child] for child in catalog.reachable(name) if child in CLASS_GROUPS]
+        properties+=['class.'+name+'.groups='+','.join(groups)]
+    for label,name in catalog.snippets().items():properties+=['snippet.'+label+'.model='+name]
+    for family,name in JSON_ROOTS.items():properties+=['owner.'+family+'.model='+name]
+    properties += ['summary.'+key+'='+str(value) for key,value in totals.items()]
+    report+=['', 'Totals: '+', '.join(key+'='+str(value) for key,value in totals.items())+'.', 'Source scope: '+str(len(MODELS))+' class models, '+str(len(SOURCES))+' nonempty field groups, '+str(len(FILES))+' pinned source files.']
+    output_dir.mkdir(parents=True,exist_ok=True)
+    (output_dir/'field-coverage.properties').write_bytes(('\n'.join(properties)+'\n').encode('ascii'))
+    (output_dir/'coverage-report.md').write_bytes(('\n'.join(report+details)+'\n').encode('utf-8'))
+    return totals
 
 if __name__ == '__main__':
-    run(*(Path(value) for value in sys.argv[1:]))
+    counts=run(*(Path(value) for value in sys.argv[1:]))
+    print('Generated shared-source editor field coverage: '+', '.join(key+'='+str(value) for key,value in counts.items()))

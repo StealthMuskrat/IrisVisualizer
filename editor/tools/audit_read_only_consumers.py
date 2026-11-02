@@ -19,6 +19,7 @@ def audit(source_dir, policy_file, manifest_file, lock_file):
         raise ValueError('Read-only consumer audit requires the current Iris revision')
     sources = manifest['sources']
     declarations = {}
+    declaration_sources={relative for fields in manifest['fields'].values() for relative in fields.values()}
     for relative, expected in sources.items():
         path = source_dir / 'core/src/main/java/art/arcane/iris' / relative
         if not path.is_file():
@@ -26,7 +27,7 @@ def audit(source_dir, policy_file, manifest_file, lock_file):
         raw = path.read_bytes()
         if hashlib.sha256(raw).hexdigest() != expected:
             raise ValueError('Read-only consumer source differs; re-audit required: ' + relative)
-        declarations[relative] = declared_fields(raw.decode('utf-8'))
+        if relative in declaration_sources:declarations[relative] = declared_fields(raw.decode('utf-8'))
     count = 0
     for group, fields in manifest['fields'].items():
         for field, relative in fields.items():

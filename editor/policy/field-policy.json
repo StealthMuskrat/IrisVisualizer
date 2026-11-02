@@ -5320,5 +5320,829 @@
       "classification": "generation",
       "reason": "Literal state used by native template/Studio block output and required nonblank by native graph/assembly validity checks. Runtime Iris assembly does not resolve this text here; registry/state parsing, export and block restoration remain unevaluated."
     }
+  },
+  "attributeModifier": {
+    "attribute": {
+      "classification": "read-only",
+      "reason": "Entity/item attribute behavior; not initial voxel generation."
+    },
+    "name": {
+      "classification": "read-only",
+      "reason": "Entity/item attribute behavior; not initial voxel generation."
+    },
+    "operation": {
+      "classification": "read-only",
+      "reason": "Entity/item attribute behavior; not initial voxel generation."
+    },
+    "minAmount": {
+      "classification": "read-only",
+      "reason": "Entity/item attribute behavior; not initial voxel generation."
+    },
+    "maxAmount": {
+      "classification": "read-only",
+      "reason": "Entity/item attribute behavior; not initial voxel generation."
+    },
+    "chance": {
+      "classification": "read-only",
+      "reason": "Entity/item attribute behavior; not initial voxel generation."
+    }
+  },
+  "blockDrops": {
+    "blocks": {
+      "classification": "read-only",
+      "reason": "Post-generation block-break drops and replacement loot; not terrain or voxel placement."
+    },
+    "exactBlocks": {
+      "classification": "read-only",
+      "reason": "Post-generation block-break drops and replacement loot; not terrain or voxel placement."
+    },
+    "drops": {
+      "classification": "read-only",
+      "reason": "Post-generation block-break drops and replacement loot; not terrain or voxel placement."
+    },
+    "skipParents": {
+      "classification": "read-only",
+      "reason": "Post-generation block-break drops and replacement loot; not terrain or voxel placement."
+    },
+    "replaceVanillaDrops": {
+      "classification": "read-only",
+      "reason": "Post-generation block-break drops and replacement loot; not terrain or voxel placement."
+    }
+  },
+  "command": {
+    "commands": {
+      "classification": "read-only",
+      "reason": "Runtime command execution and scheduling; not initial voxel generation."
+    },
+    "delay": {
+      "classification": "read-only",
+      "reason": "Runtime command execution and scheduling; not initial voxel generation."
+    },
+    "repeat": {
+      "classification": "read-only",
+      "reason": "Runtime command execution and scheduling; not initial voxel generation."
+    },
+    "repeatDelay": {
+      "classification": "read-only",
+      "reason": "Runtime command execution and scheduling; not initial voxel generation."
+    },
+    "timeBlock": {
+      "classification": "read-only",
+      "reason": "Runtime command execution and scheduling; not initial voxel generation."
+    },
+    "weather": {
+      "classification": "read-only",
+      "reason": "Runtime command execution and scheduling; not initial voxel generation."
+    }
+  },
+  "commandRegistry": {
+    "rawCommands": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    },
+    "commandOffsetX": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    },
+    "commandOffsetY": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    },
+    "commandOffsetZ": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    },
+    "commandRandomAltX": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    },
+    "commandRandomAltY": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    },
+    "commandRandomAltZ": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    },
+    "commandAllRandomLocations": {
+      "classification": "read-only",
+      "reason": "Runtime command positions and dispatch; excluded gameplay callbacks."
+    }
+  },
+  "duration": {
+    "milliseconds": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "minecraftTicks": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "seconds": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "minutes": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "minecraftHours": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "hours": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "minecraftDays": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "minecraftWeeks": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "minecraftLunarCycles": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    },
+    "days": {
+      "classification": "read-only",
+      "reason": "Gameplay spawn-rate interval; not initial voxel generation."
+    }
+  },
+  "effect": {
+    "potionEffect": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleEffect": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleOffset": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleAltX": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleAltY": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleAltZ": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "randomAltX": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "randomAltY": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "randomAltZ": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "sound": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "soundDistance": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "minPitch": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "maxPitch": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "volume": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleCount": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleDistance": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleDistanceWidth": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "extra": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "potionStrength": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "potionTicksMax": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "potionTicksMin": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "interval": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "particleAway": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "chance": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    },
+    "commandRegistry": {
+      "classification": "read-only",
+      "reason": "Entity/world particles, sounds, potions and gameplay commands; not initial voxel generation."
+    }
+  },
+  "enchantment": {
+    "enchantment": {
+      "classification": "read-only",
+      "reason": "Item enchantment behavior; not voxel generation."
+    },
+    "minLevel": {
+      "classification": "read-only",
+      "reason": "Item enchantment behavior; not voxel generation."
+    },
+    "maxLevel": {
+      "classification": "read-only",
+      "reason": "Item enchantment behavior; not voxel generation."
+    },
+    "chance": {
+      "classification": "read-only",
+      "reason": "Item enchantment behavior; not voxel generation."
+    }
+  },
+  "entity": {
+    "type": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "reason": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "customName": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "customNameVisible": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "aware": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "ai": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "glowing": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "gravity": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "invulnerable": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "silent": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "pickupItems": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "removable": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "helmet": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "chestplate": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "boots": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "leggings": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "mainHand": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "offHand": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "passengers": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "attributes": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "loot": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "leashHolder": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "spawnEffect": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "spawnEffectRiseOutOfGround": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "pandaMainGene": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "pandaHiddenGene": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "baby": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "keepEntity": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "surface": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "specialType": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "applySettingsToCustomMobAnyways": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    },
+    "rawCommands": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawning, equipment, AI and gameplay callbacks; not voxel generation."
+    }
+  },
+  "entitySpawn": {
+    "entity": {
+      "classification": "read-only",
+      "reason": "Runtime entity selection and spawn counts; not voxel generation."
+    },
+    "rarity": {
+      "classification": "read-only",
+      "reason": "Runtime entity selection and spawn counts; not voxel generation."
+    },
+    "minSpawns": {
+      "classification": "read-only",
+      "reason": "Runtime entity selection and spawn counts; not voxel generation."
+    },
+    "maxSpawns": {
+      "classification": "read-only",
+      "reason": "Runtime entity selection and spawn counts; not voxel generation."
+    }
+  },
+  "loot": {
+    "slotTypes": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "rarity": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "minAmount": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "maxAmount": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "displayName": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "minDurability": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "maxDurability": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "customModel": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "unbreakable": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "itemFlags": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "enchantments": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "attributes": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "lore": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "type": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "dyeColor": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "leatherColor": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    },
+    "customNbt": {
+      "classification": "read-only",
+      "reason": "Inventory item contents, attributes and NBT; not generated voxel contents."
+    }
+  },
+  "lootReference": {
+    "mode": {
+      "classification": "read-only",
+      "reason": "Gameplay loot-table selection; not voxel generation."
+    },
+    "tables": {
+      "classification": "read-only",
+      "reason": "Gameplay loot-table selection; not voxel generation."
+    },
+    "multiplier": {
+      "classification": "read-only",
+      "reason": "Gameplay loot-table selection; not voxel generation."
+    }
+  },
+  "lootTable": {
+    "name": {
+      "classification": "read-only",
+      "reason": "Gameplay inventory loot rolls; not voxel generation."
+    },
+    "rarity": {
+      "classification": "read-only",
+      "reason": "Gameplay inventory loot rolls; not voxel generation."
+    },
+    "maxPicked": {
+      "classification": "read-only",
+      "reason": "Gameplay inventory loot rolls; not voxel generation."
+    },
+    "minPicked": {
+      "classification": "read-only",
+      "reason": "Gameplay inventory loot rolls; not voxel generation."
+    },
+    "maxTries": {
+      "classification": "read-only",
+      "reason": "Gameplay inventory loot rolls; not voxel generation."
+    },
+    "loot": {
+      "classification": "read-only",
+      "reason": "Gameplay inventory loot rolls; not voxel generation."
+    }
+  },
+  "marker": {
+    "spawners": {
+      "classification": "read-only",
+      "reason": "Runtime marker/spawner metadata; not voxel generation."
+    },
+    "removeOnChange": {
+      "classification": "read-only",
+      "reason": "Runtime marker/spawner metadata; not voxel generation."
+    },
+    "emptyAbove": {
+      "classification": "read-only",
+      "reason": "Runtime marker/spawner metadata; not voxel generation."
+    },
+    "exhaustionChance": {
+      "classification": "read-only",
+      "reason": "Runtime marker/spawner metadata; not voxel generation."
+    }
+  },
+  "mod": {
+    "name": {
+      "classification": "read-only",
+      "reason": "Human-readable modification metadata; not voxel generation."
+    },
+    "forDimension": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "overrideFluidHeight": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "removeBiomes": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "removeObjects": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "removeRegions": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "injectRegions": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "biomeInjectors": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "biomeReplacers": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "objectReplacers": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "biomeObjectPlacementInjectors": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "regionObjectPlacementInjectors": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "regionReplacers": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "blockReplacers": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "styleReplacers": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "modBiomeInjector": {
+    "region": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "inject": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "modBiomeReplacer": {
+    "find": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "replace": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "modNoiseStyleReplacer": {
+    "find": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "replaceTypeOnly": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "replace": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "modObjectPlacementBiomeInjector": {
+    "biome": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "place": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "modObjectPlacementRegionInjector": {
+    "biome": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "place": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "modObjectReplacer": {
+    "find": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "replace": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "modRegionReplacer": {
+    "find": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    },
+    "replace": {
+      "classification": "unclassified",
+      "reason": "Modification recipe consumer and live generation scope need an explicit audit; preserved read-only until classified."
+    }
+  },
+  "objectLoot": {
+    "filter": {
+      "classification": "read-only",
+      "reason": "Gameplay container loot assignment; not voxel generation."
+    },
+    "exact": {
+      "classification": "read-only",
+      "reason": "Gameplay container loot assignment; not voxel generation."
+    },
+    "name": {
+      "classification": "read-only",
+      "reason": "Gameplay container loot assignment; not voxel generation."
+    },
+    "weight": {
+      "classification": "read-only",
+      "reason": "Gameplay container loot assignment; not voxel generation."
+    }
+  },
+  "objectMarker": {
+    "mark": {
+      "classification": "read-only",
+      "reason": "Runtime object marker metadata; not voxel generation."
+    },
+    "maximumMarkers": {
+      "classification": "read-only",
+      "reason": "Runtime object marker metadata; not voxel generation."
+    },
+    "exact": {
+      "classification": "read-only",
+      "reason": "Runtime object marker metadata; not voxel generation."
+    },
+    "marker": {
+      "classification": "read-only",
+      "reason": "Runtime object marker metadata; not voxel generation."
+    }
+  },
+  "objectVanillaLoot": {
+    "filter": {
+      "classification": "read-only",
+      "reason": "Gameplay native loot-table assignment; not voxel generation."
+    },
+    "exact": {
+      "classification": "read-only",
+      "reason": "Gameplay native loot-table assignment; not voxel generation."
+    },
+    "name": {
+      "classification": "read-only",
+      "reason": "Gameplay native loot-table assignment; not voxel generation."
+    },
+    "weight": {
+      "classification": "read-only",
+      "reason": "Gameplay native loot-table assignment; not voxel generation."
+    }
+  },
+  "rate": {
+    "amount": {
+      "classification": "read-only",
+      "reason": "Runtime entity-spawn rate limit; not initial voxel generation."
+    },
+    "per": {
+      "classification": "read-only",
+      "reason": "Runtime entity-spawn rate limit; not initial voxel generation."
+    }
+  },
+  "spawner": {
+    "spawns": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "initialSpawns": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "maxEntitiesPerChunk": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "timeBlock": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "weather": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "maximumRate": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "maximumRatePerChunk": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "allowedLightLevels": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    },
+    "group": {
+      "classification": "read-only",
+      "reason": "Runtime entity spawns, time/weather and population limits; not voxel generation."
+    }
+  },
+  "timeBlock": {
+    "startHour": {
+      "classification": "read-only",
+      "reason": "Gameplay time-of-day scheduling; not initial voxel generation."
+    },
+    "endHour": {
+      "classification": "read-only",
+      "reason": "Gameplay time-of-day scheduling; not initial voxel generation."
+    }
+  },
+  "tree": {
+    "treeTypes": {
+      "classification": "read-only",
+      "reason": "Post-generation sapling/tree-growth matching; procedural generation trees use a separate model."
+    },
+    "sizes": {
+      "classification": "read-only",
+      "reason": "Post-generation sapling/tree-growth matching; procedural generation trees use a separate model."
+    }
+  },
+  "treeSettings": {
+    "enabled": {
+      "classification": "read-only",
+      "reason": "Post-generation tree-growth replacement settings; not initial voxel generation."
+    },
+    "mode": {
+      "classification": "read-only",
+      "reason": "Post-generation tree-growth replacement settings; not initial voxel generation."
+    }
+  },
+  "treeSize": {
+    "width": {
+      "classification": "read-only",
+      "reason": "Post-generation tree-growth matching dimensions; not procedural generation geometry."
+    },
+    "depth": {
+      "classification": "read-only",
+      "reason": "Post-generation tree-growth matching dimensions; not procedural generation geometry."
+    }
   }
 }

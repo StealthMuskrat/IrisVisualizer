@@ -1211,8 +1211,9 @@ public final class EditorApp extends Application {
     }
     private void drawCoverage() {
         List<String> groups = FieldCoverage.groups(selected);
-        if (groups.isEmpty() || !ImGui.collapsingHeader("Pinned-source field coverage (partial)")) return;
-        ImGui.textWrapped("Direct declared fields in selected source classes only; inherited and other nested schemas are not inventoried. Unclassified/unimplemented fields stay read-only.");
+        if (groups.isEmpty() || !ImGui.collapsingHeader("Pinned-source field coverage")) return;
+        ImGui.textWrapped(FieldCoverage.description());
+        var summary=FieldCoverage.summary();ImGui.textWrapped(summary.fields()+" fields across "+summary.models()+" pinned class models; "+summary.unclassified()+" require classification. This resource view does not grant additional edit permissions.");
         for (String group : groups) {
             var fields = FieldCoverage.fields(group);
             long unclassified = fields.stream().filter(field -> field.classification().equals("unclassified")).count();
@@ -6859,6 +6860,11 @@ public final class EditorApp extends Application {
             catch (IllegalArgumentException invalid) { jsonFindError=invalid.getMessage(); }
         }
         refreshJsonToken(snapshot);ImGui.textWrapped("Current pointer: "+(jsonNode==0 ? "(root)" : InspectorText.label(jsonCurrentPointer.text(),512)));if (!jsonCurrentPointer.complete()) ImGui.textWrapped("Pointer exceeds the 16,384-character representation limit; this display is incomplete.");
+        if(jsonCurrentPointer.complete()){
+            var field=FieldCoverage.inspect(selected,jsonCurrentPointer.text());ImGui.textWrapped("Source field policy: "+field.classification()+". "+field.reason());
+            ImGui.textWrapped("This source browser is read-only. Classification is model metadata; stored values and supported editor contexts require their own checks.");
+        }
+
         ImGui.inputText("Find indexed names / scalar prefixes",jsonFind);
         if (!jsonFind.get().equals(jsonPreviousFind)) { jsonPage=0;jsonNodeJump.set("1");jsonPreviousFind=jsonFind.get();jsonFindError=null; }
         if (ImGui.button("Clear JSON search")) { jsonFind.set("");jsonPreviousFind="";jsonPage=0;jsonNodeJump.set("1");jsonFindError=null; }
