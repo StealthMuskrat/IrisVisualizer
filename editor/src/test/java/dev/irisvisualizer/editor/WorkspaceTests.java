@@ -159,6 +159,7 @@ public final class WorkspaceTests {
    SourceTextPagesTests.run(temp);
    SharedSourceIndexTests.run(temp);
    EditorShellPreviewTests.run(temp);
+   EditorShellLayoutTests.run();
    JsonSourceStageTests.run(temp);
    SourceMatchTests.run(temp);
    ReadOnlyPolicyTests.run(temp);

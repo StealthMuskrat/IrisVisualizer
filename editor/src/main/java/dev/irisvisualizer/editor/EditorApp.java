@@ -16,6 +16,9 @@ import imgui.flag.ImGuiTableFlags;
 import imgui.flag.ImGuiTableColumnFlags;
 import imgui.flag.ImGuiInputTextFlags;
 import imgui.flag.ImGuiWindowFlags;
+import imgui.flag.ImGuiStyleVar;
+import imgui.flag.ImGuiMouseCursor;
+import imgui.flag.ImGuiConfigFlags;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.system.MemoryUtil;
@@ -33,10 +36,13 @@ import java.nio.file.Path;
 public final class EditorApp extends Application {
     private PackWorkspace workspace = PackWorkspace.empty();
     private String selected, error;
+    private final EditorShell.State shellLayout=new EditorShell.State();
+    private EditorShell.Panel shellFocused=EditorShell.Panel.RESOURCES,shellFocusRequest;
     private final PreviewSession previewSession=new PreviewSession();
     private final ReferenceChoices.View previewContextPages=new ReferenceChoices.View();
     private final ImString previewContextFilter=new ImString(1024),previewContextJump=new ImString("1",32);
     private final ImString previewSeed=new ImString("0",64),previewX=new ImString("0",32),previewZ=new ImString("0",32);
+    private PackWorkspace previewBufferedOwner;
     private String previewBufferedDimension,previewSettingsError;private int previewContextPage;
     private PreviewSession.Coordinates previewBufferedCoordinates;
     private static final int SHELL_FLAGS=ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoMove|ImGuiWindowFlags.NoResize|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoSavedSettings|ImGuiWindowFlags.NoBringToFrontOnFocus;
@@ -206,8 +212,8 @@ public final class EditorApp extends Application {
         if (failure!=null) { ImGui.textWrapped(failure);if (ImGui.button("Retry image decode/upload")) retryImage();return; }
         if (imageTexture != 0) {
             ImGui.text(imageWidth + " × " + imageHeight + " decoded pixels");
-            if (ImGui.button("Fit image")) imageViewport.fit();ImGui.sameLine();if (ImGui.button("1:1 image")) imageViewport.actualSize();
-            ImGui.sameLine();if (ImGui.button("Zoom -")) imageViewport.zoom(1/1.25);ImGui.sameLine();if (ImGui.button("Zoom +")) imageViewport.zoom(1.25);
+            if (ImGui.button("Fit image")) imageViewport.fit();sameLineWhenFits("1:1 image",false);if (ImGui.button("1:1 image")) imageViewport.actualSize();
+            sameLineWhenFits("Zoom -",false);if (ImGui.button("Zoom -")) imageViewport.zoom(1/1.25);sameLineWhenFits("Zoom +",false);if (ImGui.button("Zoom +")) imageViewport.zoom(1.25);
             if(ImGui.button("Inspect decoded pixels")) { showImageStatistics=true;focusImageStatistics=true; }
             ImGui.textWrapped("Wheel: zoom at pointer. Left-drag: pan. Shift-left-drag: select pixels for statistics. Hover: decoded pixel RGBA. Fit never enlarges; 1:1 uses one logical display unit per source pixel.");
             float availableWidth=Math.max(1,ImGui.getContentRegionAvailX()),availableHeight=Math.max(1,ImGui.getContentRegionAvailY()-ImGui.getTextLineHeightWithSpacing());
@@ -243,35 +249,117 @@ public final class EditorApp extends Application {
             ImGui.textUnformatted(String.format(java.util.Locale.ROOT,"%.2f%% (%s)",100*imageViewport.scale(),imageViewport.fitting() ? "fit" : "manual"));
         }
     }
-    private static void positionShell(EditorShell.Rect area){ImGui.setNextWindowPos(area.x(),area.y());ImGui.setNextWindowSize(area.width(),area.height());}
-    private void bindPreviewSettings(PreviewSession.View view){
-        if(!java.util.Objects.equals(previewBufferedDimension,view.dimension()) || !java.util.Objects.equals(previewBufferedCoordinates,view.coordinates())){
-            previewBufferedDimension=view.dimension();previewBufferedCoordinates=view.coordinates();previewSeed.set(Long.toString(view.coordinates().seed()));previewX.set(Integer.toString(view.coordinates().x()));previewZ.set(Integer.toString(view.coordinates().z()));previewSettingsError=null;
+    private static void positionShell(EditorShell.Rect area){ImGui.setNextWindowPos(area.x(),area.y());ImGui.setNextWindowSize(Math.max(1,area.width()),Math.max(1,area.height()));}
+    private void beginShellPanel(EditorShell.Panel panel,EditorShell.Rect area){
+        positionShell(area);
+        if(shellFocusRequest==panel){ImGui.setNextWindowFocus();shellFocusRequest=null;}
+        float minimum=switch(panel){case RESOURCES->EditorShell.MIN_RESOURCES;case VISUALIZATION->EditorShell.MIN_VISUALIZATION;case INSPECTOR->EditorShell.MIN_INSPECTOR;};
+        ImGui.pushStyleVar(ImGuiStyleVar.WindowMinSize,1,1);
+        ImGui.begin(panel.window,SHELL_FLAGS|(area.width()<minimum?ImGuiWindowFlags.HorizontalScrollbar:0));
+        ImGui.popStyleVar();
+        if(ImGui.isWindowFocused(ImGuiFocusedFlags.RootAndChildWindows))shellFocused=panel;
+    }
+    private void drawLayoutMenu(float menuHeight){
+        if(!ImGui.beginMenu("Layout"))return;
+        float width=ImGui.getIO().getDisplaySizeX(),height=ImGui.getIO().getDisplaySizeY();
+        ImGui.beginDisabled(!shellLayout.resizable(width));
+        if(ImGui.menuItem("Widen resources"))shellLayout.move(EditorShell.Divider.RESOURCES,32,width,height,menuHeight);
+        if(ImGui.menuItem("Narrow resources"))shellLayout.move(EditorShell.Divider.RESOURCES,-32,width,height,menuHeight);
+        if(ImGui.menuItem("Widen resource editor"))shellLayout.move(EditorShell.Divider.INSPECTOR,-32,width,height,menuHeight);
+        if(ImGui.menuItem("Narrow resource editor"))shellLayout.move(EditorShell.Divider.INSPECTOR,32,width,height,menuHeight);
+        ImGui.endDisabled();
+        if(ImGui.menuItem("Reset panel widths"))shellLayout.reset();
+        ImGui.separator();
+        if(ImGui.menuItem("Focus resources"))shellFocusRequest=EditorShell.Panel.RESOURCES;
+        if(ImGui.menuItem("Focus visualization"))shellFocusRequest=EditorShell.Panel.VISUALIZATION;
+        if(ImGui.menuItem("Focus resource editor"))shellFocusRequest=EditorShell.Panel.INSPECTOR;
+        ImGui.textDisabled("F6 / Shift+F6: next / previous panel");
+        ImGui.endMenu();
+    }
+    private void drawShellDividers(EditorShell.Layout layout,float menuHeight){
+        float width=ImGui.getIO().getDisplaySizeX(),height=ImGui.getIO().getDisplaySizeY();
+        if(!shellLayout.resizable(width) || layout.resources().height()<1)return;
+        drawShellDivider(EditorShell.Divider.RESOURCES,layout.visualization().x(),layout.resources().y(),layout.resources().height(),width,height,menuHeight);
+        drawShellDivider(EditorShell.Divider.INSPECTOR,layout.inspector().x(),layout.resources().y(),layout.resources().height(),width,height,menuHeight);
+    }
+    private void drawShellDivider(EditorShell.Divider divider,float x,float y,float body,float width,float height,float menuHeight){
+        ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding,0,0);
+        ImGui.pushStyleVar(ImGuiStyleVar.WindowMinSize,1,1);
+        ImGui.setNextWindowPos(x-3,y);ImGui.setNextWindowSize(6,body);
+        int flags=SHELL_FLAGS|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse|ImGuiWindowFlags.NoBackground|ImGuiWindowFlags.NoFocusOnAppearing|ImGuiWindowFlags.NoNav;
+        if(ImGui.begin("Panel divider##"+divider,flags)){
+            ImGui.invisibleButton("Resize panel",6,body);
+            boolean hovered=ImGui.isItemHovered(),active=ImGui.isItemActive();
+            if(hovered || active){
+                ImGui.setMouseCursor(ImGuiMouseCursor.ResizeEW);
+                ImGui.getWindowDrawList().addLine(x,y,x,y+body,active?0xff999999:0xffcccccc,1);
+            }
+            if(hovered && ImGui.isMouseDoubleClicked(0))shellLayout.reset();
+            else if(active && ImGui.isMouseDragging(0))shellLayout.move(divider,ImGui.getIO().getMouseDeltaX(),width,height,menuHeight);
+            if(hovered && !active)ImGui.setTooltip("Drag to resize. Double-click to reset widths. Keyboard controls: Workspace > Layout.");
         }
+        ImGui.end();ImGui.popStyleVar(2);
+    }
+    private static void sameLineWhenFits(String label,boolean checkbox){
+        ImGui.sameLine();
+        float needed=ImGui.calcTextSizeX(label)+(checkbox?ImGui.getFrameHeight()+ImGui.getStyle().getItemInnerSpacingX():ImGui.getStyle().getFramePaddingX()*2);
+        if(ImGui.getContentRegionAvailX()<needed)ImGui.newLine();
+    }
+    private void bindPreviewSettings(PreviewSession.View view){
+        if(previewBufferedOwner!=workspace || !java.util.Objects.equals(previewBufferedDimension,view.dimension()) || !java.util.Objects.equals(previewBufferedCoordinates,view.coordinates())){
+            if(previewBufferedOwner!=workspace){previewContextFilter.set("");previewContextPage=0;previewContextJump.set("1");}
+            previewBufferedOwner=workspace;previewBufferedDimension=view.dimension();previewBufferedCoordinates=view.coordinates();previewSeed.set(Long.toString(view.coordinates().seed()));previewX.set(Integer.toString(view.coordinates().x()));previewZ.set(Integer.toString(view.coordinates().z()));previewSettingsError=null;
+        }
+    }
+    private PreviewSession.View drawPreviewModes(PreviewSession.View view){
+        if(ImGui.beginTabBar("Preview modes")){
+            for(var candidate:PreviewSession.Mode.values()){
+                boolean meaningful=view.meaningful(candidate);ImGui.beginDisabled(!meaningful);
+                if(ImGui.beginTabItem(candidate==PreviewSession.Mode.TWO_D?"2D":"3D",candidate==view.mode()?ImGuiTabItemFlags.SetSelected:0)){if(meaningful)view=previewSession.mode(candidate);ImGui.endTabItem();}
+                ImGui.endDisabled();
+            }
+            ImGui.endTabBar();
+        }
+        return view;
+    }
+    private PreviewSession.View drawPreviewLocation(PreviewSession.View view){
+        if(!view.contextual()){ImGui.textDisabled(view.kind().label);return view;}
+        ImGui.beginDisabled(view.dimension()==null);
+        float width=Math.max(0,ImGui.getContentRegionAvailX());boolean row=width>=350,paired=width>=160;
+        ImGui.setNextItemWidth(row?100:Math.max(1,width-40));
+        boolean apply=ImGui.inputText("Seed##preview",previewSeed,ImGuiInputTextFlags.EnterReturnsTrue);
+        if(ImGui.isItemHovered())ImGui.setTooltip("Signed 64-bit preview seed. Press Enter to apply preview settings; pack JSON is unchanged.");
+        if(row)ImGui.sameLine();
+        float coordinateWidth=row?55:paired?Math.max(1,(width-48)/2):Math.max(1,width-20);
+        ImGui.setNextItemWidth(coordinateWidth);apply|=ImGui.inputText("X##preview",previewX,ImGuiInputTextFlags.EnterReturnsTrue);
+        if(paired)ImGui.sameLine();
+        ImGui.setNextItemWidth(coordinateWidth);apply|=ImGui.inputText("Z##preview",previewZ,ImGuiInputTextFlags.EnterReturnsTrue);
+        ImGui.endDisabled();
+        if(apply)try{view=previewSession.configure(previewSeed.get(),previewX.get(),previewZ.get());bindPreviewSettings(view);previewSettingsError=null;}catch(IllegalArgumentException invalid){previewSettingsError=invalid.getMessage();}
+        return view;
+    }
+    private void drawPreviewUpdate(PreviewSession.View view){
+        ImGui.beginDisabled(!view.image());if(ImGui.button("Update Preview") && view.image())retryImage();ImGui.endDisabled();
+        sameLineWhenFits("Auto",true);ImGui.beginDisabled();ImGui.checkbox("Auto",false);ImGui.endDisabled();
+        if(ImGui.isItemHovered())ImGui.setTooltip("Automatic generation remains unavailable until the native preview backend is supported.");
     }
     private void drawPreviewPanel(){
         var view=previewSession.select(workspace,selected);bindPreviewSettings(view);
         if(!view.image()){var imageState=imageLoader.select(workspace,selected);if(imageRequest!=imageState.request()){clearImage();imageRequest=imageState.request();imageUploadAttempted=false;}}
-        if(ImGui.beginTable("Preview toolbar",3,ImGuiTableFlags.SizingStretchProp)){
-            ImGui.tableSetupColumn("Mode",ImGuiTableColumnFlags.WidthFixed,100);ImGui.tableSetupColumn("Location",ImGuiTableColumnFlags.WidthStretch);ImGui.tableSetupColumn("Update",ImGuiTableColumnFlags.WidthFixed,184);ImGui.tableNextRow();ImGui.tableNextColumn();
-            if(ImGui.beginTabBar("Preview modes")){
-                for(var candidate:PreviewSession.Mode.values()){
-                    boolean meaningful=view.meaningful(candidate);ImGui.beginDisabled(!meaningful);
-                    if(ImGui.beginTabItem(candidate==PreviewSession.Mode.TWO_D?"2D":"3D",candidate==view.mode()?ImGuiTabItemFlags.SetSelected:0)){if(meaningful)view=previewSession.mode(candidate);ImGui.endTabItem();}
-                    ImGui.endDisabled();
-                }
-                ImGui.endTabBar();
+        var toolbar=EditorShell.toolbar(Math.max(0,ImGui.getContentRegionAvailX()));
+        if(toolbar==EditorShell.Toolbar.ROW){
+            if(ImGui.beginTable("Preview toolbar",3,ImGuiTableFlags.SizingStretchProp)){
+                ImGui.tableSetupColumn("Mode",ImGuiTableColumnFlags.WidthFixed,100);ImGui.tableSetupColumn("Location",ImGuiTableColumnFlags.WidthStretch);ImGui.tableSetupColumn("Update",ImGuiTableColumnFlags.WidthFixed,184);
+                ImGui.tableNextRow();ImGui.tableNextColumn();view=drawPreviewModes(view);ImGui.tableNextColumn();view=drawPreviewLocation(view);ImGui.tableNextColumn();drawPreviewUpdate(view);ImGui.endTable();
             }
-            ImGui.tableNextColumn();
-            if(view.contextual()){
-                ImGui.beginDisabled(view.dimension()==null);float available=ImGui.getContentRegionAvailX();
-                ImGui.setNextItemWidth(Math.max(52,Math.min(100,available-32)));boolean apply=ImGui.inputText("Seed##preview",previewSeed,ImGuiInputTextFlags.EnterReturnsTrue);
-                if(ImGui.isItemHovered())ImGui.setTooltip("Signed 64-bit preview seed. Press Enter to apply preview settings; pack JSON is unchanged.");
-                if(available>=235)ImGui.sameLine();ImGui.setNextItemWidth(55);apply|=ImGui.inputText("X##preview",previewX,ImGuiInputTextFlags.EnterReturnsTrue);ImGui.sameLine();ImGui.setNextItemWidth(55);apply|=ImGui.inputText("Z##preview",previewZ,ImGuiInputTextFlags.EnterReturnsTrue);ImGui.endDisabled();
-                if(apply)try{view=previewSession.configure(previewSeed.get(),previewX.get(),previewZ.get());bindPreviewSettings(view);previewSettingsError=null;}catch(IllegalArgumentException invalid){previewSettingsError=invalid.getMessage();}
-            }else ImGui.textDisabled(view.kind().label);
-            ImGui.tableNextColumn();ImGui.beginDisabled(!view.image());if(ImGui.button("Update Preview") && view.image())retryImage();ImGui.endDisabled();ImGui.sameLine();ImGui.beginDisabled();ImGui.checkbox("Auto",false);ImGui.endDisabled();
-            if(ImGui.isItemHovered())ImGui.setTooltip("Automatic generation remains unavailable until the native preview backend is supported.");ImGui.endTable();
+        }else if(toolbar==EditorShell.Toolbar.COMPACT){
+            if(ImGui.beginTable("Compact preview toolbar",2,ImGuiTableFlags.SizingStretchProp)){
+                ImGui.tableSetupColumn("Mode",ImGuiTableColumnFlags.WidthStretch);ImGui.tableSetupColumn("Update",ImGuiTableColumnFlags.WidthFixed,184);
+                ImGui.tableNextRow();ImGui.tableNextColumn();view=drawPreviewModes(view);ImGui.tableNextColumn();drawPreviewUpdate(view);ImGui.endTable();
+            }
+            view=drawPreviewLocation(view);
+        }else{
+            view=drawPreviewModes(view);view=drawPreviewLocation(view);drawPreviewUpdate(view);
         }
         if(view.contextual()){
             if(view.kind()==PreviewSession.Kind.DIMENSION || view.dimensions().keys().size()==1)ImGui.textWrapped("Dimension: "+java.util.Objects.toString(view.dimension(),"None"));
@@ -438,7 +526,9 @@ public final class EditorApp extends Application {
         pollJsonSourceReview();
         updateSourceMatchFocus();
 
-        if (!styled) { ImGui.styleColorsLight();var style=ImGui.getStyle();style.setWindowRounding(0);style.setWindowBorderSize(0);style.setChildBorderSize(0);style.setWindowPadding(10,10);style.setColor(ImGuiCol.WindowBg,1f,1f,1f,1f);style.setColor(ImGuiCol.ChildBg,1f,1f,1f,1f);styled = true; }
+        if (!styled) { ImGui.getIO().addConfigFlags(ImGuiConfigFlags.NavEnableKeyboard);ImGui.styleColorsLight();var style=ImGui.getStyle();style.setWindowRounding(0);style.setWindowBorderSize(0);style.setChildBorderSize(0);style.setWindowPadding(10,10);style.setColor(ImGuiCol.WindowBg,1f,1f,1f,1f);style.setColor(ImGuiCol.ChildBg,1f,1f,1f,1f);styled = true; }
+        var shellIo=ImGui.getIO();
+        if(!shellIo.getKeyCtrl() && !shellIo.getKeyAlt() && !shellIo.getKeySuper() && !ImGui.isPopupOpen("",ImGuiPopupFlags.AnyPopup) && ImGui.isKeyPressed(ImGuiKey.F6,false)) shellFocusRequest=shellFocused.next(shellIo.getKeyShift());
         float menuHeight=ImGui.getFrameHeight();
         if (ImGui.beginMainMenuBar()) {
             menuHeight=ImGui.getWindowHeight();
@@ -448,6 +538,7 @@ public final class EditorApp extends Application {
             }
             if(ImGui.beginMenu("Workspace")){
                 for(String action:List.of("Save As","Save Copy"))if(ImGui.menuItem(action,EditorCommands.shortcutLabel(EditorCommands.Action.file(action))))perform(action);
+                drawLayoutMenu(menuHeight);
                 ImGui.separator();ImGui.textDisabled("Active folder");ImGui.textWrapped(workspace.directory()==null?"Not saved to a folder":InspectorText.label(workspace.directory().toString(),512));
                 ImGui.endMenu();
             }
@@ -508,8 +599,8 @@ public final class EditorApp extends Application {
             if (drafts.any()) ImGui.text("Unapplied text: " + drafts.count());
             ImGui.endMainMenuBar();
         }
-        var layout=EditorShell.layout(ImGui.getIO().getDisplaySizeX(),ImGui.getIO().getDisplaySizeY(),menuHeight);
-        positionShell(layout.resources());ImGui.begin("Resources",SHELL_FLAGS);ImGui.textUnformatted("Resources");ImGui.separator();
+        var layout=shellLayout.layout(ImGui.getIO().getDisplaySizeX(),ImGui.getIO().getDisplaySizeY(),menuHeight);
+        beginShellPanel(EditorShell.Panel.RESOURCES,layout.resources());ImGui.textUnformatted("Resources");ImGui.separator();
         ImGui.inputText("Search", filter);
         if (ImGui.beginCombo("Resource family",browserFamily.label())) { for (var family : ResourceFinder.Family.values()) if (ImGui.selectable(family.label(),family==browserFamily)) browserFamily=family;ImGui.endCombo(); }
         if (ImGui.checkbox("Applied changes only",browserChangedOnly)) browserChangedOnly=!browserChangedOnly;
@@ -517,7 +608,7 @@ public final class EditorApp extends Application {
         ImGui.beginDisabled(selected==null);if(ImGui.button("Reveal selected resource")){revealSelectedResource();}ImGui.endDisabled();
         ImGui.beginDisabled(!filter.get().isBlank());if(ImGui.button("Collapse folders")){resourceBrowser.collapseAll();browserPage=0;browserPageJump.set("1");browserResetScroll=true;}ImGui.endDisabled();
         if (browserFamily!=ResourceFinder.Family.ALL || browserChangedOnly) ImGui.textWrapped("File filters hide empty folders. Clear filters to see all folders.");
-        ImGui.textDisabled("Ctrl-click: duplicate; Ctrl-right-click folder: create; Ctrl-middle-click folder: subfolder");
+        ImGui.textWrapped("Ctrl-click: duplicate; Ctrl-right-click folder: create; Ctrl-middle-click folder: subfolder");
         try {
             var query=new ResourceBrowser.Query(filter.get(),browserFamily,browserChangedOnly);
             if(browserOwner!=workspace || !query.equals(browserQuery)){browserOwner=workspace;browserQuery=query;browserPage=0;browserPageJump.set("1");browserResetScroll=true;}
@@ -538,12 +629,12 @@ public final class EditorApp extends Application {
         if(selectedFolder==null && selected!=null && ImGui.isWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) && !ImGui.getIO().getWantTextInput() && !ImGui.getIO().getKeyCtrl() && !ImGui.getIO().getKeyAlt() && !ImGui.getIO().getKeySuper() && !ImGui.getIO().getKeyShift()){
             if(ImGui.isKeyPressed(ImGuiKey.F2,false))openResourceOperation(ResourceOperation.Mode.RENAME,selected,null);if(ImGui.isKeyPressed(ImGuiKey.Delete,false))openResourceOperation(ResourceOperation.Mode.DELETE,selected,null);
         }
-        ImGui.textDisabled("F2: rename; Delete: delete; drag a resource to move within its base folder. Operations require a reference-safe review.");
+        ImGui.textWrapped("F2: rename; Delete: delete; drag a resource to move within its base folder. Operations require a reference-safe review.");
         ImGui.end();
-        positionShell(layout.visualization());ImGui.begin("Visualization",SHELL_FLAGS);drawPreviewPanel();ImGui.end();
-        positionShell(layout.inspector());ImGui.begin("Resource inspector",SHELL_FLAGS);ImGui.textUnformatted("Resource editor");ImGui.separator();
+        beginShellPanel(EditorShell.Panel.VISUALIZATION,layout.visualization());drawPreviewPanel();ImGui.end();
+        beginShellPanel(EditorShell.Panel.INSPECTOR,layout.inspector());ImGui.textUnformatted("Resource editor");ImGui.separator();
         if (selected != null) {
-            ImGui.text(selected);
+            ImGui.textWrapped(selected);
             if(ImGui.button("Inspect applied file bytes"))queueEditorCommand(EditorCommands.Action.INSPECT_BYTES);
             if(ImGui.button("Compare applied file with disk"))queueEditorCommand(EditorCommands.Action.COMPARE_DISK_FILE);
             ImGui.textWrapped("Unknown and unclassified fields are read-only.");
@@ -673,6 +764,7 @@ public final class EditorApp extends Application {
         if (selected != null) drawReferences();
         if (error != null) ImGui.textWrapped(error);
         ImGui.end();
+        drawShellDividers(layout,menuHeight);
         if(showFileComparison)drawFileComparison();
         if (showByteInspection) drawByteInspection();
         if (showQuickOpen) drawQuickOpen();
