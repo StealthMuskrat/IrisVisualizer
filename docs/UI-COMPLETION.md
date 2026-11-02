@@ -1,8 +1,8 @@
 # UI completion against the original project brief
 
-The authoritative requirements are [SPECIFICATION.md](SPECIFICATION.md), particularly sections 5, 7, 8 and 9. Development order is **Engine → UI → Renderer → final integration**. The application is currently in the UI stage. A work batch is not a new stage.
+The authoritative requirements are [SPECIFICATION.md](SPECIFICATION.md), particularly sections 5, 7, 8 and 9. Development order is **Engine → UI → Renderer → final integration**. UI implementation and automated stage validation are complete; Renderer is the next development stage. A work batch is not a new stage.
 
-UI feature implementation closed at `a22a62e117211db06f2a1c38f556082d1b3ae07e`. Full UI-stage validation is now in progress as described in [UI-IMPLEMENTATION-REVIEW.md](UI-IMPLEMENTATION-REVIEW.md): the complete editor regression suite, real pinned Overworld storage/edit acceptance and Windows GitHub workflows. Resolve and record those results before renderer work. Keep the complete current project on `main`, without per-batch branches. Unsupported generation/rendering previews remain disabled. Older batch notes below retain their historical test-deferral statements; they do not describe the current validation phase.
+UI feature implementation closed at `a22a62e117211db06f2a1c38f556082d1b3ae07e`. [UI-VALIDATION.md](UI-VALIDATION.md) records passing results at `5d487ec49ce619439fa18962b83e15efd23a67eb`: all 176 editor groups, all source/policy checks, real pinned Overworld storage/edit acceptance, Windows packaging/launcher checks and all five feasibility suites. Interactive desktop QA remains separately unverified. Keep the current project on `main`, without per-batch branches, and unsupported generation/rendering previews disabled. The checklist and batch notes below retain implementation-time pending/deferral wording; the final validation record supersedes their automated-test status.
 
 ## Completion checklist
 

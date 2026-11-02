@@ -1,17 +1,17 @@
 # UI implementation closure and validation scope
 
-UI feature implementation is closed at a22a62e117211db06f2a1c38f556082d1b3ae07e. The project remains in the UI stage while its complete regression, example-pack and Windows workflow validation runs. Native generation/rendering and automatic generation remain disabled under the user's agreed scope. Renderer work has not started.
+UI feature implementation closed at a22a62e117211db06f2a1c38f556082d1b3ae07e. Its complete automated validation passed at 5d487ec49ce619439fa18962b83e15efd23a67eb, including the real pinned Overworld pack, Windows distribution and all five feasibility suites. [UI-VALIDATION.md](UI-VALIDATION.md) is the final result; the attempt history below explains the fixes. Rendering is the next development stage. Unsupported native previews and automatic generation remain disabled.
 
 The original SPECIFICATION.md sections 7–9 are implemented through the existing white three-panel shell, exact five-action File menu, typed hierarchical file operations, generation-only controls, optional/default omission, original-image inspection, preview request controls and guarded storage workflows. Current coverage accounts for 1,462 pinned fields across 150 models: 1,237 implemented generation fields and 225 read-only fields, with zero unclassified or missing policies. Known unsupported shapes, lookup modes, contexts and external recipe semantics retain the documented guards in RESOURCE-OPERATIONS.md and FIELD-POLICY.md. Preview dependency/native readiness remains explicitly unavailable; Save and Export do not depend on it.
 
-Validation now starts, as authorized after implementation completion:
+Validation scope used after implementation completion:
 
 1. Compile and execute the complete WorkspaceTests suite, fixing any regressions it exposes.
 2. Exercise the exact locked Overworld pack through representative supported edits, untouched-byte checks, Save/reopen, Save Copy, Save As and ZIP import/export. Report protected or unavailable cases explicitly.
 3. Run the complete Windows editor workflow, including pinned source regeneration/drift checks, the 1,778-source consumer audit, field policy, all Java contracts, Windows-only packaging and launcher/runtime/native-library checks.
 4. Run the repository's Windows feasibility workflow and record every matrix result without claiming native generation parity from UI tests.
 
-Interactive Windows mouse/keyboard, mixed-DPI, image GPU and visual layout behavior still requires a suitable Windows desktop. Automated and source-level results will be reported separately. Successful compilation alone is not a validation pass, and the UI stage remains open until its validation results are resolved and recorded.
+Interactive Windows mouse/keyboard, mixed-DPI, image GPU and visual layout behavior still requires a suitable Windows desktop and remains in desktop/final-integration QA. The completed automated results below do not claim those checks. Compilation alone was not used as a validation pass.
 
 ## Local validation, 2026-11-02
 
@@ -30,3 +30,7 @@ The subsequent [Windows run 41517398532](https://github.com/StealthMuskrat/IrisV
 [Windows run 41519398546](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/41519398546) verified the source-cache fix, complete production-source audit and field coverage, then reached the editor contracts. Its injected Save As failure case compared a canonical active directory to the temporary directory's uncanonical spelling. The test now captures the actual saved active path, verifies its filesystem identity, checks that exact path/baseline/history remain unchanged after failure, and compares successful retry adoption to `toRealPath()`. The complete local suite passed again: 176 groups in 149.20 seconds. Symbolic-link destinations remain rejected; no link guard or production Save As behavior changed.
 
 The complete [Windows feasibility matrix 41519398691](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/41519398691) passed at `7a59293bc3c4a008ca1b73fc181268513b485b2f`: `core`, `native-boundaries`, `native-fixture`, `overworld-context` and `overworld-structures`, with all five diagnostic artifacts uploaded. These native checks retain their established scope and preview blockers; they do not establish complete world-preview parity. The editor's final Windows/real-pack/package run remains pending with the corrected path assertion.
+
+## Completed result
+
+The corrected [Windows editor run 41521313042](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/41521313042) passed every step: source/policy evidence, all 176 Java groups, real 8,112-file Overworld acceptance, Windows-only packaging, runtime/native installation checks and both artifact uploads. The [complete five-suite feasibility run 41521313120](https://github.com/StealthMuskrat/IrisVisualizer/actions/runs/41521313120) also passed at the same tested commit, `5d487ec49ce619439fa18962b83e15efd23a67eb`. No automated UI-stage validation failures remain. See [UI-VALIDATION.md](UI-VALIDATION.md) for the final evidence and remaining manual desktop QA. Renderer implementation is next, with unsupported previews disabled.

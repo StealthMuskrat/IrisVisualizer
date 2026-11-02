@@ -1,0 +1,225 @@
+{
+  "format": 1,
+  "date": "2026-11-02",
+  "stage": "UI",
+  "status": "automated-validation-passed",
+  "testedCommit": "5d487ec49ce619439fa18962b83e15efd23a67eb",
+  "pins": {
+    "iris": "c3359e0a16438b1bb8468901c6171dcefdf63f7f",
+    "volmlib": "210705c5ab1321dc74b86b48457fd6d5e0452944",
+    "overworld": "2e85a52133ad1206c88cad2f50b6f622bea60cb9"
+  },
+  "local": {
+    "javaSources": 389,
+    "editorGroups": 176,
+    "editorSeconds": 149.2,
+    "sourceContractCommands": 93
+  },
+  "windows": {
+    "editorRun": 41521313042,
+    "editorConclusion": "success",
+    "editorGroups": 176,
+    "sourceAuditFiles": 1778,
+    "coverage": {
+      "fields": 1462,
+      "generationImplemented": 1237,
+      "readOnly": 225,
+      "unclassified": 0,
+      "models": 150
+    },
+    "overworld": {
+      "files": 8112,
+      "editedResources": 4,
+      "unchangedFiles": 8108,
+      "originalFixturePreserved": true,
+      "roundTrips": [
+        "Save",
+        "reopen",
+        "Save Copy",
+        "Save As",
+        "ZIP export/import"
+      ],
+      "undoRedo": true
+    },
+    "package": {
+      "x64WindowsDllEntries": 5,
+      "externalJavaRuntime": true,
+      "launcherAndNativeInstallationChecks": "passed"
+    },
+    "artifacts": [
+      {
+        "id": 13177708097,
+        "name": "UI-stage-acceptance",
+        "size_in_bytes": 405,
+        "url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177708097",
+        "archive_download_url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177708097/zip",
+        "expired": false,
+        "created_at": "2026-11-02T20:46:07Z",
+        "expires_at": "2027-01-31T20:40:10Z",
+        "updated_at": "2026-11-02T20:46:07Z",
+        "digest": "sha256:306df919977b7ec866e289ce55e9e41d7350a5e4fee40c9084ccd5e0e91c76d9",
+        "workflow_run": {
+          "id": 41521313042,
+          "repository_id": 1432647575,
+          "head_repository_id": 1432647575,
+          "head_branch": "main",
+          "head_sha": "5d487ec49ce619439fa18962b83e15efd23a67eb"
+        }
+      },
+      {
+        "id": 13177583655,
+        "name": "IrisVisualizer-windows-x64",
+        "size_in_bytes": 9034082,
+        "url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177583655",
+        "archive_download_url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177583655/zip",
+        "expired": false,
+        "created_at": "2026-11-02T20:46:06Z",
+        "expires_at": "2027-01-31T20:40:10Z",
+        "updated_at": "2026-11-02T20:46:06Z",
+        "digest": "sha256:442213e88e691b8c2c2ab8ea21d78620ab2616ea390e1363a1ff51d262f71bb9",
+        "workflow_run": {
+          "id": 41521313042,
+          "repository_id": 1432647575,
+          "head_repository_id": 1432647575,
+          "head_branch": "main",
+          "head_sha": "5d487ec49ce619439fa18962b83e15efd23a67eb"
+        }
+      }
+    ]
+  },
+  "feasibility": {
+    "run": 41521313120,
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 125537758749,
+        "name": "official-core (core)",
+        "conclusion": "success"
+      },
+      {
+        "id": 125537759158,
+        "name": "official-core (overworld-context)",
+        "conclusion": "success"
+      },
+      {
+        "id": 125537759168,
+        "name": "official-core (overworld-structures)",
+        "conclusion": "success"
+      },
+      {
+        "id": 125537759342,
+        "name": "official-core (native-fixture)",
+        "conclusion": "success"
+      },
+      {
+        "id": 125537759443,
+        "name": "official-core (native-boundaries)",
+        "conclusion": "success"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 13178900331,
+        "name": "windows-feasibility-overworld-structures",
+        "size_in_bytes": 7551,
+        "url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13178900331",
+        "archive_download_url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13178900331/zip",
+        "expired": false,
+        "created_at": "2026-11-02T20:47:55Z",
+        "expires_at": "2027-01-31T20:40:10Z",
+        "updated_at": "2026-11-02T20:47:55Z",
+        "digest": "sha256:63f6f9ead9208c0015586b656c26af0a43fe9fc874a14663e14d06195a8c400e",
+        "workflow_run": {
+          "id": 41521313120,
+          "repository_id": 1432647575,
+          "head_repository_id": 1432647575,
+          "head_branch": "main",
+          "head_sha": "5d487ec49ce619439fa18962b83e15efd23a67eb"
+        }
+      },
+      {
+        "id": 13177668363,
+        "name": "windows-feasibility-core",
+        "size_in_bytes": 4308,
+        "url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177668363",
+        "archive_download_url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177668363/zip",
+        "expired": false,
+        "created_at": "2026-11-02T20:47:23Z",
+        "expires_at": "2027-01-31T20:40:10Z",
+        "updated_at": "2026-11-02T20:47:23Z",
+        "digest": "sha256:0738888d857876f58e8e3b5b6c19195c131250a271f7de5a3b4cd43d8869ce25",
+        "workflow_run": {
+          "id": 41521313120,
+          "repository_id": 1432647575,
+          "head_repository_id": 1432647575,
+          "head_branch": "main",
+          "head_sha": "5d487ec49ce619439fa18962b83e15efd23a67eb"
+        }
+      },
+      {
+        "id": 13177533771,
+        "name": "windows-feasibility-native-fixture",
+        "size_in_bytes": 9759,
+        "url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177533771",
+        "archive_download_url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177533771/zip",
+        "expired": false,
+        "created_at": "2026-11-02T20:49:44Z",
+        "expires_at": "2027-01-31T20:40:10Z",
+        "updated_at": "2026-11-02T20:49:44Z",
+        "digest": "sha256:e7f958ae7dca1c807097496994daa2033459bef3584b8cd74f6796236f1ecfa7",
+        "workflow_run": {
+          "id": 41521313120,
+          "repository_id": 1432647575,
+          "head_repository_id": 1432647575,
+          "head_branch": "main",
+          "head_sha": "5d487ec49ce619439fa18962b83e15efd23a67eb"
+        }
+      },
+      {
+        "id": 13177523191,
+        "name": "windows-feasibility-native-boundaries",
+        "size_in_bytes": 16794,
+        "url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177523191",
+        "archive_download_url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177523191/zip",
+        "expired": false,
+        "created_at": "2026-11-02T20:45:40Z",
+        "expires_at": "2027-01-31T20:40:10Z",
+        "updated_at": "2026-11-02T20:45:40Z",
+        "digest": "sha256:115627317f583819bdb9b6df6742449aa95b83fbf0dab6196024351dee353149",
+        "workflow_run": {
+          "id": 41521313120,
+          "repository_id": 1432647575,
+          "head_repository_id": 1432647575,
+          "head_branch": "main",
+          "head_sha": "5d487ec49ce619439fa18962b83e15efd23a67eb"
+        }
+      },
+      {
+        "id": 13177378364,
+        "name": "windows-feasibility-overworld-context",
+        "size_in_bytes": 3327,
+        "url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177378364",
+        "archive_download_url": "https://api.github.com/repos/StealthMuskrat/IrisVisualizer/actions/artifacts/13177378364/zip",
+        "expired": false,
+        "created_at": "2026-11-02T20:45:42Z",
+        "expires_at": "2027-01-31T20:40:10Z",
+        "updated_at": "2026-11-02T20:45:42Z",
+        "digest": "sha256:389f913e6725c5488a4298bd93d23b0a21aabf9b7e1f7436cf90f341e6fbaacb",
+        "workflow_run": {
+          "id": 41521313120,
+          "repository_id": 1432647575,
+          "head_repository_id": 1432647575,
+          "head_branch": "main",
+          "head_sha": "5d487ec49ce619439fa18962b83e15efd23a67eb"
+        }
+      }
+    ]
+  },
+  "limitations": {
+    "interactiveWindowsGui": "unverified",
+    "mixedDpi": "unverified",
+    "imageGpuPath": "unverified",
+    "completeNativeWorldParity": "not-established",
+    "unsupportedWorldPreviews": "disabled"
+  }
+}
