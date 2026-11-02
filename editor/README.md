@@ -2,6 +2,8 @@
 
 Windows x64 / Java 25 only. Native previews remain unavailable.
 
+Biome and region views have a Placement selector: Isolated biome/region requests native Iris focus, while Dimension settings retains the dimension's stored focus and does not force the selected resource to appear. Hover the focus summary for native limitations: biome focus uses LAND role and native region resolution/fallback, version-excluded or unloadable content may not remain focused, and an active studio buffet takes precedence. Choices remain per resource across navigation, mode/context changes and applied rename/move, with no pack writes. Generation is still disabled; the controls describe future requests only.
+
 The visualization panel's Area / scale popup stores preview framing per dimension. A 2D map keeps 512 × 512 samples with configurable blocks per sample (default 1); 3D terrain/noise requests default to 128 × 128 blocks over the full configured dimension height. X/Z identify the first sample or terrain block. Apply and reset affect only the current mode's framing, preserve the exact seed/location, and never modify pack files. Applied settings follow a dimension rename and are removed with its deletion. Coordinate overflow is reported without clipping. These controls describe a request; generation, rendering and automatic updates remain disabled until supported.
 
 Build with Gradle 9.5.1: `gradle -p editor workspaceTest run`.

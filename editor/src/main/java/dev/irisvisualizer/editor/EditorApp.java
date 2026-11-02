@@ -390,6 +390,22 @@ public final class EditorApp extends Application {
         sameLineWhenFits("Auto",true);ImGui.beginDisabled();ImGui.checkbox("Auto",false);ImGui.endDisabled();
         if(ImGui.isItemHovered())ImGui.setTooltip("Automatic generation remains unavailable until the native preview backend is supported.");
     }
+    private PreviewSession.View drawPreviewPlacement(PreviewSession.View view){
+        if(!view.isolationAvailable())return view;
+        boolean biome=view.kind()==PreviewSession.Kind.BIOME;
+        String isolated=biome?"Isolated biome":"Isolated region";
+        ImGui.beginDisabled(view.dimension()==null);
+        ImGui.setNextItemWidth(Math.max(1,Math.min(220,ImGui.getContentRegionAvailX()-60)));
+        if(ImGui.beginCombo("Placement",view.placement()==PreviewIsolation.Placement.ISOLATED?isolated:"Dimension settings")){
+            if(ImGui.selectable(isolated,view.placement()==PreviewIsolation.Placement.ISOLATED))view=previewSession.placement(PreviewIsolation.Placement.ISOLATED);
+            if(ImGui.selectable("Dimension settings",view.placement()==PreviewIsolation.Placement.DIMENSION_SETTINGS))view=previewSession.placement(PreviewIsolation.Placement.DIMENSION_SETTINGS);
+            ImGui.endCombo();
+        }
+        ImGui.endDisabled();
+        ImGui.textDisabled(view.placement()==PreviewIsolation.Placement.ISOLATED?(biome?"Native focus: LAND role (details)":"Native focus: region distribution (details)"):"Stored dimension focus retained (details)");
+        if(ImGui.isItemHovered())ImGui.setTooltip(PreviewIsolation.help(biome,view.placement()));
+        return view;
+    }
     private void drawPreviewPanel(){
         var view=previewSession.select(workspace,selected);bindPreviewSettings(view);
         if(!view.image()){var imageState=imageLoader.select(workspace,selected);if(imageRequest!=imageState.request()){clearImage();imageRequest=imageState.request();imageUploadAttempted=false;}}
@@ -414,13 +430,13 @@ public final class EditorApp extends Application {
                 if(ImGui.inputText("Find dimension",previewContextFilter)){previewContextPage=0;previewContextJump.set("1");}
                 try{var page=previewContextPages.page(view.dimensions(),previewContextFilter.get(),previewContextPage);int requested=drawReviewPager("preview-context-pages",page.window(),previewContextJump,true);page=previewContextPages.page(view.dimensions(),previewContextFilter.get(),requested);previewContextPage=page.window().page();int row=0;for(String dimension:page.entries()){ImGui.pushID(row++);if(ImGui.selectable("Use dimension",dimension.equals(view.dimension()))){view=previewSession.dimension(dimension);bindPreviewSettings(view);ImGui.closeCurrentPopup();}ImGui.sameLine();ImGui.textUnformatted(InspectorText.label(dimension,256));if(ImGui.isItemHovered())ImGui.setTooltip(InspectorText.label(dimension,16384));ImGui.popID();}}catch(IllegalArgumentException invalid){ImGui.textWrapped(invalid.getMessage());}ImGui.endCombo();
             }
-            if(view.kind()==PreviewSession.Kind.BIOME || view.kind()==PreviewSession.Kind.REGION)ImGui.textDisabled("Isolated "+view.kind().label.toLowerCase(java.util.Locale.ROOT)+" context requested; no preview generated.");
+            view=drawPreviewPlacement(view);
         }
         if(previewSettingsError!=null)ImGui.textWrapped(previewSettingsError);
         view=drawPreviewFraming(view);
         ImGui.separator();
         if(view.image())drawImageAsset();
-        else{ImGui.textUnformatted(view.kind().title(view.mode())==null?"Visualization":view.kind().title(view.mode()));ImGui.textWrapped(view.unavailable());}
+        else{ImGui.textUnformatted(view.title()==null?"Visualization":view.title());ImGui.textWrapped(view.unavailable());}
     }
     private void setImageRegion(ImageStatistics.Region region) {
         region.validate(imageWidth,imageHeight);if(region.equals(imageRegion))return;imageRegion=region;

@@ -21,6 +21,9 @@ public final class ResourceSelectors {
     private static void field(String value) { if (value==null || !DIMENSION_FIELDS.contains(value) && !BIOME_FIELDS.contains(value)) throw new IllegalArgumentException("Unsupported resource selector"); }
     public static String family(String field) { field(field);return DATA.getProperty(field+".family"); }
     public static String help(String field) { field(field);return DATA.getProperty(field+".description"); }
+    static void requirePreviewIsolationPolicy() {
+        if(!"usableBiomeBeforeRegion".equals(DATA.getProperty("focus.policy")) || !"overridesFocus".equals(DATA.getProperty("buffet.policy")) || !"emptyString".equals(DATA.getProperty("clear.policy")) || !"LAND".equals(DATA.getProperty("focus.role")) || !"nativeResolveOrSynthesize".equals(DATA.getProperty("focus.regionPolicy")))throw new IllegalStateException("Pinned native preview isolation policy is unavailable.");
+    }
     public static List<String> choices(PackWorkspace workspace,String field) { return ResourceTypes.referenceKeys(workspace,family(field)); }
     public static String prefix(String path,String field) { field(field);return "resourceSelector#"+ResourceTypes.base(path)+"."+field; }
     static String stored(LosslessJson document,String field) { field(field);return document.token(field)==null ? "" : document.stringToken(field); }

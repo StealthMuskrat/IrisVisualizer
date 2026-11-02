@@ -22,10 +22,13 @@ final class PreviewSession {
     }
     record Coordinates(long seed,int x,int z){}
     record Identity(String resourceType,String resourceKey,String sourcePath){}
-    record View(String path,Kind kind,Mode mode,String dimension,Coordinates coordinates,PreviewFraming framing,ReferenceChoices.Catalog dimensions,String problem){
+    record View(String path,Kind kind,Mode mode,String dimension,Coordinates coordinates,PreviewFraming framing,PreviewIsolation.Placement placement,ReferenceChoices.Catalog dimensions,String problem){
         boolean meaningful(Mode candidate){return kind.meaningful(candidate);}
         boolean image(){return kind==Kind.IMAGE && mode==Mode.TWO_D;}
         boolean contextual(){return kind.context;}
+        boolean isolationAvailable(){return kind==Kind.BIOME || kind==Kind.REGION;}
+        PreviewIsolation isolationRequest(){return isolationAvailable() && dimension!=null?PreviewIsolation.request(placement,dimension,identity()):null;}
+        String title(){return isolationAvailable() && placement==PreviewIsolation.Placement.DIMENSION_SETTINGS?Kind.DIMENSION.title(mode):kind.title(mode);}
         boolean framingAvailable(){return contextual() && kind!=Kind.STRUCTURE && meaningful(mode);}
         String framingProblem(){return !framingAvailable() || dimension==null?null:mode==Mode.TWO_D?framing.mapProblem(coordinates.x(),coordinates.z()):framing.terrainProblem(coordinates.x(),coordinates.z());}
         Identity identity(){
@@ -41,10 +44,12 @@ final class PreviewSession {
     private PackWorkspace owner;private long resources=-1;private String selected,dimension;private Kind kind=Kind.OTHER;private Mode mode=Mode.TWO_D;
     private ReferenceChoices.Catalog dimensions=new ReferenceChoices.Catalog(List.of());private final Map<String,Coordinates> coordinates=new HashMap<>();
     private final Map<String,PreviewFraming> framings=new HashMap<>();
+    private final Map<String,PreviewIsolation.Placement> placements=new HashMap<>();
     static Kind kind(String path){String family=ResourceTypes.fileFamily(path);if(family==null)return Kind.OTHER;return switch(family){case "dimensions"->Kind.DIMENSION;case "regions"->Kind.REGION;case "biomes"->Kind.BIOME;case "generators"->Kind.GENERATOR;case "expressions"->Kind.EXPRESSION;case "structures","jigsaw-pools","jigsaw-pieces"->Kind.STRUCTURE;case "objects"->Kind.OBJECT;case "images"->Kind.IMAGE;default->Kind.OTHER;};}
     View select(PackWorkspace current,String path){
         Objects.requireNonNull(current);if(owner!=current){clear();owner=current;}
         if(resources!=current.resourceRevision()){
+            placements.keySet().retainAll(current.paths());
             var paths=new ArrayList<String>();long characters=0;problem=null;
             for(String candidate:current.paths())if(DimensionFields.dimension(candidate)){characters+=candidate.length();if(paths.size()>=maximumFiles || characters>maximumCharacters){problem="Dimension context catalog exceeds its file/path metadata budget; preview context is unavailable.";break;}paths.add(candidate);}
             if(problem!=null){dimensions=new ReferenceChoices.Catalog(List.of());dimensionPaths=Set.of();dimension=null;}
@@ -55,11 +60,15 @@ final class PreviewSession {
         else if(dimension==null && dimensions.keys().size()==1)dimension=dimensions.keys().getFirst();
         return view();
     }
-    private View view(){return new View(selected,kind,mode,dimension,dimension==null?DEFAULTS:coordinates.getOrDefault(dimension,DEFAULTS),dimension==null?PreviewFraming.DEFAULT:framings.getOrDefault(dimension,PreviewFraming.DEFAULT),dimensions,problem);}
+    private View view(){return new View(selected,kind,mode,dimension,dimension==null?DEFAULTS:coordinates.getOrDefault(dimension,DEFAULTS),dimension==null?PreviewFraming.DEFAULT:framings.getOrDefault(dimension,PreviewFraming.DEFAULT),placements.getOrDefault(selected,kind==Kind.BIOME || kind==Kind.REGION?PreviewIsolation.Placement.ISOLATED:PreviewIsolation.Placement.DIMENSION_SETTINGS),dimensions,problem);}
     View mode(Mode next){Objects.requireNonNull(next);if(!kind.meaningful(next))throw new IllegalArgumentException("No preview in that mode for this resource");mode=next;return view();}
     View dimension(String selected){if(!kind.context)throw new IllegalArgumentException("This resource has no dimension preview context");if(kind==Kind.DIMENSION && !Objects.equals(selected,this.selected))throw new IllegalArgumentException("The selected dimension is its own context");if(selected==null || !dimensionPaths.contains(selected))throw new IllegalArgumentException("Choose an existing top-level dimension JSON");dimension=selected;return view();}
     View configure(String seed,String x,String z){
         if(!kind.context || dimension==null)throw new IllegalArgumentException("Choose a dimension context first");var next=new Coordinates(integer64(seed,"seed"),integer32(x,"X coordinate"),integer32(z,"Z coordinate"));coordinates.put(dimension,next);return view();
+    }
+    View placement(PreviewIsolation.Placement next){
+        Objects.requireNonNull(next);if(!view().isolationAvailable() || dimension==null)throw new IllegalArgumentException("Choose a dimension and a biome or region preview first.");
+        placements.put(selected,next);return view();
     }
     private void requireFraming(Mode required){
         if(dimension==null || !view().framingAvailable() || mode!=required)throw new IllegalArgumentException("Choose a dimension and an applicable "+(required==Mode.TWO_D?"2D map":"3D terrain/noise")+" preview first.");
@@ -71,8 +80,10 @@ final class PreviewSession {
     }
     /** Observe an already-applied file operation; this method cannot mutate or authorize pack data. */
     void resourceApplied(PackWorkspace current,String source,String target){
-        if(owner!=current || !DimensionFields.dimension(source) || Objects.equals(source,target))return;
-        if(current.paths().contains(source) || target!=null && (!DimensionFields.dimension(target) || !current.paths().contains(target)))return;
+        if(owner!=current || source==null || Objects.equals(source,target))return;
+        if(current.paths().contains(source) || target!=null && (!Objects.equals(ResourceTypes.fileFamily(source),ResourceTypes.fileFamily(target)) || !current.paths().contains(target)))return;
+        var placement=placements.remove(source);if(target!=null && placement!=null)placements.put(target,placement);
+        if(!DimensionFields.dimension(source))return;
         var location=coordinates.remove(source);var framing=framings.remove(source);
         if(target!=null){if(location!=null)coordinates.put(target,location);if(framing!=null)framings.put(target,framing);}
         if(Objects.equals(dimension,source))dimension=target;
@@ -81,5 +92,5 @@ final class PreviewSession {
     private static String number(String value,String label){if(value==null)throw new IllegalArgumentException("Enter a whole "+label);String text=value.strip();if(text.isEmpty() || text.length()>20 || !text.matches("-?[0-9]+"))throw new IllegalArgumentException("Use a signed whole "+label);return text;}
     private static long integer64(String value,String label){try{return Long.parseLong(number(value,label));}catch(NumberFormatException invalid){throw new IllegalArgumentException("Use a signed 64-bit "+label);}}
     private static int integer32(String value,String label){long parsed=integer64(value,label);if(parsed<Integer.MIN_VALUE || parsed>Integer.MAX_VALUE)throw new IllegalArgumentException("Use a signed 32-bit "+label);return (int)parsed;}
-    void clear(){owner=null;resources=-1;selected=dimension=null;kind=Kind.OTHER;mode=Mode.TWO_D;dimensions=new ReferenceChoices.Catalog(List.of());dimensionPaths=Set.of();problem=null;coordinates.clear();framings.clear();}
+    void clear(){owner=null;resources=-1;selected=dimension=null;kind=Kind.OTHER;mode=Mode.TWO_D;dimensions=new ReferenceChoices.Catalog(List.of());dimensionPaths=Set.of();problem=null;coordinates.clear();framings.clear();placements.clear();}
 }
