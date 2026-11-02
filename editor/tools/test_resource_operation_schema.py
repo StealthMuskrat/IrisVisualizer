@@ -62,7 +62,7 @@ assert values['IrisDimension.hydrology.implicit.3'].endswith('|dirt')
 assert values['IrisSurfaceRiverBedConfig.paddingPalette.implicit.count'] == '2'
 assert values['IrisDimension.upperDimension'] == 'sentinel-ref:dimensions|none'
 assert values['IrisStructurePlacement.structures'] == 'list:ref:structures'
-assert values['IrisStructurePlacement.caveBiomes'] == 'list:guard:biomes'
+assert values['IrisStructurePlacement.caveBiomes'] == 'list:cave-match:biomes'
 assert values['IrisSubterrainFeature.allowedRegions'] == 'list:exact-key:regions'
 assert values['IrisFloatingChildBiomes.carving'] == 'dual-carving:biomes'
 assert values['IrisDepositGenerator.includedBiomes'] == 'list:dual-deposit:biomes'
@@ -129,4 +129,12 @@ with tempfile.TemporaryDirectory(prefix='iris-operation-schema-') as directory:
     derivative_source=fixture/'IrisBiomeDerivatives.java'
     derivative_source.write_text(sources['IrisBiomeDerivatives'].replace('String trimmed = key.trim();','String trimmed = key.toLowerCase();'))
     assert extract(fixture)[1]['generation/biome/IrisBiomeDerivatives.java'] != manifest['sources']['generation/biome/IrisBiomeDerivatives.java']
+    cave_source=fixture/'StructureCaveAnchorResolver.java'
+    assert 'normalizedActual.endsWith(":" + normalizedAllowed)' in sources['StructureCaveAnchorResolver']
+    assert 'normalizedAllowed.endsWith(":" + normalizedActual)' in sources['StructureCaveAnchorResolver']
+    assert 'StructureCaveAnchorResolver.resolve(' in sources['IrisStructureLocator']
+    assert 'default IrisBiome getCaveOrMantleBiome(' in sources['Engine']
+    assert 'return Engine.super.getCaveOrMantleBiome(x, y, z);' in sources['IrisEngine']
+    cave_source.write_text(sources['StructureCaveAnchorResolver'].replace('normalizedActual.equals(normalizedAllowed)','normalizedActual.startsWith(normalizedAllowed)'))
+    assert extract(fixture)[1]['structure/placement/StructureCaveAnchorResolver.java'] != manifest['sources']['structure/placement/StructureCaveAnchorResolver.java']
 print('PASS: ten-target/fifteen-owner/typed-snippet inherited/nested resource-operation schema regeneration, nonreference/unsupported classifications, inherited field/reference/default/enum drift and exact loader evidence')

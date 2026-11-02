@@ -155,7 +155,7 @@ Serialized instance fields in the shared pinned JSON model graph, including inhe
 | treeSize | 2 | 0 | 0 | 2 | 0 |
 
 Totals: fields=1462, generation=1237, implemented=1237, read-only=196, unclassified=29, missingPolicies=0.
-Source scope: 150 class models, 149 nonempty field groups, 240 pinned source files.
+Source scope: 150 class models, 149 nonempty field groups, 244 pinned source files.
 
 ## jigsawConnector
 

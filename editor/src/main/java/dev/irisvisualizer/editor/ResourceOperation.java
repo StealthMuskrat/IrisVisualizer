@@ -71,11 +71,12 @@ final class ResourceOperation {
         return SCHEMA.getProperty("owner."+family);
     }
     static String ownerDescriptor(String path){String metadata=SCHEMA.getProperty("metadata."+path);if(metadata!=null)return metadata;String model=ownerModel(path);return model==null?null:"object:"+model;}
-    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Canonical exact region/deposit biome filters and unambiguous carving fallback links are maintained; ambiguous derivative identities remain blocked. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
+    static String scopeDescription(){return "Current closed scope: ten editable JSON families plus typed read-only loot, spawner, entity, marker, modification and annotated snippet owners. The additional families remain read-only except for required typed-reference maintenance. Unknown owners/fields, unsupported shapes, missing/cyclic/deep snippets, unresolved defaults and uncertified runtime comparisons block operations. Canonical region/deposit filters, normalized local cave-biome selectors and unambiguous carving fallback links are maintained; ambiguous identities and affected qualified cave lookups remain blocked. Categorical targets require unambiguous image-map applications. Apply changes memory and clears acknowledged applied-edit history; Save independently checks and publishes files, then removes old paths.";}
     static void check(BooleanSupplier cancelled){if(cancelled.getAsBoolean() || Thread.currentThread().isInterrupted())throw new CancellationException("Resource operation review cancelled");}
     private static byte[] copy(byte[] owned,BooleanSupplier cancelled){var bytes=new byte[owned.length];for(int i=0;i<bytes.length;i+=65536){check(cancelled);System.arraycopy(owned,i,bytes,i,Math.min(65536,bytes.length-i));}check(cancelled);return bytes;}
     private record Rewrite(JsonStructure.Node node,String value){}
     private record ReservedKey(String path,String pointer,String family){}
+    private record CaveComparison(Reference reference,String compatibilityKey,String compatibilityResolved){}
     private static final class Scan {
         final Source source;final BooleanSupplier cancelled;final Resolver resolver;final List<Reference> refs=new ArrayList<>();final List<Issue> issues=new ArrayList<>();final Map<String,JsonStructure.Snapshot> documents=new TreeMap<>();final Map<String,List<Rewrite>> rewrites=new TreeMap<>();final Map<String,Set<String>> imageMapUses=new TreeMap<>();final List<Reference> categoricalBiomes=new ArrayList<>();final Map<String,Set<String>> snippetEdges=new TreeMap<>();final Set<Reference> exactComparisons=new HashSet<>();final List<ReservedKey> reservedKeys=new ArrayList<>();final Set<String> carvingIds=new HashSet<>();int omitted,inspected,snippetLinks,symbolicCharacters;boolean incompleteCarvingIds;
         Scan(Source source,BooleanSupplier cancelled){
@@ -244,6 +245,58 @@ final class ResourceOperation {
                 if(depositDerivativeCollisions.contains("minecraft:"+reference.key()) || depositDerivativeCollisions.contains(replacement))issue(reference.path(),reference.pointer(),"Deposit selector also has an existing or replacement derivative identity; rewriting it could change biome filtering. Use an unambiguous selector before this operation.");
             }
         }
+        final List<CaveComparison> caveComparisons=new ArrayList<>();
+        void caveBiome(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer){
+            if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Cave-biome comparison is not a plain string.");return;}
+            if(!affected("biomes"))return;
+            String value=string(document,node);if(value.isBlank())return;
+            int first=0,last=value.length();while(first<last && value.charAt(first)<=0x20)first++;while(last>first && value.charAt(last-1)<=0x20)last--;
+            String body=value.substring(first,last);if(body.isEmpty())return;
+            int colon=body.lastIndexOf(':');String namespace=colon<0?"":body.substring(0,colon+1),rawKey=body.substring(colon+1);
+            // Single-letter prefixes can be Windows drive-relative paths. Unusual namespaces
+            // and Unicode case folding remain guarded rather than borrowing local-key meaning.
+            if(!namespace.isEmpty() && !namespace.matches("[A-Za-z0-9_.-]{2,}:")){
+                issue(path,pointer,"Cave-biome namespace is outside certified local comparison/lookup rules; Windows drive-like and compound prefixes remain guarded.");return;
+            }
+            if(!ResourceTypes.referenceKey(rawKey) || !rawKey.matches("[A-Za-z0-9_./-]+")){
+                issue(path,pointer,"Cave-biome key is outside certified ASCII comparison/lookup rules.");return;
+            }
+            if(!namespace.isEmpty()){
+                String base=namespace.substring(0,namespace.length()-1);
+                if(base.equalsIgnoreCase(key(source.plan.source())+".json") || source.plan.target()!=null && base.equalsIgnoreCase(key(source.plan.target())+".json"))issue(path,pointer,"Qualified cave-biome compatibility lookup could depend on an affected Windows base file; operation blocked.");
+            }
+            String normalized=rawKey.toLowerCase(Locale.ROOT);int before=refs.size();
+            reference(path,document,node,pointer,"biomes",normalized,false,value.substring(0,first)+namespace,value.substring(last));
+            if(refs.size()>before){
+                if(!namespace.isEmpty() && refs.getLast().replacement()!=null)issue(path,pointer,"Qualified cave-biome matching and its Windows compatibility lookup cannot both be maintained confidently. Choose a canonical local key before this operation.");
+                // Native content-gate reporting also loads the original untrimmed string.
+                // Qualified lookup strings stay unchanged; affected forms remain guarded above.
+                String compatibilityKey=first==0 && last==value.length() && namespace.isEmpty()?rawKey:null;
+                caveComparisons.add(new CaveComparison(refs.getLast(),compatibilityKey,compatibilityKey==null?null:resolver.resolve("biomes",compatibilityKey)));
+            }
+        }
+        void checkCaveComparisons(Resolver nextResolver){
+            if(caveComparisons.isEmpty())return;
+            var actualKeys=new HashSet<String>();actualKeys.add(key(source.plan.source()).toLowerCase(Locale.ROOT));
+            for(var ref:refs){check(cancelled);if(source.plan.source().equals(ref.resolved()))actualKeys.add(ref.key().trim().toLowerCase(Locale.ROOT));}
+            for(var entry:caveComparisons){check(cancelled);if(source.plan.source().equals(entry.compatibilityResolved()))actualKeys.add(entry.compatibilityKey().toLowerCase(Locale.ROOT));}
+            String replacement=source.plan.target()==null?null:key(source.plan.target()).toLowerCase(Locale.ROOT);
+            for(var entry:caveComparisons){
+                check(cancelled);var ref=entry.reference();boolean beforeMatches=actualKeys.contains(ref.key());
+                if(source.plan.mode()==Mode.DELETE){
+                    if(beforeMatches || source.plan.source().equals(entry.compatibilityResolved()))issue(ref.path(),ref.pointer(),"Resource is used by a cave-biome comparison or compatibility lookup; remove or redirect it before deleting.");
+                    continue;
+                }
+                String after=ref.replacement()==null?ref.key():ref.replacement().toLowerCase(Locale.ROOT);
+                boolean afterMatches=replacement.equals(after);
+                if(afterMatches?(!beforeMatches || actualKeys.size()!=1):beforeMatches)issue(ref.path(),ref.pointer(),"Operation would change cave-biome matching for a canonical or requested loader key; dotted/unequal aliases and newly captured comparisons remain blocked.");
+                if(entry.compatibilityKey()!=null){
+                    String expected=source.plan.source().equals(entry.compatibilityResolved())?source.plan.target():entry.compatibilityResolved();
+                    String next=nextResolver.resolve("biomes",ref.replacement()==null?entry.compatibilityKey():ref.replacement());
+                    if(!Objects.equals(next,expected))issue(ref.path(),ref.pointer(),"Operation would change the original cave-biome compatibility lookup, including case-sensitive dotted fallback or a missing name.");
+                }
+            }
+        }
         void dualCarving(String path,JsonStructure.Snapshot document,JsonStructure.Node node,String pointer){
             if(node.kind()!=JsonStructure.Kind.STRING){issue(path,pointer,"Carving entry-or-biome reference is not a plain string.");return;}
             if(!affected("biomes") || incompleteCarvingIds)return;
@@ -341,6 +394,7 @@ final class ResourceOperation {
             if(type.startsWith("exact-key:")){exactKey(path,document,node,pointer,type.substring(10));return;}
             if(type.equals("dual-carving:biomes")){dualCarving(path,document,node,pointer);return;}
             if(type.equals("dual-deposit:biomes")){deposit(path,document,node,pointer);return;}
+            if(type.equals("cave-match:biomes")){caveBiome(path,document,node,pointer);return;}
             if(type.startsWith("guard:")){
                 if(node.kind()!=JsonStructure.Kind.STRING)issue(path,pointer,"Runtime-comparison reference is not a plain string.");
                 else if(affected(type.substring(6)) && !string(document,node).isBlank())issue(path,pointer,"Runtime comparison, prefix or dual-domain reference is not certified for this resource family; operation blocked.");
@@ -404,7 +458,7 @@ final class ResourceOperation {
             }
             scan.checkSnippetGraph();scan.checkCategoricalComparisons();scan.checkExactComparisons();scan.checkDepositComparisons();
             var resulting=new TreeSet<>(source.paths);resulting.remove(source.plan.source());if(source.plan.target()!=null)resulting.add(source.plan.target());
-            var nextResolver=new Resolver(resulting,cancelled);scan.checkReservedKeys(nextResolver);if(source.plan.mode()!=Mode.DELETE)for(var reference:scan.refs){String expected=Objects.equals(reference.resolved(),source.plan.source())?source.plan.target():reference.resolved();String next=nextResolver.resolve(reference.family(),reference.replacement()==null?reference.key():reference.replacement());if(!Objects.equals(next,expected))scan.issue(reference.path(),reference.pointer(),"Operation would change another reference's resolution, including an unresolved or dotted-prefix alias.");}
+            var nextResolver=new Resolver(resulting,cancelled);scan.checkReservedKeys(nextResolver);scan.checkCaveComparisons(nextResolver);if(source.plan.mode()!=Mode.DELETE)for(var reference:scan.refs){String expected=Objects.equals(reference.resolved(),source.plan.source())?source.plan.target():reference.resolved();String next=nextResolver.resolve(reference.family(),reference.replacement()==null?reference.key():reference.replacement());if(!Objects.equals(next,expected))scan.issue(reference.path(),reference.pointer(),"Operation would change another reference's resolution, including an unresolved or dotted-prefix alias.");}
         }
         var replacements=new TreeMap<String,byte[]>();if(scan.issues.isEmpty() && scan.omitted==0)for(var row:scan.rewrites.entrySet()){
             check(cancelled);var document=scan.documents.get(row.getKey());var text=new StringBuilder(document.source());var spans=new ArrayList<>(row.getValue());spans.sort(Comparator.comparingInt((Rewrite rewrite)->rewrite.node().start()).reversed());for(var rewrite:spans)text.replace(rewrite.node().start(),rewrite.node().end(),LosslessJson.quote(rewrite.value()));byte[] bytes=text.toString().getBytes(StandardCharsets.UTF_8);if(bytes.length>MAX_JSON_BYTES){scan.issue(row.getKey(),"","Rewritten JSON would exceed the 1 MB supported-source limit.");break;}new LosslessJson(bytes);replacements.put(row.getKey(),bytes);

@@ -241,7 +241,11 @@
     "studio/StudioMode.java": "35417525ae457530785e3540f56839a18999903063f28f3a733d0c35d754b634",
     "generation/subterrain/SubterrainPlanner.java": "97f99ddacf3acb14dfd10f549a53cf3468e1ae8eff6483b93404eb134344460e",
     "generation/biome/TopShapeMode.java": "9c2a129fe10c42236ac9824a8716aa18bde00c02bf2c850689f3451ebd0884ae",
-    "generation/biome/IrisBiomeDerivatives.java": "89b026f18e56e7d9570a5727bd5813cc32d397b25b9c2037bcfeaf1458ace8ea"
+    "generation/biome/IrisBiomeDerivatives.java": "89b026f18e56e7d9570a5727bd5813cc32d397b25b9c2037bcfeaf1458ace8ea",
+    "structure/placement/StructureCaveAnchorResolver.java": "e3b1ca03a4f3890cccdcafd292dd55fd14f66006ddadd30e35d5462e5d97a906",
+    "structure/placement/IrisStructureLocator.java": "999bab1891a169ec1be18174fbf2ffd46031ff2ec4676bd873fec7cf9e04e86a",
+    "generation/runtime/Engine.java": "41f671246c40e538791b26e69c43538a07c10e07b28a655ae034eaf7b53a6019",
+    "generation/runtime/IrisEngine.java": "986cdf67d7d024797915238458fb503a531e74c6dee81460f1aae498d56677b5"
   },
   "volmlibRevision": "210705c5ab1321dc74b86b48457fd6d5e0452944"
 }

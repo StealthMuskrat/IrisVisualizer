@@ -25,7 +25,12 @@ public final class StructurePlacements {
     private static void limit(int size,boolean adding) { if (size>MAXIMUM_ENTRIES || adding && size>=MAXIMUM_ENTRIES) throw new IllegalArgumentException("Structure placement lists have a 64-entry editor limit"); }
     public static String prefix() { return "structurePlacement#"; }
     public static String prefix(int index) { if (index<0) throw new IllegalArgumentException("Select a placement");return prefix()+index+"."; }
-    public static String help(String field) { return DATA.getProperty(field+".description",""); }
+    public static String help(String field) {
+        // The pinned annotation mentions prefixes, but the native resolver compares complete
+        // normalized load keys and namespace suffixes. Keep the editor's guidance accurate.
+        if("caveBiomes".equals(field))return "Optional cave-biome allowlist for cave anchors. An empty list accepts any resolved cave biome. Native matching trims whitespace, ignores case and accepts namespace-qualified names; partial prefixes do not match.";
+        return DATA.getProperty(field+".description","");
+    }
     public static String defaultToken(String field) { String value=DATA.getProperty(field+".default");if (value==null) throw new IllegalArgumentException("Unsupported placement field");return value; }
     public static List<String> choices(String field) { if (field==null || !ENUMS.contains(field)) throw new IllegalArgumentException("Unsupported placement enum");return List.of(DATA.getProperty(field+".choices").split(",")); }
     public static String choiceHelp(String field,String choice) { return DATA.getProperty(field+"."+choice+".description",""); }

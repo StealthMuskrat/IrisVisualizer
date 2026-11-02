@@ -33,7 +33,7 @@ OVERRIDES = {
  'IrisSubterrainFeature.allowedRegions':'list:exact-key:regions',
  'IrisDepositGenerator.includedBiomes':'list:dual-deposit:biomes',
  'IrisDepositGenerator.excludedBiomes':'list:dual-deposit:biomes',
- 'IrisStructurePlacement.caveBiomes':'list:guard:biomes',
+ 'IrisStructurePlacement.caveBiomes':'list:cave-match:biomes',
  'IrisObjectPlacement.allowedCollisions':'list:guard:objects',
  'IrisObjectPlacement.forbiddenCollisions':'list:guard:objects',
 }
@@ -73,7 +73,7 @@ def descriptor(owner,field,texts):
 def families(kind,potential):
  while kind.startswith(('list:','map:')):kind=kind.split(':',1)[1]
  if kind=='block-ref':return {'blocks'}
- if kind.startswith(('ref:','fallback-ref:','sentinel-ref:','reserved-ref:','trimmed-ref:','exact-key:','dual-carving:','dual-deposit:')):
+ if kind.startswith(('ref:','fallback-ref:','sentinel-ref:','reserved-ref:','trimmed-ref:','exact-key:','dual-carving:','dual-deposit:','cave-match:')):
   return {kind.split(':',1)[1].split('|',1)[0]}
  if kind.startswith(('guard:','context-')):return set(kind.split(':',1)[1].split(','))
  if kind.startswith('object:'):return potential[kind[7:]]
@@ -189,7 +189,7 @@ def extract(root):
    if kind.startswith('fallback-ref:') and not value.strip():value=kind.split('|',1)[1]
    if not value or (kind.startswith('sentinel-ref:') and value.lower()==kind.split('|',1)[1]):return []
    return [(family,pointer,value)]
-  if kind.startswith(('context-','guard:','exact-key:','dual-carving:','dual-deposit:')) and value:raise UnresolvedDefault('Context-dependent default')
+  if kind.startswith(('context-','guard:','exact-key:','dual-carving:','dual-deposit:','cave-match:')) and value:raise UnresolvedDefault('Context-dependent default')
   if kind.startswith('unsupported:'):raise UnresolvedDefault('Unsupported default type')
   return []
  for name,fs in definitions.items():
