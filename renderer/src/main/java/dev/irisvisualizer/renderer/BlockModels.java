@@ -54,7 +54,7 @@ public final class BlockModels {
                 }
                 parts.add(new ModelPlan.Part(new ModelPlan.Source(ClientAssetSnapshot.Kind.BLOCKSTATE,state.block(),group.pointer()),group.sourceIndex(),choices,Math.toIntExact(total)));
             }
-            work.check();var result=new ModelPlan(state,parts,List.of());work.check();return result;
-        }catch(ModelFields.Failure unsupported) { work.check();var result=new ModelPlan(state,List.of(),List.of(unsupported.problem));work.check();return result; }
+            work.check();var result=new ModelPlan(assets.receipt(),state,parts,List.of());work.check();return result;
+        }catch(ModelFields.Failure unsupported) { work.check();var result=new ModelPlan(assets.receipt(),state,List.of(),List.of(unsupported.problem));work.check();return result; }
     }
 }

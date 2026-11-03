@@ -2,7 +2,7 @@
 
 Java 25 library, separate from the editor and generation engine. UI implementation and automated validation finished before this stage; see [UI-VALIDATION.md](../docs/UI-VALIDATION.md).
 
-The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, and bounded blockstate/model resolution for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
+The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, bounded blockstate/model resolution and a CPU geometry baker for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
 
 Build sources with a Java 25 JDK:
 
@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its twelve main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its seventeen main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -39,14 +39,22 @@ The resolver handles literal variants and multipart predicates, including nested
 
 Model parents are traversed with cycle/depth checks. Ancestor geometry uses descendant texture overrides and inherited ambient-occlusion settings. Each resolved element retains its declaring model/pointer. Texture-variable chains resolve against the complete inherited binding map, with cycle/missing-variable checks. String sprite declarations and the newer `sprite`/`force_translucent` material objects are supported. A referenced direct PNG must be captured; generated/atlas-only sprites remain unsupported.
 
-The plans retain X/Y/Z blockstate quarter turns and UV lock; element bounds and legacy or multi-axis rotations; optional face UVs/quarter turns/cull directions/tint indices; light emission and `shade_direction_override`. They are **unbaked** descriptions: absent UVs, transforms/rescale, culling, alpha/render-pass classification, tinting and lighting are not yet turned into vertices or pixels. Native render-shape, fluids and special block renderers still need integration.
+The plans retain X/Y/Z blockstate quarter turns and UV lock; element bounds and legacy or multi-axis rotations; optional face UVs/quarter turns/cull directions/tint indices; light emission and `shade_direction_override`. They remain **unbaked** descriptions; the separate geometry baker consumes supported transforms/UVs and retains the remaining visual metadata. Each plan now carries its captured client-archive receipt. Native render-shape, fluids and special block renderers still need integration.
 
 Missing, malformed, unsupported or over-budget assets produce a structured placeholder problem, retaining the original native state and publishing no partial multipart geometry. Cancellation propagates separately. Ambiguous variants, built-in models, unknown fields and explicit empty child geometry with a parent are guarded; the latter remains unresolved until native inheritance behavior is verified. No global cross-snapshot cache is used.
 
 Default per-resolution limits are 256 source assets, 8 MiB JSON, 262,144 parsed JSON nodes, parent depth 64, 4,096 declared/resolved elements, 24,576 declared/resolved faces, 4,096 dispatch cases, 1,024 choices, 16,384 texture declaration/overlay operations, and 4,096 condition nodes at depth 32. Individual model JSON is limited to 1 MiB. See [the supported format profile](FORMAT-PROFILE.md) for source references and boundaries. These limits do not confirm the combined native/world/mesh budget.
 
+## CPU geometry and packed buffers
+
+`GeometryBaker.bake(plan, nativeTickets, cancelled)` selects one model per part using supplied native-policy tickets and returns a `BlockMesh`. It bakes stable outward-wound quads, default/explicit UVs, face UV quarter turns, UV lock, element X/Y/Z rotations, blockstate rotations, normalized normals and local-block bounds. Cull directions receive dispatch rotations while original model-face labels remain available. Source geometry, dispatch choices, native state identity and asset provenance are retained.
+
+`MeshPacket` packs position XYZ, normal XYZ and sprite UV into eight floats per vertex, with four vertices/six indices per quad and separate immutable face/material/light/tint metadata. Its buffers are read-only heap views; GPU staging is not allocated. `requireAssets` checks the captured archive SHA/version before a later texture-binding stage can mix asset epochs. No neighbor faces are dropped and no world placement, tint, lighting or alpha pass is inferred.
+
+The baker withholds all partial output on unsupported geometry, invalid tickets or exceeded budgets. Rescaling, reversed element endpoints and UVs outside their source sprite are guarded pending pinned-client verification. Default limits are 1,024 parts, 4,096 selected elements, 24,576 quads and 16 MiB of packed arrays, local coordinates within ±8 blocks, origins within the corresponding model-coordinate range and element angles within ±360 degrees. These CPU limits do not confirm total heap/native/world/mesh memory. See [GEOMETRY.md](GEOMETRY.md) for the contract and deferred verification matrix.
+
 ## Still to implement
 
-Oriented geometry/UV baking, native weighted-choice seeding, tint/cutout/transparency/fluids and special render shapes, texture decoding/animation/atlas management, mesh and GPU lifetime/budgets, and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV comparison and guarded transform cases, native weighted-choice seeding, tint/cutout/transparency/fluids and special render shapes, texture decoding/animation/atlas management, world-mesh assembly/culling, GPU lifetime/budgets, and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.
