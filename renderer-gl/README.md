@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds fifteen Java sources to the 46-source CPU renderer. All 61 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds eighteen Java sources to the 51-source CPU renderer. All 69 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -39,6 +39,10 @@ A second shader draws placeholder markers as instanced magenta unit-cell wire bo
 Before drawing, the target becomes incomplete. Only a successful draw **and** host-state restoration marks it complete again. `textureId()` rejects an incomplete, retired or released target. Its returned GL texture name is borrowed: consumers must not retain/use it after a failed update or target retirement. A later UI integration must adopt only successful frames, using separate targets when it needs to retain an old frame atomically.
 
 The backend snapshots/restores the core state it changes: program, framebuffer/read/renderbuffer bindings, VAO/array/unpack buffers, texture/sampler unit zero, pixel unpack alignment/rows/skips, depth/cull/polygon/line state, color mask/blending at draw buffer zero, relevant enable flags, clip distances, and viewport/scissor/depth-range arrays where supported. It edits only its own texture/FBO/VAO objects. Other extension interactions and actual host-state isolation remain runtime validation requirements. Enter with a clean GL error state; errors are reported rather than silently consumed as success.
+
+## 2D map textures
+
+The [map rendering path](../renderer/MAPS.md) adds `GlMapUpload`, `GlMap` and `GlMapQueue` for CPU-colorized native terrain/biome/noise maps. Uploads charge source samples plus image immediately, expand GPU storage only at the first storage step, stream whole rows, restore host state at yields and expose only complete immutable textures. Latest-revision adoption leaves displayed caller-owned maps alone. Texture row zero uses V=0 for a later top-left image widget. This path adds no shader, native sampler, editor integration or readiness gate. Source and GPU charges follow the same device retirement/quarantine contract.
 
 ## Retirement and failure cleanup
 

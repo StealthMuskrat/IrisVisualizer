@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its forty-six main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its fifty-one main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -89,7 +89,7 @@ World inputs, prototypes, atlas payload and section arrays are checked together;
 
 ## Separate OpenGL backend
 
-The [OpenGL module](../renderer-gl/README.md) now adds fifteen LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 61 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
+The [OpenGL module](../renderer-gl/README.md) now adds eighteen LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 69 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
 
 The [incremental upload layer](../renderer-gl/UPLOADS.md) validates and transfers across explicit per-step byte/action/work limits with a cooperative time target. It charges paused CPU input, restores state at each yield, and permits exactly-once complete-scene adoption guarded by the application's latest revision. Synchronous upload delegates to the same state machine. Driver allocation/cleanup latency is not a hard frame-time guarantee.
 
@@ -99,8 +99,12 @@ This backend requires an externally owned GLFW OpenGL 3.3 core context. It is no
 
 `WorldLighting.capture` now detaches optional final native per-vertex RGB modulation, and the GPU upload selects a bounded 48-byte vertex layout when supplied. Simple lighting remains the initial default. The backend also culls actual geometry/marker section bounds against the current frustum, supports vertical cameras, batches consecutive transparent indices without reordering, and returns successful-frame submission counts. See [lighting and view contracts](../renderer-gl/LIGHTING-VIEW.md). These paths have compiled but have not run in a GL context.
 
+## Native 2D map rendering
+
+`MapSamples` now captures exact native terrain heights, biome identities/indices and finite noise values for a 512 × 512 default grid with explicit world-space sampling scale. `MapRaster` colorizes detached samples using stable scalar ramps or explicit native-palette colors, retaining original values for inspection and transparent empty samples. `MapView` provides display-only fit/pan/zoom and pixel hit testing. A bounded latest-request worker moves colorization off the UI thread. The GPU map layer streams whole rows under the existing upload budgets and transfers complete revision-checked immutable textures, with source payload held through retirement. See [MAPS.md](MAPS.md) for native input, lifecycle, numerical and deferred verification contracts. No engine sampler, editor integration or preview gate is enabled.
+
 ## Still to implement
 
-Native geometry/UV/texture comparison and guarded cases, native weighted-choice/visibility production, native tint production and optional native lighting production/validation, transparent intersection/OIT handling, fluids and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, full generation/scene integration and map/3D presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV/texture comparison and guarded cases, native weighted-choice/visibility production, native tint production and optional native lighting production/validation, transparent intersection/OIT handling, fluids and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, native map sampling adapters, full generation/scene integration and map/3D presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.

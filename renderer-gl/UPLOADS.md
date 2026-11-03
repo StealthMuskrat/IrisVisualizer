@@ -1,6 +1,6 @@
 # Incremental GPU upload and revision adoption
 
-Renderer implementation, 2026-11-03. The 46 CPU and 15 OpenGL Java sources compile with Java 25 against pinned LWJGL 3.4.1. No context, upload, draw, state-restoration, fence, timing or concurrency runtime test was executed for this batch. Renderer tests remain deferred until stage implementation is complete. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. The 51 CPU and 18 OpenGL Java sources compile with Java 25 against pinned LWJGL 3.4.1. No context, upload, draw, state-restoration, fence, timing or concurrency runtime test was executed for this batch. Renderer tests remain deferred until stage implementation is complete. Unsupported previews remain disabled.
 
 ## Resumable ownership
 

@@ -1,6 +1,6 @@
 # Native tint inputs and translucent ordering
 
-Renderer implementation, 2026-11-03. All 61 main Java sources compile with Java 25 against pinned LWJGL 3.4.1: 46 CPU sources and 15 OpenGL sources. No renderer tests, GL context, shader execution, framebuffer comparison or visible Windows validation have run. Tests remain deferred until renderer implementation is complete; unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 69 main Java sources compile with Java 25 against pinned LWJGL 3.4.1: 51 CPU sources and 18 OpenGL sources. No renderer tests, GL context, shader execution, framebuffer comparison or visible Windows validation have run. Tests remain deferred until renderer implementation is complete; unsupported previews remain disabled.
 
 ## Explicit native vertex colors
 

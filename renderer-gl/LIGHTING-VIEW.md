@@ -1,6 +1,6 @@
 # Lighting samples and view submission
 
-Renderer implementation, 2026-11-03. All 61 main Java sources compile with Java 25 and pinned LWJGL 3.4.1: 46 CPU and 15 OpenGL sources. No renderer tests, GL context, shader compilation, framebuffer comparison or visible Windows QA have run. Tests remain deferred until renderer implementation is complete. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 69 main Java sources compile with Java 25 and pinned LWJGL 3.4.1: 51 CPU and 18 OpenGL sources. No renderer tests, GL context, shader compilation, framebuffer comparison or visible Windows QA have run. Tests remain deferred until renderer implementation is complete. Unsupported previews remain disabled.
 
 ## Simple lighting and optional native samples
 
