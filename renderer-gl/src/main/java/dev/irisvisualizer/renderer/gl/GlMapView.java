@@ -39,6 +39,15 @@ public final class GlMapView implements AutoCloseable {
         if(view!=null&&(view.width()!=grid.width()||view.height()!=grid.height()))view=null;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
+    /** Consumes an admitted native map input; CPU admission precedes releasing its source hold. */
+    public long submit(RenderInput<MapRasterWorker.Request> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            current();var memory=device.memory().orElse(null);
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked native map input requires the same device coordinator");
+            return submit(source.value());
+        }finally { input.close(); }
+    }
     public long submit(MapSamples samples,MapRaster.Style style) { return submit(new MapRasterWorker.Request(samples,style)); }
     private void dimensions(int width,int height) {
         if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Map viewport exceeds device target bounds");

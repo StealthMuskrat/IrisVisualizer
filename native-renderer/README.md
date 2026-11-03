@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These eleven native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These twelve native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -103,3 +103,7 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 ## Streaming native visual producer handoff
 
 `NativeVisualInputs` visits a complete captured scene request under a borrowed native session and supplies actual original state, biome and position to an explicitly provided producer. Its detached edited request preserves the baseline mask, offsets, tint inputs and scene limits. [VISUAL-EDITS.md](../renderer/VISUAL-EDITS.md) describes streaming quads, complete replacement versus layering, packet/assignment-copy admission and producer/resource responsibilities. No fluid/special renderer factory is inferred; genuine native API compilation and actual native/GPU output remain unverified.
+
+## Admitted complete native capture
+
+`NativeCapture` now composes existing full-height native volume capture with deterministic or weighted scene inputs, optional explicit tint and native geometry edits. Terrain/biome/noise/generator/expression captures return owned map-worker requests; biome display colors may be keyed by exact native identity. [NATIVE-CAPTURE.md](../renderer/NATIVE-CAPTURE.md) describes phase reservations, detached `RenderInput` ownership and consuming world/map handoffs. The caller still freezes/owns the native session and external generation/chunk/provider memory. Genuine Windows API compilation and actual native/GPU fidelity remain pending; no unsupported preview is enabled.

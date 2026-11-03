@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its seventy-two main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its seventy-three main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -137,7 +137,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its eleven native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 101 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its twelve native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 102 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
@@ -145,7 +145,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native hidden-face masks and scene capture
 
-`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Eleven native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
+`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Twelve native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
 
 ## Native model offsets
 
@@ -180,3 +180,7 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 ## Picking and standalone worker admission
 
 [Picking and standalone preparation](PICKING-MEMORY.md) now optionally share the renderer coordinator: index build/source lifetime and animated alpha-query pages, queued pointer requests, visual completion holds and managed standalone scene/cache output. Visual-to-scene handoff admits the destination before closing its source hold. Scene invalidation and revision-specific transfer now reject stale adoption explicitly. Native/external scratch and whole-application profiling remain pending.
+
+## Admitted native capture to renderer queues
+
+[NativeCapture and RenderInput](NATIVE-CAPTURE.md) now carry admitted native volume/model/visibility and terrain/biome/noise capture into the CPU world/map queues. Owned input retains its byte charge until destination admission, with exact coordinator checks and consuming failure semantics. Biome display colors can be keyed by exact native identity and ordered after capture. Native session ownership, genuine Windows compilation/fidelity and unsupported preview guards remain explicit.

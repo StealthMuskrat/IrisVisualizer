@@ -46,6 +46,14 @@ public final class MapRasterWorker implements AutoCloseable {
             if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;job.admission.close();status=failed(next,request.samples().context(),failure); } }return next;
         }
     }
+    /** Consumes a detached native map input after destination admission or rejection. */
+    public long submit(RenderInput<Request> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked native map input requires the same map coordinator");
+            return submit(source.value());
+        }finally { input.close(); }
+    }
     private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
     public Status status() { synchronized(lock) { return status; } }

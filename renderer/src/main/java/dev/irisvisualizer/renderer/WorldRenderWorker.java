@@ -50,14 +50,14 @@ public final class WorldRenderWorker implements AutoCloseable {
         Job(long revision,Submission request) { this.revision=revision;this.request=request;admissionBytes=request.workingBytes(); }
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
-    private final Object lock=new Object();private final WorldSectionCache cache;private final RenderMemory.Account admission;private final ExecutorService executor;private final long workingBytes;
+    private final Object lock=new Object();private final WorldSectionCache cache;private final RenderMemory.Account admission;private final RenderMemory memory;private final ExecutorService executor;private final long workingBytes;
     private long revision;private boolean closed,scheduled;private Job active,pending;private WorldScene.Result completed;private WorldTint completedTint;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());
     public WorldRenderWorker() { this(1024L*1024*1024); }
     /** Aggregate admission includes active/cache CPU payload and one frozen pending input. */
     public WorldRenderWorker(long workingBytes) { this(workingBytes,null); }
     public WorldRenderWorker(long workingBytes,RenderMemory memory) {
-        if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Render worker working limit exceeds 1 GiB");this.workingBytes=workingBytes;
+        if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Render worker working limit exceeds 1 GiB");this.workingBytes=workingBytes;this.memory=memory;
         admission=memory==null?null:memory.open("World preparation and scene cache");
         try {
             cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);
@@ -74,6 +74,20 @@ public final class WorldRenderWorker implements AutoCloseable {
     public Optional<RenderMemory.Owner> memoryUsage() { synchronized(lock) { return admission==null?Optional.empty():Optional.of(admission.stats()); } }
     public long submit(Request request) { return submit(new Submission(Objects.requireNonNull(request),null)); }
     public long submit(ModelRequest request) { return submit(new Submission(null,Objects.requireNonNull(request))); }
+    /** Consumes detached native input on every outcome; source admission survives destination preflight. */
+    public long submit(RenderInput<Request> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) { requireCoordinator(source.admission());return submit(source.value()); }
+        finally { input.close(); }
+    }
+    public long submitModel(RenderInput<ModelRequest> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) { requireCoordinator(source.admission());return submit(source.value()); }
+        finally { input.close(); }
+    }
+    private void requireCoordinator(RenderMemory.Hold source) {
+        if(source.tracked()&&(admission==null||!source.belongsTo(memory)))throw new IllegalArgumentException("Tracked native input requires the same managed world coordinator");
+    }
     private long submit(Submission request) {
         Objects.requireNonNull(request);synchronized(lock) {
             requireOpen();long running=active==null?cache.stats().knownPayloadBytes():active.request.workingBytes();

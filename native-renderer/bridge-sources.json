@@ -7,6 +7,10 @@
   "platform": "windows-x64",
   "files": [
     {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
+      "sha256": "f8674dc852f77f48e7176244da7cdfb68a016a5f70e6e339bfdbab69d4c6fe22"
+    },
+    {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",
       "sha256": "3403a7b44841e05f6d52478c1c13206282265cee9e89dae041595dd7c6ce7a35"
     },

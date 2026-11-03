@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 72-source CPU renderer. All 101 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 73-source CPU renderer. All 102 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -111,3 +111,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Connected preparation holds
 
 `GlMapView` and `GlWorldView` now pass a participating device coordinator to their map, atlas and camera-order workers. CPU completions keep shared memory holds through transfer; the views scope those owners across upload/draw-plan admission and rejection. The GPU journal is admitted before the CPU hold closes, so overlap is conservative and never creates an uncharged gap. See [WORKER-MEMORY.md](../renderer/WORKER-MEMORY.md).
+
+## Owned native map inputs
+
+`GlMapView.submit(RenderInput<MapRasterWorker.Request>)` now consumes an [admitted detached native input](../renderer/NATIVE-CAPTURE.md), checks the device coordinator and admits CPU colorization before dropping its source hold. Closed/foreign input and shared pressure do not bypass normal revision, upload, image lifetime or preview gates.
