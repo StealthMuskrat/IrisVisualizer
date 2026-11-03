@@ -13,10 +13,11 @@ public final class GlReadback implements AutoCloseable {
         public Limits { if(pixelBytes<0||pixelBytes>64L*1024*1024||workingBytes<0||workingBytes>128L*1024*1024)throw new IllegalArgumentException("Readback limits exceed their bounded payload"); }
     }
     /** Detached top-left RGBA pixels and the exact original image receipt; no GL/native owner remains. */
-    public record Pixels(Optional<GlFrame.Info> world,Optional<GlMapFrame.Info> map,RgbaImage image) {
+    public record Pixels(Optional<GlFrame.Info> world,Optional<GlMapFrame.Info> map,Optional<GlNoiseFrame.Info> noise,RgbaImage image) {
+        public Pixels(Optional<GlFrame.Info> world,Optional<GlMapFrame.Info> map,RgbaImage image) { this(world,map,Optional.empty(),image); }
         public Pixels {
-            Objects.requireNonNull(world);Objects.requireNonNull(map);Objects.requireNonNull(image);if(world.isPresent()==map.isPresent())throw new IllegalArgumentException("Readback requires exactly one completed image receipt");
-            int width=world.isPresent()?world.orElseThrow().width():map.orElseThrow().width(),height=world.isPresent()?world.orElseThrow().height():map.orElseThrow().height();
+            Objects.requireNonNull(world);Objects.requireNonNull(map);Objects.requireNonNull(noise);Objects.requireNonNull(image);if((world.isPresent()?1:0)+(map.isPresent()?1:0)+(noise.isPresent()?1:0)!=1)throw new IllegalArgumentException("Readback requires exactly one completed image receipt");
+            int width=world.isPresent()?world.orElseThrow().width():map.isPresent()?map.orElseThrow().width():noise.orElseThrow().width(),height=world.isPresent()?world.orElseThrow().height():map.isPresent()?map.orElseThrow().height():noise.orElseThrow().height();
             if(image.width()!=width||image.height()!=height)throw new IllegalArgumentException("Readback dimensions differ from their image receipt");
         }
     }
@@ -25,6 +26,7 @@ public final class GlReadback implements AutoCloseable {
     public record Step(Progress progress,int readBytes,int copiedBytes,long storageBytes,int actions,int workUnits,long elapsedNanoseconds) {}
     private interface Source extends AutoCloseable {
         GlTarget target();GlDevice.Allocation journal();Optional<GlFrame.Info> world();Optional<GlMapFrame.Info> map();boolean closed();void close();
+        default Optional<GlNoiseFrame.Info> noise() { return Optional.empty(); }
     }
     private record WorldSource(GlFrame frame) implements Source {
         public GlTarget target() { return frame.readbackTarget(); }public GlDevice.Allocation journal() { return frame.readbackJournal(); }
@@ -36,13 +38,23 @@ public final class GlReadback implements AutoCloseable {
         public Optional<GlFrame.Info> world() { return Optional.empty(); }public Optional<GlMapFrame.Info> map() { return Optional.of(frame.info()); }
         public boolean closed() { return frame.closed(); }public void close() { frame.close(); }
     }
-    private final GlDevice device;private final GlTarget target;private final int width,height,rowBytes;private final long bytes;private final Optional<GlFrame.Info> world;private final Optional<GlMapFrame.Info> map;
+    private record NoiseSource(GlNoiseFrame frame) implements Source {
+        public GlTarget target() { return frame.readbackTarget(); }public GlDevice.Allocation journal() { return frame.readbackJournal(); }
+        public Optional<GlFrame.Info> world() { return Optional.empty(); }public Optional<GlMapFrame.Info> map() { return Optional.empty(); }public Optional<GlNoiseFrame.Info> noise() { return Optional.of(frame.info()); }
+        public boolean closed() { return frame.closed(); }public void close() { frame.close(); }
+    }
+    private final GlDevice device;private final GlTarget target;private final int width,height,rowBytes;private final long bytes;private final Optional<GlFrame.Info> world;private final Optional<GlMapFrame.Info> map;private final Optional<GlNoiseFrame.Info> noise;
     private Source source;private GlDevice.Allocation work,output;private RgbaImage.Builder builder;private Pixels completed;private Phase phase=Phase.STORAGE;private int gpuRows,cpuRows;
     private GlReadback(Source source,GlDevice.Allocation work,GlDevice.Allocation output,RgbaImage.Builder builder) {
-        this.source=source;target=source.target();device=target.device;width=target.width();height=target.height();rowBytes=width*4;bytes=(long)rowBytes*height;world=source.world();map=source.map();this.work=work;this.output=output;this.builder=builder;
+        this.source=source;target=source.target();device=target.device;width=target.width();height=target.height();rowBytes=width*4;bytes=(long)rowBytes*height;world=source.world();map=source.map();noise=source.noise();this.work=work;this.output=output;this.builder=builder;
     }
     public static GlReadback begin(GlFrame frame) { return begin(frame,Limits.DEFAULT); }
     public static GlReadback begin(GlMapFrame frame) { return begin(frame,Limits.DEFAULT); }
+    public static GlReadback begin(GlNoiseFrame frame) { return begin(frame,Limits.DEFAULT); }
+    public static GlReadback begin(GlNoiseFrame frame,Limits limits) {
+        Objects.requireNonNull(frame);Objects.requireNonNull(limits);var owner=frame.retain();
+        try { return begin(new NoiseSource(owner),limits); }catch(RuntimeException|Error failure) { try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
+    }
     public static GlReadback begin(GlFrame frame,Limits limits) {
         Objects.requireNonNull(frame);Objects.requireNonNull(limits);var owner=frame.retain();
         try { return begin(new WorldSource(owner),limits); }catch(RuntimeException|Error failure) { try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
@@ -111,7 +123,7 @@ public final class GlReadback implements AutoCloseable {
             }
         }finally { if(state!=null)state.close(); }
         if(finish) {
-            check(cancelled);var image=builder.finish();var result=new Pixels(world,map,image);device.moveCpu(work,output,bytes,image);releaseWork();check(cancelled);completed=result;phase=Phase.READY;
+            check(cancelled);var image=builder.finish();var result=new Pixels(world,map,noise,image);device.moveCpu(work,output,bytes,image);releaseWork();check(cancelled);completed=result;phase=Phase.READY;
         }
         return new Step(progress(),readNow,copiedNow,storage,actions,units,System.nanoTime()-start);
     }

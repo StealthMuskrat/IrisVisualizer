@@ -28,6 +28,7 @@ public final class GlReadbackQueue implements AutoCloseable {
     }
     public boolean submit(long next,GlFrame frame) { Objects.requireNonNull(frame);return submit(next,()->GlReadback.begin(frame,limits)); }
     public boolean submit(long next,GlMapFrame frame) { Objects.requireNonNull(frame);return submit(next,()->GlReadback.begin(frame,limits)); }
+    public boolean submit(long next,GlNoiseFrame frame) { Objects.requireNonNull(frame);return submit(next,()->GlReadback.begin(frame,limits)); }
     private boolean submit(long next,Supplier<GlReadback> begin) {
         current();if(next<1)throw new IllegalArgumentException("Invalid readback revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;if(next>revision)invalidate(next);
         try {

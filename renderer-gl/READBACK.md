@@ -30,7 +30,7 @@ Closing/cancelling a job before readiness discards partial CPU output and retire
 
 ## Latest-revision queue
 
-`GlReadbackQueue(device, limits)` owns at most one job, including its untaken ready output. `submit(revision, frame)` supports both world and map frames, rejects stale/duplicate submissions and retains only accepted source images. `invalidate(revision)` immediately cancels queue-owned older work and drops untaken output. A submit/setup failure publishes a bounded diagnostic and no incomplete pixels. No background GL thread or unbounded completed-image history is introduced.
+`GlReadbackQueue(device, limits)` owns at most one job, including its untaken ready output. `submit(revision, frame)` supports world, map and scalar frames, rejects stale/duplicate submissions and retains only accepted source images. `invalidate(revision)` immediately cancels queue-owned older work and drops untaken output. A submit/setup failure publishes a bounded diagnostic and no incomplete pixels. No background GL thread or unbounded completed-image history is introduced.
 
 `advance(budget, latestRevision)` cannot progress an older request; a newer revision invalidates it. `take(latestRevision)` checks the exact token and READY state again, constructs a completion before transfer and hands over the packet once. Source image UUID/receipt remains available for the host's final adoption checks. Queue status is an immutable volatile snapshot without full pixel/source graphs. Mutators and direct job progress belong to the original context thread.
 
@@ -64,3 +64,7 @@ On Windows GL, compare every captured RGBA byte against independently known comp
 ## Pixel-store group
 
 The readback guard now shares the [complete core pixel-store capture](HOST-STATE.md) used by upload isolation. Pack alignment, row length, row/pixel skips, image height/image skips, byte swapping and bit order are normalized for tight output and restored. The pack PBO and original read framebuffer/read buffer remain separately preserved. Readback does not bind a program or normalize drawing state; uploaded RGBA8 and completed-frame ownership contracts are unchanged.
+
+## Scalar completed images
+
+Readback now also accepts `GlNoiseFrame` through both direct and queue overloads. `Pixels.noise()` retains its exact detached volume UUID, native resource/grid, display interval/colors, camera and frame statistics; it contains no scalar arrays or GL owner. Exactly one world/map/noise receipt is required. The original world/map constructor and transfer/pack/fence/journal contracts remain unchanged. See [NOISE-VIEW.md](NOISE-VIEW.md) for scalar lifetimes and deferred pixel checks.

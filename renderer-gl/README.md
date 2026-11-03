@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds thirty-one Java sources to the 79-source CPU renderer. All 110 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds thirty-six Java sources to the 80-source CPU renderer. All 116 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -123,3 +123,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Host-state isolation
 
 [Host-state guards](HOST-STATE.md) now separate transfer/creation bindings from full draw state. Upload steps no longer query or rewrite program, viewport, raster or blend state. Pack/unpack use complete core pixel-store groups. World/map draws normalize supported clip-control conventions, depth-bounds testing, fixed restart, sample shading and additional core coverage/polygon flags, then restore them. Detectable unpaused transform feedback is rejected before invalidating an existing target. OpenGL 3.3 remains the minimum; optional enums/functions are used only with their advertised core/extension capability. Real Windows restoration/pixel checks remain deferred.
+
+## Connected scalar-volume images
+
+[Scalar GPU presentation](NOISE-VIEW.md) now connects background `NoiseSurfaceWorker` output to eight-byte instanced-face upload, opaque offscreen drawing, immutable `GlNoiseFrame` images and original scalar-face inspection. `GlNoiseView` separates source/display revisions and preserves caller-held images through replacement. Readback supports an exact scalar receipt alongside its existing world/map variants. Camera changes redraw without resampling native values. All shaders/driver/pixel/native checks remain deferred, and unsupported previews remain disabled.
