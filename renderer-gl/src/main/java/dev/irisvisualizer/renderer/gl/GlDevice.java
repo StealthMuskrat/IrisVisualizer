@@ -20,7 +20,7 @@ public final class GlDevice implements AutoCloseable {
         public long knownWorkingBytes() { return gpuBytes+cpuPayloadBytes+stagingBytes; }
     }
     static final class Allocation {
-        final int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;final long gpu,cpu;final int names;WorldScene.Result owner;
+        int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;long gpu;final long cpu;int names;WorldScene.Result owner;
         boolean retired,released,quarantined;long fence;Allocation dependency;int dependents;
         Allocation(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
             this.gpu=gpu;this.cpu=cpu;this.owner=owner;this.buffers=new int[buffers];this.textures=new int[textures];this.vaos=new int[vaos];this.framebuffers=new int[framebuffers];this.renderbuffers=new int[renderbuffers];this.programs=new int[programs];this.shaders=new int[shaders];names=buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders;
@@ -50,6 +50,7 @@ public final class GlDevice implements AutoCloseable {
     }
     void check(String operation) { int error=glGetError();if(error!=GL_NO_ERROR)throw new GlFailure(GlFailure.Code.GL_ERROR,operation+" failed with OpenGL error 0x"+Integer.toHexString(error)); }
     ByteBuffer staging() { current();staging.clear();return staging; }
+    boolean ownsCpu(WorldScene.Result owner) { current();for(var allocation:allocations)if(allocation.owner==owner)return true;return false; }
     Allocation reserve(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
         current();collect();int[] counts={buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders};long total=0;for(int count:counts) { if(count<0||count>limits.names())throw new GlFailure(GlFailure.Code.LIMIT,"GPU object count budget exceeded");total+=count; }
         if(gpu<0||cpu<0||gpu>limits.gpuBytes()-gpuBytes||cpu>limits.workingBytes()-cpuBytes||gpuBytes+gpu+cpuBytes+cpu+limits.stagingBytes()>limits.workingBytes()||allocations.size()>=limits.allocations()||total>limits.names()-names)
@@ -57,12 +58,22 @@ public final class GlDevice implements AutoCloseable {
         var allocation=new Allocation(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,owner);allocations.add(allocation);gpuBytes+=gpu;cpuBytes+=cpu;names+=allocation.names;return allocation;
     }
     void live(Allocation allocation) { current();if(allocation.retired||allocation.released)throw new GlFailure(GlFailure.Code.STATE,"GPU resource is retired or released"); }
+    /** Upgrade a CPU-only journal after incremental validation, before any scene GL name is made. */
+    void expand(Allocation allocation,long gpu,int buffers,int textures,int vaos) {
+        live(allocation);collect();if(allocation.gpu!=0||allocation.names!=0)throw new GlFailure(GlFailure.Code.STATE,"Upload reservation was already expanded");
+        long added=(long)buffers+textures+vaos;
+        if(gpu<0||buffers<0||textures<0||vaos<0||added>limits.names()-names||gpu>limits.gpuBytes()-gpuBytes||gpuBytes+gpu+cpuBytes+limits.stagingBytes()>limits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Validated GPU scene exceeds active/retired resource admission limits");
+        int[] nextBuffers=new int[buffers],nextTextures=new int[textures],nextVaos=new int[vaos];
+        allocation.buffers=nextBuffers;allocation.textures=nextTextures;allocation.vaos=nextVaos;allocation.gpu=gpu;allocation.names=(int)added;gpuBytes+=gpu;names+=(int)added;
+    }
     void depend(Allocation child,Allocation parent) {
         live(child);live(parent);if(child.dependency!=null)throw new GlFailure(GlFailure.Code.STATE,"GPU dependency already assigned");
         for(var cursor=parent;cursor!=null;cursor=cursor.dependency)if(cursor==child)throw new GlFailure(GlFailure.Code.STATE,"Cyclic GPU resource dependency");child.dependency=parent;parent.dependents++;
     }
     void retire(Allocation allocation) {
-        if(allocation.released)return;current();if(allocation.retired)return;allocation.retired=true;
+        if(allocation.released)return;current();if(allocation.retired)return;
+        if(allocation.names==0&&allocation.gpu==0&&allocation.dependents==0) { release(allocation);allocations.remove(allocation);return; }
+        allocation.retired=true;
         // Every allocation already has a journal slot, including failed uploads. A failed fence
         // leaves it quarantined and charged until successful explicit device teardown.
         try { allocation.fence=glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE,0);check("resource retirement fence");glFlush();check("resource retirement flush"); }
