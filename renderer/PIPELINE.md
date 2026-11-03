@@ -49,6 +49,7 @@ Create `GlWorldView(renderer)` on the renderer's current owning context. It borr
 | `view(camera, width, height)` | Validates camera/target bounds and advances the display revision when the view changes |
 | `advance(uploadBudget, latestWorldRevision)` | Advances current uploads, polls current sorting and renders a complete requested image when ready |
 | `take(worldRevision, viewRevision)` | Transfers the matching completed image exactly once |
+| `clock(tick, partialTick)` | Requests externally clocked atlas animation without regeneration or re-sorting geometry |
 | `redraw()` | Explicitly retries/redraws the current view without regenerating native output |
 | `close()` | Cancels CPU sorting and retires view-owned resources; leaves the renderer/device and transferred frames caller-owned |
 
@@ -62,7 +63,7 @@ Only a complete GPU upload becomes the view's scene. Only a successful draw and 
 
 Upload steps obey the existing byte/action/work limits and cooperative elapsed target. Drawing a whole admitted scene remains synchronous; individual driver calls and frame rendering have no hard elapsed guarantee. Failed cleanup leaves resources charged under existing retirement/quarantine rules. `close()` retries unfinished retirement rather than treating a CLOSED queue status as proof of release. Close the endpoint and its transferred image owners before destroying the original context/device.
 
-This endpoint currently draws the scene's initial atlas clock snapshot. The separate animation/frame APIs remain available; animated atlas scheduling, map presentation and editor routing still require application integration. No current capability, matching revision or completed image bypasses `PreviewReadiness`.
+This endpoint now connects external `clock` inputs through one CPU atlas worker and immutable GPU frame adoption. Animation adoption advances the view revision and renders with the exact updated raster; same-pixel clocks coalesce and camera changes can keep drawing the current atlas while an update is prepared. One advance steps either scene upload or atlas upload under the caller's budget. Caller-held images preserve their original pixels, atlas and clock receipt. See [WORLD-ANIMATION.md](../renderer-gl/WORLD-ANIMATION.md) for worker admission, cancellation, diagnostics and retry contracts. Native interpolation, map presentation and editor routing remain pending. No current capability, matching revision or completed image bypasses `PreviewReadiness`.
 
 ## Deferred validation
 

@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-two Java sources to the 66-source CPU renderer. All 88 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-three Java sources to the 67-source CPU renderer. All 90 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -90,4 +90,8 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 
 ## Connected world view
 
-`GlWorldView` now owns the route from a fresh complete CPU scene lease through bounded upload and asynchronous transparent sorting to a revision-checked completed image. `WorldRenderWorker` provides the matching single CPU visual/visibility/scene path. World and display revisions are separate; camera/viewport changes do not regenerate voxels, and transferred frames remain independent during replacement. See [PIPELINE.md](../renderer/PIPELINE.md) for native material requirements, CPU/GPU handoff, memory scope, failure/retry and deferred validation. This endpoint draws the initial atlas snapshot and adds no editor integration or readiness change.
+`GlWorldView` now owns the route from a fresh complete CPU scene lease through bounded upload and asynchronous transparent sorting to a revision-checked completed image. `WorldRenderWorker` provides the matching single CPU visual/visibility/scene path. World and display revisions are separate; camera/viewport changes do not regenerate voxels, and transferred frames remain independent during replacement. See [PIPELINE.md](../renderer/PIPELINE.md) for native material requirements, CPU/GPU handoff, memory scope, failure/retry and deferred validation. This endpoint now supports externally clocked immutable atlas updates through the connected animation path below; it adds no editor integration or readiness change.
+
+## Connected world animation
+
+`GlWorldView.clock` now routes external animation clocks through one bounded `AtlasFrameWorker`, immutable CPU plans and `GlWorldAnimation` to the existing GPU atlas queue. Completed atlas adoption advances the view revision and redraws without regenerating native data or re-sorting unchanged geometry. Same-pixel clocks coalesce; current atlas/images survive replacements, and one advance spends at most one scene-or-atlas upload budget. See [WORLD-ANIMATION.md](WORLD-ANIMATION.md) for input, admission, diagnostic, cleanup and deferred validation contracts. Interpolation guards and preview gates remain unchanged.
