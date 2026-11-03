@@ -2,7 +2,7 @@
 
 Java 25 library, separate from the editor and generation engine. UI implementation and automated validation finished before this stage; see [UI-VALIDATION.md](../docs/UI-VALIDATION.md).
 
-The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, bounded blockstate/model resolution, CPU geometry baking, PNG decoding, animation schedules, conservative mapped-area alpha classification, shared CPU atlas layout/rasters and atlas-bound mesh buffers for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
+The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, bounded blockstate/model resolution, CPU geometry baking, PNG decoding, animation schedules, conservative mapped-area alpha classification, shared CPU atlas layout/rasters, atlas-bound mesh buffers and bounded world-section assembly for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
 
 Build sources with a Java 25 JDK:
 
@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its thirty-one main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its thirty-seven main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -71,8 +71,16 @@ Alpha scans cover only each face's conservative UV pixel rectangle across all di
 
 `AtlasImages.capture(layout, tick, partialTick, cancelled)` creates immutable base-level CPU RGBA pages with frame-edge/corner extrusion. `updates` creates bounded whole-slot patches only for changed scheduled tiles; `apply` checks the exact prior raster identity and creates a new snapshot by cloning changed pages once and sharing untouched pages. All partial output is withheld on failure, and cancellation is separate. Multi-frame native interpolation stays guarded; filtering/mipmaps and GPU uploads are not implemented. See [ATLAS.md](ATLAS.md) for the contracts, numerical budgets, exclusions and deferred verification matrix.
 
+## Native world snapshots and section meshes
+
+`WorldSnapshot.capture` detaches native state/biome palettes and full-volume compact indices while retaining exact IDs, original texts/properties, generation context and configured height. `WorldModels.capture` checks one externally supplied visual choice per cell against that exact state; it does not replace position-dependent native model selection with one mesh per state. Visual entries distinguish successful meshes, explicitly empty cells and unsupported-model placeholders.
+
+`WorldVisibility` either keeps every face or captures explicit native per-cell direction masks tied to the exact snapshot and atlas. Only declared cull directions can be suppressed; the renderer does not infer native opacity/neighbor shapes. `WorldMesher.assemble` counts and budgets a requested section before emitting exact-sized arrays, retaining source face order and native picking provenance. Float geometry stays relative to an exact integer world origin. Unsupported visuals produce unit-cell marker records for a future diagnostic draw pass, preserving generated state/biome data.
+
+World inputs, prototypes, atlas payload and section arrays are checked together; failures publish no partial section and cancellation propagates separately. These primitive-byte/count limits do not confirm total native/cache/GPU memory or complete volume coverage. See [WORLD-MESH.md](WORLD-MESH.md) for the input contract, numerical limits, exclusions and deferred verification matrix. No engine or UI bridge is enabled.
+
 ## Still to implement
 
-Native geometry/UV/texture comparison and guarded cases, native weighted-choice seeding, tint/lighting, actual cutout/transparency rendering, fluids and special render shapes, native animation interpolation/mipmap/filtering, active atlas/GPU lifetime and staging budgets, world-mesh assembly/culling, and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV/texture comparison and guarded cases, native weighted-choice/visibility production, tint/lighting, actual cutout/transparency rendering, fluids and special render shapes, native animation interpolation/mipmap/filtering, active atlas/GPU lifetime and staging budgets, complete scene coverage/cache scheduling, and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.

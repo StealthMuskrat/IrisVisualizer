@@ -1,6 +1,6 @@
 # CPU texture preparation
 
-Renderer-stage implementation, 2026-11-03. All 31 renderer sources compile with Java 25, including the later [CPU atlas layer](ATLAS.md). Runtime tests remain deferred until renderer implementation is complete. No user-selected client archive, native decoder, animation or GPU result has been exercised for this batch. Unsupported previews remain disabled.
+Renderer-stage implementation, 2026-11-03. All 37 renderer sources compile with Java 25, including the later [CPU atlas layer](ATLAS.md). Runtime tests remain deferred until renderer implementation is complete. No user-selected client archive, native decoder, animation or GPU result has been exercised for this batch. Unsupported previews remain disabled.
 
 ## Snapshot-bound contract
 
