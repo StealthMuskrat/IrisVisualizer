@@ -20,6 +20,8 @@ final class AssetJson {
     record NumberToken(String spelling) implements Value {}
     record Flag(boolean value) implements Value {}
     enum Empty implements Value { NULL }
+    record Document(Value root,int nodes) {}
+    static final class LimitFailure extends IOException { LimitFailure(String message) { super(message); } }
     record Limits(int bytes,int nodes,int depth,int stringCharacters) {
         Limits {
             if(bytes<1 || bytes>16*1024*1024 || nodes<1 || nodes>262_144 || depth<1 || depth>128 || stringCharacters<1 || stringCharacters>1_048_576)
@@ -30,23 +32,27 @@ final class AssetJson {
     private int at,nodes,ticks;
     private AssetJson(String source,Limits limits,BooleanSupplier cancelled) { this.source=source;this.limits=limits;this.cancelled=cancelled; }
     static Value parse(byte[] bytes,Limits limits,BooleanSupplier cancelled)throws IOException {
+        return document(bytes,limits,cancelled).root();
+    }
+    static Document document(byte[] bytes,Limits limits,BooleanSupplier cancelled)throws IOException {
         Objects.requireNonNull(bytes);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         if(cancelled.getAsBoolean())throw new CancellationException("Asset JSON reading cancelled");
-        if(bytes.length>limits.bytes())throw new IOException("Asset JSON exceeds its byte limit");
+        if(bytes.length>limits.bytes())throw new LimitFailure("Asset JSON exceeds its byte limit");
         String text;
         try { text=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString(); }
         catch(CharacterCodingException invalid) { throw new IOException("Asset JSON is not strict UTF-8",invalid); }
         var parser=new AssetJson(text,limits,cancelled);var result=parser.value(0);parser.space();
         if(parser.at!=text.length())throw parser.error("Trailing JSON content");
-        if(cancelled.getAsBoolean())throw new CancellationException("Asset JSON reading cancelled");return result;
+        if(cancelled.getAsBoolean())throw new CancellationException("Asset JSON reading cancelled");return new Document(result,parser.nodes);
     }
     private void poll() { if((ticks++&1023)==0 && cancelled.getAsBoolean())throw new CancellationException("Asset JSON reading cancelled"); }
     private IOException error(String message) { return new IOException(message+" at JSON character "+at); }
+    private LimitFailure limit(String message) { return new LimitFailure(message+" at JSON character "+at); }
     private char peek() { return at<source.length()?source.charAt(at):0; }
     private void space() { while(at<source.length()) { poll();char c=source.charAt(at);if(c!=' ' && c!='\n' && c!='\r' && c!='\t')return;at++; } }
     private void require(char expected)throws IOException { space();if(peek()!=expected)throw error("Expected '"+expected+"'");at++; }
     private Value value(int depth)throws IOException {
-        poll();space();if(++nodes>limits.nodes() || depth>limits.depth())throw error("Asset JSON node/depth limit reached");
+        poll();space();if(++nodes>limits.nodes() || depth>limits.depth())throw limit("Asset JSON node/depth limit reached");
         return switch(peek()) {
             case '{'->object(depth);case '['->array(depth);case '"'->new Text(string());
             case 't'->{literal("true");yield new Flag(true);}case 'f'->{literal("false");yield new Flag(false);}
@@ -75,7 +81,7 @@ final class AssetJson {
         else { if(peek()<'1' || peek()>'9')throw error("Invalid JSON value");while(digit(peek())){poll();at++;} }
         if(peek()=='.'){at++;if(!digit(peek()))throw error("Missing fractional digits");while(digit(peek())){poll();at++;}}
         if(peek()=='e' || peek()=='E'){at++;if(peek()=='+' || peek()=='-')at++;if(!digit(peek()))throw error("Missing exponent digits");while(digit(peek())){poll();at++;}}
-        if(at-start>256)throw error("Asset JSON number exceeds its token limit");return new NumberToken(source.substring(start,at));
+        if(at-start>256)throw limit("Asset JSON number exceeds its token limit");return new NumberToken(source.substring(start,at));
     }
     private static boolean digit(char c) { return c>='0' && c<='9'; }
     private String string()throws IOException {
@@ -91,7 +97,7 @@ final class AssetJson {
                     default->throw error("Invalid JSON escape");
                 };
             }
-            if(text.length()>=limits.stringCharacters())throw error("Asset JSON string exceeds its character limit");text.append(c);
+            if(text.length()>=limits.stringCharacters())throw limit("Asset JSON string exceeds its character limit");text.append(c);
         }
         if(!closed)throw error("Unterminated JSON string");
         for(int i=0;i<text.length();i++) {
