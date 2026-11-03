@@ -2,6 +2,8 @@ package dev.irisvisualizer.renderer.gl;
 
 import static org.lwjgl.opengl.GL33C.*;
 import org.lwjgl.opengl.GL41C;
+import org.lwjgl.opengl.GL40C;
+import org.lwjgl.opengl.ARBDrawBuffersBlend;
 
 /** Bounded snapshot of the core state changed by this backend; no host objects are edited. */
 final class GlState implements AutoCloseable {
@@ -11,6 +13,7 @@ final class GlState implements AutoCloseable {
     private final int[] viewport=new int[4],scissor=new int[4],colorMask=new int[4];private final double[] depthRange=new double[2];private final float lineWidth;private final boolean depthMask;
     private final boolean[] clips;
     private final boolean blend;private final float[][] viewports;private final int[][] scissors;private final double[][] depths;private final boolean[] scissorEnabled;
+    private final int blendSrcRgb,blendDstRgb,blendSrcAlpha,blendDstAlpha,blendEquationRgb,blendEquationAlpha;
     GlState(GlDevice device) {
         this.device=device;device.current();device.check("incoming host state");
         // Query unit zero by indexed sampler lookup; active texture is restored even if capture fails.
@@ -21,6 +24,7 @@ final class GlState implements AutoCloseable {
         draw=glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);read=glGetInteger(GL_READ_FRAMEBUFFER_BINDING);renderbuffer=glGetInteger(GL_RENDERBUFFER_BINDING);program=glGetInteger(GL_CURRENT_PROGRAM);
         depthMask=glGetBoolean(GL_DEPTH_WRITEMASK);depthFunction=glGetInteger(GL_DEPTH_FUNC);cull=glGetInteger(GL_CULL_FACE_MODE);front=glGetInteger(GL_FRONT_FACE);int[] modes=new int[2];glGetIntegerv(GL_POLYGON_MODE,modes);polygon=modes[0];lineWidth=glGetFloat(GL_LINE_WIDTH);
         glGetIntegerv(GL_VIEWPORT,viewport);glGetIntegerv(GL_SCISSOR_BOX,scissor);var mask=device.staging();mask.limit(4);glGetBooleani_v(GL_COLOR_WRITEMASK,0,mask);for(int i=0;i<4;i++)colorMask[i]=mask.get(i)==0?0:1;glGetDoublev(GL_DEPTH_RANGE,depthRange);blend=glIsEnabledi(GL_BLEND,0);
+        blendSrcRgb=blendValue(GL_BLEND_SRC_RGB);blendDstRgb=blendValue(GL_BLEND_DST_RGB);blendSrcAlpha=blendValue(GL_BLEND_SRC_ALPHA);blendDstAlpha=blendValue(GL_BLEND_DST_ALPHA);blendEquationRgb=blendValue(GL_BLEND_EQUATION_RGB);blendEquationAlpha=blendValue(GL_BLEND_EQUATION_ALPHA);
         int views=device.indexedViewports()?glGetInteger(GL41C.GL_MAX_VIEWPORTS):1;if(views<1||views>32)throw new GlFailure(GlFailure.Code.CAPABILITY,"Viewport state exceeds the backend snapshot bound");
         viewports=new float[views][4];scissors=new int[views][4];depths=new double[views][2];scissorEnabled=new boolean[views];
         for(int i=0;i<views;i++) {
@@ -31,6 +35,14 @@ final class GlState implements AutoCloseable {
         for(int i=0;i<clips.length;i++)clips[i]=glIsEnabled(GL_CLIP_DISTANCE0+i);for(int i=0;i<FLAGS.length;i++)enabled[i]=glIsEnabled(FLAGS[i]);device.check("host state capture");
     }
     static void unpack() { glBindBuffer(GL_PIXEL_UNPACK_BUFFER,0);glPixelStorei(GL_UNPACK_ALIGNMENT,1);glPixelStorei(GL_UNPACK_ROW_LENGTH,0);glPixelStorei(GL_UNPACK_SKIP_ROWS,0);glPixelStorei(GL_UNPACK_SKIP_PIXELS,0); }
+    private int blendValue(int parameter) { return device.indexedBlend()?glGetIntegeri(parameter,0):glGetInteger(parameter); }
+    private void blendFunctions(int srcRgb,int dstRgb,int srcAlpha,int dstAlpha,int equationRgb,int equationAlpha) {
+        if(device.coreIndexedBlend()) { GL40C.glBlendFuncSeparatei(0,srcRgb,dstRgb,srcAlpha,dstAlpha);GL40C.glBlendEquationSeparatei(0,equationRgb,equationAlpha); }
+        else if(device.indexedBlend()) { ARBDrawBuffersBlend.glBlendFuncSeparateiARB(0,srcRgb,dstRgb,srcAlpha,dstAlpha);ARBDrawBuffersBlend.glBlendEquationSeparateiARB(0,equationRgb,equationAlpha); }
+        else { glBlendFuncSeparate(srcRgb,dstRgb,srcAlpha,dstAlpha);glBlendEquationSeparate(equationRgb,equationAlpha); }
+    }
+    void translucent() { blendFunctions(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA,GL_FUNC_ADD,GL_FUNC_ADD);glEnablei(GL_BLEND,0);glDepthMask(false); }
+    void opaque() { glDisablei(GL_BLEND,0);glDepthMask(true); }
     void drawing() {
         for(int i=0;i<clips.length;i++)glDisable(GL_CLIP_DISTANCE0+i);for(int flag:FLAGS)glDisable(flag);glDisablei(GL_BLEND,0);glDisable(GL_SCISSOR_TEST);glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);glCullFace(GL_BACK);glFrontFace(GL_CCW);glDepthFunc(GL_LEQUAL);glDepthMask(true);glDepthRange(0,1);glColorMaski(0,true,true,true,true);glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);glLineWidth(1);
     }
@@ -41,7 +53,7 @@ final class GlState implements AutoCloseable {
         if(device.indexedViewports()) {
             for(int i=0;i<viewports.length;i++) { var v=viewports[i];var s=scissors[i];var d=depths[i];GL41C.glViewportIndexedf(i,v[0],v[1],v[2],v[3]);GL41C.glScissorIndexed(i,s[0],s[1],s[2],s[3]);GL41C.glDepthRangeIndexed(i,d[0],d[1]);if(scissorEnabled[i])glEnablei(GL_SCISSOR_TEST,i);else glDisablei(GL_SCISSOR_TEST,i); }
         } else { glViewport(viewport[0],viewport[1],viewport[2],viewport[3]);glScissor(scissor[0],scissor[1],scissor[2],scissor[3]);glDepthRange(depthRange[0],depthRange[1]);if(scissorEnabled[0])glEnable(GL_SCISSOR_TEST);else glDisable(GL_SCISSOR_TEST); }
-        if(blend)glEnablei(GL_BLEND,0);else glDisablei(GL_BLEND,0);glColorMaski(0,colorMask[0]!=0,colorMask[1]!=0,colorMask[2]!=0,colorMask[3]!=0);glDepthMask(depthMask);glDepthFunc(depthFunction);glCullFace(cull);glFrontFace(front);glPolygonMode(GL_FRONT_AND_BACK,polygon);glLineWidth(lineWidth);
+        blendFunctions(blendSrcRgb,blendDstRgb,blendSrcAlpha,blendDstAlpha,blendEquationRgb,blendEquationAlpha);if(blend)glEnablei(GL_BLEND,0);else glDisablei(GL_BLEND,0);glColorMaski(0,colorMask[0]!=0,colorMask[1]!=0,colorMask[2]!=0,colorMask[3]!=0);glDepthMask(depthMask);glDepthFunc(depthFunction);glCullFace(cull);glFrontFace(front);glPolygonMode(GL_FRONT_AND_BACK,polygon);glLineWidth(lineWidth);
         for(int i=0;i<clips.length;i++)if(clips[i])glEnable(GL_CLIP_DISTANCE0+i);else glDisable(GL_CLIP_DISTANCE0+i);for(int i=0;i<FLAGS.length;i++)if(enabled[i])glEnable(FLAGS[i]);else glDisable(FLAGS[i]);device.check("host state restoration");
     }
 }

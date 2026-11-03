@@ -17,20 +17,23 @@ public final class GlUpload implements AutoCloseable {
     private static final int CHUNK_BYTES=65536;
     private final GlRenderer renderer;private final GlDevice device;private final WorldSnapshot.Source source;
     private final int totalSections,totalFaces;private final long totalBytes;
-    private WorldScene scene;private GlDevice.Allocation allocation;private GlScene completed;private final List<GlScene.Section> sections;
+    private WorldScene scene;private WorldTint tint;private int translucentFaces;private GlDevice.Allocation allocation;private GlScene completed;private final List<GlScene.Section> sections;
     private Phase phase=Phase.VALIDATING;private int validatedSection,validatedFace,validationFace=-1,validatedPage,geometryCount,markerSections;
-    private long markerBytes,uploadedBytes;private int page,pageRow,section,bufferSlot,vaoSlot,geometryVao,markerVao,vertexBuffer,indexBuffer,markerBuffer,floatOffset,indexOffset,markerOffset;
-    private GlUpload(GlRenderer renderer,WorldScene scene,GlDevice.Allocation allocation) {
-        this.renderer=renderer;device=renderer.device;this.scene=scene;this.allocation=allocation;source=scene.snapshot().source();
-        totalSections=scene.sections().size();totalFaces=scene.usage().faces();totalBytes=scene.usage().meshBytes()+(long)scene.usage().markers()*12+scene.raster().rgbaBytes();sections=new ArrayList<>(totalSections);
+    private long markerBytes,uploadedBytes;private int page,pageRow,section,bufferSlot,vaoSlot,geometryVao,markerVao,vertexBuffer,indexBuffer,markerBuffer,vertexWordOffset,indexOffset,markerOffset;
+    private GlUpload(GlRenderer renderer,WorldScene scene,WorldTint tint,GlDevice.Allocation allocation) {
+        this.renderer=renderer;device=renderer.device;this.scene=scene;this.tint=tint;this.allocation=allocation;source=scene.snapshot().source();
+        totalSections=scene.sections().size();totalFaces=scene.usage().faces();totalBytes=scene.usage().meshBytes()+(long)scene.usage().faces()*16+(long)scene.usage().markers()*12+scene.raster().rgbaBytes();sections=new ArrayList<>(totalSections);
     }
     /** Fresh nonnull leases transfer on every outcome; re-transferring a device-owned lease is rejected intact. */
-    public static GlUpload begin(GlRenderer renderer,WorldScene.Result owner) {
+    public static GlUpload begin(GlRenderer renderer,WorldScene.Result owner) { return begin(renderer,owner,null); }
+    public static GlUpload begin(GlRenderer renderer,WorldScene.Result owner,WorldTint tint) {
         Objects.requireNonNull(renderer);Objects.requireNonNull(owner);var device=renderer.device;GlDevice.Allocation allocation=null;boolean alreadyOwned=false;
         try {
             alreadyOwned=device.ownsCpu(owner);if(alreadyOwned)throw new GlFailure(GlFailure.Code.STATE,"This CPU result lease was already transferred to the device");
             device.live(renderer.allocation);var scene=owner.scene().orElseThrow(()->new GlFailure(GlFailure.Code.STATE,"A complete CPU scene is required"));
-            allocation=device.reserve(0,scene.usage().knownPayloadBytes(),0,0,0,0,0,0,0,owner);device.depend(allocation,renderer.allocation);return new GlUpload(renderer,scene,allocation);
+            if(tint!=null&&tint.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete native tint capture is required");
+            if(tint!=null&&tint.scene()!=scene)throw new GlFailure(GlFailure.Code.STALE,"Native tint must match the exact CPU scene");
+            allocation=device.reserve(0,scene.usage().knownPayloadBytes()+(tint==null?0:tint.bytes()),0,0,0,0,0,0,0,owner);allocation.retained=tint;device.depend(allocation,renderer.allocation);return new GlUpload(renderer,scene,tint,allocation);
         }catch(RuntimeException|Error failure) {
             if(allocation==null) { if(!alreadyOwned)owner.close(); }else try { device.retire(allocation); }catch(RuntimeException retirement) { failure.addSuppressed(retirement); }throw failure;
         }
@@ -81,12 +84,17 @@ public final class GlUpload implements AutoCloseable {
                         geometryVao=0;markerVao=0;var mesh=scene.sections().get(section);phase=mesh.indexCount()>0?Phase.VERTEX_STORAGE:mesh.markers().isEmpty()?Phase.SECTION_DONE:Phase.MARKER_STORAGE;
                     }
                     case VERTEX_STORAGE -> {
-                        var mesh=scene.sections().get(section);allocation.vaos[vaoSlot++]=geometryVao=glGenVertexArrays();glBindVertexArray(geometryVao);allocation.buffers[bufferSlot++]=vertexBuffer=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,vertexBuffer);long size=(long)mesh.vertexCount()*32;glBufferData(GL_ARRAY_BUFFER,size,GL_STATIC_DRAW);device.check("incremental vertex storage");storage+=size;floatOffset=0;phase=Phase.VERTEX_DATA;
+                        var mesh=scene.sections().get(section);allocation.vaos[vaoSlot++]=geometryVao=glGenVertexArrays();glBindVertexArray(geometryVao);allocation.buffers[bufferSlot++]=vertexBuffer=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,vertexBuffer);long size=(long)mesh.vertexCount()*36;glBufferData(GL_ARRAY_BUFFER,size,GL_STATIC_DRAW);device.check("incremental vertex storage");storage+=size;vertexWordOffset=0;phase=Phase.VERTEX_DATA;
                     }
                     case VERTEX_DATA -> {
-                        var source=scene.sections().get(section).vertexBuffer();int count=Math.min(source.remaining()-floatOffset,chunk(budget.transferBytes()-bytes)/4);if(count==0)break units;
-                        var stage=device.staging();stage.limit(count*4);var values=stage.asFloatBuffer();for(int i=0;i<count;i++) { if((i&1023)==0)check(cancelled);values.put(source.get(floatOffset+i)); }
-                        glBindBuffer(GL_ARRAY_BUFFER,vertexBuffer);glBufferSubData(GL_ARRAY_BUFFER,(long)floatOffset*4,stage);device.check("incremental vertex data");floatOffset+=count;transferred=count*4;if(floatOffset==source.remaining())phase=Phase.INDEX_STORAGE;
+                        var mesh=scene.sections().get(section);var source=mesh.vertexBuffer();int words=mesh.vertexCount()*9,count=Math.min(words-vertexWordOffset,chunk(budget.transferBytes()-bytes)/4);if(count==0)break units;
+                        var stage=device.staging();stage.limit(count*4);
+                        for(int i=0;i<count;i++) {
+                            if((i&1023)==0)check(cancelled);int word=vertexWordOffset+i,vertex=word/9,component=word%9;
+                            if(component<8)stage.putFloat(source.get(vertex*8+component));
+                            else { int rgb=tint==null?0xffffff:tint.rgb(section,vertex/4,vertex%4);stage.put((byte)(rgb>>>16)).put((byte)(rgb>>>8)).put((byte)rgb).put((byte)255); }
+                        }
+                        stage.flip();glBindBuffer(GL_ARRAY_BUFFER,vertexBuffer);glBufferSubData(GL_ARRAY_BUFFER,(long)vertexWordOffset*4,stage);device.check("incremental vertex data");vertexWordOffset+=count;transferred=count*4;if(vertexWordOffset==words)phase=Phase.INDEX_STORAGE;
                     }
                     case INDEX_STORAGE -> {
                         var mesh=scene.sections().get(section);glBindVertexArray(geometryVao);allocation.buffers[bufferSlot++]=indexBuffer=glGenBuffers();glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indexBuffer);long size=(long)mesh.indexCount()*4;glBufferData(GL_ELEMENT_ARRAY_BUFFER,size,GL_STATIC_DRAW);device.check("incremental index storage");storage+=size;indexOffset=0;phase=Phase.INDEX_DATA;
@@ -97,7 +105,7 @@ public final class GlUpload implements AutoCloseable {
                         glBindBuffer(GL_ARRAY_BUFFER,indexBuffer);glBufferSubData(GL_ARRAY_BUFFER,(long)indexOffset*4,stage);device.check("incremental index data");indexOffset+=count;transferred=count*4;if(indexOffset==source.remaining())phase=Phase.GEOMETRY_LAYOUT;
                     }
                     case GEOMETRY_LAYOUT -> {
-                        glBindVertexArray(geometryVao);glBindBuffer(GL_ARRAY_BUFFER,vertexBuffer);glVertexAttribPointer(0,3,GL_FLOAT,false,32,0L);glEnableVertexAttribArray(0);glVertexAttribPointer(1,3,GL_FLOAT,false,32,12L);glEnableVertexAttribArray(1);glVertexAttribPointer(2,2,GL_FLOAT,false,32,24L);glEnableVertexAttribArray(2);device.check("incremental geometry layout");phase=scene.sections().get(section).markers().isEmpty()?Phase.SECTION_DONE:Phase.MARKER_STORAGE;
+                        glBindVertexArray(geometryVao);glBindBuffer(GL_ARRAY_BUFFER,vertexBuffer);glVertexAttribPointer(0,3,GL_FLOAT,false,36,0L);glEnableVertexAttribArray(0);glVertexAttribPointer(1,3,GL_FLOAT,false,36,12L);glEnableVertexAttribArray(1);glVertexAttribPointer(2,2,GL_FLOAT,false,36,24L);glEnableVertexAttribArray(2);glVertexAttribPointer(4,4,GL_UNSIGNED_BYTE,true,36,32L);glEnableVertexAttribArray(4);device.check("incremental geometry layout");phase=scene.sections().get(section).markers().isEmpty()?Phase.SECTION_DONE:Phase.MARKER_STORAGE;
                     }
                     case MARKER_STORAGE -> {
                         var mesh=scene.sections().get(section);allocation.vaos[vaoSlot++]=markerVao=glGenVertexArrays();glBindVertexArray(markerVao);glBindBuffer(GL_ARRAY_BUFFER,renderer.allocation.buffers[0]);glVertexAttribPointer(0,3,GL_FLOAT,false,12,0L);glEnableVertexAttribArray(0);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,renderer.allocation.buffers[1]);allocation.buffers[bufferSlot++]=markerBuffer=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,markerBuffer);long size=(long)mesh.markers().size()*12;glBufferData(GL_ARRAY_BUFFER,size,GL_STATIC_DRAW);device.check("incremental marker storage");storage+=size;markerOffset=0;phase=Phase.MARKER_DATA;
@@ -116,7 +124,7 @@ public final class GlUpload implements AutoCloseable {
                 bytes+=transferred;uploadedBytes+=transferred;work++;if(gpu)actions++;if(finish)break;
             }
         }finally { if(state!=null)state.close(); }
-        if(finish) { check(cancelled);completed=new GlScene(device,allocation,sections);scene=null;sections.clear();phase=Phase.READY; }
+        if(finish) { check(cancelled);completed=new GlScene(device,allocation,sections,translucentFaces);scene=null;tint=null;sections.clear();phase=Phase.READY; }
         return result(start,bytes,storage,actions,work);
     }
     private int chunk(int remaining) { return Math.min(CHUNK_BYTES,Math.min(device.limits().stagingBytes(),remaining)); }
@@ -125,7 +133,7 @@ public final class GlUpload implements AutoCloseable {
         if(validatedSection<totalSections) {
             var mesh=scene.sections().get(validatedSection);
             if(validationFace<0) { mesh.requireRaster(scene.raster());if(mesh.indexCount()>0)geometryCount++;if(!mesh.markers().isEmpty())markerSections++;markerBytes+=(long)mesh.markers().size()*12;validationFace=0; }
-            else if(validationFace<mesh.faces().size()) { var face=mesh.faces().get(validationFace++);validatedFace++;if(face.source().alpha()==TexturePreparation.AlphaClass.TRANSLUCENT||face.source().source().tintIndex()>=0)throw new GlFailure(GlFailure.Code.MATERIAL,"Native tint and translucent rendering are required for this scene"); }
+            else if(validationFace<mesh.faces().size()) { var face=mesh.faces().get(validationFace++);validatedFace++;if(face.source().alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)translucentFaces++;if(face.source().source().tintIndex()>=0&&tint==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Explicit native per-vertex tint colors are required for this scene"); }
             else { validatedSection++;validationFace=-1; }
         } else if(validatedPage<scene.raster().pages().size()) {
             var image=scene.raster().pages().get(validatedPage++);if(image.width()>device.maximumTextureSize()||image.height()>device.maximumTextureSize()||image.width()*4>device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.CAPABILITY,"Atlas exceeds hardware or bounded row-staging dimensions");
@@ -136,7 +144,7 @@ public final class GlUpload implements AutoCloseable {
     }
     private void dispose(Phase terminal) {
         try { if(allocation!=null)device.retire(allocation); }
-        finally { if(allocation==null||allocation.retired||allocation.released) { allocation=null;scene=null;completed=null;sections.clear(); }phase=terminal; }
+        finally { if(allocation==null||allocation.retired||allocation.released) { allocation=null;scene=null;tint=null;completed=null;sections.clear(); }phase=terminal; }
     }
     @Override public void close() { if(phase==Phase.TAKEN||phase==Phase.CLOSED)return;dispose(Phase.CLOSED); }
 }

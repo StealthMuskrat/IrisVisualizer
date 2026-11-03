@@ -1,6 +1,6 @@
 # Incremental GPU upload and revision adoption
 
-Renderer implementation, 2026-11-03. The 43 CPU and 13 OpenGL Java sources compile with Java 25 against pinned LWJGL 3.4.1. No context, upload, draw, state-restoration, fence, timing or concurrency runtime test was executed for this batch. Renderer tests remain deferred until stage implementation is complete. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. The 45 CPU and 14 OpenGL Java sources compile with Java 25 against pinned LWJGL 3.4.1. No context, upload, draw, state-restoration, fence, timing or concurrency runtime test was executed for this batch. Renderer tests remain deferred until stage implementation is complete. Unsupported previews remain disabled.
 
 ## Resumable ownership
 
@@ -8,7 +8,9 @@ Renderer implementation, 2026-11-03. The 43 CPU and 13 OpenGL Java sources compi
 
 Fresh leases are consumed on every outcome after nonnull argument checks. Beginning with a lease already owned by the same device is rejected without closing its existing owner. This protects an active/retired scene against a duplicate handoff. Callers must still never reuse a transferred lease across devices or close it independently.
 
-The uploader validates one section header, face or atlas page at a time. Native tint/translucency guards, raster epoch checks, metadata counts and hardware/staging dimensions must pass before scene GL objects/storage are created. It then upgrades the same CPU journal with the complete GPU bytes and exact name-array reservation. Admission includes active and retired allocations; no extra temporary journal slot or replacement of the CPU lease is needed.
+The optional `WorldTint` overload retains/charges detached native color arrays and expands GPU vertices from eight CPU floats to eight floats plus RGBA8. See [MATERIALS.md](MATERIALS.md) for the 16-byte-per-face GPU addition, color-word chunking and separate translucent draw-plan contract.
+
+The uploader validates one section header, face or atlas page at a time. Native tint completeness/scene-identity guards, raster epoch checks, metadata counts and hardware/staging dimensions must pass before scene GL objects/storage are created. It then upgrades the same CPU journal with the complete GPU bytes and exact name-array reservation. Admission includes active and retired allocations; no extra temporary journal slot or replacement of the CPU lease is needed.
 
 `step(budget, cancelled)` advances explicit texture-storage/data, vertex-storage/data, index-storage/data, vertex-layout, marker-storage/data/layout and section-completion phases. Each step uses the original context/thread. A GPU work step lazily captures host state, normalizes upload bindings/unpack parameters, and restores state before returning or throwing. Validation-only steps do not capture or mutate upload bindings.
 

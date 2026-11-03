@@ -5,34 +5,39 @@ import java.nio.*;
 import java.util.Objects;
 import static org.lwjgl.opengl.GL33C.*;
 
-/** Basic nearest/base-level opaque/cutout renderer with an instanced diagnostic marker pass. */
+/** Nearest/base-level material passes with native vertex tint and explicit global translucent order. */
 public final class GlRenderer implements AutoCloseable {
     private static final String GEOMETRY_VERTEX="""
         #version 330 core
         layout(location=0) in vec3 position;
         layout(location=1) in vec3 normal;
         layout(location=2) in vec2 uv;
+        layout(location=4) in vec4 vertexTint;
         uniform mat4 viewProjection;
         uniform vec3 sectionOffset;
         out vec2 spriteUv;
         out float light;
+        out vec3 tintRgb;
         void main() {
             gl_Position=viewProjection*vec4(position+sectionOffset,1.0);
             spriteUv=uv;
+            tintRgb=vertexTint.rgb;
             light=0.55+0.45*max(dot(normalize(normal),normalize(vec3(0.3,1.0,0.2))),0.0);
         }
         """;
     private static final String GEOMETRY_FRAGMENT="""
         #version 330 core
         uniform sampler2D atlas;
-        uniform int cutout;
+        uniform int passMode;
         in vec2 spriteUv;
         in float light;
+        in vec3 tintRgb;
         out vec4 color;
         void main() {
             vec4 sampleColor=texture(atlas,spriteUv);
-            if(cutout!=0 && sampleColor.a<0.5) discard;
-            color=vec4(sampleColor.rgb*light,1.0);
+            if(passMode==1 && sampleColor.a<0.5) discard;
+            if(passMode==2 && sampleColor.a<=0.0) discard;
+            color=vec4(sampleColor.rgb*light*tintRgb,passMode==2?sampleColor.a:1.0);
         }
         """;
     private static final String MARKER_VERTEX="""
@@ -50,9 +55,9 @@ public final class GlRenderer implements AutoCloseable {
         """;
     private static final int[] EDGES={0,1,2,3,4,5,6,7,0,2,1,3,4,6,5,7,0,4,1,5,2,6,3,7,0,7,1,6,2,5,3,4};
     final GlDevice device;final GlDevice.Allocation allocation;
-    private final int geometryMatrix,geometryOffset,geometryCutout,geometryAtlas,markerMatrix,markerOffset;
+    private final int geometryMatrix,geometryOffset,geometryPass,geometryAtlas,markerMatrix,markerOffset;
     private GlRenderer(GlDevice device,GlDevice.Allocation allocation) {
-        this.device=device;this.allocation=allocation;geometryMatrix=uniform(allocation.programs[0],"viewProjection");geometryOffset=uniform(allocation.programs[0],"sectionOffset");geometryCutout=uniform(allocation.programs[0],"cutout");geometryAtlas=uniform(allocation.programs[0],"atlas");markerMatrix=uniform(allocation.programs[1],"viewProjection");markerOffset=uniform(allocation.programs[1],"sectionOffset");
+        this.device=device;this.allocation=allocation;geometryMatrix=uniform(allocation.programs[0],"viewProjection");geometryOffset=uniform(allocation.programs[0],"sectionOffset");geometryPass=uniform(allocation.programs[0],"passMode");geometryAtlas=uniform(allocation.programs[0],"atlas");markerMatrix=uniform(allocation.programs[1],"viewProjection");markerOffset=uniform(allocation.programs[1],"sectionOffset");
     }
     public static GlRenderer create(GlDevice device) {
         Objects.requireNonNull(device);var allocation=device.reserve(224,0,2,0,0,0,0,2,4,null);
@@ -74,14 +79,23 @@ public final class GlRenderer implements AutoCloseable {
         if(glGetProgrami(allocation.programs[index],GL_LINK_STATUS)==GL_FALSE)throw new GlFailure(GlFailure.Code.SHADER,"Renderer program linking failed: "+glGetProgramInfoLog(allocation.programs[index],4096));device.check("shader program creation");
     }
     public void render(GlScene scene,GlTarget target,GlCamera camera) {
-        draw(scene,null,target,camera);
+        draw(scene,null,null,target,camera);
     }
     public void render(GlScene scene,GlAtlasFrame atlas,GlTarget target,GlCamera camera) {
-        Objects.requireNonNull(atlas);draw(scene,atlas,target,camera);
+        Objects.requireNonNull(atlas);draw(scene,atlas,null,target,camera);
     }
-    private void draw(GlScene scene,GlAtlasFrame atlas,GlTarget target,GlCamera camera) {
+    public void render(GlScene scene,GlDrawPlan plan,GlTarget target,GlCamera camera) {
+        Objects.requireNonNull(plan);draw(scene,null,plan,target,camera);
+    }
+    public void render(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) {
+        Objects.requireNonNull(atlas);Objects.requireNonNull(plan);draw(scene,atlas,plan,target,camera);
+    }
+    private void draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) {
         Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");device.live(scene.allocation);device.live(target.allocation);scene.cpuScene();device.collect();
+        if(plan!=null&&plan.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Face order and renderer must share one device");
+        if(scene.translucentFaces>0&&plan==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Prepare a complete global translucent order for this scene and camera before drawing");
+        var order=plan==null?null:plan.order(scene,camera);
         int[] textures=atlas==null?scene.allocation.textures:atlas.textures(scene);
         float[] matrix=camera.matrix((double)target.width()/target.height());float[] offsets=new float[scene.sections.size()*3];for(int i=0;i<scene.sections.size();i++)camera.offset(scene.sections.get(i).origin(),offsets,i*3);
         target.complete=false;
@@ -90,9 +104,17 @@ public final class GlRenderer implements AutoCloseable {
             glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);
             for(int i=0;i<scene.sections.size();i++) {
                 var section=scene.sections.get(i);if(section.geometryVao()==0)continue;glUniform3f(geometryOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.geometryVao());
-                for(var range:section.ranges()) { glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryCutout,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4); }
+                for(var range:section.ranges()) { if(range.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)continue;glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryPass,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4); }
             }
-            glUseProgram(allocation.programs[1]);glUniformMatrix4fv(markerMatrix,false,matrix);
+            if(order!=null&&order.size()>0) {
+                state.translucent();glUniform1i(geometryPass,2);var meshes=scene.cpuScene().sections();
+                for(int at=0;at<order.size();at++) {
+                    int index=order.section(at),face=order.face(at);var section=scene.sections.get(index);
+                    glUniform3f(geometryOffset,offsets[index*3],offsets[index*3+1],offsets[index*3+2]);glBindVertexArray(section.geometryVao());
+                    glBindTexture(GL_TEXTURE_2D,textures[meshes.get(index).faces().get(face).source().page()]);glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_INT,(long)face*24);
+                }
+            }
+            state.opaque();glUseProgram(allocation.programs[1]);glUniformMatrix4fv(markerMatrix,false,matrix);
             for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount()); }
             device.check("complete offscreen scene draw");
         }

@@ -42,6 +42,8 @@ public final class GlDevice implements AutoCloseable {
     public int maximumTextureSize() { return maximumTexture; }
     public int maximumRenderbufferSize() { return maximumRenderbuffer; }
     boolean indexedViewports() { return capabilities.OpenGL41||capabilities.GL_ARB_viewport_array; }
+    boolean coreIndexedBlend() { return capabilities.OpenGL40; }
+    boolean indexedBlend() { return coreIndexedBlend()||capabilities.GL_ARB_draw_buffers_blend; }
     void current() {
         if(closed)throw new GlFailure(GlFailure.Code.STATE,"GPU device is closed");
         if(Thread.currentThread()!=thread||glfwGetCurrentContext()!=context)throw new GlFailure(GlFailure.Code.CONTEXT,"GPU work must use its original thread and GLFW context");

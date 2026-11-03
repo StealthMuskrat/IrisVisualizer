@@ -26,6 +26,9 @@ public final class GlUploadQueue implements AutoCloseable {
     }
     /** Fresh nonnull leases are consumed; an already-device-owned lease is ignored without closing it. */
     public boolean submit(long next,WorldScene.Result owner) {
+        return submit(next,owner,null);
+    }
+    public boolean submit(long next,WorldScene.Result owner,WorldTint tint) {
         Objects.requireNonNull(owner);boolean handedOff=false;
         try {
             current();
@@ -35,7 +38,7 @@ public final class GlUploadQueue implements AutoCloseable {
             if(next>revision)invalidate(next);
             status=new Status(revision,Phase.UPLOADING,Optional.of(owner.source()),Optional.empty(),Optional.empty(),"");
             handedOff=true;
-            try { active=GlUpload.begin(renderer,owner);status=new Status(revision,Phase.UPLOADING,Optional.of(owner.source()),Optional.of(active.progress()),Optional.empty(),"");return true; }
+            try { active=GlUpload.begin(renderer,owner,tint);status=new Status(revision,Phase.UPLOADING,Optional.of(owner.source()),Optional.of(active.progress()),Optional.empty(),"");return true; }
             catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error retirement) { if(retirement!=failure)failure.addSuppressed(retirement); }failed(failure);throw failure; }
         }finally { if(!handedOff)owner.close(); }
     }

@@ -1,6 +1,7 @@
 package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.WorldSnapshot;
+import dev.irisvisualizer.renderer.WorldDrawOrder;
 import java.util.Objects;
 
 /** Camera coordinates are relative to an exact world anchor, never absolute world floats. */
@@ -9,6 +10,7 @@ public record GlCamera(WorldSnapshot.Position anchor,double eyeX,double eyeY,dou
         Objects.requireNonNull(anchor);double[] values={eyeX,eyeY,eyeZ,targetX,targetY,targetZ,fieldOfView,near,far};for(double value:values)if(!Double.isFinite(value))throw new IllegalArgumentException("Nonfinite camera parameter");
         if(fieldOfView<10||fieldOfView>150||near<0.001||far<=near||far>1048576||Math.max(Math.max(Math.abs(eyeX),Math.abs(eyeY)),Math.abs(eyeZ))>1048576||Math.max(Math.max(Math.abs(targetX),Math.abs(targetY)),Math.abs(targetZ))>1048576)throw new IllegalArgumentException("Camera exceeds supported precision or clipping bounds");
     }
+    public WorldDrawOrder.View drawView() { return new WorldDrawOrder.View(anchor,eyeX,eyeY,eyeZ,targetX,targetY,targetZ); }
     float[] matrix(double aspect) {
         if(!Double.isFinite(aspect)||aspect<=0)throw new IllegalArgumentException("Invalid camera aspect");
         double fx=targetX-eyeX,fy=targetY-eyeY,fz=targetZ-eyeZ,length=Math.sqrt(fx*fx+fy*fy+fz*fz);

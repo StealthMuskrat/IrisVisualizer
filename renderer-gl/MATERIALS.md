@@ -1,0 +1,43 @@
+# Native tint inputs and translucent ordering
+
+Renderer implementation, 2026-11-03. All 59 main Java sources compile with Java 25 against pinned LWJGL 3.4.1: 45 CPU sources and 14 OpenGL sources. No renderer tests, GL context, shader execution, framebuffer comparison or visible Windows validation have run. Tests remain deferred until renderer implementation is complete; unsupported previews remain disabled.
+
+## Explicit native vertex colors
+
+`WorldTint.capture(scene, nativePolicy, sectionVertexRgb, cancelled)` is a worker-side boundary for externally produced native tint results. Supply one RGB24 array per section, four colors per emitted face in original vertex order. The caller must freeze the input list and arrays throughout capture. The result owns detached copies and retains the exact immutable CPU scene; a label describes the producer but does not prove that it followed the native biome/color policy.
+
+Every color must be in `0x000000..0xffffff`. A face without a model tint index must have four white samples. Tinted faces can have different vertex samples when the native producer requires them. Capture does not calculate biome colors, blend radii, native random choices, AO, block/sky light or emission. Original face tint indices and native state/biome/picking data stay intact.
+
+Wrong section/vertex counts, invalid colors and exceeded limits publish structured placeholder problems without partial colors. Cancellation propagates separately. Copied color arrays cost 16 bytes per face, capped at 32 MiB; scene primitive payload plus output must fit the configured 512 MiB CPU preparation ceiling. Caller-owned source arrays, native producer work and other simultaneous preparation jobs require application admission separately.
+
+Pass a successful capture to `GlUpload.begin(renderer, cpuOwner, tint)`, `queue.submit(revision, cpuOwner, tint)` or `GlScene.upload(renderer, cpuOwner, tint, cancelled)`. Fresh CPU lease consumption follows the existing upload contract on failure as well as success. Tint must belong to that exact CPU scene; matching hashes or equal generation metadata are insufficient. The no-tint overload remains usable for entirely untinted scenes. A tinted face without explicit colors fails incremental preflight before scene GL storage is created.
+
+The scene journal retains and charges the tint arrays alongside its CPU lease until resource retirement completes. Local upload references are cleared after completion/disposal. CPU mesh buffers keep their eight-float layout. GPU staging interleaves position/normal/UV with normalized RGBA8 color at attribute four: 36 bytes per vertex, 168 bytes per quad including six indices. RGB bytes are written explicitly and alpha is 255; texture alpha remains independent. This adds 16 GPU bytes per face to admission and cumulative transfer progress. Transfers may pause at any four-byte word, including either side of a color word, without a full-scene repack allocation.
+
+## Worker-prepared global face order
+
+Prepare `WorldDrawOrder.prepare(scene, view, cancelled)` on a worker while the scene lease remains owned. `view` contains an exact world anchor and relative eye/target pose; `camera.drawView()` provides that representation. Projection FOV, clip planes and target dimensions do not change the ordering. Changing the anchor or pose requires a new order before drawing.
+
+The order covers every translucent candidate across all sections, sorted by descending camera-forward depth of the quad centroid. Equal depths use section/face order for deterministic ties. Section-anchor subtraction uses checked integers before conversion, with the same relative precision ceiling as drawing. Opaque/cutout faces are absent from this list; source meshes, index buffers and picking provenance are never reordered.
+
+Default translucent count is capped at 262,144 faces, configurable through 1,048,576. Count and byte admission occur before sorting arrays are allocated. Stable merge sorting uses two key arrays and two depth arrays, totaling 32 bytes per face, under a 32 MiB scratch ceiling and combined scene/preparation ceiling of 512 MiB. Cancellation is checked through counting, centroid computation and merge passes. Output retains one eight-byte key per face; failures publish no partial order. This worker budget excludes external source arrays, tint captures, other jobs and Java object overhead; application scheduling still needs combined admission.
+
+Adopt the complete result on the context thread with `GlDrawPlan.create(gpuScene, order)`. It checks the exact CPU scene and translucent count, charges the retained order bytes to the device, and pins the GPU scene through a resource dependency. Close a replaced plan explicitly; its CPU-only journal releases immediately because drawing does not submit the order arrays to the GPU. The plan holds no independently retained CPU graph after its journal is released. Callers must respect the underlying scene lease lifetime and account separately for their own escaped references.
+
+## Draw passes and stale work
+
+Use `renderer.render(scene, plan, target, camera)` or `renderer.render(scene, atlasFrame, plan, target, camera)` for a scene containing translucent faces. The original overloads remain usable for opaque/cutout scenes. Missing plans, different GPU/CPU scenes, closed plans and changed camera poses fail before the target is marked incomplete or cleared, preserving the previous complete frame.
+
+The renderer first draws original opaque/cutout ranges with depth writes. It then draws each translucent quad in the global order with depth testing, depth writes disabled, and straight-alpha RGB blending (`SRC_ALPHA`, `ONE_MINUS_SRC_ALPHA`). Alpha uses `ONE`, `ONE_MINUS_SRC_ALPHA`; equations use `FUNC_ADD`. Zero-alpha samples are discarded. Tint multiplies sample RGB; texture alpha is preserved. Diagnostic markers follow with blending disabled and depth writes restored. Animation frames reuse the same geometry/order because their conservative alpha classes already span scheduled frames.
+
+Global centroid ordering is an approximation: intersecting, overlapping and cyclic transparent surfaces can still render incorrectly. There is no native OIT implementation, fluid/special-shape producer, native material-pass verification or correctness claim for those cases. The nearest/base-level shader still uses simple directional lighting; native lighting, AO, emission, filtering, interpolation, mipmaps and color-space parity remain pending. The default opaque target background has alpha one, so composited target alpha normally stays one.
+
+Host-state capture now includes RGB/alpha blend factors and equations in addition to enable flags. GL 4.0 uses indexed buffer-zero functions; extension-only `ARB_draw_buffers_blend` uses its ARB entry points. Other indexed draw-buffer settings remain untouched. GL 3.3 without indexed blend functions captures/restores the shared settings. Blend functions, depth writes and all previously tracked state are restored on success or failure. This is an implementation contract awaiting real-driver validation.
+
+## Deferred stage verification
+
+At renderer completion, check detached tint input mutation, exact scene identity, invalid lengths/colors, white untinted faces, cancellation and every primitive budget boundary. Compare per-vertex tint output with actual pinned-native producers at biome boundaries. Cover color words split across upload chunks and the complete GPU byte/progress totals; stale/failed captures must not corrupt an existing owner.
+
+Verify global ordering across sections, exact distant anchors, tie determinism, changed viewpoints, zero/all-translucent scenes, overflow, count/scratch/working limits, cancellation during every merge phase and absence of partial output. Check plan charge/dependency release, scene/plan closure, camera changes and old target preservation before draw admission. Use known overlapping pixels to validate blending and depth writes; include documented intersecting-surface limitations.
+
+Exercise both static and animated atlas frames, opaque/cutout/translucent mixtures, marker visibility, GL 3.3 shared blend state, GL 4.x indexed state and ARB-only entry points. Seed hostile RGB/alpha factors and equations on multiple host draw buffers, then verify restoration after success and injected draw/state errors. Profile sorting and the bounded but potentially large per-quad draw-call count before editor integration. Native visual parity and visible Windows QA remain unverified.
