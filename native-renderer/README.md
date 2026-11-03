@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These nine native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These ten native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -43,7 +43,7 @@ The terrain policy samples the native integer height API with explicit floor qua
 
 `MapCapture` preflights grid and input/copy bytes before sampling, collects exact native biome identities, and checks explicit presence, finite noise, full-height terrain bounds, text/count limits and identity conflicts. It calls native completion guards before and after immutable capture. Native samplers mark every successful queried point present; native exceptions or session faults fail the complete result. The generic sampler API can carry explicit absent samples, but an all-absent biome map without a supplied identity fails instead of inventing a palette. Cancellation propagates separately.
 
-Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Native block/fluid/special visual geometry, tint and optional lighting producers remain separate pending work. The explicit weighted-selection path below supplies model choices with a caller-verified native random policy; its genuine API/runtime validation remains pending. These adapters supply no rendered approximation for them.
+Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Native block/fluid/special visual geometry, native tint factory/output validation and optional lighting producers remain separate pending work. The explicit weighted-selection path below supplies model choices with a caller-verified native random policy; its genuine API/runtime validation remains pending. These adapters supply no rendered approximation for them.
 
 ## Native model input decisions
 
@@ -95,3 +95,7 @@ It checks pinned clean upstream checkouts and the compatibility source hash, the
 Renderer-stage validation must compile against the genuine pinned native API and compare actual generated chunks/maps for the same pack, source revisions, seed, dimension/isolation, coordinates and full height. Cover every native vanilla state/property domain, native/custom biome IDs, resolved aliases, deferred/external blocks, null native cells, duplicate/missing/edge chunks, negative/signed endpoints, relative/world Y, full-height limits and source immutability. Check genuine generator/expression loader identity, fractional/negative samples, zero/nonfinite noise, fluid height policies and surface derivative identities.
 
 Exercise report/epoch faults during sampling, during immutable copy and at final adoption; cancellation and every primitive/palette/text boundary must publish no partial output or retained native graph. Verify the host serializes sampling with generation/hotload and releases borrowed sessions only after operations unwind. Compare final rendered block/biome inspection against these native outputs before enabling previews. Independent complete native-world parity, real-driver/native visual checks, total application admission and final editor integration remain pending.
+
+## Explicit native tint resolver boundary
+
+`NativeTintInputs` detaches bounded RGB layer tables from a host-supplied native resolver using original registry states, biomes and world positions. The deterministic/weighted scene capture overloads share those inputs through scene preparation; missing tint coverage remains guarded. See [TINT-INPUTS.md](../renderer/TINT-INPUTS.md) for identity, resource/blending responsibility, primitive admission and GPU handoff. No default native color factory is implemented or verified. Genuine pinned Windows API compilation and actual native/pixel comparisons remain pending.

@@ -102,7 +102,7 @@ public final class WorldMesher {
         if(visibility.snapshot()!=models.snapshot()||visibility.layout()!=models.layout())throw WorldProblem.fail(WorldProblem.Code.VISIBILITY,"World models and native visibility must share the exact snapshot and atlas epoch");
         if(!models.snapshot().extent().contains(extent))throw WorldProblem.fail(WorldProblem.Code.EXTENT,"Requested world section lies outside the captured native volume");
         if(extent.width()>limits.axis()||extent.height()>limits.axis()||extent.depth()>limits.axis()||extent.cells()>limits.cells())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"World section dimensions exceed the assembly budget; request explicit sections without truncating the world");
-        long source=models.snapshot().indexBytes()+models.indexBytes()+models.offsets().bytes(),mask=visibility.bytes();
+        long source=models.snapshot().indexBytes()+models.indexBytes()+models.offsets().bytes()+models.tints().bytes(),mask=visibility.bytes();
         if(source+mask>limits.sourceIndexBytes()||models.meshBytes()>limits.prototypeBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Retained native indices, visibility or prototype mesh budget reached");
         long atlas=models.layout().usage().orElseThrow().knownPayloadBytes()-models.layout().usage().orElseThrow().boundMeshBytes();
         if(source+mask+models.meshBytes()+atlas>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Combined world, prototype and atlas payload budget reached");

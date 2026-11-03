@@ -43,6 +43,7 @@ public final class GlWorldView implements AutoCloseable {
         try { ordering.invalidate();frames.invalidate(viewRevision);uploads.invalidate(worldRevision);releaseScene();return true; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
+    public boolean submit(WorldRenderWorker.Completion completion) { Objects.requireNonNull(completion);return submit(completion.revision(),completion.owner(),completion.tint().orElse(null),null); }
     public boolean submit(long revision,WorldScene.Result owner) { return submit(revision,owner,null,null); }
     /** Consumes fresh CPU scene owners on every outcome; optional native colors belong to this exact scene. */
     public boolean submit(long revision,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {

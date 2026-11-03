@@ -29,23 +29,25 @@ public final class NativeWeightedInputs {
     }
     /** Caller owns/freezes this dedicated RNG and verifies its algorithm matches the pinned renderer; no factory is guessed. */
     public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,BooleanSupplier cancelled) { return capture(context,assets,snapshot,rendererRandom,tick,partialTick,Limits.DEFAULT,cancelled); }
-    public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) {
+    public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return capture(context,assets,snapshot,rendererRandom,tick,partialTick,limits,WorldTintInput.none(snapshot),cancelled); }
+    public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,WorldTintInput tints,BooleanSupplier cancelled) {
         Objects.requireNonNull(context);Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(rendererRandom);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid native weighted input clock");
         try {
             check(cancelled);context.check();if(snapshot.requiresPlaceholder())return failed(snapshot,snapshot.problems(),List.of());String randomClass=rendererRandom.getClass().getName();
             if(!randomClass.startsWith("net.minecraft.")||randomClass.length()>128)throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Weighted inputs require an actual native renderer-matching random source, exclusively owned by the caller");
-            var s=limits.scene();long catalog=assets.receipt().capturedAssetBytes(),base=catalog+snapshot.indexBytes();
+            if(tints.snapshot()!=snapshot||tints.requiresPlaceholder()||!tints.matchesAssets(assets.receipt()))throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Native weighted tints require the exact snapshot/assets");
+            var s=limits.scene();long catalog=assets.receipt().capturedAssetBytes(),base=catalog+snapshot.indexBytes()+tints.bytes();
             if(base+(long)snapshot.cellCount()*9>s.workingBytes())throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native weighted catalog/world/mask/assignment-copy peak exceeds its working budget");
-            var o=s.offsets();long offsetWorking=Math.min(o.workingBytes(),s.workingBytes()-catalog);
+            var o=s.offsets();long offsetWorking=Math.min(o.workingBytes(),s.workingBytes()-catalog-tints.bytes());
             var capturedOffsets=NativeOffsets.capture(context,snapshot,new WorldOffsets.Limits(o.translations(),o.payloadBytes(),offsetWorking,o.componentBlocks()),cancelled);if(capturedOffsets.requiresPlaceholder())return failed(snapshot,capturedOffsets.problems(),List.of());var offsets=capturedOffsets.offsets().orElseThrow();
             var original=s.models();var v=original.visuals();long modelWorking=Math.min(v.workingBytes(),s.workingBytes());
             var visualLimits=new WorldVisuals.Limits(v.choices(),v.modelStates(),v.meshVariants(),v.ticketReferences(),v.problemReferences(),v.sourcePackedBytes(),modelWorking);
             var modelLimits=new WorldModelInputs.Limits(visualLimits,original.models(),original.inspectedStates(),original.inspectedFaces());
-            var capturedModels=NativeModelInputs.capture(context,assets,snapshot,tick,partialTick,modelLimits,offsets,cancelled);if(capturedModels.requiresPlaceholder())return failed(snapshot,capturedModels.problems(),List.of());
+            var capturedModels=NativeModelInputs.capture(context,assets,snapshot,tick,partialTick,modelLimits,offsets,tints,cancelled);if(capturedModels.requiresPlaceholder())return failed(snapshot,capturedModels.problems(),List.of());
             var choiceLimits=new WorldModelChoices.Limits(modelLimits,limits.parts(),limits.alternatives(),limits.selectionVisits());
-            var plan=WorldModelChoices.inspect(assets,snapshot,capturedModels.inputs().orElseThrow().decisions(),offsets,choiceLimits,cancelled);if(plan.requiresPlaceholder())return failed(snapshot,plan.problems(),plan.assetProblems());
-            long other=catalog+offsets.bytes()+plan.bytes();if(other>s.workingBytes())throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native weighted descriptors exceed combined source admission");
+            var plan=WorldModelChoices.inspect(assets,snapshot,capturedModels.inputs().orElseThrow().decisions(),offsets,tints,choiceLimits,cancelled);if(plan.requiresPlaceholder())return failed(snapshot,plan.problems(),plan.assetProblems());
+            long other=catalog+offsets.bytes()+tints.bytes()+plan.bytes();if(other>s.workingBytes())throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native weighted descriptors exceed combined source admission");
             var visibility=s.visibility();var mask=visibility.visibility();long maskWorking=Math.min(mask.workingBytes(),s.workingBytes()-other);
             var boundedVisibility=new NativeVisibility.Limits(new WorldVisibility.Limits(mask.maskBytes(),maskWorking),visibility.cachedPairs(),visibility.nativeQueries(),visibility.pairProbes());
             var capturedVisibility=NativeVisibility.capture(context,snapshot,boundedVisibility,cancelled);if(capturedVisibility.requiresPlaceholder())return failed(snapshot,capturedVisibility.problems(),List.of());var input=capturedVisibility.input().orElseThrow();

@@ -33,15 +33,16 @@ public final class WorldRenderWorker implements AutoCloseable {
         long inputBytes() { return ready!=null?ready.inputBytes():model.inputBytes(); }
         long frozenBytes() { return ready!=null?ready.visuals().inputBytes():model.inputs().inputBytes(); }
         long visualBudget() { return ready!=null?ready.visuals().limits().workingBytes():model.inputs().limits().visuals().workingBytes(); }
-        long extraSceneBytes() { return ready!=null?ready.visuals().inputBytes()-snapshot().indexBytes()-(long)snapshot().cellCount()*4-ready.visuals().offsets().bytes():model.inputs().extraSceneBytes(); }
+        long extraSceneBytes() { return ready!=null?ready.visuals().inputBytes()-snapshot().indexBytes()-(long)snapshot().cellCount()*4-ready.visuals().offsets().bytes()-ready.visuals().tints().bytes():model.inputs().extraSceneBytes(); }
     }
     public enum Phase { IDLE, QUEUED, INSPECTING, VISUALS, PLANNING, BUILDING, READY, DELIVERED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<WorldSnapshot.Source> source,Optional<UUID> snapshotId,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);Objects.requireNonNull(snapshotId);problems=List.copyOf(problems);assetProblems=List.copyOf(assetProblems); }
     }
     /** Owns the scene tickets until closed or explicitly transferred to the GPU upload path. */
-    public record Completion(long revision,WorldScene.Result owner) implements AutoCloseable {
-        public Completion { Objects.requireNonNull(owner); }
+    public record Completion(long revision,WorldScene.Result owner,Optional<WorldTint> tint) implements AutoCloseable {
+        public Completion { Objects.requireNonNull(owner);Objects.requireNonNull(tint);if(tint.isPresent()&&(tint.orElseThrow().requiresPlaceholder()||tint.orElseThrow().scene()!=owner.scene().orElseThrow()))throw new IllegalArgumentException("Completed tint belongs to another scene"); }
+        public Completion(long revision,WorldScene.Result owner) { this(revision,owner,Optional.empty()); }
         @Override public void close() { owner.close(); }
     }
     private static final class Job {
@@ -50,7 +51,7 @@ public final class WorldRenderWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final WorldSectionCache cache=new WorldSectionCache();private final ExecutorService executor;private final long workingBytes;
-    private long revision;private boolean closed,scheduled;private Job active,pending;private WorldScene.Result completed;
+    private long revision;private boolean closed,scheduled;private Job active,pending;private WorldScene.Result completed;private WorldTint completedTint;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());
     public WorldRenderWorker() { this(1024L*1024*1024); }
     /** Aggregate admission includes active/cache CPU payload and one frozen pending input. */
@@ -79,11 +80,11 @@ public final class WorldRenderWorker implements AutoCloseable {
     public Status status() { synchronized(lock) { return status; } }
     public WorldSectionCache.Stats cacheStats() { return cache.stats(); }
     public Optional<Completion> take(long expectedRevision) {
-        synchronized(lock) { if(closed||revision!=expectedRevision||completed==null)return Optional.empty();var completion=new Completion(revision,completed);completed=null;status=new Status(revision,Phase.DELIVERED,status.source(),status.snapshotId(),List.of(),List.of());return Optional.of(completion); }
+        synchronized(lock) { if(closed||revision!=expectedRevision||completed==null)return Optional.empty();var completion=Optional.of(new Completion(revision,completed,Optional.ofNullable(completedTint)));var delivered=new Status(revision,Phase.DELIVERED,status.source(),status.snapshotId(),List.of(),List.of());completed=null;completedTint=null;status=delivered;return completion; }
     }
     private void requireOpen() { if(closed)throw new IllegalStateException("Render worker is closed"); }
     private long nextRevision() { if(revision==Long.MAX_VALUE)throw new IllegalStateException("Render revision counter exhausted");return revision+1; }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
+    private void dropCompleted() { if(completed!=null) { completed.close();completed=null;completedTint=null; } }
     private static WorldProblem problem(WorldProblem.Code code,String reason) { return new WorldProblem(code,Optional.empty(),reason); }
     private static Status status(Job job,Phase phase,List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Status(job.revision,phase,Optional.of(job.request.snapshot().source()),Optional.of(job.request.snapshot().id()),problems,assets); }
     private void phase(Job job,Phase phase) { synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,phase,List.of(),List.of()); } }
@@ -121,9 +122,9 @@ public final class WorldRenderWorker implements AutoCloseable {
         return WorldScene.build(plan,visuals.raster().orElseThrow(),cache,job::cancelled);
     }
     private void execute(Job job) {
-        WorldScene.Result result=null;List<WorldProblem> problems=List.of();List<ModelPlan.Problem> assets=List.of();boolean retained=false;
+        WorldScene.Result result=null;WorldTint tint=null;List<WorldProblem> problems=List.of();List<ModelPlan.Problem> assets=List.of();boolean retained=false;
         try {
-            try { result=build(job);if(result.requiresPlaceholder())problems=result.problems(); }
+            try { result=build(job);if(result.requiresPlaceholder())problems=result.problems();else if(result.scene().orElseThrow().plan().models().tints().hasColors())tint=WorldTint.fromInput(result.scene().orElseThrow()); }
             catch(CancellationException superseded) { /* No stale result or status adoption. */ }
             catch(ModelFields.Failure failure) { assets=List.of(failure.problem); }
             catch(WorldProblem.Failure failure) { problems=List.of(failure.problem); }
@@ -131,7 +132,7 @@ public final class WorldRenderWorker implements AutoCloseable {
             catch(OutOfMemoryError exhausted) { problems=List.of(problem(WorldProblem.Code.MEMORY,"Not enough memory to complete CPU world rendering")); }
             synchronized(lock) {
                 if(!closed&&revision==job.revision&&!job.cancelled.get()) {
-                    if(result!=null&&!result.requiresPlaceholder()) { completed=result;retained=true;status=status(job,Phase.READY,List.of(),List.of()); }
+                    if(result!=null&&!result.requiresPlaceholder()&&problems.isEmpty()&&assets.isEmpty()) { var ready=status(job,Phase.READY,List.of(),List.of());completed=result;completedTint=tint;retained=true;status=ready; }
                     else { if(problems.isEmpty()&&assets.isEmpty())problems=List.of(problem(WorldProblem.Code.WORKER,"CPU world rendering ended without a complete scene"));status=status(job,Phase.FAILED,problems,assets); }
                 }
             }

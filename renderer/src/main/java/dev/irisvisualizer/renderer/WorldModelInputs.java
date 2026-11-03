@@ -20,32 +20,35 @@ public final class WorldModelInputs {
     public record Usage(int inspectedStates,int inspectedFaces,int modelStates,int emptyStates,int placeholderStates,int ticketReferences,long assignmentBytes) {}
     /** Frozen native decisions; queuing this object retains no engine, registry or native callback. */
     public static final class Request {
-        private final ClientAssetSnapshot assets;private final WorldSnapshot snapshot;private final WorldOffsets offsets;private final List<Decision> decisions;private final long tick;private final double partialTick;private final Limits limits;
-        private Request(ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOffsets offsets,List<Decision> decisions,long tick,double partialTick,Limits limits) { this.assets=assets;this.snapshot=snapshot;this.offsets=offsets;this.decisions=decisions;this.tick=tick;this.partialTick=partialTick;this.limits=limits; }
+        private final ClientAssetSnapshot assets;private final WorldSnapshot snapshot;private final WorldOffsets offsets;private final WorldTintInput tints;private final List<Decision> decisions;private final long tick;private final double partialTick;private final Limits limits;
+        private Request(ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOffsets offsets,WorldTintInput tints,List<Decision> decisions,long tick,double partialTick,Limits limits) { this.assets=assets;this.snapshot=snapshot;this.offsets=offsets;this.tints=tints;this.decisions=decisions;this.tick=tick;this.partialTick=partialTick;this.limits=limits; }
         public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,BooleanSupplier cancelled) { return capture(assets,snapshot,decisions,tick,partialTick,Limits.DEFAULT,cancelled); }
         public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return capture(assets,snapshot,decisions,tick,partialTick,limits,WorldOffsets.none(snapshot),cancelled); }
-        public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,WorldOffsets offsets,BooleanSupplier cancelled) {
+        public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,WorldOffsets offsets,BooleanSupplier cancelled) { return capture(assets,snapshot,decisions,tick,partialTick,limits,offsets,WorldTintInput.none(snapshot),cancelled); }
+        public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,WorldOffsets offsets,WorldTintInput tints,BooleanSupplier cancelled) {
             Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(offsets);Objects.requireNonNull(decisions);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
             if(offsets.snapshot()!=snapshot||offsets.requiresPlaceholder())throw new IllegalArgumentException("Native decision offsets must belong to the exact successful snapshot");
+            if(tints.snapshot()!=snapshot||tints.requiresPlaceholder()||!tints.matchesAssets(assets.receipt()))throw new IllegalArgumentException("Native decisions require matching successful tint inputs");
             if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid native decision clock");
             if(snapshot.requiresPlaceholder()||decisions.size()!=snapshot.states().size()||decisions.size()>limits.visuals().choices())throw new IllegalArgumentException("Native decisions require a complete bounded exact state palette");
             if(!snapshot.source().minecraftVersion().equals(BlockModels.PROFILE)||!assets.receipt().version().equals(BlockModels.PROFILE)||!assets.receipt().expectedVersion().equals(BlockModels.PROFILE))throw new IllegalArgumentException("Native decisions require the pinned native/client profile");
-            if(assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes()>limits.visuals().workingBytes())throw new IllegalArgumentException("Native decision input payload exceeds its working budget");
+            if(assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes()+tints.bytes()>limits.visuals().workingBytes())throw new IllegalArgumentException("Native decision input payload exceeds its working budget");
             var frozen=List.copyOf(decisions);long problems=0;
             for(var decision:frozen) { WorldProblem.check(cancelled);problems+=decision.problems().size();if(problems>limits.visuals().problemReferences())throw new IllegalArgumentException("Native decision diagnostic-reference budget reached"); }
-            return new Request(assets,snapshot,offsets,frozen,tick,partialTick,limits);
+            return new Request(assets,snapshot,offsets,tints,frozen,tick,partialTick,limits);
         }
         public WorldSnapshot snapshot() { return snapshot; }
         public List<Decision> decisions() { return decisions; }
         public WorldOffsets offsets() { return offsets; }
+        public WorldTintInput tints() { return tints; }
         public Limits limits() { return limits; }
-        public long inputBytes() { return assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes(); }
+        public long inputBytes() { return assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes()+tints.bytes(); }
         /** Source catalog/raw input outside the future scene's shared native/choice indices. */
         public long extraSceneBytes() { return assets.receipt().capturedAssetBytes(); }
         public Request withWorkingBytes(long bytes) {
             if(bytes<inputBytes()||bytes>limits.visuals().workingBytes())throw new IllegalArgumentException("Reduced native decision allowance cannot hold its frozen inputs");
             var v=limits.visuals();var bounded=new WorldVisuals.Limits(v.choices(),v.modelStates(),v.meshVariants(),v.ticketReferences(),v.problemReferences(),v.sourcePackedBytes(),bytes);
-            return new Request(assets,snapshot,offsets,decisions,tick,partialTick,new Limits(bounded,limits.models(),limits.inspectedStates(),limits.inspectedFaces()));
+            return new Request(assets,snapshot,offsets,tints,decisions,tick,partialTick,new Limits(bounded,limits.models(),limits.inspectedStates(),limits.inspectedFaces()));
         }
     }
     public record Result(WorldSnapshot.Source source,UUID snapshotId,Optional<WorldVisuals.Request> request,Optional<Usage> usage,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) {
@@ -56,12 +59,12 @@ public final class WorldModelInputs {
         public boolean requiresPlaceholder() { return !problems.isEmpty()||!assetProblems.isEmpty(); }
     }
     public static Result prepare(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,BooleanSupplier cancelled) { return prepare(assets,snapshot,decisions,tick,partialTick,Limits.DEFAULT,cancelled); }
-    public static Result prepare(Request request,BooleanSupplier cancelled) { Objects.requireNonNull(request);return prepare(request.assets,request.snapshot,request.decisions,request.tick,request.partialTick,request.limits,request.offsets,cancelled); }
-    public static Result prepare(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return prepare(assets,snapshot,decisions,tick,partialTick,limits,WorldOffsets.none(snapshot),cancelled); }
-    private static Result prepare(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,WorldOffsets offsets,BooleanSupplier cancelled) {
+    public static Result prepare(Request request,BooleanSupplier cancelled) { Objects.requireNonNull(request);return prepare(request.assets,request.snapshot,request.decisions,request.tick,request.partialTick,request.limits,request.offsets,request.tints,cancelled); }
+    public static Result prepare(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return prepare(assets,snapshot,decisions,tick,partialTick,limits,WorldOffsets.none(snapshot),WorldTintInput.none(snapshot),cancelled); }
+    private static Result prepare(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> decisions,long tick,double partialTick,Limits limits,WorldOffsets offsets,WorldTintInput tints,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(decisions);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
         if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid visual animation clock");
-        try { return execute(assets,snapshot,decisions,tick,partialTick,limits,offsets,cancelled); }
+        try { return execute(assets,snapshot,decisions,tick,partialTick,limits,offsets,tints,cancelled); }
         catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(snapshot,List.of(failure.problem),List.of()); }
         catch(ModelFields.Failure failure) { WorldProblem.check(cancelled);return failed(snapshot,List.of(),List.of(failure.problem)); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(snapshot,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to prepare native model inputs; no partial request was published")),List.of()); }
@@ -69,13 +72,14 @@ public final class WorldModelInputs {
     private static Result failed(WorldSnapshot snapshot,List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Result(snapshot.source(),snapshot.id(),Optional.empty(),Optional.empty(),problems,assets); }
     private static void fatal(List<ModelPlan.Problem> problems) { for(var problem:problems)if(TextureBatch.fatal(problem.code()))throw new ModelFields.Failure(problem); }
     private static ModelPlan.Problem unsupported(RenderBlockState state,ModelPlan.Code code,String pointer,String reason) { return new ModelPlan.Problem(code,ClientAssetSnapshot.Kind.BLOCKSTATE,state.block(),pointer,reason); }
-    private static Result execute(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> input,long tick,double partialTick,Limits limits,WorldOffsets offsets,BooleanSupplier cancelled) {
+    private static Result execute(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Decision> input,long tick,double partialTick,Limits limits,WorldOffsets offsets,WorldTintInput tints,BooleanSupplier cancelled) {
         if(snapshot.requiresPlaceholder())return failed(snapshot,snapshot.problems(),List.of());
         if(!snapshot.source().minecraftVersion().equals(BlockModels.PROFILE)||!assets.receipt().version().equals(BlockModels.PROFILE)||!assets.receipt().expectedVersion().equals(BlockModels.PROFILE))throw WorldProblem.fail(WorldProblem.Code.VERSION,"Native model inputs require the pinned snapshot/client profile");
         if(offsets.snapshot()!=snapshot)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Model offsets belong to another native snapshot");
         if(offsets.requiresPlaceholder())return failed(snapshot,offsets.problems(),List.of());
         if(input.size()!=snapshot.states().size()||input.size()>limits.visuals().choices())throw WorldProblem.fail(WorldProblem.Code.PALETTE,"Supply one bounded native visual decision for every exact state palette entry");
-        long assignmentBytes=(long)snapshot.cellCount()*4,known=assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes()+assignmentBytes*2;
+        if(tints.snapshot()!=snapshot||tints.requiresPlaceholder()||!tints.matchesAssets(assets.receipt()))throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Native model tints belong to another snapshot/assets capture");
+        long assignmentBytes=(long)snapshot.cellCount()*4,known=assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes()+tints.bytes()+assignmentBytes*2;
         if(known>limits.visuals().workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native input inspection plus full-volume assignment/copy payload exceeds its working budget");
         var decisions=List.copyOf(input);var choices=new ArrayList<WorldVisuals.Choice>(input.size());int inspected=0,faces=0,models=0,empty=0,placeholders=0,tickets=0,problems=0;
         for(int index=0;index<decisions.size();index++) {
@@ -95,7 +99,7 @@ public final class WorldModelInputs {
                         for(var element:part.choose(0).model().elements())for(var entry:element.faces().entrySet()) {
                             var face=entry.getValue();
                             WorldProblem.check(cancelled);selectedFaces++;if(++faces>limits.inspectedFaces())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native model inspection aggregate face budget reached");
-                            if(face.tintIndex()>=0&&unsupported==null)unsupported=new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,element.source().kind(),element.source().asset(),element.source().pointer()+"/faces/"+entry.getKey().name().toLowerCase(Locale.ROOT)+"/tintindex","Native biome/block tint producer is not supplied for this visual");
+                            if(face.tintIndex()>=0&&!tints.supports(index,face.tintIndex())&&unsupported==null)unsupported=new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,element.source().kind(),element.source().asset(),element.source().pointer()+"/faces/"+entry.getKey().name().toLowerCase(Locale.ROOT)+"/tintindex","Native biome/block tint producer is not supplied for this visual");
                         }
                     }
                     if(unsupported==null&&selectedFaces==0)unsupported=unsupported(state,ModelPlan.Code.UNSUPPORTED_GEOMETRY,"/native/render_shape","A native MODEL decision with no verified geometric faces is not inferred to be invisible");
@@ -110,7 +114,7 @@ public final class WorldModelInputs {
             if(problems>limits.visuals().problemReferences())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native visual problem-reference budget reached");choices.add(choice);
         }
         int[] assignments=new int[snapshot.cellCount()];for(int cell=0;cell<assignments.length;cell++) { if((cell&4095)==0)WorldProblem.check(cancelled);assignments[cell]=snapshot.stateIndex(cell); }
-        var request=WorldVisuals.Request.capture(assets,snapshot,choices,assignments,tick,partialTick,limits.visuals(),offsets,cancelled);WorldProblem.check(cancelled);
+        var request=WorldVisuals.Request.capture(assets,snapshot,choices,assignments,tick,partialTick,limits.visuals(),offsets,tints,cancelled);WorldProblem.check(cancelled);
         return new Result(snapshot.source(),snapshot.id(),Optional.of(request),Optional.of(new Usage(inspected,faces,models,empty,placeholders,tickets,assignmentBytes)),List.of(),List.of());
     }
 }

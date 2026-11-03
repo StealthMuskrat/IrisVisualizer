@@ -9,8 +9,9 @@ public final class WorldTint {
         public static final Limits DEFAULT=new Limits(32L*1024*1024,512L*1024*1024);
         public Limits { if(colorBytes<0||colorBytes>32L*1024*1024||workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Native tint limits exceed renderer bounds"); }
     }
-    private final WorldScene scene;private final String policy;private final List<int[]> colors;private final long bytes;private final List<WorldProblem> problems;
-    private WorldTint(WorldScene scene,String policy,List<int[]> owned,long bytes,List<WorldProblem> problems) { this.scene=scene;this.policy=policy;colors=List.copyOf(owned);this.bytes=bytes;this.problems=List.copyOf(problems);if(!problems.isEmpty()&&(!owned.isEmpty()||bytes!=0))throw new IllegalArgumentException("Partial native tint escaped failure"); }
+    private final WorldScene scene;private final String policy;private final List<int[]> colors;private final WorldTintInput input;private final long bytes;private final List<WorldProblem> problems;
+    private WorldTint(WorldScene scene,String policy,List<int[]> owned,long bytes,List<WorldProblem> problems) { this(scene,policy,owned,bytes,null,problems); }
+    private WorldTint(WorldScene scene,String policy,List<int[]> owned,long bytes,WorldTintInput input,List<WorldProblem> problems) { this.scene=scene;this.policy=policy;colors=List.copyOf(owned);this.bytes=bytes;this.input=input;this.problems=List.copyOf(problems);if(!problems.isEmpty()&&(!owned.isEmpty()||bytes!=0))throw new IllegalArgumentException("Partial native tint escaped failure"); }
     /** Caller freezes the source list/arrays throughout capture; output owns detached copies. */
     public static WorldTint capture(WorldScene scene,String nativePolicy,List<int[]> sectionVertexRgb,BooleanSupplier cancelled) { return capture(scene,nativePolicy,sectionVertexRgb,Limits.DEFAULT,cancelled); }
     public static WorldTint capture(WorldScene scene,String nativePolicy,List<int[]> sectionVertexRgb,Limits limits,BooleanSupplier cancelled) {
@@ -36,11 +37,17 @@ public final class WorldTint {
         }
         WorldProblem.check(cancelled);return new WorldTint(scene,policy,output,bytes,List.of());
     }
+    /** Zero-copy uniform-per-layer view; the tint palette is already charged as shared scene source data. */
+    public static WorldTint fromInput(WorldScene scene) {
+        Objects.requireNonNull(scene);var input=scene.plan().models().tints();
+        if(input.requiresPlaceholder()||input.mode()!=WorldTintInput.Mode.NATIVE||input.snapshot()!=scene.snapshot()||!input.matchesAssets(scene.layout().assets()))throw new IllegalArgumentException("Native tint input must match the exact scene/assets");
+        return new WorldTint(scene,input.policy(),List.of(),0,input,List.of());
+    }
     public WorldScene scene() { return scene; }
     public String policy() { return policy; }
     public long bytes() { return bytes; }
-    public int rgb(int section,int face,int vertex) { if(requiresPlaceholder())throw new IllegalStateException("Native tint capture failed");if(vertex<0||vertex>=4)throw new IndexOutOfBoundsException("Invalid tint vertex");return colors.get(section)[Math.addExact(Math.multiplyExact(face,4),vertex)]; }
-    public int[] copySectionColors(int section) { if(requiresPlaceholder())throw new IllegalStateException("Native tint capture failed");return colors.get(section).clone(); }
+    public int rgb(int section,int face,int vertex) { if(requiresPlaceholder())throw new IllegalStateException("Native tint capture failed");if(vertex<0||vertex>=4)throw new IndexOutOfBoundsException("Invalid tint vertex");if(input==null)return colors.get(section)[Math.addExact(Math.multiplyExact(face,4),vertex)];var mesh=scene.sections().get(section);var emitted=mesh.faces().get(face);int layer=emitted.source().source().tintIndex();return layer<0?0xffffff:input.rgb(mesh.cells().get(emitted.cell()).sourceCell(),layer); }
+    public int[] copySectionColors(int section) { if(requiresPlaceholder())throw new IllegalStateException("Native tint capture failed");if(input==null)return colors.get(section).clone();int faces=scene.sections().get(section).faces().size();int[] result=new int[Math.multiplyExact(faces,4)];for(int face=0;face<faces;face++)Arrays.fill(result,face*4,face*4+4,rgb(section,face,0));return result; }
     public List<WorldProblem> problems() { return problems; }
     public boolean requiresPlaceholder() { return !problems.isEmpty(); }
 }

@@ -38,9 +38,9 @@ public final class WorldModelChoices {
         default void complete() {}
     }
     public static final class Plan {
-        private final ClientAssetSnapshot assets;private final WorldSnapshot snapshot;private final WorldOffsets offsets;private final Limits limits;private final List<State> states;private final int maxParts;private final long bytes;private final List<WorldProblem> problems;private final List<ModelPlan.Problem> assetProblems;
-        private Plan(ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOffsets offsets,Limits limits,List<State> states,int maxParts,long bytes,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) {
-            this.assets=assets;this.snapshot=snapshot;this.offsets=offsets;this.limits=limits;this.states=List.copyOf(states);this.maxParts=maxParts;this.bytes=bytes;this.problems=List.copyOf(problems);this.assetProblems=List.copyOf(assetProblems);
+        private final ClientAssetSnapshot assets;private final WorldSnapshot snapshot;private final WorldOffsets offsets;private final WorldTintInput tints;private final Limits limits;private final List<State> states;private final int maxParts;private final long bytes;private final List<WorldProblem> problems;private final List<ModelPlan.Problem> assetProblems;
+        private Plan(ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOffsets offsets,WorldTintInput tints,Limits limits,List<State> states,int maxParts,long bytes,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) {
+            this.assets=assets;this.snapshot=snapshot;this.offsets=offsets;this.tints=tints;this.limits=limits;this.states=List.copyOf(states);this.maxParts=maxParts;this.bytes=bytes;this.problems=List.copyOf(problems);this.assetProblems=List.copyOf(assetProblems);
             if((!problems.isEmpty()||!assetProblems.isEmpty())&&(!states.isEmpty()||bytes!=0||maxParts!=0))throw new IllegalArgumentException("Partial model-choice plan escaped failure");
         }
         public WorldSnapshot snapshot() { return snapshot; }
@@ -61,20 +61,22 @@ public final class WorldModelChoices {
     private static void fatal(List<ModelPlan.Problem> problems) { for(var problem:problems)if(TextureBatch.fatal(problem.code()))throw new ModelFields.Failure(problem); }
     private static ModelPlan.Problem problem(RenderBlockState state,String pointer,String reason) { return new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,state.block(),pointer,reason); }
     private static State fixed(int index,WorldVisuals.Choice choice) { return new State(index,false,List.of(),Optional.of(choice)); }
-    public static Plan inspect(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<WorldModelInputs.Decision> decisions,WorldOffsets offsets,Limits limits,BooleanSupplier cancelled) {
+    public static Plan inspect(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<WorldModelInputs.Decision> decisions,WorldOffsets offsets,Limits limits,BooleanSupplier cancelled) { return inspect(assets,snapshot,decisions,offsets,WorldTintInput.none(snapshot),limits,cancelled); }
+    public static Plan inspect(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<WorldModelInputs.Decision> decisions,WorldOffsets offsets,WorldTintInput tints,Limits limits,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(decisions);Objects.requireNonNull(offsets);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
-        try { return inspectStates(assets,snapshot,decisions,offsets,limits,cancelled); }
-        catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failedPlan(assets,snapshot,offsets,limits,List.of(failure.problem),List.of()); }
-        catch(ModelFields.Failure failure) { WorldProblem.check(cancelled);return failedPlan(assets,snapshot,offsets,limits,List.of(),List.of(failure.problem)); }
-        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failedPlan(assets,snapshot,offsets,limits,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to inspect native model choices")),List.of()); }
+        try { return inspectStates(assets,snapshot,decisions,offsets,tints,limits,cancelled); }
+        catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failedPlan(assets,snapshot,offsets,tints,limits,List.of(failure.problem),List.of()); }
+        catch(ModelFields.Failure failure) { WorldProblem.check(cancelled);return failedPlan(assets,snapshot,offsets,tints,limits,List.of(),List.of(failure.problem)); }
+        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failedPlan(assets,snapshot,offsets,tints,limits,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to inspect native model choices")),List.of()); }
     }
-    private static Plan failedPlan(ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOffsets offsets,Limits limits,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) { return new Plan(assets,snapshot,offsets,limits,List.of(),0,0,problems,assetProblems); }
-    private static Plan inspectStates(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<WorldModelInputs.Decision> decisions,WorldOffsets offsets,Limits limits,BooleanSupplier cancelled) {
-        if(snapshot.requiresPlaceholder())return failedPlan(assets,snapshot,offsets,limits,snapshot.problems(),List.of());
+    private static Plan failedPlan(ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOffsets offsets,WorldTintInput tints,Limits limits,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) { return new Plan(assets,snapshot,offsets,tints,limits,List.of(),0,0,problems,assetProblems); }
+    private static Plan inspectStates(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<WorldModelInputs.Decision> decisions,WorldOffsets offsets,WorldTintInput tints,Limits limits,BooleanSupplier cancelled) {
+        if(snapshot.requiresPlaceholder())return failedPlan(assets,snapshot,offsets,tints,limits,snapshot.problems(),List.of());
         if(offsets.snapshot()!=snapshot||offsets.requiresPlaceholder())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Native model choices require offsets from the exact successful snapshot");
         if(!snapshot.source().minecraftVersion().equals(BlockModels.PROFILE)||!assets.receipt().version().equals(BlockModels.PROFILE)||!assets.receipt().expectedVersion().equals(BlockModels.PROFILE))throw WorldProblem.fail(WorldProblem.Code.VERSION,"Native model choices require the pinned native/client profile");
+        if(tints.snapshot()!=snapshot||tints.requiresPlaceholder()||!tints.matchesAssets(assets.receipt()))throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Native model choices require matching successful tint inputs");
         var v=limits.models().visuals();if(decisions.size()!=snapshot.states().size()||decisions.size()>v.choices())throw WorldProblem.fail(WorldProblem.Code.PALETTE,"Supply exactly one bounded native decision per state");
-        long base=assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes();if(base>v.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native model-choice source working budget reached");
+        long base=assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes()+tints.bytes();if(base>v.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native model-choice source working budget reached");
         var input=List.copyOf(decisions);var states=new ArrayList<State>(input.size());int inspected=0,parts=0,alternatives=0,faces=0,maxParts=0,problems=0;long bytes=0;
         for(int index=0;index<input.size();index++) {
             WorldProblem.check(cancelled);var state=snapshot.states().get(index);var decision=input.get(index);fatal(decision.problems());State result;
@@ -95,7 +97,7 @@ public final class WorldModelChoices {
                             int selectedFaces=0;ModelPlan.Problem tint=null;
                             for(var element:choice.model().elements())for(var entry:element.faces().entrySet()) {
                                 WorldProblem.check(cancelled);selectedFaces++;if(++faces>limits.models().inspectedFaces())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native model-choice aggregate face inspection limit reached");
-                                if(entry.getValue().tintIndex()>=0&&tint==null)tint=new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,element.source().kind(),element.source().asset(),element.source().pointer()+"/faces/"+entry.getKey().name().toLowerCase(Locale.ROOT)+"/tintindex","Native biome/block tint producer is not supplied for this selected visual");
+                                if(entry.getValue().tintIndex()>=0&&!tints.supports(index,entry.getValue().tintIndex())&&tint==null)tint=new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,element.source().kind(),element.source().asset(),element.source().pointer()+"/faces/"+entry.getKey().name().toLowerCase(Locale.ROOT)+"/tintindex","Native biome/block tint producer is not supplied for this selected visual");
                             }
                             choices.add(new Alternative(choice.weight(),selectedFaces,Optional.ofNullable(tint)));if(tint!=null&&++problems>v.problemReferences())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native model-choice descriptor diagnostic limit reached");
                         }
@@ -106,7 +108,7 @@ public final class WorldModelChoices {
             }
             if(result.fixed().orElse(null) instanceof WorldVisuals.ProblemChoice issue) { fatal(issue.problems());problems+=issue.problems().size();if(problems>v.problemReferences())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native model-choice diagnostic limit reached"); }states.add(result);
         }
-        WorldProblem.check(cancelled);return new Plan(assets,snapshot,offsets,limits,states,maxParts,bytes,List.of(),List.of());
+        WorldProblem.check(cancelled);return new Plan(assets,snapshot,offsets,tints,limits,states,maxParts,bytes,List.of(),List.of());
     }
     /** Keys retain private canonical tickets only for new mesh variants; cell probes borrow one reusable scratch array. */
     private static final class Key {
@@ -128,7 +130,7 @@ public final class WorldModelChoices {
     private static Capture failedCapture(Plan plan,List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Capture(plan.snapshot.source(),plan.snapshot.id(),Optional.empty(),Optional.empty(),problems,assets); }
     private static Capture captureCells(Plan plan,String policy,Reader reader,long tick,double partialTick,long workingBytes,BooleanSupplier cancelled) {
         if(plan.requiresPlaceholder())return failedCapture(plan,plan.problems,plan.assetProblems);var snapshot=plan.snapshot;var v=plan.limits.models().visuals();
-        long scratch=(long)(plan.maxParts+plan.states.size()+v.ticketReferences())*4,base=plan.assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+plan.offsets.bytes();
+        long scratch=(long)(plan.maxParts+plan.states.size()+v.ticketReferences())*4,base=plan.assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+plan.offsets.bytes()+plan.tints.bytes();
         if(base+plan.bytes+scratch+(long)snapshot.cellCount()*8>workingBytes)throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native model-choice source, descriptor, scratch and assignment-copy peak exceeds its working allowance");
         int[] assignments=new int[snapshot.cellCount()],fixedIndices=new int[plan.states.size()],tickets=new int[plan.maxParts];Arrays.fill(fixedIndices,-1);var keys=new HashMap<Key,Integer>();var choices=new ArrayList<WorldVisuals.Choice>();var modelStates=new HashSet<Integer>();int variants=0,ticketReferences=0,problemReferences=0;long visits=0;
         for(int cell=0;cell<assignments.length;cell++) {
@@ -151,7 +153,7 @@ public final class WorldModelChoices {
         }
         reader.complete();WorldProblem.check(cancelled);
         var bounded=new WorldVisuals.Limits(v.choices(),v.modelStates(),v.meshVariants(),v.ticketReferences(),v.problemReferences(),v.sourcePackedBytes(),workingBytes);
-        var request=WorldVisuals.Request.capture(plan.assets,snapshot,choices,assignments,tick,partialTick,bounded,plan.offsets,cancelled);reader.complete();WorldProblem.check(cancelled);
+        var request=WorldVisuals.Request.capture(plan.assets,snapshot,choices,assignments,tick,partialTick,bounded,plan.offsets,plan.tints,cancelled);reader.complete();WorldProblem.check(cancelled);
         return new Capture(snapshot.source(),snapshot.id(),Optional.of(request),Optional.of(new Usage(policy,choices.size(),variants,ticketReferences,visits)),List.of(),List.of());
     }
 }

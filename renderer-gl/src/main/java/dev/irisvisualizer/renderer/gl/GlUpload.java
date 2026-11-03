@@ -33,6 +33,7 @@ public final class GlUpload implements AutoCloseable {
         try {
             alreadyOwned=device.ownsCpu(owner);if(alreadyOwned)throw new GlFailure(GlFailure.Code.STATE,"This CPU result lease was already transferred to the device");
             device.live(renderer.allocation);var scene=owner.scene().orElseThrow(()->new GlFailure(GlFailure.Code.STATE,"A complete CPU scene is required"));
+            if(tint==null&&scene.plan().models().tints().hasColors())tint=WorldTint.fromInput(scene);
             if(tint!=null&&tint.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete native tint capture is required");
             if(tint!=null&&tint.scene()!=scene)throw new GlFailure(GlFailure.Code.STALE,"Native tint must match the exact CPU scene");
             if(lighting!=null&&lighting.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete lighting capture is required");

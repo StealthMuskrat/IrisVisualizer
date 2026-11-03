@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its sixty-nine main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its seventy main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -137,15 +137,15 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its nine native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 98 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its ten native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 99 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
-`NativeModelInputs.capture` now checks actual native render shape, fluid/entity guards, exact offset input and registry metadata, then detaches state decisions. `WorldModelInputs` admits only unit-weight, untinted JSON model parts while preserving other visuals as explicit original-state placeholders. `WorldRenderWorker.ModelRequest` performs this inspection, visual preparation and complete scene assembly on the same CPU thread; no native session is retained by the queue. See [MODEL-INPUTS.md](MODEL-INPUTS.md) for unsupported paths, ownership, limits and deferred validation. Native API compilation, actual native/GPU verification and preview readiness remain pending.
+`NativeModelInputs.capture` now checks actual native render shape, fluid/entity guards, exact offset input and registry metadata, then detaches state decisions. `WorldModelInputs` admits unit-weight JSON model parts with complete explicit tint coverage while preserving other visuals as explicit original-state placeholders. `WorldRenderWorker.ModelRequest` performs this inspection, visual preparation and complete scene assembly on the same CPU thread; no native session is retained by the queue. See [MODEL-INPUTS.md](MODEL-INPUTS.md) for unsupported paths, ownership, limits and deferred validation. Native API compilation, actual native/GPU verification and preview readiness remain pending.
 
 ## Native hidden-face masks and scene capture
 
-`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Nine native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
+`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Ten native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
 
 ## Native model offsets
 
@@ -157,6 +157,10 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Still to implement
 
-Native geometry/UV/texture comparison and guarded cases, native weighted-choice factory/output validation, offset and visibility validation, native tint production and optional native lighting production/validation, transparent intersection/OIT handling, fluids and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, native map sampling adapters, full generation/scene integration and final map/3D editor presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV/texture comparison and guarded cases, native weighted-choice factory/output validation, offset and visibility validation, native tint factory/output validation and optional native lighting production/validation, transparent intersection/OIT handling, fluids and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, native map sampling adapters, full generation/scene integration and final map/3D editor presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.
+
+## Captured native tint layers
+
+The [native tint input path](TINT-INPUTS.md) now carries bounded, exact-snapshot RGB palettes through deterministic/weighted model inspection, shared mesh prototypes and scene/GPU admission. A zero-copy scene view supplies GPU colors, and missing layers retain original-state placeholders. The host must supply and verify the native resolver, resources and blending policy; genuine native compilation and pixel comparisons remain pending.
