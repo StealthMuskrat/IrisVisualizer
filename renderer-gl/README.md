@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-three Java sources to the 67-source CPU renderer. All 90 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-six Java sources to the 68-source CPU renderer. All 94 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -46,7 +46,7 @@ The backend snapshots/restores the core state it changes: program, framebuffer/r
 
 ## 2D map textures
 
-The [map rendering path](../renderer/MAPS.md) adds `GlMapUpload`, `GlMap` and `GlMapQueue` for CPU-colorized native terrain/biome/noise maps. Uploads charge source samples plus image immediately, expand GPU storage only at the first storage step, stream whole rows, restore host state at yields and expose only complete immutable textures. Latest-revision adoption leaves displayed caller-owned maps alone. Texture row zero uses V=0 for a later top-left image widget. This path adds no shader, native sampler, editor integration or readiness gate. Source and GPU charges follow the same device retirement/quarantine contract.
+The [map rendering path](../renderer/MAPS.md) adds `GlMapUpload`, `GlMap` and `GlMapQueue` for CPU-colorized native terrain/biome/noise maps. Uploads charge source samples plus image immediately, expand GPU storage only at the first storage step, stream whole rows, restore host state at yields and expose only complete immutable textures. Latest-revision adoption leaves displayed caller-owned maps alone. Texture row zero uses V=0 for a later top-left image widget. The lower-level uploader creates no shader; the connected canvas below adds presentation while native sampling, editor integration and readiness gates remain separate. Source and GPU charges follow the same device retirement/quarantine contract.
 
 ## Completed-frame presentation
 
@@ -95,3 +95,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Connected world animation
 
 `GlWorldView.clock` now routes external animation clocks through one bounded `AtlasFrameWorker`, immutable CPU plans and `GlWorldAnimation` to the existing GPU atlas queue. Completed atlas adoption advances the view revision and redraws without regenerating native data or re-sorting unchanged geometry. Same-pixel clocks coalesce; current atlas/images survive replacements, and one advance spends at most one scene-or-atlas upload budget. See [WORLD-ANIMATION.md](WORLD-ANIMATION.md) for input, admission, diagnostic, cleanup and deferred validation contracts. Interpolation guards and preview gates remain unchanged.
+
+## Connected map canvas and inspection
+
+`GlMapView` now connects background colorization, bounded map upload and `GlMapRenderer` offscreen fit/pan/zoom drawing. Completed `GlMapFrame` owners retain independent targets and shared source-map/native data; `MapPick` inspects the original sample through the exact displayed transform, including transparent colors and explicit absent samples. Exact map/view tokens gate adoption, old transferred images survive source/style/viewport replacement, and cleanup follows the device dependency/fence contract. See [MAP-VIEW.md](MAP-VIEW.md) for texture orientation, memory, failure/retry and deferred verification. No native generation or editor preview is enabled.

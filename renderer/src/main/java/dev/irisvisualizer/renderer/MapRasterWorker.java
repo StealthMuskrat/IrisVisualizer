@@ -41,6 +41,10 @@ public final class MapRasterWorker implements AutoCloseable {
     }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;completed=null; }
     public Status status() { synchronized(lock) { return status; } }
+    /** Cancelled active stacks remain charged; transferred rasters are external owners. */
+    public long reservedBytes() {
+        synchronized(lock) { return (active==null?0:active.request.reservation())+(pending==null?0:pending.request.reservation())+(completed==null||active!=null&&active.revision==revision?0:completed.payloadBytes()); }
+    }
     public Optional<Completion> take(long latestRevision) {
         synchronized(lock) { if(closed||latestRevision!=revision||completed==null)return Optional.empty();var value=Optional.of(new Completion(revision,completed));var delivered=new Status(revision,Phase.DELIVERED,status.context(),List.of());completed=null;status=delivered;return value; }
     }

@@ -1,6 +1,6 @@
 # Native 2D samples, colorization and GPU maps
 
-Renderer implementation, 2026-11-03. The combined renderer has 78 main Java sources: 57 CPU and 21 OpenGL. Java 25 compilation against pinned LWJGL 3.4.1 passes. No map/native comparison, worker test, GL context, upload, pixel readback, timing or interactive Windows validation has run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. The combined renderer has 94 main Java sources: 68 CPU and 26 OpenGL. Java 25 compilation against pinned LWJGL 3.4.1 passes. No map/native comparison, worker test, GL context, upload, pixel readback, timing or interactive Windows validation has run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
 
 ## Engine output stays separate from display
 
@@ -75,3 +75,7 @@ At renderer completion, compare map positions/values/biome IDs against actual na
 Check scalar endpoints, constant/extreme double ranges, transparent/intermediate-alpha ramps, stable explicit ranges, exact biome colors, all-empty maps and unclamped inspection data. Verify fit/pan/zoom anchors, outside/border hits, matching raster dimensions, finite bounds and repeated tiny scales. Exercise rapid submit/invalidate/take races, budget rejection without state mutation, worker failure/retry/close and no stale/pending accumulation.
 
 On real Windows GL contexts, compare every uploaded pixel/row and orientation, odd sizes, exact/final short row groups, minimum budgets, byte/action/work limits, cancellation/restoration failures and inability to take partial textures. Seed hostile PBO/unpack/texture/sampler state at each yield. Check source charge retention, CPU-only close, GPU retirement/quarantine, context/device/thread rejection and cleanup. Exercise queue updates before sampling completes, during upload, ready-before-take and after caller transfer. Native sampling adapters, renderer/UI adoption and visible interaction remain integration work; no map preview gate is enabled by this batch.
+
+## Connected map presentation
+
+The [map-view endpoint](../renderer-gl/MAP-VIEW.md) now combines this worker/uploader with a private offscreen canvas, display-only fit/pan/zoom, immutable completed images and original-sample inspection. Retained map/frame wrappers share exact source data without duplicating native payload. The source texture V=0 convention above still applies; rendered framebuffer images use a flipped V convention in a top-left widget. Native API/runtime validation, real-driver/pixel comparison, combined application admission and final editor routing remain pending.
