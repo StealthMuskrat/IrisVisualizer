@@ -69,6 +69,8 @@ public final class WorldVisuals {
         public UUID snapshotId() { return snapshot.id(); }
         public Limits limits() { return limits; }
         public long inputBytes() { return inputBytes; }
+        /** Immutable native decision palette, including original-state unsupported visual diagnostics. */
+        public List<Choice> choices() { return choices; }
         public WorldSnapshot snapshot() { return snapshot; }
         /** Lower admission without copying or exposing the frozen native inputs. */
         public Request withWorkingBytes(long bytes) {

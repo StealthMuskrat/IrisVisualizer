@@ -12,6 +12,8 @@ One active request and one replaceable pending request are retained. Accepted su
 
 `Completion.owner()` is a `WorldScene.Result` lease. Close it if it will not be uploaded, or transfer it to `GlWorldView.submit`/`GlUploadQueue.submit`, which consume fresh nonnull owners on every outcome. Do not close the same wrapper after transfer. `retain()` gives another independent owner if native material preparation, inspection or another consumer must continue separately. Cancellation, failed assembly and stale completion close all worker-owned scene tickets. Transferred owners remain caller-owned, including during worker shutdown.
 
+`WorldRenderWorker.ModelRequest` also accepts frozen native state decisions from `NativeModelInputs.capture`. Model inspection enters a separate `INSPECTING` status on this same CPU thread, before visual preparation. Pending requests retain no native context or choice-index arrays; assignment/copy payloads are admitted before allocation. See [MODEL-INPUTS.md](MODEL-INPUTS.md) for deterministic ticket, native shape, placeholder and budget boundaries.
+
 ## CPU admission across phases
 
 | Resource | Default / hard ceiling |
