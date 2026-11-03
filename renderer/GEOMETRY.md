@@ -26,7 +26,7 @@ Model plans now carry the archive receipt through to geometry and packets. `Mesh
 
 These are implemented CPU conventions awaiting end-of-stage native comparison, not a claim of bit-exact client vertex parity. Element rescale requires further pinned implementation review and is guarded. Reversed endpoints remain represented in `ModelPlan` but fail baking pending native winding verification. Zero-area faces may remain as degenerate quads; their presence does not imply visible pixels or a render-shape classification.
 
-The current baker requires UVs to stay inside their source sprite, 0..16 before normalization. It does not clamp or wrap out-of-sprite coordinates. Atlas inclusion, interpolation/shrink, generated sprites and sampling beyond a sprite's rectangle require later texture/atlas work. Materials retain `force_translucent`; no alpha pass is assigned before sprite decoding and mapped-area analysis. Tint, ambient occlusion, light emission and raw shade-direction overrides remain metadata, not applied lighting.
+The current baker requires UVs to stay inside their source sprite, 0..16 before normalization. It does not clamp or wrap out-of-sprite coordinates. Atlas inclusion, interpolation/shrink, generated sprites and sampling beyond a sprite's rectangle require later texture/atlas work. Materials retain `force_translucent`; the separate [texture preparation layer](TEXTURES.md) now decodes source sprites and assigns conservative mapped-area alpha candidates without changing mesh packets. Actual render passes remain unimplemented. Tint, ambient occlusion, light emission and raw shade-direction overrides remain metadata, not applied lighting.
 
 ## Packet layout and limits
 
