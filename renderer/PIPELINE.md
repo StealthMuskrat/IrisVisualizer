@@ -14,6 +14,8 @@ One active request and one replaceable pending request are retained. Accepted su
 
 `WorldRenderWorker.ModelRequest` also accepts frozen native state decisions from `NativeModelInputs.capture`. Model inspection enters a separate `INSPECTING` status on this same CPU thread, before visual preparation. Pending requests retain no native context or choice-index arrays; assignment/copy payloads are admitted before allocation. See [MODEL-INPUTS.md](MODEL-INPUTS.md) for deterministic ticket, native shape, placeholder and budget boundaries.
 
+The [native visibility bridge](NATIVE-VISIBILITY.md) now supplies masks from the actual vanilla block-face predicate. `NativeSceneInputs.capture` can capture both native model decisions and visibility in one borrowed session, then hand off a complete detached `ModelRequest`. Streaming mask capture avoids an extra full-volume source array; native validation and final application admission remain pending.
+
 ## CPU admission across phases
 
 | Resource | Default / hard ceiling |

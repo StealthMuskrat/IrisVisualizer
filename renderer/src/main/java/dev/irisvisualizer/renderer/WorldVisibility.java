@@ -6,11 +6,37 @@ import java.util.function.BooleanSupplier;
 /** Optional native per-cell directional suppression. The renderer does not derive opacity/shapes. */
 public final class WorldVisibility {
     public enum Mode { KEEP_ALL, NATIVE_DIRECTION_MASK }
+    /** Synchronous native producer, released before publishing the immutable mask. */
+    public interface Reader {
+        int hiddenDirections(int cell);
+        default void complete() {}
+    }
+    public record Limits(long maskBytes,long workingBytes) {
+        public static final Limits DEFAULT=new Limits(16L*1024*1024,256L*1024*1024);
+        public Limits { if(maskBytes<0||maskBytes>16L*1024*1024||workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Native visibility read limits exceed renderer bounds"); }
+    }
     /** Captures native masks before atlas creation; binding later shares only privately frozen bytes. */
     public static final class Input {
         private final WorldSnapshot snapshot;private final Mode mode;private final String policy;private final byte[] masks;private final List<WorldProblem> problems;
         private Input(WorldSnapshot snapshot,Mode mode,String policy,byte[] owned,List<WorldProblem> problems) { this.snapshot=snapshot;this.mode=mode;this.policy=policy;masks=owned;this.problems=List.copyOf(problems); }
         public static Input keepAll(WorldSnapshot snapshot) { Objects.requireNonNull(snapshot);return new Input(snapshot,Mode.KEEP_ALL,"No directional suppression",new byte[0],snapshot.problems()); }
+        public static Input read(WorldSnapshot snapshot,String policy,Reader reader,BooleanSupplier cancelled) { return read(snapshot,policy,reader,Limits.DEFAULT,cancelled); }
+        /** Writes a single privately owned mask array; no native reader or mutable source escapes. */
+        public static Input read(WorldSnapshot snapshot,String policy,Reader reader,Limits limits,BooleanSupplier cancelled) {
+            Objects.requireNonNull(snapshot);Objects.requireNonNull(policy);Objects.requireNonNull(reader);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
+            if(policy.isBlank()||policy.length()>256)throw new IllegalArgumentException("Invalid native visibility producer policy");
+            try {
+                if(snapshot.requiresPlaceholder())return new Input(snapshot,Mode.NATIVE_DIRECTION_MASK,policy,new byte[0],snapshot.problems());
+                if(snapshot.cellCount()>limits.maskBytes()||snapshot.indexBytes()+snapshot.cellCount()>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Native world indices and visibility output exceed the read budget");
+                byte[] owned=new byte[snapshot.cellCount()];
+                for(int cell=0;cell<owned.length;cell++) { WorldProblem.check(cancelled);int value=reader.hiddenDirections(cell);if((value&~63)!=0)throw WorldProblem.at(WorldProblem.Code.VISIBILITY,snapshot.extent().position(cell),"Native producer returned undefined direction bits");owned[cell]=(byte)value; }
+                reader.complete();WorldProblem.check(cancelled);return new Input(snapshot,Mode.NATIVE_DIRECTION_MASK,policy,owned,List.of());
+            }catch(WorldCapture.ReadFailure failure) { WorldProblem.check(cancelled);return new Input(snapshot,Mode.NATIVE_DIRECTION_MASK,policy,new byte[0],List.of(failure.problem())); }
+            catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return new Input(snapshot,Mode.NATIVE_DIRECTION_MASK,policy,new byte[0],List.of(failure.problem)); }
+            catch(java.util.concurrent.CancellationException cancellation) { throw cancellation; }
+            catch(RuntimeException failure) { WorldProblem.check(cancelled);return new Input(snapshot,Mode.NATIVE_DIRECTION_MASK,policy,new byte[0],List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Native visibility reader failed: "+failure.getClass().getSimpleName()))); }
+            catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return new Input(snapshot,Mode.NATIVE_DIRECTION_MASK,policy,new byte[0],List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to read native visibility; no partial mask was published"))); }
+        }
         public static Input capture(WorldSnapshot snapshot,String policy,byte[] directions,BooleanSupplier cancelled) { return capture(snapshot,policy,directions,16L*1024*1024,cancelled); }
         public static Input capture(WorldSnapshot snapshot,String policy,byte[] directions,long maximumBytes,BooleanSupplier cancelled) {
             Objects.requireNonNull(snapshot);Objects.requireNonNull(policy);Objects.requireNonNull(directions);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);

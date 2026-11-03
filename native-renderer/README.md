@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These five native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These seven native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -43,11 +43,15 @@ The terrain policy samples the native integer height API with explicit floor qua
 
 `MapCapture` preflights grid and input/copy bytes before sampling, collects exact native biome identities, and checks explicit presence, finite noise, full-height terrain bounds, text/count limits and identity conflicts. It calls native completion guards before and after immutable capture. Native samplers mark every successful queried point present; native exceptions or session faults fail the complete result. The generic sampler API can carry explicit absent samples, but an all-absent biome map without a supplied identity fails instead of inventing a palette. Cancellation propagates separately.
 
-Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Native block/fluid/special visual geometry, model tickets, visibility, tint and optional lighting producers remain separate pending work. These adapters supply no rendered approximation for them.
+Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Native block/fluid/special visual geometry, model tickets, tint and optional lighting producers remain separate pending work. These adapters supply no rendered approximation for them.
 
 ## Native model input decisions
 
 `NativeModelInputs.capture` now detaches actual native render-shape decisions for the original snapshot palette, guarding fluid contents, block entities and native offset functions before accepting a model or invisible shape. Its immutable output can feed `WorldRenderWorker.ModelRequest` after the native session guard is released. The same CPU worker inspects deterministic unit-weight models, guards missing native tint and other unsupported visuals, then assembles the complete scene. No PRNG, fluid/special renderer, offset algorithm or neighbor visibility is invented. See [MODEL-INPUTS.md](../renderer/MODEL-INPUTS.md). Native model-decision API compilation and runtime fidelity remain pending with the other native adapter sources.
+
+## Native block visibility and combined scene input
+
+`NativeVisibility.capture` now calls the vanilla three-argument `Block.shouldRenderFace` for exact captured neighbor states, retaining all unknown boundary faces. It streams a single privately owned mask, memoizes bounded state-pair/direction answers and checks native-query/probe budgets without replacing native shape logic. `NativeSceneInputs.capture` combines detached native model decisions and this visibility input under a shared catalog/world/mask/choice-copy budget, returning a request for the single CPU scene worker without retaining the native session. See [NATIVE-VISIBILITY.md](../renderer/NATIVE-VISIBILITY.md). Genuine native compilation and actual visibility comparisons remain pending; fluid-specific culling and visual producers are separate.
 
 ## Budgets and exclusions
 

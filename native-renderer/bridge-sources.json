@@ -23,6 +23,14 @@
       "sha256": "88335ddbfbe0979fb7b07df3e888720a76de3d13a1f1d8f613aef1078082a2ce"
     },
     {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeSceneInputs.java",
+      "sha256": "da71d956e474291448bab8fdd48b39fa338309198bbf40f08f13f9378a9ffd0b"
+    },
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeVisibility.java",
+      "sha256": "6bd33015912fd122529e5f4bda239b4fa270f5b99c83fceb2e7898b92ebe54fe"
+    },
+    {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWorldCapture.java",
       "sha256": "cdc0977cfff7f0108e2533cf20e7081229d77e5468184dd9b1dffa91dbe18a76"
     }
@@ -39,6 +47,20 @@
       "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
       "path": "native/minecraft-common/src/main/java/art/arcane/volmlib/nativelib/minecraft26_2/modded/ModdedBiome.java",
       "blob": "23bc495fd82dafdf5e79bbeb10bfcb29864d6624"
+    },
+    {
+      "repository": "neoforged/NeoForge",
+      "revision": "b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4",
+      "path": "patches/net/minecraft/world/level/block/Block.java.patch",
+      "blob": "87bad9b24a2072ce5cfccb14d17588b90a8023ad",
+      "scope": "Unmodified vanilla three-argument face predicate signature; no NeoForge dependency or modded overload"
+    },
+    {
+      "repository": "neoforged/NeoForge",
+      "revision": "b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4",
+      "path": "gradle.properties",
+      "blob": "6b5d54103b839e353df9228d96d4b85adc2607dc",
+      "scope": "Minecraft 26.3 source target for the reviewed vanilla signature"
     }
   ],
   "validation": "Source reviewed; native adapter compilation and runtime validation remain pending; renderer stage tests deferred"
