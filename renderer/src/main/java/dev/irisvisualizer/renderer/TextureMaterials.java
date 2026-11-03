@@ -16,11 +16,53 @@ public final class TextureMaterials {
         }
     }
     private record ScanKey(AssetId sprite,TexturePreparation.Region region) {}
+    static TextureBatch prepareBatch(ClientAssetSnapshot assets,List<BlockMesh> meshes,TextureBatch.Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);Objects.requireNonNull(meshes);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);AtlasBuilder.check(cancelled);
+        try { return executeBatch(assets,meshes,limits,cancelled); }
+        catch(ModelFields.Failure failure) { AtlasBuilder.check(cancelled);return TextureBatch.failed(List.of(failure.problem)); }
+        catch(OutOfMemoryError exhausted) { AtlasBuilder.check(cancelled);return TextureBatch.failed(List.of(AtlasBuilder.blockFailure(ModelPlan.Code.MEMORY,meshes.isEmpty()?AssetId.minecraft("air"):meshes.getFirst().state().block(),"Not enough memory to prepare shared textures; no partial batch was published").problem)); }
+    }
+    private static TextureBatch executeBatch(ClientAssetSnapshot assets,List<BlockMesh> inputs,TextureBatch.Limits limits,BooleanSupplier cancelled) {
+        AssetId owner=inputs.isEmpty()?AssetId.minecraft("air"):Objects.requireNonNull(inputs.getFirst()).state().block();
+        if(inputs.size()>limits.meshes())throw AtlasBuilder.blockFailure(ModelPlan.Code.LIMIT,owner,"Shared texture mesh count exceeded");
+        if(!assets.receipt().version().equals(BlockModels.PROFILE)||!assets.receipt().expectedVersion().equals(BlockModels.PROFILE))throw AtlasBuilder.blockFailure(ModelPlan.Code.VERSION,owner,"Shared textures require the pinned selected-client profile");
+        var meshes=List.copyOf(inputs);var ids=new TreeSet<AssetId>();var packets=new IdentityHashMap<MeshPacket,Boolean>();long packed=0;int faces=0;
+        for(var mesh:meshes) {
+            AtlasBuilder.check(cancelled);if(!AtlasLayout.sameAssets(assets.receipt(),mesh.assets()))throw AtlasBuilder.blockFailure(ModelPlan.Code.VERSION,mesh.state().block(),"Shared texture meshes must use the exact selected asset capture");
+            if(mesh.requiresPlaceholder()) { for(var problem:mesh.problems())if(TextureBatch.fatal(problem.code()))throw new ModelFields.Failure(problem);continue; }
+            var packet=mesh.packet().orElseThrow();if(packets.put(packet,Boolean.TRUE)==null)packed+=packet.packedBytes();faces+=mesh.quads().size();
+            if(packed>limits.sourcePackedBytes()||faces>limits.faces()||assets.receipt().capturedAssetBytes()+packed>limits.workingBytes())throw AtlasBuilder.blockFailure(ModelPlan.Code.LIMIT,mesh.state().block(),"Shared texture face/source/working budget exceeded");
+            var localIds=new HashSet<AssetId>();if(mesh.quads().size()>limits.resources().faces())throw AtlasBuilder.blockFailure(ModelPlan.Code.LIMIT,owner,"Per-mesh texture face limit exceeded");
+            for(var quad:mesh.quads()) { AtlasBuilder.check(cancelled);localIds.add(quad.material().sprite());if(localIds.size()>limits.resources().sprites())throw AtlasBuilder.blockFailure(ModelPlan.Code.LIMIT,owner,"Per-mesh texture sprite limit exceeded");ids.add(quad.material().sprite());if(ids.size()>limits.sprites())throw AtlasBuilder.blockFailure(ModelPlan.Code.LIMIT,owner,"Shared sprite count exceeded"); }
+        }
+        long remaining=limits.workingBytes()-assets.receipt().capturedAssetBytes()-packed;
+        if(remaining<0)throw AtlasBuilder.blockFailure(ModelPlan.Code.LIMIT,owner,"Captured assets and source packets exceed shared texture working budget");
+        var source=limits.resources();var bounded=new Limits(source.sprites(),source.faces(),source.imageDimension(),source.imagePixels(),Math.min(source.rgbaBytes(),remaining),source.encodedBytes(),source.metadataBytes(),source.metadataNodes(),source.frames(),source.regions(),source.alphaPixelVisits());
+        var work=new Work(assets,bounded,cancelled);var failed=new TreeMap<AssetId,ModelPlan.Problem>();
+        var nodesBySprite=new HashMap<AssetId,Integer>();
+        for(var id:ids) { work.check();try { int before=work.metadataNodes;work.load(id);nodesBySprite.put(id,work.metadataNodes-before); }catch(ModelFields.Failure failure) { if(TextureBatch.fatal(failure.problem.code()))throw failure;failed.put(id,failure.problem); } }
+        var results=new ArrayList<TexturePreparation>(meshes.size());
+        for(var mesh:meshes) {
+            work.check();if(mesh.requiresPlaceholder()) { results.add(TexturePreparation.placeholder(mesh,mesh.problems()));continue; }
+            var sprites=new TreeMap<AssetId,TextureSprite>();var seen=new HashSet<AssetId>();var problems=new ArrayList<ModelPlan.Problem>();
+            for(var quad:mesh.quads()) { work.check();var id=quad.material().sprite();if(!seen.add(id))continue;var problem=failed.get(id);if(problem!=null) { if(!problems.contains(problem))problems.add(problem); }else sprites.put(id,work.sprites.get(id)); }
+            if(!problems.isEmpty()) { results.add(TexturePreparation.placeholder(mesh,problems));continue; }
+            long encoded=0,rgba=0;int metadata=0,nodes=0,frames=0;
+            for(var entry:sprites.entrySet()) { work.check();var id=entry.getKey();var sprite=entry.getValue();var png=assets.find(ClientAssetSnapshot.Kind.TEXTURE,id).orElseThrow();int meta=assets.find(ClientAssetSnapshot.Kind.TEXTURE_METADATA,id).map(ClientAssetSnapshot.Asset::bytes).orElse(0);encoded+=(long)png.bytes()+meta;metadata+=meta;nodes+=nodesBySprite.get(id);rgba+=sprite.image().bytes();frames+=sprite.frames().size(); }
+            try {
+            var prepared=new ArrayList<TexturePreparation.Face>(mesh.quads().size());var regions=new HashSet<ScanKey>();long visits=0;
+            for(int face=0;face<mesh.quads().size();face++) { work.check();var quad=mesh.quads().get(face);var sprite=sprites.get(quad.material().sprite());var region=work.region(quad,sprite);var alpha=work.alpha(sprite,region);if(regions.add(new ScanKey(sprite.id(),region)))visits+=(long)(region.x1()-region.x0())*(region.y1()-region.y0())*sprite.referencedFrames().size();prepared.add(new TexturePreparation.Face(face,quad.source(),quad.material(),region,alpha,alpha.classification(quad.material().forceTranslucent()))); }
+            results.add(TexturePreparation.success(mesh,sprites,prepared,new TexturePreparation.Usage(sprites.size(),encoded,rgba,metadata,nodes,frames,regions.size(),visits)));
+            }catch(ModelFields.Failure failure) { if(TextureBatch.fatal(failure.problem.code()))throw failure;results.add(TexturePreparation.placeholder(mesh,List.of(failure.problem))); }
+        }
+        long retained=0;var exported=new IdentityHashMap<RgbaImage,Boolean>();for(var result:results)for(var sprite:result.sprites().values())if(exported.put(sprite.image(),Boolean.TRUE)==null)retained+=sprite.image().bytes();work.check();
+        return TextureBatch.success(results,new TextureBatch.Usage(meshes.size(),work.sprites.size(),failed.size(),packed,retained,work.rgbaBytes,work.encodedBytes,work.metadataBytes,work.metadataNodes,work.frames,work.scans.size(),work.alphaPixelVisits));
+    }
     private static final class Work {
-        final ClientAssetSnapshot assets;final BlockMesh mesh;final Limits limits;final BooleanSupplier cancelled;
+        final ClientAssetSnapshot assets;final Limits limits;final BooleanSupplier cancelled;
         final NavigableMap<AssetId,TextureSprite> sprites=new TreeMap<>();final Map<ScanKey,TexturePreparation.Alpha> scans=new HashMap<>();
         long encodedBytes,rgbaBytes,alphaPixelVisits;int metadataBytes,metadataNodes,frames;
-        Work(ClientAssetSnapshot assets,BlockMesh mesh,Limits limits,BooleanSupplier cancelled) { this.assets=assets;this.mesh=mesh;this.limits=limits;this.cancelled=cancelled; }
+        Work(ClientAssetSnapshot assets,Limits limits,BooleanSupplier cancelled) { this.assets=assets;this.limits=limits;this.cancelled=cancelled; }
         void check() { if(cancelled.getAsBoolean())throw new CancellationException("Texture preparation cancelled"); }
         void require(boolean condition,ModelPlan.Code code,ClientAssetSnapshot.Kind kind,AssetId id,String pointer,String reason) { check();if(!condition)throw TextureMetadata.failure(code,kind,id,pointer,reason); }
         void load(AssetId id) {
@@ -80,7 +122,7 @@ public final class TextureMaterials {
     }
     private static TexturePreparation execute(ClientAssetSnapshot assets,BlockMesh mesh,Limits limits,BooleanSupplier cancelled) {
         if(mesh.requiresPlaceholder())return TexturePreparation.placeholder(mesh,mesh.problems());
-        var work=new Work(assets,mesh,limits,cancelled);var owner=mesh.state().block();var receipt=assets.receipt();var original=mesh.assets();
+        var work=new Work(assets,limits,cancelled);var owner=mesh.state().block();var receipt=assets.receipt();var original=mesh.assets();
         work.require(receipt.archiveSha256().equals(original.archiveSha256())&&receipt.version().equals(original.version())&&receipt.expectedVersion().equals(original.expectedVersion())&&receipt.version().equals(BlockModels.PROFILE)&&receipt.expectedVersion().equals(BlockModels.PROFILE),
             ModelPlan.Code.VERSION,ClientAssetSnapshot.Kind.BLOCKSTATE,owner,"","Texture preparation requires the mesh's exact captured archive SHA and pinned profile");
         work.require(mesh.packet().isPresent()&&mesh.quads().size()<=limits.faces(),ModelPlan.Code.LIMIT,ClientAssetSnapshot.Kind.BLOCKSTATE,owner,"","Texture preparation requires a bounded complete CPU mesh packet");

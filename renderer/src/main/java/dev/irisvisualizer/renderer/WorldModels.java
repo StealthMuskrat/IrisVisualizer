@@ -26,13 +26,16 @@ public final class WorldModels {
         if(!problems.isEmpty()&&(!entries.isEmpty()||indices.length!=0||meshBytes!=0))throw new IllegalArgumentException("Partial visual assignments escaped failure");
     }
     public static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,Limits.DEFAULT,cancelled); }
-    public static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,BooleanSupplier cancelled) {
+    public static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,limits,true,cancelled); }
+    /** Package-only sharing of the visual request's privately captured immutable assignment array. */
+    static WorldModels captureShared(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,limits,false,cancelled); }
+    private static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,boolean copy,BooleanSupplier cancelled) {
         Objects.requireNonNull(snapshot);Objects.requireNonNull(layout);Objects.requireNonNull(entries);Objects.requireNonNull(cellAssignments);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
-        try { return execute(snapshot,layout,entries,cellAssignments,limits,cancelled); }
+        try { return execute(snapshot,layout,entries,cellAssignments,limits,copy,cancelled); }
         catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return placeholder(snapshot,layout,List.of(failure.problem)); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return placeholder(snapshot,layout,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to capture per-cell model choices; no partial assignments were published"))); }
     }
-    private static WorldModels execute(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> input,int[] cells,Limits limits,BooleanSupplier cancelled) {
+    private static WorldModels execute(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> input,int[] cells,Limits limits,boolean copy,BooleanSupplier cancelled) {
         if(snapshot.requiresPlaceholder())return placeholder(snapshot,layout,snapshot.problems());
         if(layout.requiresPlaceholder())throw WorldProblem.fail(WorldProblem.Code.ATLAS,"World model assignments require a successful CPU atlas; inspect its asset problems");
         if(!snapshot.source().minecraftVersion().equals(layout.assets().version()))throw WorldProblem.fail(WorldProblem.Code.VERSION,"World snapshot and captured visual assets target different Minecraft versions");
@@ -55,11 +58,11 @@ public final class WorldModels {
             }
             captured.add(entry);stateIndices.add(index);nativeSources.add(nativeSource);
         }
-        int[] indices=new int[cells.length];
+        int[] indices=copy?new int[cells.length]:cells;
         for(int i=0;i<cells.length;i++) {
             if((i&4095)==0)WorldProblem.check(cancelled);int choice=cells[i];
             if(choice<0||choice>=captured.size()||stateIndices.get(choice)!=snapshot.stateIndex(i))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Per-cell visual choice is absent or belongs to a different native block state");
-            var origin=nativeSources.get(choice);if(origin.isPresent()&&origin.orElseThrow().position().isPresent()&&!origin.orElseThrow().position().orElseThrow().equals(snapshot.extent().position(i)))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Position-dependent native visual was assigned to a different cell");indices[i]=choice;
+            var origin=nativeSources.get(choice);if(origin.isPresent()&&origin.orElseThrow().position().isPresent()&&!origin.orElseThrow().position().orElseThrow().equals(snapshot.extent().position(i)))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Position-dependent native visual was assigned to a different cell");if(copy)indices[i]=choice;
         }
         WorldProblem.check(cancelled);return new WorldModels(snapshot,layout,captured,indices,meshBytes,List.of());
     }
