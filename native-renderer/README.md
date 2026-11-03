@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These twelve native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These thirteen native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -111,3 +111,7 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 ## Loaded catalog ownership
 
 `NativeCapture.models` and `weighted` now also consume `RenderInput<ClientAssetSnapshot>` from the [selected-client loader](../renderer/ASSET-WORKER.md). A tracked catalog requires the same shared coordinator and stays retained through native capture and destination request admission. Retain a separate catalog owner for future regeneration or retry; the passed wrapper closes on failure as well as success. The existing raw catalog APIs, native provider/factory responsibilities and preview guards remain unchanged. These overloads are syntax-parsed only until genuine Windows native classpath compilation.
+
+## Native three-coordinate scalar resources
+
+`NativeNoiseSampler` and `NativeCapture.generatorVolume` / `expressionVolume` now supply admitted [full-height scalar volumes](../renderer/NOISE-VOLUME.md). They validate exact resource/loader/policy/session identity and preserve original finite doubles, configured world Y and native dimensional behavior. The pinned generator ignores Y internally; expression streams use their actual three-coordinate evaluator. Inline two-coordinate noise layers gain no invented 3D algorithm. Results contain owned detached samples, with no native resource/stream retained. Scalar display surfaces are distinct from Minecraft block IDs. Dedicated scalar GPU rendering, genuine native compilation and runtime fidelity remain pending.

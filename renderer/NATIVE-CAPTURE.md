@@ -77,3 +77,7 @@ Check input retain/close races, consuming closed/foreign/untracked inputs, retai
 ## Owned selected-client catalogs
 
 The model and weighted capture families now have consuming `RenderInput<ClientAssetSnapshot>` overloads for [background loaded catalogs](ASSET-WORKER.md). They retain a temporary source handle, reject a tracked catalog from another coordinator, and keep its charge through capture/destination request admission. The supplied wrapper closes on every outcome; retain another input first for retries or later regeneration. Raw-catalog APIs retain their existing external-ownership responsibility. Existing native session/RNG/provider contracts, 512 MiB aggregate capture bound, conservative source/destination overlap and unsupported visual/readiness guards remain unchanged. Genuine pinned native type checking remains pending.
+
+## Full-height scalar input
+
+`generatorVolume` and `expressionVolume` now return owned `NoiseVolume` inputs through the same admitted capture protocol. The separate [scalar-volume path](NOISE-VOLUME.md) samples every configured world Y through actual pinned resource APIs, then hands immutable samples to `NoiseSurfaceWorker` with exact coordinator checks and source retention through destination admission. No native state/biome or replacement noise formula is introduced. Scalar GPU presentation remains unfinished.

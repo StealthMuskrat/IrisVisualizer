@@ -13,7 +13,7 @@ import java.util.function.BooleanSupplier;
 public final class NativeCapture {
     private NativeCapture() {}
     private static final long WORLD_BYTES=512L*1024*1024;
-    public enum Kind { VOLUME, MODELS, WEIGHTED, VISUAL_EDIT, TERRAIN, BIOMES, NOISE_LAYER, GENERATOR, EXPRESSION }
+    public enum Kind { VOLUME, MODELS, WEIGHTED, VISUAL_EDIT, TERRAIN, BIOMES, NOISE_LAYER, GENERATOR, EXPRESSION, GENERATOR_VOLUME, EXPRESSION_VOLUME }
     public record WorldLimits(NativeWorldCapture.Limits volume,NativeWeightedInputs.Limits visuals) {
         public static final WorldLimits DEFAULT=new WorldLimits(NativeWorldCapture.Limits.DEFAULT,NativeWeightedInputs.Limits.DEFAULT);
         public WorldLimits { Objects.requireNonNull(volume);Objects.requireNonNull(visuals); }
@@ -156,6 +156,18 @@ public final class NativeCapture {
     }
     public static Result<MapRasterWorker.Request> expression(NativeRenderContext context,IrisExpression expression,MapSamples.Context source,MapSamples.Grid grid,MapRaster.Style style,MapRaster.Limits rasterLimits,MapCapture.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
         Objects.requireNonNull(expression);return map(Kind.EXPRESSION,context,style,rasterLimits,limits,memory,()->NativeMapSampler.expression(context,expression,source,grid,limits,cancelled),cancelled);
+    }
+    public static Result<NoiseVolume> generatorVolume(NativeRenderContext context,IrisGenerator generator,MapSamples.Context source,NoiseVolume.Grid grid,NoiseCapture.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(generator);Objects.requireNonNull(limits);
+        return capture(Kind.GENERATOR_VOLUME,context,memory,limits.workingBytes(),()->{
+            var volume=NativeNoiseSampler.generator(context,generator,source,grid,limits,cancelled);return volume.requiresPlaceholder()?failure(volume.problems(),List.of()):success(volume,volume.payloadBytes());
+        },cancelled);
+    }
+    public static Result<NoiseVolume> expressionVolume(NativeRenderContext context,IrisExpression expression,MapSamples.Context source,NoiseVolume.Grid grid,NoiseCapture.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(expression);Objects.requireNonNull(limits);
+        return capture(Kind.EXPRESSION_VOLUME,context,memory,limits.workingBytes(),()->{
+            var volume=NativeNoiseSampler.expression(context,expression,source,grid,limits,cancelled);return volume.requiresPlaceholder()?failure(volume.problems(),List.of()):success(volume,volume.payloadBytes());
+        },cancelled);
     }
     private static void check(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("Admitted native renderer capture cancelled"); }
 }

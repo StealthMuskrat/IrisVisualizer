@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
-      "sha256": "66b61b8908245ba4d6f307dfb8b3e9a5a14805b7a06b525ee277137ac7b1f216"
+      "sha256": "03110ca052b1aa1d2f40ddf25bbdca02b18283d41406ed4adaf2640ec0fcedb4"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",
@@ -21,6 +21,10 @@
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeModelInputs.java",
       "sha256": "3c81eebc58dbcef96d4886810f71cb20a773b5827d9bac7697b97dd6ff570d91"
+    },
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeNoiseSampler.java",
+      "sha256": "66e7a0ac9edf2d9bf8894145d3353aeac978dbbe3369998117ae1c0b24b1e22c"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeOffsets.java",
@@ -116,6 +120,20 @@
       "path": "patches/net/minecraft/client/renderer/LevelRenderer.java.patch",
       "blob": "2e7af67a7f61ba52c1f567f27eb7300269fd4bcf",
       "scope": "Unmodified vanilla block-state position seed call in model part collection; source review only"
+    },
+    {
+      "repository": "VolmitSoftware/Iris",
+      "revision": "c3359e0a16438b1bb8468901c6171dcefdf63f7f",
+      "path": "core/src/main/java/art/arcane/iris/generation/noise/IrisGenerator.java",
+      "blob": "6ff6032fbc53286a03c5f95e54abe7460a1d2e6b",
+      "scope": "Native three-coordinate getHeight currently ignores Y; adapter preserves this policy without inventing a 3D generator"
+    },
+    {
+      "repository": "VolmitSoftware/Iris",
+      "revision": "c3359e0a16438b1bb8468901c6171dcefdf63f7f",
+      "path": "core/src/main/java/art/arcane/iris/generation/noise/IrisExpression.java",
+      "blob": "eb96d30f05bbe5d827a5c6de2b0f0911af0b073d",
+      "scope": "Native expression stream provides distinct two/three-coordinate evaluation; exact native RNG/stream used"
     }
   ],
   "validation": "Source reviewed; native adapter compilation and runtime validation remain pending; renderer stage tests deferred"
