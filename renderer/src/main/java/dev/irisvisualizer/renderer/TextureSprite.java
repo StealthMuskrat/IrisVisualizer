@@ -37,6 +37,7 @@ public final class TextureSprite {
     public int frameWidth() { return frameWidth; }
     public int frameHeight() { return frameHeight; }
     public int tileCount() { return tiles; }
+    /** Effective playback state, not merely presence of an animation metadata section. */
     public boolean animated() { return animated; }
     public boolean interpolate() { return interpolate; }
     public List<Frame> frames() { return frames; }

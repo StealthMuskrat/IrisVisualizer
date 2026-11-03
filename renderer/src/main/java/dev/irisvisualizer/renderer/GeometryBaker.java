@@ -39,7 +39,6 @@ public final class GeometryBaker {
                 ModelTransforms.Element transform=null;
                 if(element.rotation().isPresent()) {
                     var rotation=element.rotation().get();
-                    require(!rotation.rescale(),ModelPlan.Code.UNSUPPORTED_GEOMETRY,new ModelPlan.Source(source.asset(),source.pointer()+"/rotation/rescale"),"Element rescale requires pinned native verification before baking");
                     double originLimit=limits.coordinateBlocks()*16;var origin=rotation.origin();
                     require(Math.abs((double)origin.x())<=originLimit && Math.abs((double)origin.y())<=originLimit && Math.abs((double)origin.z())<=originLimit,ModelPlan.Code.GEOMETRY_RANGE,source,"Element origin exceeds the supported local precision budget");
                     require(Math.abs((double)rotation.x())<=limits.angleDegrees() && Math.abs((double)rotation.y())<=limits.angleDegrees() && Math.abs((double)rotation.z())<=limits.angleDegrees(),ModelPlan.Code.GEOMETRY_RANGE,source,"Element angle exceeds the supported bake precision budget");

@@ -23,7 +23,7 @@ public record ModelPlan(ClientAssetSnapshot.Receipt assets,RenderBlockState stat
     }
     public record Vec3(float x,float y,float z) { public Vec3 { if(!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z))throw new IllegalArgumentException("Nonfinite model vector"); } }
     public record Uv(float u0,float v0,float u1,float v1) { public Uv { if(!Float.isFinite(u0)||!Float.isFinite(v0)||!Float.isFinite(u1)||!Float.isFinite(v1))throw new IllegalArgumentException("Nonfinite model UV"); } }
-    /** Model-unit origin; rotation is X, then Y, then Z. Rescale is retained for the future baker. */
+    /** Model-unit origin; X, then Y, then Z rotation, with optional pre-rotation per-axis rescale. */
     public record Rotation(Vec3 origin,float x,float y,float z,boolean rescale) {
         public Rotation { Objects.requireNonNull(origin);if(!Float.isFinite(x)||!Float.isFinite(y)||!Float.isFinite(z))throw new IllegalArgumentException("Nonfinite element rotation"); }
     }

@@ -37,7 +37,7 @@ No half-texel adjustment, UV shrink or native atlas epsilon is inferred. Source 
 
 ## Raster snapshots and animation patches
 
-`AtlasImages.capture(layout, tick, partialTick, cancelled)` materializes immutable base-level RGBA pages using the current scheduled tile of each sprite. Clock arguments follow `TextureSprite.sample`: nonnegative integer ticks and finite partial ticks in `[0,1)`. Each raster records its layout, clock and selected source tile per sprite. No native game clock is created.
+`AtlasImages.capture(layout, tick, partialTick, cancelled)` materializes immutable base-level RGBA pages using the current scheduled tile of each sprite. Clock arguments follow `TextureSprite.sample`: nonnegative integer ticks and finite partial ticks in `[0,1)`. Each raster records its layout, clock and selected source tile per sprite. Frame rectangles now support implicit horizontal/vertical strips and either single-axis dimension. Zero/one-entry metadata yields the effective static top-left tile throughout capture, alpha analysis and updates; see [model coverage](MODEL-COVERAGE.md). No native game clock is created.
 
 Multi-frame interpolated sprites are guarded before raster allocation because the pinned native RGB/alpha interpolation policy is unverified. Layout and UV planning can still represent them, and their texture metadata remains intact. Single referenced tiles, repeated references to that tile, and animations without interpolation can be rasterized. Blur/clamp/mipmap settings remain retained source metadata; this batch creates neither filtered samples nor mip levels.
 

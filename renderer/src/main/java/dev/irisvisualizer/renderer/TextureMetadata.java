@@ -49,20 +49,18 @@ final class TextureMetadata {
         var settings=new TextureSprite.Settings(parser.flag(texture.get("blur"),"/texture/blur"),parser.flag(texture.get("clamp"),"/texture/clamp"),strategy,bias);
         int width=image.width(),height=image.height();boolean animated=root.containsKey("animation"),interpolate=false;var frames=new ArrayList<TextureSprite.Frame>();
         if(animated) {
+            if(remainingFrames<1)throw failure(ModelPlan.Code.LIMIT,ClientAssetSnapshot.Kind.TEXTURE_METADATA,id,"/animation/frames","Sprite schedule budget reached");
             var animation=parser.object(root.get("animation"),"/animation",Set.of("width","height","frametime","frames","interpolate"));
             boolean hasWidth=animation.containsKey("width"),hasHeight=animation.containsKey("height");
-            if(hasWidth!=hasHeight)throw parser.format("/animation","Single-axis animation sizes require pinned-client layout verification");
-            if(hasWidth) { width=parser.integer(animation.get("width"),0,1,image.width(),"/animation/width");height=parser.integer(animation.get("height"),0,1,image.height(),"/animation/height"); }
-            else {
-                if(image.width()>image.height())throw parser.format("/animation","Implicit horizontal animation layout requires pinned-client verification");
-                width=height=image.width();
-            }
+            if(hasWidth||hasHeight) {
+                width=hasWidth?parser.integer(animation.get("width"),0,1,image.width(),"/animation/width"):image.width();
+                height=hasHeight?parser.integer(animation.get("height"),0,1,image.height(),"/animation/height"):image.height();
+            } else width=height=Math.min(image.width(),image.height());
             if(image.width()%width!=0||image.height()%height!=0)throw parser.format("/animation","Sprite sheet is not a whole number of animation tiles");
             int tiles=(image.width()/width)*(image.height()/height),time=parser.integer(animation.get("frametime"),1,1,Integer.MAX_VALUE,"/animation/frametime");
             interpolate=parser.flag(animation.get("interpolate"),"/animation/interpolate");
             if(animation.containsKey("frames")) {
                 if(!(animation.get("frames") instanceof AssetJson.ArrayValue array))throw parser.format("/animation/frames","Expected an animation frame list");
-                if(array.values().isEmpty())throw parser.format("/animation/frames","Explicit empty animation requires pinned-client verification");
                 if(array.values().size()>remainingFrames)throw failure(ModelPlan.Code.LIMIT,ClientAssetSnapshot.Kind.TEXTURE_METADATA,id,"/animation/frames","Animation frame budget reached");
                 for(int i=0;i<array.values().size();i++) {
                     parser.check();String pointer="/animation/frames/"+i;var value=array.values().get(i);int index,duration=time;
@@ -75,6 +73,11 @@ final class TextureMetadata {
             } else {
                 if(tiles>remainingFrames)throw failure(ModelPlan.Code.LIMIT,ClientAssetSnapshot.Kind.TEXTURE_METADATA,id,"/animation/frames","Implicit animation frame budget reached");
                 for(int i=0;i<tiles;i++) { parser.check();frames.add(new TextureSprite.Frame(i,time)); }
+            }
+            // The client creates no animation state for zero/one schedule entries.
+            // Its static upload uses the sheet's top-left tile, even for a lone nonzero index.
+            if(frames.size()<=1) {
+                frames.clear();frames.add(new TextureSprite.Frame(0,1));animated=false;interpolate=false;
             }
         } else {
             if(remainingFrames<1)throw failure(ModelPlan.Code.LIMIT,ClientAssetSnapshot.Kind.TEXTURE,id,"","Static sprite frame budget reached");frames.add(new TextureSprite.Frame(0,1));

@@ -47,19 +47,28 @@ final class ModelTransforms {
         double v(double u,double v) { return 8+c*(u-8)+d*(v-8); }
     }
     static final class Element {
-        private final V origin;private final double a,b,c,d,e,f,g,h,i;private final boolean identity;
+        private final V origin;private final double a,b,c,d,e,f,g,h,i,scaleX,scaleY,scaleZ;private final boolean identity;
         Element(ModelPlan.Rotation rotation) {
             origin=vector(rotation.origin());identity=rotation.x()==0 && rotation.y()==0 && rotation.z()==0;
             double x=StrictMath.toRadians(rotation.x()),y=StrictMath.toRadians(rotation.y()),z=StrictMath.toRadians(rotation.z());
             double sx=StrictMath.sin(x),cx=StrictMath.cos(x),sy=StrictMath.sin(y),cy=StrictMath.cos(y),sz=StrictMath.sin(z),cz=StrictMath.cos(z);
             a=cz*cy;b=cz*sy*sx-sz*cx;c=cz*sy*cx+sz*sx;
             d=sz*cy;e=sz*sy*sx+cz*cx;f=sz*sy*cx-cz*sx;g=-sy;h=cy*sx;i=cy*cx;
+            // Each rotated unit axis is expanded until its largest component reaches one.
+            scaleX=rotation.rescale()&&!identity?1/Math.max(Math.abs(a),Math.max(Math.abs(d),Math.abs(g))):1;
+            scaleY=rotation.rescale()&&!identity?1/Math.max(Math.abs(b),Math.max(Math.abs(e),Math.abs(h))):1;
+            scaleZ=rotation.rescale()&&!identity?1/Math.max(Math.abs(c),Math.max(Math.abs(f),Math.abs(i))):1;
         }
         V position(V input) {
             if(identity)return input;V p=input.subtract(origin);
-            // p + (R-I)(p-origin) avoids discarding small input coordinates for a large origin.
-            return input.add(new V((a-1)*p.x()+b*p.y()+c*p.z(),d*p.x()+(e-1)*p.y()+f*p.z(),g*p.x()+h*p.y()+(i-1)*p.z()));
+            // input + (R*S-I)(input-origin) preserves small coordinates near a large origin.
+            return input.add(new V((a*scaleX-1)*p.x()+b*scaleY*p.y()+c*scaleZ*p.z(),d*scaleX*p.x()+(e*scaleY-1)*p.y()+f*scaleZ*p.z(),g*scaleX*p.x()+h*scaleY*p.y()+(i*scaleZ-1)*p.z()));
         }
-        V normal(V input) { return identity?input:new V(a*input.x()+b*input.y()+c*input.z(),d*input.x()+e*input.y()+f*input.z(),g*input.x()+h*input.y()+i*input.z()); }
+        V normal(V input) {
+            if(identity)return input;
+            // Inverse transpose of R*S is R*inverse(S); the baker normalizes afterward.
+            double x=input.x()/scaleX,y=input.y()/scaleY,z=input.z()/scaleZ;
+            return new V(a*x+b*y+c*z,d*x+e*y+f*z,g*x+h*y+i*z);
+        }
     }
 }

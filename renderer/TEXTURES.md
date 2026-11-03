@@ -1,6 +1,6 @@
 # CPU texture preparation
 
-Renderer-stage implementation, 2026-11-03. All 43 CPU renderer sources compile with Java 25, including the later [CPU atlas layer](ATLAS.md). Runtime tests remain deferred until renderer implementation is complete. No user-selected client archive, native decoder, animation or GPU result has been exercised for this batch. Unsupported previews remain disabled.
+Renderer-stage implementation, 2026-11-03. The CPU renderer and separate OpenGL backend compile with Java 25, including the later [CPU atlas layer](ATLAS.md). Runtime tests remain deferred until renderer implementation is complete. No user-selected client archive, native decoder, animation or GPU result has been exercised for this batch. Unsupported previews remain disabled.
 
 ## Snapshot-bound contract
 
@@ -25,17 +25,20 @@ The supported metadata fields follow the [NeoForge texture documentation](https:
 | Input | CPU behavior |
 | --- | --- |
 | No animation section | Full image is one static tile |
-| Empty animation object | Square vertical-strip tiles using image width; height must divide exactly |
+| Empty animation object | Square tiles using the smaller image dimension; horizontal/vertical strips must divide exactly |
+| Only width | Declared frame width and full image height |
+| Only height | Full image width and declared frame height |
 | Explicit width and height | Whole-tile row-major grid, including rectangular tiles |
-| Omitted frames | Every grid tile in order |
+| Omitted frames | Every grid tile in row-major order |
+| Zero/one schedule entries | Static top-left tile, with interpolation disabled; a lone nonzero index does not select that tile |
 | Frame number | Tile index with default positive `frametime` |
 | Frame object | Required `index`, optional positive `time`; repetitions/order preserved |
 | `interpolate` | Intent retained with current/next indices and fractional progress; pixels are not blended |
 | Texture settings | Blur, clamp, mean/cutout/strict_cutout/dark_cutout strategy and finite cutoff bias retained; no filtering/mipmaps applied |
 
-Single-axis dimensions, implicit horizontal layout, explicit empty frame lists and unknown fields fail explicitly rather than guessing native behavior. Root sections outside `texture`/`animation`, including GUI-specific metadata on a referenced sprite, are currently unsupported. Strict bounded UTF-8 JSON rejects duplicate keys, malformed strings and nonfinite values; tile indices and exact positive durations are checked. Metadata absence is distinct from malformed metadata.
+Sizing and effective playback now follow the reviewed 26.3 source structure; see [model coverage](MODEL-COVERAGE.md). Unknown fields fail explicitly. Invalid frame indices and durations are rejected rather than reproducing the client's warning-and-removal recovery. Root sections outside `texture`/`animation`, including GUI-specific metadata on a referenced sprite, are currently unsupported. Strict bounded UTF-8 JSON rejects duplicate keys, malformed strings and nonfinite values; tile indices and exact positive durations are checked. Metadata absence is distinct from malformed metadata.
 
-`TextureSprite.sample(long tick, double partialTick)` takes a nonnegative external integer tick and finite partial tick in `[0,1)`. It uses integer modulo and binary search over long duration totals, preserving large-clock and duration boundaries without converting the clock to a floating value. It returns the selected sequence slot, current/next tile and blend fraction. No game clock, PRNG, frame upload, native RGB/alpha interpolation rule or mipmap regeneration is supplied. Referenced tile indices are separately deduplicated for alpha work.
+`TextureSprite.sample(long tick, double partialTick)` takes a nonnegative external integer tick and finite partial tick in `[0,1)`. It uses integer modulo and binary search over long duration totals, preserving large-clock and duration boundaries without converting the clock to a floating value. It returns the selected effective sequence slot, current/next tile and blend fraction. Zero/one-entry metadata becomes a single `(tile 0, duration 1)` entry; PNG/metadata digests retain source identity, and `animated()` reports effective playback rather than section presence. No game clock, PRNG, frame upload, native RGB/alpha interpolation rule or mipmap regeneration is supplied. Referenced tile indices are separately deduplicated for alpha work.
 
 ## Conservative alpha candidates
 
@@ -65,6 +68,6 @@ Counts exclude object overhead, JSON text, temporary encoded copies, scanline bu
 
 At renderer completion, run known PNG vectors for all legal color/depth forms, five filters, small/odd Adam7 passes, palettes and transparency keys at original precision, ignored profiles, 16-bit reduction and exact immutable pixel/buffer copies. Include bad signatures/header fields, CRCs/order, duplicate/unknown critical chunks, palette misuse, zlib checksum/dictionary/truncation/excess/trailing streams, chunk limits and cancellation in every phase. Compare source samples with the pinned native decoder, including transparent RGB and color metadata.
 
-Exercise static/animated distinction, explicit grids, frame objects/order/repetition, omitted defaults, tile and duration boundaries, large clocks, fractional rollover, malformed/duplicate-key metadata and guarded layouts/fields. Compare native frame sizing, empty lists, interpolation channel policy and all mipmap strategies before lifting guards or using candidates for actual drawing.
+Exercise static/animated distinction, implicit horizontal/vertical strips, each single-axis dimension, explicit rectangular grids, divisibility, frame objects/order/repetition, empty and single-entry schedules (including nonzero indices), omitted defaults, tile and duration boundaries, large clocks, fractional rollover, malformed/duplicate-key metadata and guarded fields. Compare effective tile selection, native frame sizing, interpolation channel policy and all mipmap strategies against the selected pinned client.
 
 Validate subrectangles/mirrors/rotated UV corners, exact boundaries, degenerate UVs, opaque/zero/partial samples, forced translucency, later and unused frames, interpolation uncertainty, duplicate-region caching, face ordering, wrong archive/version, aggregate budgets, cancellation and whole-result failure. Native model/atlas/pass comparison, full world integration and visible Windows/GPU checks remain required before previews can be enabled. No renderer tests were executed for this implementation batch.

@@ -22,7 +22,7 @@ final class ModelResolver {
             }
             if(raw.ambientOcclusion().isPresent())ao=raw.ambientOcclusion().get();
             if(raw.elements().isPresent()) {
-                if(raw.elements().get().isEmpty() && raw.parent().isPresent())throw fail(ModelPlan.Code.UNSUPPORTED_INHERITANCE,raw.id(),"/elements","Explicit empty child geometry requires native inheritance verification");
+                // Present empty geometry replaces the parent just like a nonempty declaration.
                 geometry=raw.elements().get();geometryOwner=raw.id();
             }
         }
