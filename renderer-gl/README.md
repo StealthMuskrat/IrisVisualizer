@@ -1,0 +1,71 @@
+# OpenGL backend
+
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds seven Java sources to the 42-source CPU renderer. All 49 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+
+Compile the library with a Java 25 JDK:
+
+```powershell
+gradle -p renderer-gl classes
+```
+
+The module depends on `../renderer` and pinned LWJGL core/OpenGL/GLFW Java libraries. The context owner supplies Windows x64 natives. It creates no window, downloads no assets/runtime and changes no editor packaging or readiness gate. The editor's current OpenGL requirement is unchanged; this backend separately requires a **GLFW OpenGL 3.3 core context** with LWJGL capabilities already initialized.
+
+## Context and ownership
+
+Construct `GlDevice` on the thread owning the current context. Every live GPU operation checks the original thread, GLFW context handle and LWJGL capabilities object. Close GPU resources before destroying that context. Context loss/replacement and cross-thread disposal do not silently free accounting or submit work to a different context.
+
+`GlRenderer.create(device)` builds two shader programs and shared diagnostic cube buffers. `GlTarget.create(device, width, height)` creates an owned, single-sample RGBA8/depth24 framebuffer, initialized to transparent color and cleared depth. It does not resize or draw into the host window framebuffer. Target dimension/pixel limits are checked against both configured ceilings and hardware texture/renderbuffer limits.
+
+`GlScene.upload(renderer, cpuResult, cancelled)` **consumes the `WorldScene.Result` lease on every outcome** after nonnull argument checks. Do not separately close that result after invoking upload. Preflight failure closes it immediately. Successful or partially submitted GPU work transfers it into the device's allocation journal; it stays leased until actual resource retirement. This prevents CPU cache data from being counted as free while a live/retired GPU scene still owns it. `cpuScene()` only borrows that data while the GPU scene remains live.
+
+Upload preflight validates the complete scene/raster, hardware atlas size, materials, object counts and combined known CPU/GPU/staging budget. It then allocates base-level textures and per-section vertex/index/marker-instance buffers. Immutable CPU buffer views stream through one explicitly owned native staging allocation, in bounded chunks. Texture transfers use whole tightly packed row groups and explicit unpack state; no full-image direct buffer copy or pixel-unpack-buffer allocation is introduced. Cancellation is checked between sections, faces, row groups and chunks.
+
+No partial `GlScene` is returned after failure or cancellation. Already submitted allocations remain in the journal for deferred cleanup, including their CPU lease and budget charges. Driver allocation failure can still occur within configured limits; byte ceilings are not available-VRAM guarantees.
+
+## Drawing and visual boundaries
+
+`renderer.render(scene, target, camera)` draws section-relative meshes into the target. `GlCamera` uses an exact integer world anchor and finite relative eye/target coordinates, computes a perspective/look-at matrix, and subtracts section origins as integers before float conversion. Camera/offset precision bounds and degenerate views fail before drawing.
+
+The geometry pass uses nearest/base-level texture sampling, source normals and simple directional lighting. Opaque and binary cutout candidates retain their original indexed ranges and face order. The cutout shader discards alpha below 0.5; with unfiltered binary samples this separates zero/full alpha, but native filtered/mipmap/cutoff parity remains unverified. No sRGB conversion, AO, native light/emission/shade-override application or native mipmap/interpolation rule is claimed.
+
+Tinted faces and translucent candidates are explicitly rejected before allocation. Their native biome tint and transparency/sorting paths remain unfinished; the backend does not silently draw them with guessed colors or opaque blending. Fluids/special render shapes still require native producers upstream. CPU model/state/biome data remains unchanged.
+
+A second shader draws placeholder markers as instanced magenta unit-cell wire boxes with crossed diagonals. Instance order maps to the source marker list; original block IDs, states and asset problems remain available through the CPU scene. Markers use depth testing rather than replacing terrain data with another block type. The shared cube buffers remain dependency-pinned until all referencing scene VAOs are released.
+
+Before drawing, the target becomes incomplete. Only a successful draw **and** host-state restoration marks it complete again. `textureId()` rejects an incomplete, retired or released target. Its returned GL texture name is borrowed: consumers must not retain/use it after a failed update or target retirement. A later UI integration must adopt only successful frames, using separate targets when it needs to retain an old frame atomically.
+
+The backend snapshots/restores the core state it changes: program, framebuffer/read/renderbuffer bindings, VAO/array/unpack buffers, texture/sampler unit zero, pixel unpack alignment/rows/skips, depth/cull/polygon/line state, color mask/blending at draw buffer zero, relevant enable flags, clip distances, and viewport/scissor/depth-range arrays where supported. It edits only its own texture/FBO/VAO objects. Other extension interactions and actual host-state isolation remain runtime validation requirements. Enter with a clean GL error state; errors are reported rather than silently consumed as success.
+
+## Retirement and failure cleanup
+
+Closing a scene, target or renderer marks its allocation retired and inserts a fence after previously submitted work. `device.collect()` polls fences with zero wait time, deletes eligible objects only after completion, then releases their GPU charge and CPU scene lease. Call it periodically even after a failed upload; retirement does not require another successful draw. Shader/cube dependencies prevent parent resources from being deleted while a scene still references them. A parent may require a later collection pass after its children retire.
+
+Every allocation already has a journal entry before GL objects are created. Fence/cleanup failure therefore cannot lose its ownership record. An allocation without a usable retirement fence remains quarantined and charged. `device.close()` explicitly finishes GPU work, deletes children before dependencies, releases CPU owners and frees native staging. This final teardown may block and must happen while the original context is current. Context/driver/process-wide failure recovery is not guaranteed; failed deletion does not falsely release a budget charge.
+
+Close methods are idempotent after release. Previously returned Java/native identifiers are borrowed and cannot extend a closed object's legal lifetime. Escaping CPU scene references after owner release is also outside the ownership contract.
+
+## Numerical bounds
+
+| Resource | Default and hard ceiling |
+| --- | --- |
+| Reserved active/retired GPU payload | 512 MiB |
+| Known retained CPU + GPU + native staging payload | 1 GiB |
+| Native staging | 4 MiB; configurable down to 64 KiB |
+| Allocation journals / object names | 64 / 65,536 |
+| Offscreen dimension / pixels | 4,096 / 16,777,216 |
+| Captured viewport / clip-distance slots | 32 / 32 |
+| Relative camera/section component magnitude | 1,048,576 |
+
+Counts include buffers, textures, VAOs, FBOs, renderbuffers, programs and shaders. At most one fence belongs to each allocation journal. Texture bytes use RGBA8; framebuffer bytes reserve four color plus four depth bytes per pixel, conservatively rounding depth24. Geometry uses the existing packed size; marker instances add 12 bytes per marker; shared cube arrays add 224 bytes. Each live/retired scene conservatively charges its entire CPU scene primitive payload, even when another allocation shares some inputs.
+
+Opaque shader/driver allocation overhead, alignment/storage overhead, native/JNI internal scratch, Java objects/collections, captured ZIP bytes, unrelated cache entries, active/pending input bundles, external native generation work and other application/GPU resources remain outside these byte estimates. These proposed backend limits do not confirm total application memory or alter preview defaults. Admission includes all still-charged retired allocations; the backend never shrinks the world or textures to fit.
+
+## Deferred renderer-stage verification
+
+At stage completion, run a real OpenGL 3.3 core context and representative higher-version contexts on Windows. Compile/link both shaders, verify matrix orientation/winding/UVs at distant anchors, compare GPU output with known CPU/native fixtures, and check target initialization/size/depth/alpha, binary cutout, lighting and marker visibility/picking provenance. Confirm tint/translucency guards fail before allocation and preserve native inputs.
+
+Exercise streaming across every chunk/row boundary, hostile host unpack/PBO/texture/sampler/VAO/FBO state, per-buffer blend/color masks, indexed/fractional viewports/scissors/depth ranges, clip distances and all modified enable states. Verify restoration on success, cancellation, allocation/shader errors and incomplete frames. Run foreign-thread/context/capabilities and use-after-retirement cases without corrupting the host.
+
+Control fence completion to prove retired resources and CPU leases stay charged; test timeout, failed fence, deletion/quarantine, dependency-pinned shared buffers, repeated close, device teardown and partial-upload cleanup. Check every configured/hardware/object/working limit, multiple live scenes/targets, allocation failure and staging reclamation. Measure large-upload responsiveness before integrating a per-frame upload scheduler. Native material fidelity, animated GPU updates, translucent rendering, editor adoption/readiness and visible GPU QA remain unfinished. No renderer tests were executed in this batch.
+
+API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl/opengl/GL33C.html), [Khronos sync wait contract](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glClientWaitSync.xhtml). Pinned method signatures were checked from the local 3.4.1 JARs; Java compilation does not validate GL execution or GLSL programs.

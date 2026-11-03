@@ -1,0 +1,3 @@
+rootProject.name = 'IrisVisualizerOpenGL'
+include ':renderer'
+project(':renderer').projectDir = file('../renderer')

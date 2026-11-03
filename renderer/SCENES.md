@@ -1,6 +1,6 @@
 # Complete CPU scenes and latest-request assembly
 
-Renderer implementation, 2026-11-03. All 42 renderer sources compile with Java 25. Renderer runtime tests remain deferred until stage implementation is complete. Native world/model comparisons, cache/concurrency runtime verification, GPU drawing and visible Windows checks have not been executed for this batch. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 42 CPU renderer sources compile with Java 25. The separate [OpenGL backend](../renderer-gl/README.md) adds seven compiling sources, without editor integration. Renderer runtime tests remain deferred until stage implementation is complete. Native world/model comparisons, cache/concurrency runtime verification, GPU drawing and visible Windows checks have not been executed for this batch. Unsupported previews remain disabled.
 
 ## Complete coverage before emission
 

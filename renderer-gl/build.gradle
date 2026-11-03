@@ -1,0 +1,10 @@
+plugins { id 'java-library' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+dependencies {
+    api project(':renderer')
+    implementation 'org.lwjgl:lwjgl:3.4.1'
+    implementation 'org.lwjgl:lwjgl-opengl:3.4.1'
+    implementation 'org.lwjgl:lwjgl-glfw:3.4.1'
+}
+// The context owner supplies platform natives. No window, runtime download or preview task is added.
