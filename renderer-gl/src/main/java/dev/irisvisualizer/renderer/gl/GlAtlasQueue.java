@@ -41,13 +41,13 @@ public final class GlAtlasQueue implements AutoCloseable {
         catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
     }
     public Status advance(GlUploadBudget budget,long latestScene,long latestFrame) {
-        Objects.requireNonNull(budget);current();if(!observe(latestScene,latestFrame)||active==null)return status;
+        Objects.requireNonNull(budget);current();if(!observe(latestScene,latestFrame)||(status.phase()!=Phase.UPDATING&&status.phase()!=Phase.READY)||active==null)return status;
         try { device.live(scene.allocation);active.step(budget,()->false);status=state(active.ready()?Phase.READY:Phase.UPDATING,null,"");return status; }
         catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
     }
     /** Caller adopts only against its still-displayed frame; neither stale nor failed work closes it. */
     public Optional<Completion> take(long latestScene,long latestFrame,GlAtlasFrame displayed) {
-        Objects.requireNonNull(displayed);current();if(!observe(latestScene,latestFrame)||active==null||!active.ready())return Optional.empty();
+        Objects.requireNonNull(displayed);current();if(!observe(latestScene,latestFrame)||status.phase()!=Phase.READY||active==null||!active.ready())return Optional.empty();
         try {
             displayed.requireScene(scene);if(displayed.token()!=active.expectedToken()) { releaseOwned();status=state(Phase.STALE,GlFailure.Code.STALE,"The displayed atlas baseline changed");return Optional.empty(); }
             var result=Optional.of(new Completion(sceneRevision,frameRevision,active.readyFrame()));var delivered=new Status(sceneRevision,frameRevision,Phase.DELIVERED,status.progress(),Optional.empty(),"");

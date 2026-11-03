@@ -54,7 +54,7 @@ public final class WorldScene {
     private static Result execute(WorldScenePlan plan,AtlasRaster raster,WorldSectionCache cache,BooleanSupplier cancelled) {
         if(plan.requiresPlaceholder())return Result.failed(plan.snapshot().source(),plan.problems());
         if(raster.requiresPlaceholder()||raster.layout()!=plan.layout())throw WorldProblem.fail(WorldProblem.Code.ATLAS,"Scene raster must be successful and share the exact planned atlas epoch");
-        WorldProblem.check(cancelled);cache.prepare(plan);
+        WorldProblem.check(cancelled);cache.prepare(plan,cancelled);
         try(var work=new Work(plan.sections().size())) {
             long bytes=0,covered=0;int faces=0,cells=0,markers=0;
             for(var section:plan.sections()) {

@@ -1,12 +1,12 @@
 # Native inspection and camera navigation
 
-Renderer implementation, 2026-11-03. All 74 Java sources compile with Java 25 and pinned LWJGL 3.4.1: 55 CPU and 19 OpenGL sources. No picking, shared-lease/concurrency, camera, pixel comparison, GL or interactive Windows tests have run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 76 Java sources compile with Java 25 and pinned LWJGL 3.4.1: 55 CPU and 21 OpenGL sources. No picking, shared-lease/concurrency, camera, pixel comparison, GL or interactive Windows tests have run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
 
 ## Shared ownership of an exact scene
 
 `WorldScene.Result.retain()` returns an independent owner of the same immutable CPU scene. Retaining after close fails. Each shared ticket bundle allows at most 65,536 live result owners. A new owner is allocated before its reference count increases, so failed owner allocation cannot leak a reference. Each wrapper's close is idempotent and clears its shared-scene reference. Cache tickets remain pinned until the final shared owner closes.
 
-Retaining does not duplicate meshes or add one cache ticket per section again. Cache statistics continue to count actual section tickets, while their shared bundle remains live. Closing a GPU scene does not invalidate another retained CPU owner. Closing a cache keeps shared tickets charged as before; all owners must finish before a different native epoch can be admitted. An escaped bare scene reference is still outside the ownership contract.
+Retaining does not duplicate meshes or add one cache ticket per section again. Cache statistics continue to count actual section tickets, while their shared bundle remains live. Closing a GPU scene does not invalidate another retained CPU owner. Closing a cache keeps shared tickets charged as before; each pinned epoch remains charged when a different native epoch is admitted within the shared aggregate budget. Insufficient combined capacity still blocks replacement. An escaped bare scene reference is still outside the ownership contract.
 
 `GlScene.retainCpuScene()` checks the original context/device and returns this independent CPU owner. The returned owner can be transferred to a worker without calling GL there. Close it explicitly or transfer it to `WorldPickIndex.prepare`. Do not pass a result owner already consumed by GPU upload or another index; obtain a fresh retained owner first. This does not change the existing duplicate-device-owner protection in upload.
 

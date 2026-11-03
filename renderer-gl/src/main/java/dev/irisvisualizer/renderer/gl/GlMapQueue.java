@@ -28,12 +28,12 @@ public final class GlMapQueue implements AutoCloseable {
         catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }
     }
     public Status advance(GlUploadBudget budget,long latestRevision) {
-        Objects.requireNonNull(budget);current();if(latestRevision<1)throw new IllegalArgumentException("Invalid map revision");if(latestRevision>revision) { invalidate(latestRevision);return status; }if(latestRevision<revision||active==null)return status;
+        Objects.requireNonNull(budget);current();if(latestRevision<1)throw new IllegalArgumentException("Invalid map revision");if(latestRevision>revision) { invalidate(latestRevision);return status; }if(latestRevision<revision||status.phase()!=Phase.UPLOADING||active==null)return status;
         try { var progress=active.step(budget,()->false).progress();if(active.ready()) { completed=active.take();active.close();active=null;status=new Status(revision,Phase.READY,status.context(),Optional.of(progress),Optional.empty(),""); }else status=new Status(revision,Phase.UPLOADING,status.context(),Optional.of(progress),Optional.empty(),"");return status; }
         catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }
     }
     public Optional<Completion> take(long latestRevision) {
-        current();if(latestRevision<1)throw new IllegalArgumentException("Invalid map revision");if(latestRevision>revision) { invalidate(latestRevision);return Optional.empty(); }if(latestRevision!=revision||completed==null)return Optional.empty();
+        current();if(latestRevision<1)throw new IllegalArgumentException("Invalid map revision");if(latestRevision>revision) { invalidate(latestRevision);return Optional.empty(); }if(latestRevision!=revision||status.phase()!=Phase.READY||completed==null)return Optional.empty();
         var value=Optional.of(new Completion(revision,completed));var delivered=new Status(revision,Phase.DELIVERED,status.context(),status.progress(),Optional.empty(),"");completed=null;status=delivered;return value;
     }
     private void failed(Throwable failure) { var code=failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);status=new Status(revision,Phase.FAILED,status.context(),status.progress(),Optional.of(code),reason); }

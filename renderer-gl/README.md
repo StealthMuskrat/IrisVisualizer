@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds nineteen Java sources to the 55-source CPU renderer. All 74 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-one Java sources to the 55-source CPU renderer. All 76 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -47,6 +47,10 @@ The backend snapshots/restores the core state it changes: program, framebuffer/r
 ## 2D map textures
 
 The [map rendering path](../renderer/MAPS.md) adds `GlMapUpload`, `GlMap` and `GlMapQueue` for CPU-colorized native terrain/biome/noise maps. Uploads charge source samples plus image immediately, expand GPU storage only at the first storage step, stream whole rows, restore host state at yields and expose only complete immutable textures. Latest-revision adoption leaves displayed caller-owned maps alone. Texture row zero uses V=0 for a later top-left image widget. This path adds no shader, native sampler, editor integration or readiness gate. Source and GPU charges follow the same device retirement/quarantine contract.
+
+## Completed-frame presentation
+
+`GlFrame` renders into a fresh private target, captures exact successful frame metadata and retains independent image/CPU-inspection ownership. `GlFrameQueue` checks latest revisions/obsolescence before transfer; failed draw/resize work never redraws a prior caller-owned image. Source allocations remain dependency-pinned and changed animated CPU pages are charged explicitly. The [frame/replacement contract](FRAMES.md) also describes multi-epoch scene-cache admission and cleanup-phase guards across upload queues. No editor presentation or readiness gate is enabled.
 
 ## Retirement and failure cleanup
 
