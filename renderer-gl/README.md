@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 68-source CPU renderer. All 97 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 69-source CPU renderer. All 98 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 

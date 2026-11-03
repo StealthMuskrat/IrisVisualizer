@@ -16,6 +16,8 @@ One active request and one replaceable pending request are retained. Accepted su
 
 The [native visibility bridge](NATIVE-VISIBILITY.md) now supplies masks from the actual vanilla block-face predicate. `NativeSceneInputs.capture` can capture native offsets, model decisions and visibility in one borrowed session, then hand off a complete detached `ModelRequest`. Streaming mask capture avoids an extra full-volume source array; native validation and final application admission remain pending.
 
+The [weighted native input adapter](WEIGHTED-CHOICES.md) can now return the existing ready `WorldRenderWorker.Request` after inspecting bounded selection descriptors and capturing actual per-cell native choices, offsets and visibility under one borrowed session. Its dedicated random source must match the pinned renderer. The queue retains no native random/list/session object; JSON geometry/textures/scenes still prepare on the same CPU worker. Genuine native/factory/pixel validation remains pending.
+
 ## CPU admission across phases
 
 | Resource | Default / hard ceiling |

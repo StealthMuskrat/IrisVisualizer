@@ -36,6 +36,7 @@ public final class WorldModelInputs {
             return new Request(assets,snapshot,offsets,frozen,tick,partialTick,limits);
         }
         public WorldSnapshot snapshot() { return snapshot; }
+        public List<Decision> decisions() { return decisions; }
         public WorldOffsets offsets() { return offsets; }
         public Limits limits() { return limits; }
         public long inputBytes() { return assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes(); }

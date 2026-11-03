@@ -35,6 +35,10 @@
       "sha256": "6bd33015912fd122529e5f4bda239b4fa270f5b99c83fceb2e7898b92ebe54fe"
     },
     {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWeightedInputs.java",
+      "sha256": "e3bcaf84fa3f27adc0da342f11b12b00d50e01e6a5e86dd9ca0a75fb40eeb5cd"
+    },
+    {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWorldCapture.java",
       "sha256": "cdc0977cfff7f0108e2533cf20e7081229d77e5468184dd9b1dffa91dbe18a76"
     }
@@ -72,6 +76,34 @@
       "path": "patches/net/minecraft/client/renderer/block/ModelBlockRenderer.java.patch",
       "blob": "3bb9df86777f2e0a47805ef8c679050b415d357b",
       "scope": "Unmodified vanilla BlockState.getOffset(BlockPos) call before native model rendering; no client classes or NeoForge code executed"
+    },
+    {
+      "repository": "neoforged/NeoForge",
+      "revision": "b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4",
+      "path": "patches/net/minecraft/client/renderer/block/dispatch/WeightedVariants.java.patch",
+      "blob": "b9b842c8531a87282bff725cae7c534550911a1a",
+      "scope": "Unmodified vanilla weighted-list model selection call; no client classes executed"
+    },
+    {
+      "repository": "neoforged/NeoForge",
+      "revision": "b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4",
+      "path": "patches/net/minecraft/client/renderer/block/dispatch/multipart/MultiPartModel.java.patch",
+      "blob": "252a82b6c3c6caf737e6c9565dcb683dea8dad04",
+      "scope": "Unmodified vanilla multipart nextLong and per-part setSeed policy; no client classes executed"
+    },
+    {
+      "repository": "neoforged/NeoForge",
+      "revision": "b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4",
+      "path": "patches/net/minecraft/util/random/WeightedList.java.patch",
+      "blob": "229ceac9fa01aec24ca02b70bc8b2cb02f1d9735",
+      "scope": "Native common weighted-list builder/add/build API; no NeoForge overloads used"
+    },
+    {
+      "repository": "neoforged/NeoForge",
+      "revision": "b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4",
+      "path": "patches/net/minecraft/client/renderer/LevelRenderer.java.patch",
+      "blob": "2e7af67a7f61ba52c1f567f27eb7300269fd4bcf",
+      "scope": "Unmodified vanilla block-state position seed call in model part collection; source review only"
     }
   ],
   "validation": "Source reviewed; native adapter compilation and runtime validation remain pending; renderer stage tests deferred"

@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These eight native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These nine native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -43,7 +43,7 @@ The terrain policy samples the native integer height API with explicit floor qua
 
 `MapCapture` preflights grid and input/copy bytes before sampling, collects exact native biome identities, and checks explicit presence, finite noise, full-height terrain bounds, text/count limits and identity conflicts. It calls native completion guards before and after immutable capture. Native samplers mark every successful queried point present; native exceptions or session faults fail the complete result. The generic sampler API can carry explicit absent samples, but an all-absent biome map without a supplied identity fails instead of inventing a palette. Cancellation propagates separately.
 
-Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Native block/fluid/special visual geometry, model tickets, tint and optional lighting producers remain separate pending work. These adapters supply no rendered approximation for them.
+Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Native block/fluid/special visual geometry, tint and optional lighting producers remain separate pending work. The explicit weighted-selection path below supplies model choices with a caller-verified native random policy; its genuine API/runtime validation remains pending. These adapters supply no rendered approximation for them.
 
 ## Native model input decisions
 
@@ -56,6 +56,10 @@ Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volu
 ## Native model offsets
 
 `NativeOffsets.capture` calls vanilla `BlockState.getOffset` at exact original positions under the borrowed native session. It checks original registry identities and full configured height, then streams double translations into a bounded private palette and per-cell index. A no-offset palette uses the explicit zero-storage mode. `NativeSceneInputs` captures offsets before native model decisions and visibility, deducts their payload from later phase allowances and returns only detached data. Shared model prototypes stay unchanged; world meshing applies the captured translations. See [OFFSETS.md](../renderer/OFFSETS.md) for placement, source references, limits and deferred verification. No native offset formula or random policy is reproduced.
+
+## Native weighted scene inputs
+
+`NativeWeightedInputs.capture` now combines actual native offset/shape/visibility capture with bounded per-cell weighted/multipart model selection. The caller supplies an exclusively owned native random source whose factory must match the pinned renderer; class names and receipts do not establish that match. Native `BlockState.getSeed`, native weighted lists and the reviewed vanilla multipart seed-reset contract determine selected alternatives. Canonical interval tickets identify those selected models, and repeated combinations share one choice/prototype. Full-volume assignment/copy admission, native list-weight/query limits, cancellation and final healthy-session checks publish no partial request or retained native graph. See [WEIGHTED-CHOICES.md](../renderer/WEIGHTED-CHOICES.md) for source references, random-source responsibility, guards and deferred verification. The legacy deterministic path keeps its weighted guard. The dedicated selection source stays separate from generation. Client execution and preview gates remain unchanged.
 
 ## Budgets and exclusions
 

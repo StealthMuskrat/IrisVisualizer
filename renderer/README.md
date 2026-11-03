@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its sixty-eight main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its sixty-nine main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -89,7 +89,7 @@ World inputs, prototypes, atlas payload and section arrays are checked together;
 
 ## Separate OpenGL backend
 
-The [OpenGL module](../renderer-gl/README.md) now adds twenty-nine LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 97 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
+The [OpenGL module](../renderer-gl/README.md) now adds twenty-nine LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 98 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
 
 The [incremental upload layer](../renderer-gl/UPLOADS.md) validates and transfers across explicit per-step byte/action/work limits with a cooperative time target. It charges paused CPU input, restores state at each yield, and permits exactly-once complete-scene adoption guarded by the application's latest revision. Synchronous upload delegates to the same state machine. Driver allocation/cleanup latency is not a hard frame-time guarantee.
 
@@ -137,7 +137,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its eight native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 97 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its nine native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 98 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
@@ -145,14 +145,18 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native hidden-face masks and scene capture
 
-`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Eight native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
+`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Nine native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
 
 ## Native model offsets
 
 `NativeOffsets` now captures actual native `BlockState.getOffset` translations into bounded immutable `WorldOffsets` tied to the exact native snapshot. `NativeSceneInputs` supplies them through model inspection and visual preparation; meshing translates shared prototype vertices during placement. Actual translated bounds drive culling, transparent ordering and picking while original state/biome/cell identity and diagnostic marker locations remain intact. Offset arrays are included in pending-input, source/cache and phase budgets. See [OFFSETS.md](OFFSETS.md). Native API compilation and runtime/pixel comparison remain pending; other model guards and preview gates still apply.
 
+## Native weighted model choices
+
+`WorldModelChoices` now inspects bounded alternative descriptors and streams per-cell native selections into an interned choice palette. `NativeWeightedInputs` uses actual native position seeds/weighted lists and multipart seed resets with an explicitly supplied, renderer-matching dedicated native random source. It captures offsets and visibility under shared admission and returns a detached request for the existing CPU scene worker. Selected tint/empty/unsupported visuals remain guarded. See [WEIGHTED-CHOICES.md](WEIGHTED-CHOICES.md) for canonical tickets, random-source responsibility, budgets, ownership and deferred validation. Genuine Windows API compilation, factory/native/pixel comparison and readiness remain pending.
+
 ## Still to implement
 
-Native geometry/UV/texture comparison and guarded cases, native weighted-choice production, offset and visibility validation, native tint production and optional native lighting production/validation, transparent intersection/OIT handling, fluids and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, native map sampling adapters, full generation/scene integration and final map/3D editor presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV/texture comparison and guarded cases, native weighted-choice factory/output validation, offset and visibility validation, native tint production and optional native lighting production/validation, transparent intersection/OIT handling, fluids and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, native map sampling adapters, full generation/scene integration and final map/3D editor presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.
