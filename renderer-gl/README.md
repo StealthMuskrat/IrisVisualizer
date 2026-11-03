@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 71-source CPU renderer. All 100 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 72-source CPU renderer. All 101 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -103,3 +103,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Completed-image readback
 
 `GlReadback`/`GlReadbackQueue` now transfer actual stored pixels from retained `GlFrame`/`GlMapFrame` images through a bounded pixel-pack buffer, nonblocking fence polls and incremental CPU row copies. Results preserve original receipts and top-left RGBA; exact revision adoption withholds stale/partial output. A separate CPU journal keeps READY pixels charged until taken/dropped, and transfer fences follow allocation cleanup. See [READBACK.md](READBACK.md). This adds the capture path for later renderer-stage pixel comparisons; no readback, GL context or test has run.
+
+## Shared CPU/device allowance
+
+`GlDevice(limits, memory)` now admits native staging and every live/retired journal against a shared [RenderMemory](../renderer/SHARED-MEMORY.md) coordinator before allocation. A participating `WorldRenderWorker` keeps preparation and pinned cache ownership under the same ceiling. Charge moves preserve totals; failed cleanup remains charged and successful teardown releases the device account. Other workers and external native/output owners still require separate host admission.

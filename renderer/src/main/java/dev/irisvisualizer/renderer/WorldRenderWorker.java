@@ -46,19 +46,32 @@ public final class WorldRenderWorker implements AutoCloseable {
         @Override public void close() { owner.close(); }
     }
     private static final class Job {
-        final long revision;final Submission request;final AtomicBoolean cancelled=new AtomicBoolean();
-        Job(long revision,Submission request) { this.revision=revision;this.request=request; }
+        final long revision;final Submission request;long admissionBytes;final AtomicBoolean cancelled=new AtomicBoolean();
+        Job(long revision,Submission request) { this.revision=revision;this.request=request;admissionBytes=request.workingBytes(); }
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
-    private final Object lock=new Object();private final WorldSectionCache cache=new WorldSectionCache();private final ExecutorService executor;private final long workingBytes;
+    private final Object lock=new Object();private final WorldSectionCache cache;private final RenderMemory.Account admission;private final ExecutorService executor;private final long workingBytes;
     private long revision;private boolean closed,scheduled;private Job active,pending;private WorldScene.Result completed;private WorldTint completedTint;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());
     public WorldRenderWorker() { this(1024L*1024*1024); }
     /** Aggregate admission includes active/cache CPU payload and one frozen pending input. */
-    public WorldRenderWorker(long workingBytes) {
+    public WorldRenderWorker(long workingBytes) { this(workingBytes,null); }
+    public WorldRenderWorker(long workingBytes,RenderMemory memory) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Render worker working limit exceeds 1 GiB");this.workingBytes=workingBytes;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-render");thread.setDaemon(true);return thread;});
+        admission=memory==null?null:memory.open("World preparation and scene cache");
+        try {
+            cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);
+            executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-render");thread.setDaemon(true);return thread;});
+        }catch(RuntimeException|OutOfMemoryError failure) { if(admission!=null)admission.close();throw failure; }
     }
+    private void reserve(long bytes) { if(admission!=null)admission.reserve(bytes); }
+    /** Retained cache payload is covered by the current job ceiling rather than charged a second time. */
+    private void refreshAdmission() {
+        long activeBytes=active==null?0:active.admissionBytes,pendingBytes=pending==null?0:pending.request.inputBytes();
+        if(active==null&&pending!=null)activeBytes=cache.stats().knownPayloadBytes();
+        reserve(Math.max(activeBytes+pendingBytes,pending==null?0:pending.request.workingBytes()));
+    }
+    public Optional<RenderMemory.Owner> memoryUsage() { synchronized(lock) { return admission==null?Optional.empty():Optional.of(admission.stats()); } }
     public long submit(Request request) { return submit(new Submission(Objects.requireNonNull(request),null)); }
     public long submit(ModelRequest request) { return submit(new Submission(null,Objects.requireNonNull(request))); }
     private long submit(Submission request) {
@@ -66,16 +79,18 @@ public final class WorldRenderWorker implements AutoCloseable {
             requireOpen();long running=active==null?cache.stats().knownPayloadBytes():active.request.workingBytes();
             if(Math.max(request.workingBytes(),running+request.inputBytes())>workingBytes)throw new IllegalArgumentException("Active render/cache and pending input exceed the worker CPU budget");
             long next=nextRevision();var job=new Job(next,request);var queued=status(job,Phase.QUEUED,List.of(),List.of());
+            // Reject shared admission before changing revisions, cancelling jobs or dropping old output.
+            reserve(Math.max(request.workingBytes(),(active==null?running:active.admissionBytes)+request.inputBytes()));
             if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);dropCompleted();pending=job;revision=next;status=queued;
             if(!scheduled) {
                 scheduled=true;try { executor.execute(this::drain); }
-                catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;status=status(job,Phase.FAILED,List.of(problem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,"The CPU render worker could not be started")),List.of()); }
+                catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;refreshAdmission();status=status(job,Phase.FAILED,List.of(problem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,"The CPU render worker could not be started")),List.of()); }
             }
             return next;
         }
     }
     public long invalidate() {
-        synchronized(lock) { requireOpen();long next=nextRevision();if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();revision=next;status=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());return next; }
+        synchronized(lock) { requireOpen();long next=nextRevision();if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();refreshAdmission();revision=next;status=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());return next; }
     }
     public Status status() { synchronized(lock) { return status; } }
     public WorldSectionCache.Stats cacheStats() { return cache.stats(); }
@@ -92,10 +107,12 @@ public final class WorldRenderWorker implements AutoCloseable {
         try {
             while(true) {
                 Job job;
-                synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job;status=status(job,job.request.model()!=null?Phase.INSPECTING:Phase.VISUALS,List.of(),List.of()); }
-                execute(job);
-                synchronized(lock) { active=null;job=null; }
+                synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;refreshAdmission();return; }job=pending;job.admissionBytes=Math.max(job.request.workingBytes(),cache.stats().knownPayloadBytes()+job.request.inputBytes());pending=null;active=job;refreshAdmission();status=status(job,job.request.model()!=null?Phase.INSPECTING:Phase.VISUALS,List.of(),List.of()); }
+                try { execute(job); }
+                finally { synchronized(lock) { active=null;job=null;refreshAdmission(); } }
             }
+        }catch(RuntimeException|Error failure) {
+            synchronized(lock) { active=null;scheduled=false;refreshAdmission(); }throw failure;
         }finally { synchronized(lock) { if(closed)cache.close(); } }
     }
     private WorldScene.Result build(Job job) {
@@ -139,7 +156,7 @@ public final class WorldRenderWorker implements AutoCloseable {
         }finally { if(!retained&&result!=null)result.close(); }
     }
     @Override public void close() {
-        synchronized(lock) { if(closed)return;closed=true;if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of(),List.of()); }
+        synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of(),List.of());closed=true;if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();refreshAdmission();status=done; }
         executor.shutdownNow();cache.close();
     }
 }

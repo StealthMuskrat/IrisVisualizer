@@ -38,10 +38,18 @@ public final class WorldSectionCache implements AutoCloseable {
         }
         @Override public void close() { synchronized(owner) { if(slot==null)return;var entry=slot;slot=null;owner.release(entry); } }
     }
-    private final Limits limits;private final LinkedHashMap<Key,Slot> entries=new LinkedHashMap<>(16,0.75f,true);
-    private List<Epoch> epochs=new ArrayList<>();private Epoch prepared;private Set<Key> preparedKeys=Set.of();private long sourceBytes,meshBytes,leases;private int faces,cellRecords,markers;private boolean closed;
+    private final Limits limits;private final RenderMemory.Account admission;private final LinkedHashMap<Key,Slot> entries=new LinkedHashMap<>(16,0.75f,true);
+    private List<Epoch> epochs=new ArrayList<>();private Epoch prepared;private Set<Key> preparedKeys=Set.of();private long sourceBytes,meshBytes,leases,preparedBytes;private int faces,cellRecords,markers;private boolean closed;
     public WorldSectionCache() { this(Limits.DEFAULT); }
-    public WorldSectionCache(Limits limits) { this.limits=Objects.requireNonNull(limits); }
+    public WorldSectionCache(Limits limits) { this(limits,(RenderMemory.Account)null); }
+    /** The cache exclusively owns retained-byte accounting; its host may set a covering job reservation. */
+    public WorldSectionCache(Limits limits,RenderMemory.Account admission) { this.limits=Objects.requireNonNull(limits);this.admission=admission; }
+    private void admit(long bytes) {
+        if(admission==null)return;
+        try { admission.retained(bytes); }
+        catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.CACHE_BUSY,failure.getMessage()); }
+    }
+    private void updateAdmission() { admit(sourceBytes+meshBytes+preparedBytes); }
     public Limits limits() { return limits; }
     /** Preflight complete replacement plus all pinned old data before changing cache admissions. */
     public synchronized void prepare(WorldScenePlan plan) { prepare(plan,()->false); }
@@ -66,8 +74,12 @@ public final class WorldSectionCache implements AutoCloseable {
         // Allocate all new metadata before committing admission or evicting unleased data.
         var nextEpochs=new ArrayList<Epoch>(epochs.size()+1);for(var epoch:epochs)if(epoch.slots>0||epoch==target)nextEpochs.add(epoch);if(!nextEpochs.contains(target))nextEpochs.add(target);
         var iterator=entries.values().iterator();WorldProblem.check(cancelled);
-        prepared=target;preparedKeys=wanted;epochs=nextEpochs;sourceBytes=0;for(int i=0;i<epochs.size();i++)sourceBytes+=epochs.get(i).sourceBytes;
         int missing=usage.sections()-resident,missingFaces=usage.faces()-residentFaces,missingCells=usage.cellRecords()-residentCells,missingMarkers=usage.markers()-residentMarkers;long missingBytes=usage.meshBytes()-residentBytes;
+        long nextSource=0;for(var epoch:nextEpochs)nextSource+=epoch.sourceBytes;
+        // Shared admission precedes every cache mutation and the first section output allocation.
+        // Existing unleased payload is conservatively included until eviction actually releases it.
+        admit(nextSource+meshBytes+missingBytes);
+        prepared=target;preparedKeys=wanted;epochs=nextEpochs;sourceBytes=nextSource;preparedBytes=missingBytes;
         while(!futureFits(missing,missingBytes,missingFaces,missingCells,missingMarkers,working)) {
             boolean removed=false;while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0&&!wanted.contains(slot.key)) { subtract(slot);iterator.remove();removed=true;break; } }
             if(!removed)throw new IllegalStateException("Preflight and complete cache replacement admission disagree");
@@ -87,7 +99,7 @@ public final class WorldSectionCache implements AutoCloseable {
         trim(usage,working,null);var slot=new Slot(key,plan);var ticket=new Ticket(this,slot);
         try { entries.put(key,slot); }
         catch(OutOfMemoryError exhausted) { entries.remove(key);throw exhausted; }
-        prepared.slots++;meshBytes+=usage.outputBytes();faces+=usage.faces();cellRecords+=usage.nonEmptyCells();markers+=usage.markers();leases++;return ticket;
+        prepared.slots++;preparedBytes-=usage.outputBytes();meshBytes+=usage.outputBytes();faces+=usage.faces();cellRecords+=usage.nonEmptyCells();markers+=usage.markers();leases++;updateAdmission();return ticket;
     }
     private boolean futureFits(int sections,long bytes,int faces,int cells,int markers,long working) { return epochs.size()<=MAX_EPOCHS&&entries.size()+sections<=limits.sections()&&meshBytes+bytes<=limits.meshBytes()&&this.faces+faces<=limits.faces()&&cellRecords+cells<=limits.cellRecords()&&this.markers+markers<=limits.markers()&&sourceBytes+meshBytes+bytes<=working; }
     private boolean fits(WorldMesh.Usage addition,long working) {
@@ -103,26 +115,30 @@ public final class WorldSectionCache implements AutoCloseable {
             if(!removed)throw WorldProblem.fail(WorldProblem.Code.CACHE_BUSY,"Section cache is pinned or reserved at its limit; release scene leases before requesting more output");
         }
     }
-    private void subtract(Slot slot) { var usage=slot.plan.usage().orElseThrow();meshBytes-=usage.outputBytes();faces-=usage.faces();cellRecords-=usage.nonEmptyCells();markers-=usage.markers();var epoch=slot.key.epoch();if(--epoch.slots==0&&epoch!=prepared) { epochs.remove(epoch);sourceBytes-=epoch.sourceBytes; } }
+    private void subtract(Slot slot) {
+        var usage=slot.plan.usage().orElseThrow();meshBytes-=usage.outputBytes();faces-=usage.faces();cellRecords-=usage.nonEmptyCells();markers-=usage.markers();var epoch=slot.key.epoch();
+        if(epoch==prepared&&preparedKeys.contains(slot.key))preparedBytes+=usage.outputBytes();
+        if(--epoch.slots==0&&epoch!=prepared) { epochs.remove(epoch);sourceBytes-=epoch.sourceBytes; }updateAdmission();
+    }
     private void remove(Slot slot) { entries.remove(slot.key);subtract(slot); }
     private void release(Slot slot) {
         if(slot.pins<1||leases<1)throw new IllegalStateException("Invalid section lease accounting");slot.pins--;leases--;if(slot.pins==0&&(slot.mesh==null||closed))remove(slot);
         if(closed&&leases==0)clearEntries();
     }
-    private void clearEntries() { entries.clear();epochs.clear();prepared=null;preparedKeys=Set.of();sourceBytes=0;meshBytes=0;faces=0;cellRecords=0;markers=0; }
+    private void clearEntries() { entries.clear();epochs.clear();prepared=null;preparedKeys=Set.of();sourceBytes=0;meshBytes=0;preparedBytes=0;faces=0;cellRecords=0;markers=0;updateAdmission();if(closed&&admission!=null)admission.close(); }
     /** Returns false while any output reservation or scene lease is still live. */
     public synchronized boolean clear() { if(leases!=0)return false;clearEntries();return true; }
     /** Worker-owned epoch transition: discard prior admission and only unleased data before decoding. */
     synchronized void retireUnleased() {
-        if(closed)throw new IllegalStateException("Section cache is closed");prepared=null;preparedKeys=Set.of();var iterator=entries.values().iterator();
+        if(closed)throw new IllegalStateException("Section cache is closed");prepared=null;preparedKeys=Set.of();preparedBytes=0;var iterator=entries.values().iterator();
         while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0) { subtract(slot);iterator.remove(); } }
-        var unused=epochs.iterator();while(unused.hasNext()) { var epoch=unused.next();if(epoch.slots==0) { sourceBytes-=epoch.sourceBytes;unused.remove(); } }
+        var unused=epochs.iterator();while(unused.hasNext()) { var epoch=unused.next();if(epoch.slots==0) { sourceBytes-=epoch.sourceBytes;unused.remove(); } }updateAdmission();
     }
     /** Retires admissions immediately; still-leased entries stay charged until their last release. */
     @Override public synchronized void close() {
-        closed=true;prepared=null;preparedKeys=Set.of();var iterator=entries.values().iterator();while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0) { subtract(slot);iterator.remove(); } }
+        closed=true;prepared=null;preparedKeys=Set.of();preparedBytes=0;var iterator=entries.values().iterator();while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0) { subtract(slot);iterator.remove(); } }
         var epochIterator=epochs.iterator();while(epochIterator.hasNext()) { var epoch=epochIterator.next();if(epoch.slots==0) { sourceBytes-=epoch.sourceBytes;epochIterator.remove(); } }
-        if(leases==0)clearEntries();
+        if(leases==0)clearEntries();else { updateAdmission();if(admission!=null)admission.close(); }
     }
     public synchronized Stats stats() {
         int pinned=0,reserved=0;for(var slot:entries.values()) { if(slot.pins>0)pinned++;if(slot.mesh==null)reserved++; }

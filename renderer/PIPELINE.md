@@ -76,3 +76,7 @@ For ordering, cover source/scratch limits, native face identity, rapid pose/resi
 ## Supplied native visual producer edits
 
 Before enqueueing a ready request, `NativeVisualInputs.capture` can apply explicit full native replacements or additional layers under the same borrowed source session. [WorldVisualEdits](VISUAL-EDITS.md) bounds complete cell traversal, choice interning, old/new source packets and assignment-copy peak; the native wrapper also admits the retained mask. The result preserves snapshot, offsets, tint input, scene/section/job limits and visibility identity. No producer callback or native handle reaches this CPU/GPU path, and native fidelity/readiness remain unverified.
+
+## Shared memory coordinator
+
+Opt into [RenderMemory](SHARED-MEMORY.md) with `WorldRenderWorker(workerBytes, memory)` and `GlDevice(limits, memory)`. One world account covers its job reservation and cache admission; completed/external scene leases keep the cache charge after transfer or worker close. The device separately admits staging and all source/GPU journals before allocation, conservatively including shared CPU scene data again. Shared rejection precedes world revision/cancellation changes and cache admission mutation; retirement/fence/quarantine retain charges. Other preparation workers and external native/CPU owners are not implicitly admitted by these constructors.

@@ -1,6 +1,7 @@
 package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.WorldScene;
+import dev.irisvisualizer.renderer.RenderMemory;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.system.MemoryUtil;
@@ -26,17 +27,36 @@ public final class GlDevice implements AutoCloseable {
             this.gpu=gpu;this.cpu=cpu;this.owner=owner;this.buffers=new int[buffers];this.textures=new int[textures];this.vaos=new int[vaos];this.framebuffers=new int[framebuffers];this.renderbuffers=new int[renderbuffers];this.programs=new int[programs];this.shaders=new int[shaders];names=buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders;
         }
     }
-    private final Thread thread=Thread.currentThread();private final long context;private final GLCapabilities capabilities;private final Limits limits;
+    private final Thread thread=Thread.currentThread();private final long context;private final GLCapabilities capabilities;private final Limits limits;private final RenderMemory memory;private final RenderMemory.Account admission;
     private final int maximumTexture,maximumRenderbuffer;private final List<Allocation> allocations=new ArrayList<>();private ByteBuffer staging;
     private long gpuBytes,cpuBytes;private int names;private boolean closed;
     public GlDevice() { this(Limits.DEFAULT); }
-    public GlDevice(Limits limits) {
-        this.limits=Objects.requireNonNull(limits);context=glfwGetCurrentContext();if(context==0)throw new GlFailure(GlFailure.Code.CONTEXT,"A current GLFW OpenGL context is required");
+    public GlDevice(Limits limits) { this(limits,null); }
+    public GlDevice(Limits limits,RenderMemory memory) {
+        this.limits=Objects.requireNonNull(limits);this.memory=memory;context=glfwGetCurrentContext();if(context==0)throw new GlFailure(GlFailure.Code.CONTEXT,"A current GLFW OpenGL context is required");
         try { capabilities=GL.getCapabilities(); }catch(IllegalStateException missing) { throw new GlFailure(GlFailure.Code.CONTEXT,"Initialize LWJGL capabilities for the current context first"); }
         if(!capabilities.OpenGL33||(glGetInteger(GL_CONTEXT_PROFILE_MASK)&GL_CONTEXT_CORE_PROFILE_BIT)==0)throw new GlFailure(GlFailure.Code.CAPABILITY,"The backend requires an OpenGL 3.3 core context");
         maximumTexture=glGetInteger(GL_MAX_TEXTURE_SIZE);maximumRenderbuffer=glGetInteger(GL_MAX_RENDERBUFFER_SIZE);check("device capabilities");
         if(limits.stagingBytes()>limits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Staging exceeds the working budget");
-        try { staging=MemoryUtil.memAlloc(limits.stagingBytes()).order(ByteOrder.nativeOrder()); }catch(OutOfMemoryError exhausted) { throw new GlFailure(GlFailure.Code.MEMORY,"Could not allocate bounded native upload staging"); }
+        admission=memory==null?null:openAdmission(memory);
+        try {
+            admit(limits.stagingBytes());staging=MemoryUtil.memAlloc(limits.stagingBytes()).order(ByteOrder.nativeOrder());
+        }catch(RuntimeException|OutOfMemoryError failure) {
+            if(admission!=null) { admission.retained(0);admission.close(); }
+            if(failure instanceof OutOfMemoryError)throw new GlFailure(GlFailure.Code.MEMORY,"Could not allocate bounded native upload staging");throw failure;
+        }
+    }
+    /** Borrowed optional shared admission; frame/upload resources are charged automatically by this device. */
+    public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
+    private static RenderMemory.Account openAdmission(RenderMemory memory) {
+        try { return memory.open("OpenGL device"); }
+        catch(RenderMemory.LimitException failure) { throw new GlFailure(GlFailure.Code.LIMIT,failure.getMessage()); }
+        catch(IllegalStateException failure) { throw new GlFailure(GlFailure.Code.STATE,failure.getMessage()); }
+    }
+    private void admit(long bytes) {
+        if(admission==null)return;
+        try { admission.retained(bytes); }
+        catch(RenderMemory.LimitException failure) { throw new GlFailure(GlFailure.Code.LIMIT,failure.getMessage()); }
     }
     public Limits limits() { return limits; }
     public int maximumTextureSize() { return maximumTexture; }
@@ -57,7 +77,11 @@ public final class GlDevice implements AutoCloseable {
         current();collect();int[] counts={buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders};long total=0;for(int count:counts) { if(count<0||count>limits.names())throw new GlFailure(GlFailure.Code.LIMIT,"GPU object count budget exceeded");total+=count; }
         if(gpu<0||cpu<0||gpu>limits.gpuBytes()-gpuBytes||cpu>limits.workingBytes()-cpuBytes||gpuBytes+gpu+cpuBytes+cpu+limits.stagingBytes()>limits.workingBytes()||allocations.size()>=limits.allocations()||total>limits.names()-names)
             throw new GlFailure(GlFailure.Code.LIMIT,"GPU, retained CPU, staging or object budget exceeded; retired resources remain charged");
-        var allocation=new Allocation(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,owner);allocations.add(allocation);gpuBytes+=gpu;cpuBytes+=cpu;names+=allocation.names;return allocation;
+        var allocation=new Allocation(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,owner);
+        admit(gpuBytes+gpu+cpuBytes+cpu+limits.stagingBytes());
+        try { allocations.add(allocation); }
+        catch(RuntimeException|OutOfMemoryError failure) { admit(gpuBytes+cpuBytes+limits.stagingBytes());throw failure; }
+        gpuBytes+=gpu;cpuBytes+=cpu;names+=allocation.names;return allocation;
     }
     void live(Allocation allocation) { current();if(allocation.retired||allocation.released)throw new GlFailure(GlFailure.Code.STATE,"GPU resource is retired or released"); }
     /** Upgrade a CPU-only journal after incremental validation, before any scene GL name is made. */
@@ -66,6 +90,7 @@ public final class GlDevice implements AutoCloseable {
         long added=(long)buffers+textures+vaos;
         if(gpu<0||buffers<0||textures<0||vaos<0||added>limits.names()-names||gpu>limits.gpuBytes()-gpuBytes||gpuBytes+gpu+cpuBytes+limits.stagingBytes()>limits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Validated GPU scene exceeds active/retired resource admission limits");
         int[] nextBuffers=new int[buffers],nextTextures=new int[textures],nextVaos=new int[vaos];
+        admit(gpuBytes+gpu+cpuBytes+limits.stagingBytes());
         allocation.buffers=nextBuffers;allocation.textures=nextTextures;allocation.vaos=nextVaos;allocation.gpu=gpu;allocation.names=(int)added;gpuBytes+=gpu;names+=(int)added;
     }
     void depend(Allocation child,Allocation parent) {
@@ -114,7 +139,7 @@ public final class GlDevice implements AutoCloseable {
     }
     private void release(Allocation allocation) {
         if(allocation.owner!=null) { allocation.owner.close();allocation.owner=null; }
-        allocation.retained=null;for(var parent:allocation.dependencies)parent.dependents--;allocation.dependencies.clear();allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;
+        allocation.retained=null;for(var parent:allocation.dependencies)parent.dependents--;allocation.dependencies.clear();allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;admit(gpuBytes+cpuBytes+limits.stagingBytes());
     }
     public Stats stats() { current();int retired=0,quarantined=0;for(var allocation:allocations)if(allocation.retired) { retired++;if(allocation.fence==0||allocation.quarantined)quarantined++; }return new Stats(gpuBytes,cpuBytes,limits.stagingBytes(),allocations.size(),names,retired,quarantined); }
     /** Explicit teardown may wait for the GPU. Call before destroying the original current context. */
@@ -125,6 +150,6 @@ public final class GlDevice implements AutoCloseable {
             while(iterator.hasNext()) { var allocation=iterator.next();if(allocation.dependents!=0)continue;delete(allocation);if(allocation.fence!=0) { glDeleteSync(allocation.fence);check("teardown fence deletion");allocation.fence=0; }release(allocation);iterator.remove();progress=true; }
             if(!progress)throw new GlFailure(GlFailure.Code.STATE,"GPU dependency teardown cannot progress");
         }
-        MemoryUtil.memFree(staging);staging=null;closed=true;
+        MemoryUtil.memFree(staging);staging=null;if(admission!=null) { admission.retained(0);admission.close(); }closed=true;
     }
 }
