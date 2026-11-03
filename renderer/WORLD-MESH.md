@@ -1,6 +1,6 @@
 # Native-data CPU world sections
 
-Renderer implementation, 2026-11-03. All 42 renderer sources compile with Java 25. Runtime tests remain deferred until the renderer stage is implemented. No native generated-volume comparison, GPU rendering or visible Windows validation was executed for this batch. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 43 CPU renderer sources compile with Java 25. Runtime tests remain deferred until the renderer stage is implemented. No native generated-volume comparison, GPU rendering or visible Windows validation was executed for this batch. Unsupported previews remain disabled.
 
 ## Immutable native inputs
 

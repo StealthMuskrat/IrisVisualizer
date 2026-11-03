@@ -1,6 +1,6 @@
 # CPU atlas layout, binding and animation
 
-Implemented during the renderer stage on 2026-11-03. All 42 renderer sources compile with Java 25. Renderer runtime tests remain deferred until implementation is complete. No real client atlas, native filtering, GPU upload or visible rendering has been validated for this batch. Unsupported previews remain disabled.
+Implemented during the renderer stage on 2026-11-03. All 43 CPU renderer sources compile with Java 25. Renderer runtime tests remain deferred until implementation is complete. No real client atlas, native filtering, GPU upload or visible rendering has been validated for this batch. Unsupported previews remain disabled.
 
 ## One layout epoch
 

@@ -74,8 +74,15 @@ public final class GlRenderer implements AutoCloseable {
         if(glGetProgrami(allocation.programs[index],GL_LINK_STATUS)==GL_FALSE)throw new GlFailure(GlFailure.Code.SHADER,"Renderer program linking failed: "+glGetProgramInfoLog(allocation.programs[index],4096));device.check("shader program creation");
     }
     public void render(GlScene scene,GlTarget target,GlCamera camera) {
+        draw(scene,null,target,camera);
+    }
+    public void render(GlScene scene,GlAtlasFrame atlas,GlTarget target,GlCamera camera) {
+        Objects.requireNonNull(atlas);draw(scene,atlas,target,camera);
+    }
+    private void draw(GlScene scene,GlAtlasFrame atlas,GlTarget target,GlCamera camera) {
         Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");device.live(scene.allocation);device.live(target.allocation);scene.cpuScene();device.collect();
+        int[] textures=atlas==null?scene.allocation.textures:atlas.textures(scene);
         float[] matrix=camera.matrix((double)target.width()/target.height());float[] offsets=new float[scene.sections.size()*3];for(int i=0;i<scene.sections.size();i++)camera.offset(scene.sections.get(i).origin(),offsets,i*3);
         target.complete=false;
         try(var state=new GlState(device)) {
@@ -83,7 +90,7 @@ public final class GlRenderer implements AutoCloseable {
             glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);
             for(int i=0;i<scene.sections.size();i++) {
                 var section=scene.sections.get(i);if(section.geometryVao()==0)continue;glUniform3f(geometryOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.geometryVao());
-                for(var range:section.ranges()) { glBindTexture(GL_TEXTURE_2D,scene.allocation.textures[range.page()]);glUniform1i(geometryCutout,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4); }
+                for(var range:section.ranges()) { glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryCutout,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4); }
             }
             glUseProgram(allocation.programs[1]);glUniformMatrix4fv(markerMatrix,false,matrix);
             for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount()); }

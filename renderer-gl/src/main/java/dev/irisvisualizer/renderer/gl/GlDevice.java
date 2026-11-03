@@ -20,8 +20,8 @@ public final class GlDevice implements AutoCloseable {
         public long knownWorkingBytes() { return gpuBytes+cpuPayloadBytes+stagingBytes; }
     }
     static final class Allocation {
-        int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;long gpu;final long cpu;int names;WorldScene.Result owner;
-        boolean retired,released,quarantined;long fence;Allocation dependency;int dependents;
+        int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;long gpu,cpu;int names;WorldScene.Result owner;Object retained;
+        boolean retired,released,quarantined;long fence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
         Allocation(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
             this.gpu=gpu;this.cpu=cpu;this.owner=owner;this.buffers=new int[buffers];this.textures=new int[textures];this.vaos=new int[vaos];this.framebuffers=new int[framebuffers];this.renderbuffers=new int[renderbuffers];this.programs=new int[programs];this.shaders=new int[shaders];names=buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders;
         }
@@ -67,8 +67,18 @@ public final class GlDevice implements AutoCloseable {
         allocation.buffers=nextBuffers;allocation.textures=nextTextures;allocation.vaos=nextVaos;allocation.gpu=gpu;allocation.names=(int)added;gpuBytes+=gpu;names+=(int)added;
     }
     void depend(Allocation child,Allocation parent) {
-        live(child);live(parent);if(child.dependency!=null)throw new GlFailure(GlFailure.Code.STATE,"GPU dependency already assigned");
-        for(var cursor=parent;cursor!=null;cursor=cursor.dependency)if(cursor==child)throw new GlFailure(GlFailure.Code.STATE,"Cyclic GPU resource dependency");child.dependency=parent;parent.dependents++;
+        live(child);live(parent);if(child.dependencies.contains(parent))return;
+        if(reaches(parent,child,new IdentityHashMap<>()))throw new GlFailure(GlFailure.Code.STATE,"Cyclic GPU resource dependency");
+        child.dependencies.add(parent);parent.dependents++;
+    }
+    private boolean reaches(Allocation from,Allocation target,IdentityHashMap<Allocation,Boolean> seen) {
+        if(from==target)return true;if(seen.put(from,Boolean.TRUE)!=null)return false;for(var parent:from.dependencies)if(reaches(parent,target,seen))return true;return false;
+    }
+    /** Move an already-admitted CPU page charge; no aggregate byte allowance is released or added. */
+    void moveCpu(Allocation from,Allocation to,long bytes,Object retained) {
+        live(from);live(to);Objects.requireNonNull(retained);
+        if(from==to||bytes<0||bytes>from.cpu||to.cpu!=0||to.retained!=null)throw new GlFailure(GlFailure.Code.STATE,"Invalid CPU payload reservation transfer");
+        from.cpu-=bytes;to.cpu=bytes;to.retained=retained;
     }
     void retire(Allocation allocation) {
         if(allocation.released)return;current();if(allocation.retired)return;
@@ -100,7 +110,8 @@ public final class GlDevice implements AutoCloseable {
         for(int i=0;i<allocation.shaders.length;i++)if(allocation.shaders[i]!=0) { glDeleteShader(allocation.shaders[i]);check("shader deletion");allocation.shaders[i]=0; }
     }
     private void release(Allocation allocation) {
-        if(allocation.owner!=null) { allocation.owner.close();allocation.owner=null; }if(allocation.dependency!=null) { allocation.dependency.dependents--;allocation.dependency=null; }allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;
+        if(allocation.owner!=null) { allocation.owner.close();allocation.owner=null; }
+        allocation.retained=null;for(var parent:allocation.dependencies)parent.dependents--;allocation.dependencies.clear();allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;
     }
     public Stats stats() { current();int retired=0,quarantined=0;for(var allocation:allocations)if(allocation.retired) { retired++;if(allocation.fence==0||allocation.quarantined)quarantined++; }return new Stats(gpuBytes,cpuBytes,limits.stagingBytes(),allocations.size(),names,retired,quarantined); }
     /** Explicit teardown may wait for the GPU. Call before destroying the original current context. */
