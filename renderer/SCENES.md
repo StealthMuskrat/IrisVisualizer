@@ -1,6 +1,6 @@
 # Complete CPU scenes and latest-request assembly
 
-Renderer implementation, 2026-11-03. All 43 CPU renderer sources compile with Java 25. The separate [OpenGL backend](../renderer-gl/README.md) adds thirteen compiling sources, without editor integration. Renderer runtime tests remain deferred until stage implementation is complete. Native world/model comparisons, cache/concurrency runtime verification, GPU drawing and visible Windows checks have not been executed for this batch. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 55 CPU renderer sources compile with Java 25. The separate [OpenGL backend](../renderer-gl/README.md) adds nineteen compiling sources, without editor integration. Renderer runtime tests remain deferred until stage implementation is complete. Native world/model comparisons, cache/concurrency runtime verification, GPU drawing and visible Windows checks have not been executed for this batch. Unsupported previews remain disabled.
 
 ## Complete coverage before emission
 
@@ -26,7 +26,7 @@ Unleased completed entries may be evicted in least-recently-used order. A single
 
 `WorldScene.build(plan, raster, cache, cancelled)` requires a successful raster sharing the exact atlas layout. It reserves/builds or reuses each planned section, then checks full section count, covered cells and aggregate output counts against the admitted plan. The immutable `WorldScene` retains ordered section-local meshes, the native snapshot and the raster. It does not combine their integer origins into imprecise absolute float vertices.
 
-The returned `WorldScene.Result` is an `AutoCloseable` owner of all section tickets. Keep it open while using its scene. Closing it releases tickets and clears its scene references; later `scene()` access fails. Java cannot prevent a caller from retaining previously obtained mesh/scene references, so consumers must stop using and retaining those references after releasing the owner. Arbitrary escaped references are outside cache accounting.
+The returned `WorldScene.Result` is an `AutoCloseable` owner of all section tickets. Keep it open while using its scene. Closing it clears that owner's scene reference; later `scene()` access fails. `retain()` creates an independent owner of the exact same scene and shared ticket bundle, capped at 65,536 live owners per bundle. Tickets release only after the final shared owner closes. Retain/close are synchronized and a failed wrapper allocation does not increment the shared count. A retained picking owner can keep the scene charged after its GPU owner retires; see [PICKING.md](PICKING.md). Java cannot prevent a caller from retaining previously obtained mesh/scene references, so consumers must stop using and retaining those references after releasing the owner. Arbitrary escaped references are outside cache accounting.
 
 Failed or cancelled builds release every acquired ticket and publish no partial scene. Valid completed sections from an interrupted build may remain as unleased, bounded cache entries. They are reusable only under the same epoch/key. Structured failures preserve the source generation receipt; memory recovery is best effort and does not guarantee survival under process-wide exhaustion.
 

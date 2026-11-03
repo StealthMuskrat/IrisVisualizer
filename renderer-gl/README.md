@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds eighteen Java sources to the 51-source CPU renderer. All 69 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds nineteen Java sources to the 55-source CPU renderer. All 74 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -39,6 +39,10 @@ A second shader draws placeholder markers as instanced magenta unit-cell wire bo
 Before drawing, the target becomes incomplete. Only a successful draw **and** host-state restoration marks it complete again. `textureId()` rejects an incomplete, retired or released target. Its returned GL texture name is borrowed: consumers must not retain/use it after a failed update or target retirement. A later UI integration must adopt only successful frames, using separate targets when it needs to retain an old frame atomically.
 
 The backend snapshots/restores the core state it changes: program, framebuffer/read/renderbuffer bindings, VAO/array/unpack buffers, texture/sampler unit zero, pixel unpack alignment/rows/skips, depth/cull/polygon/line state, color mask/blending at draw buffer zero, relevant enable flags, clip distances, and viewport/scissor/depth-range arrays where supported. It edits only its own texture/FBO/VAO objects. Other extension interactions and actual host-state isolation remain runtime validation requirements. Enter with a clean GL error state; errors are reported rather than silently consumed as success.
+
+## Camera navigation and inspection
+
+`GlOrbitCamera` now supplies immutable fit/orbit/pan/dolly/focus/rebase navigation. `GlCamera.ray` shares its view basis and off-axis near/far clipping convention. `GlScene.retainCpuScene` returns an independent CPU lease for the [bounded native picking layer](../renderer/PICKING.md), which runs without GL calls and preserves native state/biome/visual-problem identity. Camera/index/frame revisions still require application checks; CPU index memory and retained external jobs require combined application admission. No preview or inspection widget is enabled.
 
 ## 2D map textures
 

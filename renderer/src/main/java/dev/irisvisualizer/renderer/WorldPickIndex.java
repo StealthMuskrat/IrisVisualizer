@@ -1,0 +1,137 @@
+package dev.irisvisualizer.renderer;
+
+import java.nio.*;
+import java.util.*;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
+
+/** Balanced section-bound hierarchy; owns a CPU scene lease until close and in-flight queries finish. */
+public final class WorldPickIndex implements AutoCloseable {
+    private static final double[] EMPTY_BOUNDS=new double[0];private static final int[] EMPTY_NODES=new int[0];
+    public record Limits(long indexBytes,long workingBytes) {
+        public static final Limits DEFAULT=new Limits(16L*1024*1024,512L*1024*1024);
+        public Limits { if(indexBytes<0||indexBytes>16L*1024*1024||workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Picking index limits exceed renderer bounds"); }
+    }
+    public enum Alpha { GEOMETRY, DISPLAYED_BASE_LEVEL }
+    public record Options(int nodeTests,int faceTests,int markerTests,boolean backFaces,Alpha alpha) {
+        public static final Options DEFAULT=new Options(131071,262144,65536,false,Alpha.DISPLAYED_BASE_LEVEL);
+        public Options { Objects.requireNonNull(alpha);if(nodeTests<0||nodeTests>131071||faceTests<0||faceTests>2097152||markerTests<0||markerTests>1048576)throw new IllegalArgumentException("Picking query limits exceed renderer bounds"); }
+    }
+    private final UUID id=UUID.randomUUID();private final WorldSnapshot.Source source;private final WorldSnapshot.Position anchor;private final long bytes;private final List<WorldProblem> problems;
+    private WorldScene.Result owner;private WorldScene scene;private double[] bounds;private int[] left,right,section;private volatile boolean closed;private boolean released;private int queries;
+    private WorldPickIndex(WorldSnapshot.Source source,WorldSnapshot.Position anchor,WorldScene.Result owner,WorldScene scene,double[] bounds,int[] left,int[] right,int[] section,List<WorldProblem> problems) {
+        this.source=source;this.anchor=anchor;this.owner=owner;this.scene=scene;this.bounds=bounds;this.left=left;this.right=right;this.section=section;bytes=(long)bounds.length*8+(long)(left.length+right.length+section.length)*4;this.problems=List.copyOf(problems);released=owner==null;
+    }
+    /** Consumes this fresh Result owner on all outcomes after nonnull checks; pass retain() for a shared scene. */
+    public static WorldPickIndex prepare(WorldScene.Result owner,BooleanSupplier cancelled) { return prepare(owner,Limits.DEFAULT,cancelled); }
+    public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();
+        try {
+            WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0;
+            for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++; }
+            int nodes=count==0?0:count*2-1;long bytes=(long)nodes*60,peak=bytes+(long)count*4;
+            if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking section hierarchy or combined CPU payload budget exceeded");
+            var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());int[] admitted=new int[count];int at=0;
+            for(int i=0;i<scene.sections().size();i++) { WorldProblem.check(cancelled);if(scene.sections().get(i).bounds().isPresent())admitted[at++]=i; }
+            var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],List.of());Arrays.fill(result.section,-1);
+            if(count>0)result.build(admitted,0,count,new int[1],cancelled);WorldProblem.check(cancelled);transferred=true;return result;
+        }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(source,List.of(failure.problem)); }
+        catch(ArithmeticException overflow) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Picking index anchor subtraction exceeds exact coordinate bounds"))); }
+        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to index the complete scene; no partial picking index was published"))); }
+        finally { if(!transferred)owner.close(); }
+    }
+    private static WorldPickIndex failed(WorldSnapshot.Source source,List<WorldProblem> problems) { return new WorldPickIndex(source,new WorldSnapshot.Position(0,0,0),null,null,EMPTY_BOUNDS,EMPTY_NODES,EMPTY_NODES,EMPTY_NODES,problems); }
+    private static double relative(long value,long origin) { long difference=Math.subtractExact(value,origin);if(Math.abs((double)difference)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Picking coordinates exceed the relative precision bound");return difference; }
+    private int build(int[] admitted,int from,int to,int[] next,BooleanSupplier cancelled) {
+        WorldProblem.check(cancelled);int node=next[0]++,offset=node*6;
+        if(to-from==1) {
+            int index=admitted[from];section[node]=index;var mesh=scene.sections().get(index);var box=mesh.bounds().orElseThrow();double x=relative(mesh.origin().x(),anchor.x()),y=relative(mesh.origin().y(),anchor.y()),z=relative(mesh.origin().z(),anchor.z());
+            bounds[offset]=x+box.min().x();bounds[offset+1]=y+box.min().y();bounds[offset+2]=z+box.min().z();bounds[offset+3]=x+box.max().x();bounds[offset+4]=y+box.max().y();bounds[offset+5]=z+box.max().z();
+        }else {
+            int middle=(from+to)>>>1;left[node]=build(admitted,from,middle,next,cancelled);right[node]=build(admitted,middle,to,next,cancelled);
+            for(int axis=0;axis<3;axis++) { bounds[offset+axis]=Math.min(bounds[left[node]*6+axis],bounds[right[node]*6+axis]);bounds[offset+axis+3]=Math.max(bounds[left[node]*6+axis+3],bounds[right[node]*6+axis+3]); }
+        }
+        return node;
+    }
+    public UUID id() { return id; }
+    public WorldSnapshot.Source source() { return source; }
+    public List<WorldProblem> problems() { return problems; }
+    public boolean requiresPlaceholder() { return !problems.isEmpty(); }
+    public synchronized long retainedBytes() { return released?0:bytes; }
+    public boolean closed() { return closed; }
+    public synchronized boolean released() { return released; }
+    public WorldPick query(WorldRay ray,BooleanSupplier cancelled) { return query(ray,Options.DEFAULT,null,cancelled); }
+    /** Supply the exact displayed animated raster for alpha tests; null uses the scene's original raster. */
+    public WorldPick query(WorldRay ray,Options options,AtlasRaster displayed,BooleanSupplier cancelled) {
+        Objects.requireNonNull(ray);Objects.requireNonNull(options);Objects.requireNonNull(cancelled);if(cancelled.getAsBoolean())throw new CancellationException("Scene picking cancelled");
+        synchronized(this) { if(closed)throw new IllegalStateException("Picking index is closed");if(requiresPlaceholder())return new WorldPick(id,source,ray,Optional.empty(),new WorldPick.Stats(0,0,0,0,0),problems);if(queries>=64)throw new IllegalStateException("Concurrent picking query limit reached");queries++; }
+        Query work=null;
+        try { work=new Query(ray,options,displayed,cancelled);return work.execute(); }
+        catch(WorldProblem.Failure failure) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(failure.problem)); }
+        catch(ArithmeticException overflow) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Ray and picking index anchors exceed exact coordinate bounds"))); }
+        catch(OutOfMemoryError exhausted) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to complete picking; no partial hit was published"))); }
+        finally { synchronized(this) { queries--;releaseIfIdle(); } }
+    }
+    private void checkQuery(BooleanSupplier cancelled) { if(closed||cancelled.getAsBoolean())throw new CancellationException("Scene picking cancelled"); }
+    private void releaseIfIdle() { if(closed&&queries==0&&!released) { owner.close();owner=null;scene=null;bounds=EMPTY_BOUNDS;left=EMPTY_NODES;right=EMPTY_NODES;section=EMPTY_NODES;released=true; } }
+    @Override public synchronized void close() { closed=true;releaseIfIdle(); }
+    private final class Query {
+        final WorldRay ray;final Options options;final AtlasRaster raster;final BooleanSupplier cancelled;final double ox,oy,oz;double nearest,hitU,hitV,normalX,normalY,normalZ;int hitSection=-1,hitFace=-1,hitMarker=-1;int nodes,sections,faces,markers,alphaRejected;
+        Query(WorldRay ray,Options options,AtlasRaster displayed,BooleanSupplier cancelled) {
+            this.ray=ray;this.options=options;this.cancelled=cancelled;raster=displayed==null?scene.raster():displayed;
+            if(raster.requiresPlaceholder()||raster.layout()!=scene.layout())throw WorldProblem.fail(WorldProblem.Code.ATLAS,"Picking raster must match the exact displayed scene layout");
+            ox=relative(ray.anchor().x(),anchor.x())+ray.x();oy=relative(ray.anchor().y(),anchor.y())+ray.y();oz=relative(ray.anchor().z(),anchor.z())+ray.z();nearest=ray.maximum();
+        }
+        void check() { checkQuery(cancelled); }
+        WorldPick.Stats stats() { return new WorldPick.Stats(nodes,sections,faces,markers,alphaRejected); }
+        WorldPick execute() { check();if(section.length>0)visit(0,nodeEntry(0));check();return new WorldPick(id,source,ray,Optional.ofNullable(hit()),stats(),List.of()); }
+        double box(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z) {
+            double low=ray.minimum(),high=nearest;
+            if(ray.dx()==0) { if(x<minX||x>maxX)return Double.POSITIVE_INFINITY; }else { double a=(minX-x)/ray.dx(),b=(maxX-x)/ray.dx();low=Math.max(low,Math.min(a,b));high=Math.min(high,Math.max(a,b)); }
+            if(ray.dy()==0) { if(y<minY||y>maxY)return Double.POSITIVE_INFINITY; }else { double a=(minY-y)/ray.dy(),b=(maxY-y)/ray.dy();low=Math.max(low,Math.min(a,b));high=Math.min(high,Math.max(a,b)); }
+            if(ray.dz()==0) { if(z<minZ||z>maxZ)return Double.POSITIVE_INFINITY; }else { double a=(minZ-z)/ray.dz(),b=(maxZ-z)/ray.dz();low=Math.max(low,Math.min(a,b));high=Math.min(high,Math.max(a,b)); }
+            return low<=high?low:Double.POSITIVE_INFINITY;
+        }
+        double nodeEntry(int node) { check();if(++nodes>options.nodeTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking node-test budget exceeded; no nearest hit can be certified");int at=node*6;return box(bounds[at],bounds[at+1],bounds[at+2],bounds[at+3],bounds[at+4],bounds[at+5],ox,oy,oz); }
+        void visit(int node,double entry) {
+            check();if(!Double.isFinite(entry)||entry>nearest)return;
+            if(section[node]>=0) { mesh(section[node]);return; }int a=left[node],b=right[node];double first=nodeEntry(a),second=nodeEntry(b);
+            if(first<=second) { visit(a,first);visit(b,second); }else { visit(b,second);visit(a,first); }
+        }
+        boolean better(double distance,int sectionIndex,int face,int marker) {
+            if(distance<ray.minimum()||distance>nearest)return false;if(hitSection<0||distance<nearest)return true;
+            if(sectionIndex!=hitSection)return sectionIndex<hitSection;int kind=face>=0?0:1,old=hitFace>=0?0:1;if(kind!=old)return kind<old;return (face>=0?face:marker)<(hitFace>=0?hitFace:hitMarker);
+        }
+        void mesh(int sectionIndex) {
+            sections++;var mesh=scene.sections().get(sectionIndex);var vertices=mesh.vertexBuffer();var indices=mesh.indexBuffer();double x=relative(mesh.origin().x(),anchor.x()),y=relative(mesh.origin().y(),anchor.y()),z=relative(mesh.origin().z(),anchor.z());
+            for(int face=0;face<mesh.faces().size();face++) { if((face&255)==0)check();if(++faces>options.faceTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking face-test budget exceeded; no partial hit was published");for(int triangle=0;triangle<2;triangle++)triangle(mesh,sectionIndex,face,triangle,vertices,indices,ox-x,oy-y,oz-z); }
+            for(int marker=0;marker<mesh.markers().size();marker++) {
+                if((marker&255)==0)check();if(++markers>options.markerTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking marker-test budget exceeded; no partial hit was published");var value=mesh.markers().get(marker);var position=value.position();double px=Math.subtractExact(position.x(),anchor.x()),py=(long)position.y()-anchor.y(),pz=Math.subtractExact(position.z(),anchor.z());double distance=box(px,py,pz,px+1,py+1,pz+1,ox,oy,oz);
+                if(!Double.isFinite(distance)||!better(distance,sectionIndex,-1,marker))continue;hitSection=sectionIndex;hitFace=-1;hitMarker=marker;nearest=distance;
+            }
+        }
+        WorldPick.Hit hit() {
+            if(hitSection<0)return null;var mesh=scene.sections().get(hitSection);WorldSnapshot.Position position;RenderBlockState state;WorldSnapshot.Biome biome;Optional<WorldPick.Surface> surface;List<ModelPlan.Problem> visualProblems;
+            if(hitFace>=0) { position=mesh.positionForFace(hitFace);state=mesh.stateForFace(hitFace);biome=mesh.biomeForFace(hitFace);surface=Optional.of(new WorldPick.Surface(mesh.faces().get(hitFace).source().source(),hitU,hitV,normalX,normalY,normalZ));visualProblems=List.of(); }
+            else { var marker=mesh.markers().get(hitMarker);position=marker.position();state=marker.state();biome=mesh.snapshot().biome(mesh.cells().get(marker.cell()).sourceCell());surface=Optional.empty();visualProblems=marker.problems(); }
+            double x=Math.subtractExact(position.x(),anchor.x()),y=(long)position.y()-anchor.y(),z=Math.subtractExact(position.z(),anchor.z());
+            return new WorldPick.Hit(position,state,biome,hitSection,hitFace,hitMarker,nearest,ox+ray.dx()*nearest-x,oy+ray.dy()*nearest-y,oz+ray.dz()*nearest-z,surface,visualProblems);
+        }
+        void triangle(WorldMesh mesh,int sectionIndex,int face,int triangle,FloatBuffer v,IntBuffer indices,double x,double y,double z) {
+            int start=face*6+triangle*3,a=indices.get(start)*8,b=indices.get(start+1)*8,c=indices.get(start+2)*8;
+            double ax=v.get(a),ay=v.get(a+1),az=v.get(a+2),ex=v.get(b)-ax,ey=v.get(b+1)-ay,ez=v.get(b+2)-az,fx=v.get(c)-ax,fy=v.get(c+1)-ay,fz=v.get(c+2)-az;
+            double px=ray.dy()*fz-ray.dz()*fy,py=ray.dz()*fx-ray.dx()*fz,pz=ray.dx()*fy-ray.dy()*fx,det=ex*px+ey*py+ez*pz;
+            double epsilon=1e-12*Math.hypot(Math.hypot(ex,ey),ez)*Math.hypot(Math.hypot(fx,fy),fz);if(options.backFaces()?Math.abs(det)<=epsilon:det<=epsilon)return;
+            double tx=x-ax,ty=y-ay,tz=z-az,beta=(tx*px+ty*py+tz*pz)/det,qx=ty*ez-tz*ey,qy=tz*ex-tx*ez,qz=tx*ey-ty*ex,gamma=(ray.dx()*qx+ray.dy()*qy+ray.dz()*qz)/det;
+            if(beta< -1e-10||gamma< -1e-10||beta+gamma>1+1e-10)return;double distance=(fx*qx+fy*qy+fz*qz)/det;if(!better(distance,sectionIndex,face,-1))return;
+            beta=Math.max(0,beta);gamma=Math.max(0,gamma);double sum=beta+gamma;if(sum>1) { beta/=sum;gamma/=sum; }double weight=1-beta-gamma;
+            double u=weight*v.get(a+6)+beta*v.get(b+6)+gamma*v.get(c+6),vv=weight*v.get(a+7)+beta*v.get(b+7)+gamma*v.get(c+7);var material=mesh.faces().get(face).source();
+            if(options.alpha()==Alpha.DISPLAYED_BASE_LEVEL&&material.alpha()!=TexturePreparation.AlphaClass.OPAQUE) {
+                var image=raster.pages().get(material.page());int ix=Math.clamp((int)Math.floor(u*image.width()),0,image.width()-1),iy=Math.clamp((int)Math.floor(vv*image.height()),0,image.height()-1),alpha=image.alpha(ix,iy);
+                if(material.alpha()==TexturePreparation.AlphaClass.CUTOUT?alpha<128:alpha==0) { alphaRejected++;return; }
+            }
+            double nx=ey*fz-ez*fy,ny=ez*fx-ex*fz,nz=ex*fy-ey*fx,length=Math.hypot(Math.hypot(nx,ny),nz);
+            hitSection=sectionIndex;hitFace=face;hitMarker=-1;hitU=u;hitV=vv;normalX=nx/length;normalY=ny/length;normalZ=nz/length;nearest=distance;
+        }
+    }
+}

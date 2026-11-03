@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its fifty-one main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its fifty-five main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -89,7 +89,7 @@ World inputs, prototypes, atlas payload and section arrays are checked together;
 
 ## Separate OpenGL backend
 
-The [OpenGL module](../renderer-gl/README.md) now adds eighteen LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 69 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
+The [OpenGL module](../renderer-gl/README.md) now adds nineteen LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 74 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
 
 The [incremental upload layer](../renderer-gl/UPLOADS.md) validates and transfers across explicit per-step byte/action/work limits with a cooperative time target. It charges paused CPU input, restores state at each yield, and permits exactly-once complete-scene adoption guarded by the application's latest revision. Synchronous upload delegates to the same state machine. Driver allocation/cleanup latency is not a hard frame-time guarantee.
 
@@ -102,6 +102,10 @@ This backend requires an externally owned GLFW OpenGL 3.3 core context. It is no
 ## Native 2D map rendering
 
 `MapSamples` now captures exact native terrain heights, biome identities/indices and finite noise values for a 512 × 512 default grid with explicit world-space sampling scale. `MapRaster` colorizes detached samples using stable scalar ramps or explicit native-palette colors, retaining original values for inspection and transparent empty samples. `MapView` provides display-only fit/pan/zoom and pixel hit testing. A bounded latest-request worker moves colorization off the UI thread. The GPU map layer streams whole rows under the existing upload budgets and transfers complete revision-checked immutable textures, with source payload held through retirement. See [MAPS.md](MAPS.md) for native input, lifecycle, numerical and deferred verification contracts. No engine sampler, editor integration or preview gate is enabled.
+
+## Camera navigation and native inspection
+
+`WorldScene.Result.retain` now shares exact scene ownership safely across GPU use and inspection. `WorldPickIndex` consumes a fresh CPU owner, builds a bounded section-bound hierarchy, and tests actual mesh triangles/atlas alpha or diagnostic marker boxes while retaining original block/state/biome identity. Queries report explicit limits without partial nearest hits; closing cancels active queries and defers source release until they unwind. A latest-pointer worker prevents stale inspection adoption. `GlCamera` shares its orientation basis with clipped viewport rays, and `GlOrbitCamera` provides fit, orbit, pan, dolly, focus and exact-anchor rebase. See [PICKING.md](PICKING.md). No voxel editing, native collision replacement, editor integration or readiness change is introduced.
 
 ## Still to implement
 

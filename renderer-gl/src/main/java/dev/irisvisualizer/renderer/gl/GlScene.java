@@ -40,6 +40,8 @@ public final class GlScene implements AutoCloseable {
             glBufferSubData(target,(long)offset*4,stage);device.check("bounded index upload");offset+=count;
         }
     }
+    /** Independent CPU owner for asynchronous inspection; close it or transfer it to WorldPickIndex.prepare. */
+    public WorldScene.Result retainCpuScene() { device.live(allocation);return allocation.owner.retain(); }
     public boolean hasNativeLighting() { device.live(allocation);return nativeLighting; }
     public WorldScene cpuScene() { device.live(allocation);return allocation.owner.scene().orElseThrow(); }
     @Override public void close() { try { device.retire(allocation); }finally { if(allocation.retired||allocation.released)sections=List.of(); } }

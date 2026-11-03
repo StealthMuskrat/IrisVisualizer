@@ -6,19 +6,28 @@ import java.util.function.BooleanSupplier;
 /** Complete immutable CPU scene. Its owner must keep the Result lease open while using its meshes. */
 public final class WorldScene {
     public static final class Result implements AutoCloseable {
+        private static final class Shared {
+            final WorldScene scene;final List<WorldSectionCache.Ticket> tickets;int references=1;
+            Shared(WorldScene scene,List<WorldSectionCache.Ticket> tickets) { this.scene=scene;this.tickets=List.copyOf(tickets); }
+            void release() { boolean last;synchronized(this) { if(references<1)throw new IllegalStateException("Invalid shared scene lease");last=--references==0; }if(last)for(var ticket:tickets)ticket.close(); }
+        }
         private final WorldSnapshot.Source source;private final List<WorldProblem> problems;
-        private WorldScene scene;private List<WorldSectionCache.Ticket> tickets;private boolean closed;
-        private Result(WorldSnapshot.Source source,WorldScene scene,List<WorldSectionCache.Ticket> tickets,List<WorldProblem> problems) { this.source=source;this.scene=scene;this.tickets=List.copyOf(tickets);this.problems=List.copyOf(problems); }
+        private Shared shared;private boolean closed;
+        private Result(WorldSnapshot.Source source,WorldScene scene,List<WorldSectionCache.Ticket> tickets,List<WorldProblem> problems) { this.source=source;shared=scene==null?null:new Shared(scene,tickets);this.problems=List.copyOf(problems); }
+        private Result(WorldSnapshot.Source source,Shared shared,List<WorldProblem> problems) { this.source=source;this.shared=shared;this.problems=problems; }
         static Result failed(WorldSnapshot.Source source,List<WorldProblem> problems) { if(problems.isEmpty())throw new IllegalArgumentException("Failure requires a problem");return new Result(source,null,List.of(),problems); }
         public WorldSnapshot.Source source() { return source; }
         public List<WorldProblem> problems() { return problems; }
         public boolean requiresPlaceholder() { return !problems.isEmpty(); }
         public synchronized boolean closed() { return closed; }
-        public synchronized Optional<WorldScene> scene() { if(closed)throw new IllegalStateException("Scene result lease is closed");return Optional.ofNullable(scene); }
+        public synchronized Optional<WorldScene> scene() { if(closed)throw new IllegalStateException("Scene result lease is closed");return shared==null?Optional.empty():Optional.of(shared.scene); }
+        /** Independent owner of the same exact scene. Shared cache tickets release only after all owners close. */
+        public synchronized Result retain() {
+            if(closed)throw new IllegalStateException("Scene result lease is closed");if(shared==null)return new Result(source,(Shared)null,problems);
+            synchronized(shared) { if(shared.references>=65536)throw new IllegalStateException("Shared scene lease limit reached");var result=new Result(source,shared,problems);shared.references++;return result; }
+        }
         @Override public void close() {
-            List<WorldSectionCache.Ticket> release;
-            synchronized(this) { if(closed)return;closed=true;scene=null;release=tickets;tickets=List.of(); }
-            for(var ticket:release)ticket.close();
+            Shared release;synchronized(this) { if(closed)return;closed=true;release=shared;shared=null; }if(release!=null)release.release();
         }
     }
     private static final class Work implements AutoCloseable {

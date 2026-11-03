@@ -1,6 +1,6 @@
 # Native 2D samples, colorization and GPU maps
 
-Renderer implementation, 2026-11-03. The combined renderer has 69 main Java sources: 51 CPU and 18 OpenGL. Java 25 compilation against pinned LWJGL 3.4.1 passes. No map/native comparison, worker test, GL context, upload, pixel readback, timing or interactive Windows validation has run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. The combined renderer has 74 main Java sources: 55 CPU and 19 OpenGL. Java 25 compilation against pinned LWJGL 3.4.1 passes. No map/native comparison, worker test, GL context, upload, pixel readback, timing or interactive Windows validation has run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
 
 ## Engine output stays separate from display
 

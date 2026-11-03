@@ -1,6 +1,6 @@
 # Immutable GPU atlas animation frames
 
-Renderer implementation, 2026-11-03. All 69 Java sources compile: 51 in the CPU library and 18 in the LWJGL backend. No GL context, framebuffer copy, animation upload, fence/dependency, timing or pixel-comparison test was executed for this batch. Tests remain deferred until renderer implementation is complete. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 74 Java sources compile: 55 in the CPU library and 19 in the LWJGL backend. No GL context, framebuffer copy, animation upload, fence/dependency, timing or pixel-comparison test was executed for this batch. Tests remain deferred until renderer implementation is complete. Unsupported previews remain disabled.
 
 ## CPU preparation and exact baselines
 
