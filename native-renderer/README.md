@@ -107,3 +107,7 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 ## Admitted complete native capture
 
 `NativeCapture` now composes existing full-height native volume capture with deterministic or weighted scene inputs, optional explicit tint and native geometry edits. Terrain/biome/noise/generator/expression captures return owned map-worker requests; biome display colors may be keyed by exact native identity. [NATIVE-CAPTURE.md](../renderer/NATIVE-CAPTURE.md) describes phase reservations, detached `RenderInput` ownership and consuming world/map handoffs. The caller still freezes/owns the native session and external generation/chunk/provider memory. Genuine Windows API compilation and actual native/GPU fidelity remain pending; no unsupported preview is enabled.
+
+## Loaded catalog ownership
+
+`NativeCapture.models` and `weighted` now also consume `RenderInput<ClientAssetSnapshot>` from the [selected-client loader](../renderer/ASSET-WORKER.md). A tracked catalog requires the same shared coordinator and stays retained through native capture and destination request admission. Retain a separate catalog owner for future regeneration or retry; the passed wrapper closes on failure as well as success. The existing raw catalog APIs, native provider/factory responsibilities and preview guards remain unchanged. These overloads are syntax-parsed only until genuine Windows native classpath compilation.

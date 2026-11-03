@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
-      "sha256": "f8674dc852f77f48e7176244da7cdfb68a016a5f70e6e339bfdbab69d4c6fe22"
+      "sha256": "66b61b8908245ba4d6f307dfb8b3e9a5a14805b7a06b525ee277137ac7b1f216"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",

@@ -74,6 +74,21 @@ public final class NativeCapture {
         if(!assets.receipt().version().equals(BlockModels.PROFILE)||!assets.receipt().expectedVersion().equals(BlockModels.PROFILE))throw NativeIdentities.failure(WorldProblem.Code.VERSION,"Native capture requires the selected pinned client profile");
     }
     private static long worldPeak(ClientAssetSnapshot assets,WorldLimits limits) { return Math.max(assets.receipt().capturedAssetBytes()+limits.volume().capture().workingBytes(),limits.visuals().scene().workingBytes()); }
+    private static void catalogOwner(RenderInput<ClientAssetSnapshot> assets,RenderMemory memory) {
+        if(assets.admission().tracked()&&(memory==null||!assets.admission().belongsTo(memory)))throw new IllegalArgumentException("Native capture requires the loaded catalog's shared coordinator");
+    }
+    /** Consumes a fresh loaded catalog owner on every outcome; retain another owner for later regeneration. */
+    public static Result<WorldRenderWorker.ModelRequest> models(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);
+        try(var source=assets.retain()) { catalogOwner(source,memory);return models(context,source.value(),extent,chunks,tick,partialTick,limits,options,memory,cancelled); }
+        finally { assets.close(); }
+    }
+    /** Same consuming catalog handoff for native weighted model selection; RNG policy remains caller-owned. */
+    public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);
+        try(var source=assets.retain()) { catalogOwner(source,memory);return weighted(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,memory,cancelled); }
+        finally { assets.close(); }
+    }
     /** Unit-weight inspection remains deferred to WorldRenderWorker; missing native producers stay guarded. */
     public static Result<WorldRenderWorker.ModelRequest> models(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(limits);Objects.requireNonNull(options);clock(tick,partialTick);

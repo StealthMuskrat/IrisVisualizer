@@ -21,6 +21,10 @@ public final class ClientAssets {
                 throw new IllegalArgumentException("Client-asset capture limits exceed renderer bounds");
         }
     }
+    /** Known primitive capture peak; archive-copy, directory preflight and catalog loading are sequential phases. */
+    public static long workingBytes(Limits limits) {
+        Objects.requireNonNull(limits);return Math.max(65536,Math.max(ZipDirectory.workingBytes(limits.archiveBytes()),limits.capturedBytes()+65536));
+    }
     private record Stamp(long size,FileTime modified,Object key) {
         static Stamp file(Path path)throws IOException {
             var value=Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);

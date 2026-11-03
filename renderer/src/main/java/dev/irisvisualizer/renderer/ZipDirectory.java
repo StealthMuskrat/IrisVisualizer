@@ -12,6 +12,8 @@ import java.util.function.BooleanSupplier;
 /** Preflight before ZipFile allocates its central-directory index, including ZIP64 entry counts. */
 final class ZipDirectory {
     private static final int MAX_DIRECTORY_BYTES=32*1024*1024;
+    /** Tail, central bytes and simultaneous ZIP64 locator/end headers; JDK ZIP index objects are separate. */
+    static long workingBytes(long archiveBytes) { return Math.min(archiveBytes,MAX_DIRECTORY_BYTES)+Math.min(archiveBytes,22+65535)+76; }
     private static void check(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("Client ZIP directory reading cancelled"); }
     private static ByteBuffer read(FileChannel channel,long position,int bytes,BooleanSupplier cancelled)throws IOException {
         if(position<0 || bytes<0 || position>channel.size()-bytes)throw new IOException("Client ZIP directory lies outside its archive");
