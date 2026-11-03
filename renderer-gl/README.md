@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-six Java sources to the 68-source CPU renderer. All 94 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 68-source CPU renderer. All 97 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -99,3 +99,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Connected map canvas and inspection
 
 `GlMapView` now connects background colorization, bounded map upload and `GlMapRenderer` offscreen fit/pan/zoom drawing. Completed `GlMapFrame` owners retain independent targets and shared source-map/native data; `MapPick` inspects the original sample through the exact displayed transform, including transparent colors and explicit absent samples. Exact map/view tokens gate adoption, old transferred images survive source/style/viewport replacement, and cleanup follows the device dependency/fence contract. See [MAP-VIEW.md](MAP-VIEW.md) for texture orientation, memory, failure/retry and deferred verification. No native generation or editor preview is enabled.
+
+## Completed-image readback
+
+`GlReadback`/`GlReadbackQueue` now transfer actual stored pixels from retained `GlFrame`/`GlMapFrame` images through a bounded pixel-pack buffer, nonblocking fence polls and incremental CPU row copies. Results preserve original receipts and top-left RGBA; exact revision adoption withholds stale/partial output. A separate CPU journal keeps READY pixels charged until taken/dropped, and transfer fences follow allocation cleanup. See [READBACK.md](READBACK.md). This adds the capture path for later renderer-stage pixel comparisons; no readback, GL context or test has run.

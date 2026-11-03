@@ -21,7 +21,7 @@ public final class GlDevice implements AutoCloseable {
     }
     static final class Allocation {
         int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;long gpu,cpu;int names;WorldScene.Result owner;Object retained;
-        boolean retired,released,quarantined;long fence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
+        boolean retired,released,quarantined;long fence,transferFence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
         Allocation(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
             this.gpu=gpu;this.cpu=cpu;this.owner=owner;this.buffers=new int[buffers];this.textures=new int[textures];this.vaos=new int[vaos];this.framebuffers=new int[framebuffers];this.renderbuffers=new int[renderbuffers];this.programs=new int[programs];this.shaders=new int[shaders];names=buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders;
         }
@@ -103,6 +103,7 @@ public final class GlDevice implements AutoCloseable {
         }
     }
     private void delete(Allocation allocation) {
+        if(allocation.transferFence!=0) { glDeleteSync(allocation.transferFence);check("transfer fence deletion");allocation.transferFence=0; }
         for(int i=0;i<allocation.vaos.length;i++)if(allocation.vaos[i]!=0) { glDeleteVertexArrays(allocation.vaos[i]);check("VAO deletion");allocation.vaos[i]=0; }
         for(int i=0;i<allocation.framebuffers.length;i++)if(allocation.framebuffers[i]!=0) { glDeleteFramebuffers(allocation.framebuffers[i]);check("framebuffer deletion");allocation.framebuffers[i]=0; }
         for(int i=0;i<allocation.renderbuffers.length;i++)if(allocation.renderbuffers[i]!=0) { glDeleteRenderbuffers(allocation.renderbuffers[i]);check("renderbuffer deletion");allocation.renderbuffers[i]=0; }

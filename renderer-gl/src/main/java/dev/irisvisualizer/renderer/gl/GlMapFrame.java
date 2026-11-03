@@ -7,8 +7,8 @@ import java.util.function.BooleanSupplier;
 
 /** Independently owned completed map canvas, original samples and exact display transform. */
 public final class GlMapFrame implements AutoCloseable {
-    public record Info(UUID id,long revision,MapSamples.Context context,MapSamples.Kind kind,MapView view,int width,int height) {
-        public Info { Objects.requireNonNull(id);Objects.requireNonNull(context);Objects.requireNonNull(kind);Objects.requireNonNull(view);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid map frame receipt"); }
+    public record Info(UUID id,long revision,MapSamples.Context context,MapSamples.Kind kind,MapSamples.Grid grid,MapView view,int width,int height) {
+        public Info { Objects.requireNonNull(id);Objects.requireNonNull(context);Objects.requireNonNull(kind);Objects.requireNonNull(grid);Objects.requireNonNull(view);if(revision<1||width<1||height<1||view.width()!=grid.width()||view.height()!=grid.height())throw new IllegalArgumentException("Invalid map frame receipt"); }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final GlMap map;final Info info;int references=1;boolean closing;
@@ -26,7 +26,7 @@ public final class GlMapFrame implements AutoCloseable {
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);journal.retained=raster;
             check(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);check(obsolete);renderer.render(owner,target,view);check(obsolete);
-            var info=new Info(UUID.randomUUID(),revision,raster.samples().context(),raster.samples().kind(),view,width,height);return new GlMapFrame(new Shared(device,journal,target,owner,info));
+            var info=new Info(UUID.randomUUID(),revision,raster.samples().context(),raster.samples().kind(),raster.samples().grid(),view,width,height);return new GlMapFrame(new Shared(device,journal,target,owner,info));
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(target!=null)try { target.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
@@ -38,6 +38,8 @@ public final class GlMapFrame implements AutoCloseable {
     public boolean closed() { return shared==null; }
     /** Offscreen output uses OpenGL bottom-left UVs; a top-left image widget must flip texture V. */
     public int textureId() { return live().target.textureId(); }
+    GlTarget readbackTarget() { return live().target; }
+    GlDevice.Allocation readbackJournal() { return live().journal; }
     /** Borrowed exact native raster. Keep this frame owner live through inspection. */
     public MapRaster raster() { return live().map.raster(); }
     public Optional<MapPick.Hit> hit(double x,double y) {

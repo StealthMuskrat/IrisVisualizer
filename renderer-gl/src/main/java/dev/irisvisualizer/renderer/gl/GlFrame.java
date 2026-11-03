@@ -42,6 +42,8 @@ public final class GlFrame implements AutoCloseable {
     public Info info() { return info; }
     public boolean closed() { return shared==null; }
     public int textureId() { return live().target.textureId(); }
+    GlTarget readbackTarget() { return live().target; }
+    GlDevice.Allocation readbackJournal() { return live().journal; }
     /** Borrowed exact atlas snapshot for picking; keep a retained frame owner through the query. */
     public AtlasRaster raster() { return (AtlasRaster)live().journal.retained; }
     public WorldScene.Result retainCpuScene() { return live().journal.owner.retain(); }

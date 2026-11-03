@@ -89,7 +89,7 @@ World inputs, prototypes, atlas payload and section arrays are checked together;
 
 ## Separate OpenGL backend
 
-The [OpenGL module](../renderer-gl/README.md) now adds twenty-six LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 94 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
+The [OpenGL module](../renderer-gl/README.md) now adds twenty-nine LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 97 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
 
 The [incremental upload layer](../renderer-gl/UPLOADS.md) validates and transfers across explicit per-step byte/action/work limits with a cooperative time target. It charges paused CPU input, restores state at each yield, and permits exactly-once complete-scene adoption guarded by the application's latest revision. Synchronous upload delegates to the same state machine. Driver allocation/cleanup latency is not a hard frame-time guarantee.
 
@@ -115,6 +115,10 @@ This backend requires an externally owned GLFW OpenGL 3.3 core context. It is no
 
 The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private targets and retains exact source/atlas/camera receipts. A failed redraw or resize can leave the prior caller-owned image intact. Reference-counted image owners pin source dependencies and retain CPU inspection context; a latest-revision queue transfers only complete current frames. Multi-epoch cache preflight now admits the complete replacement alongside pinned older scenes under unchanged aggregate limits. Upload queues also require explicit active/READY phases after cleanup failures. This layer is not wired to editor presentation or readiness.
 
+## Completed-image pixel readback
+
+`GlReadback` and its latest-revision queue now read immutable completed world/map images through bounded pixel-pack transfers, zero-timeout fence polling and top-left CPU row copies. The new `RgbaImage.Builder` seals one private output array without a second full-image copy; ready output stays charged until transfer/drop. Source owners and transfer fences remain journaled through retirement, with pack state restored at every yield. See [READBACK.md](../renderer-gl/READBACK.md) for inputs, bounds, ownership and deferred pixel-comparison validation. No tests or GPU operations ran; unsupported previews remain disabled.
+
 ## Native visual geometry and layer composition
 
 `NativeGeometry.capture` now accepts supplied vanilla native block/fluid/special quads with block-local positions, source UVs, normals/material metadata and detached exact capture/position provenance. `combine` preserves a JSON base and native layers atomically, including waterlogged-style compositions without replacing the native block/state. World assignments reject cross-capture/cell reuse; texture/atlas/world/GL/picking stages preserve native face provenance. `AtlasBuilder.empty` supports all-empty/placeholder scenes without a dummy mesh or texture. See [NATIVE-GEOMETRY.md](NATIVE-GEOMETRY.md). Native geometry producers and actual fluid/special visual verification remain pending; this adds no renderer simulation, client execution or preview readiness.
@@ -133,7 +137,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its eight native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 94 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its eight native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 97 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 

@@ -57,3 +57,7 @@ Render/resize from a displayed complete image while injecting invalid camera/ord
 Verify retained wrapper limits and exactly-once release, CPU/changed-page charge sharing, source retirement before image closure, dependency-pinned parents, GPU fence timeout/quarantine, retry after wrong context, multiple live frames and full device teardown. Retain an old image/atlas for a delayed pick, replace presentation, then close each owner without uncharging live data early.
 
 Exercise queue invalidation during cleanup failure, ready-before-take, obsolete checks during rendering, repeated take, close/retry and delayed caller adoption. No failed old scene/map/atlas/frame may be delivered under a new revision. Profile synchronous target creation, complete draw, cache preflight/commit and retirement under Windows driver stalls. No runtime or native fidelity claim follows from Java compilation.
+
+## Detached pixel capture
+
+The [bounded readback path](READBACK.md) now retains complete world or map images independently, reads actual framebuffer pixels through journaled pixel-pack/fence work, and transfers immutable top-left RGBA with the original image receipt. Closing/replacing the caller's image does not alter its in-flight capture. Ready CPU output remains admitted until transfer/drop; no GL/native owner remains in a taken packet. Native/driver pixel comparison and renderer tests remain deferred.
