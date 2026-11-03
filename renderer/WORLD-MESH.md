@@ -1,6 +1,6 @@
 # Native-data CPU world sections
 
-Renderer implementation, 2026-11-03. All 37 renderer sources compile with Java 25. Runtime tests remain deferred until the renderer stage is implemented. No native generated-volume comparison, GPU rendering or visible Windows validation was executed for this batch. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 42 renderer sources compile with Java 25. Runtime tests remain deferred until the renderer stage is implemented. No native generated-volume comparison, GPU rendering or visible Windows validation was executed for this batch. Unsupported previews remain disabled.
 
 ## Immutable native inputs
 
@@ -40,13 +40,13 @@ A mask bit suppresses only a face carrying that declared world cull direction. F
 
 The output `WorldMesh` retains an exact integer origin at the section's minimum coordinate. Float vertices contain section-relative position XYZ, unchanged normal XYZ and atlas UV. Translation uses small cell offsets rather than converting absolute world coordinates to floats, so distant X/Z origins and negative Y do not lose integer placement during assembly. Indices are remapped per surviving quad without changing its corner order. Relative coordinates are bounded to ±128, covering admitted section offsets and the existing source geometry limits.
 
-Each nonempty cell records its original full-volume cell index, visual entry, emitted face span and optional marker. Each emitted face retains the source prototype face/index. `stateForFace`, `biomeForFace` and `positionForFace` trace picking back to the exact native snapshot; no visual classification rewrites generation data. Empty visual cells remain in the snapshot even though they emit no records.
+Each cell emitting geometry or a placeholder records its original full-volume cell index, visual entry, emitted face span and optional marker. Each emitted face retains the source prototype face/index. `stateForFace`, `biomeForFace` and `positionForFace` trace picking back to the exact native snapshot; no visual classification rewrites generation data. Empty and fully hidden visual cells remain in the snapshot even though they emit no picking records.
 
 Consecutive matching page/alpha candidates form CPU draw ranges without reordering. This is not a transparency sort or executed render-pass policy. Tint indices, light emission, AO, cull directions, source material declarations and shade metadata remain available through the prototype face; tint and lighting are not applied.
 
 Unsupported visual cells produce explicit unit-cell `Marker` records with exact positions, original native states and asset problems. Bounds include these unit cells. A later dedicated marker draw pass must make them visible; this CPU batch does not yet display a placeholder. Markers never replace the original world state/biome data. All-culled or empty sections can have empty geometry/bounds while still retaining their requested extent and source snapshot.
 
-`requireRaster` checks the successful atlas epoch. It does not establish native-world readiness. Requested sections do not change the volume's height or the specified 128 × 128 preview default. A future scene controller must schedule full requested coverage, enforce an aggregate section cache budget and discard obsolete generations before presentation. One section result is not evidence that an entire world preview has been built.
+`requireRaster` checks the successful atlas epoch. It does not establish native-world readiness. Requested sections do not change the volume's height or the specified 128 × 128 preview default. The later [CPU scene layer](SCENES.md) now plans full captured-volume coverage, admits a complete scene into a leased cache and rejects obsolete CPU assembly completions. Application generation scheduling and final presentation remain separate. One section result alone is not evidence that an entire world preview has been built.
 
 ## Limits and atomic results
 
@@ -78,4 +78,4 @@ Exercise multiple per-position native choices for the same state, mismatched ass
 
 Check source face/index/normal/UV order, section-relative translation at distant origins, negative heights, cell picking, biome lookup, cull-only suppression, complete range coverage, bounds including markers, all-hidden/empty geometry and native-state retention for every visual failure. Compare count and emit passes, guard every output/combined-memory threshold, and verify cancellation/failure cannot publish partial data.
 
-Full native model/occlusion/tint/fluid handling, complete world coverage/cache scheduling, GPU marker/mesh drawing, transparency/filtering, latest-request adoption and visible Windows checks remain unfinished renderer/integration work. No renderer tests were executed for this implementation batch.
+Full native model/occlusion/tint/fluid handling, application world generation/scene integration, GPU marker/mesh drawing, transparency/filtering, UI result adoption and visible Windows checks remain unfinished renderer/integration work. No renderer tests were executed for this implementation batch.

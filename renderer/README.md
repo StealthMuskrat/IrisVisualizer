@@ -2,7 +2,7 @@
 
 Java 25 library, separate from the editor and generation engine. UI implementation and automated validation finished before this stage; see [UI-VALIDATION.md](../docs/UI-VALIDATION.md).
 
-The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, bounded blockstate/model resolution, CPU geometry baking, PNG decoding, animation schedules, conservative mapped-area alpha classification, shared CPU atlas layout/rasters, atlas-bound mesh buffers and bounded world-section assembly for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
+The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, bounded blockstate/model resolution, CPU geometry baking, PNG decoding, animation schedules, conservative mapped-area alpha classification, shared CPU atlas layout/rasters, atlas-bound mesh buffers, bounded world sections, complete CPU scene coverage, leased section caching and latest-request assembly for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
 
 Build sources with a Java 25 JDK:
 
@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its thirty-seven main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its forty-two main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -79,8 +79,16 @@ Alpha scans cover only each face's conservative UV pixel rectangle across all di
 
 World inputs, prototypes, atlas payload and section arrays are checked together; failures publish no partial section and cancellation propagates separately. These primitive-byte/count limits do not confirm total native/cache/GPU memory or complete volume coverage. See [WORLD-MESH.md](WORLD-MESH.md) for the input contract, numerical limits, exclusions and deferred verification matrix. No engine or UI bridge is enabled.
 
+## Complete CPU scenes, cache admission and latest requests
+
+`WorldScenePlan.plan` counts every section covering the full native volume and checks aggregate geometry/metadata/working limits before world-section output allocation. `WorldMesher.plan` exposes immutable section counts for this admission pass. Fully hidden cells now avoid redundant picking-span records while remaining unchanged in the native snapshot.
+
+`WorldSectionCache` reserves arrays/counts before section emission, shares the source payload within one exact native/atlas epoch, reuses matching sections and evicts only unleased LRU entries. `WorldScene.build` publishes a complete immutable scene through an `AutoCloseable` result owning all section tickets; failure/cancellation releases the tickets without publishing a partial scene. Cache shutdown retires unleased data immediately and keeps outstanding leases charged until their owners release them.
+
+`WorldSceneWorker` uses one active worker and one replaceable pending request, cooperatively cancels superseded work, checks the latest revision before adoption and transfers completed result ownership exactly once. A consumer must close transferred results and check their revision before presentation. Outstanding old leases can explicitly block new epoch admission. The default aggregate section mesh cap is 256 MiB; the primitive source/output working ceiling is 512 MiB, with metadata count limits and existing section budgets still applied. See [SCENES.md](SCENES.md) for lifecycle contracts, excluded memory and deferred cache/concurrency validation. No UI or GPU readiness flag is enabled.
+
 ## Still to implement
 
-Native geometry/UV/texture comparison and guarded cases, native weighted-choice/visibility production, tint/lighting, actual cutout/transparency rendering, fluids and special render shapes, native animation interpolation/mipmap/filtering, active atlas/GPU lifetime and staging budgets, complete scene coverage/cache scheduling, and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV/texture comparison and guarded cases, native weighted-choice/visibility production, tint/lighting, actual cutout/transparency rendering, fluids and special render shapes, native animation interpolation/mipmap/filtering, active atlas/GPU lifetime and staging budgets, full application generation/scene scheduling and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.

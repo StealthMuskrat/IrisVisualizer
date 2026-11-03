@@ -6,7 +6,7 @@ import java.util.function.BooleanSupplier;
 
 /** Scene-level diagnostics, separate from source-asset model problems and engine readiness. */
 public record WorldProblem(Code code,Optional<WorldSnapshot.Position> position,String reason) {
-    public enum Code { VERSION, LIMIT, PALETTE, STATE, ASSIGNMENT, ATLAS, VISIBILITY, EXTENT, COORDINATE, MEMORY }
+    public enum Code { VERSION, LIMIT, PALETTE, STATE, ASSIGNMENT, ATLAS, VISIBILITY, EXTENT, COORDINATE, CACHE_BUSY, WORKER, MEMORY }
     public WorldProblem { Objects.requireNonNull(code);Objects.requireNonNull(position);Objects.requireNonNull(reason); }
     static final class Failure extends RuntimeException {
         final WorldProblem problem;Failure(WorldProblem problem) { super(problem.reason());this.problem=problem; }

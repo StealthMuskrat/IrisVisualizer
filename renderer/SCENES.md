@@ -1,0 +1,67 @@
+# Complete CPU scenes and latest-request assembly
+
+Renderer implementation, 2026-11-03. All 42 renderer sources compile with Java 25. Renderer runtime tests remain deferred until stage implementation is complete. Native world/model comparisons, cache/concurrency runtime verification, GPU drawing and visible Windows checks have not been executed for this batch. Unsupported previews remain disabled.
+
+## Complete coverage before emission
+
+`WorldMesher.plan` now exposes an immutable `WorldMeshPlan` count pass. It contains exact snapshot/model/visibility inputs, section extent, section limits and predicted output counts/bytes, with no world-section vertex/index arrays. `WorldMesher.assemble(plan, cancelled)` consumes the admitted counts and verifies that emission agrees. The existing convenience assembly API still performs both steps.
+
+`WorldScenePlan.plan(models, visibility, cancelled)` partitions the entire captured native extent into explicit sections. The default edge is 16 blocks, and clipped edge sections cover nonmultiples exactly. Ordering is Y, then Z, then X. Negative coordinates/Y and distant long X/Z origins retain the existing integer-coordinate representation. The planner checks section count and tile limits before expansion, counts every section, and checks aggregate mesh/metadata/working limits before scene output allocation.
+
+Every successful plan covers exactly `snapshot.extent().cells()`, including the complete configured height. It does not reduce area, sample resolution, vertical extent, model detail or selected generation features to fit. An over-budget scene fails explicitly. Section size is an assembly parameter; the specified 128 × 128 preview default and source volume are unchanged.
+
+The section count/emit passes now omit redundant cell-span records for fully hidden meshes. Cells emitting faces or explicit placeholder markers retain picking spans. All original cells, states and biomes remain in the native snapshot, including hidden and explicitly empty cells. This reduces cache metadata without dropping generated data, visible geometry or unsupported-content markers.
+
+## Cache reservations and leases
+
+`WorldSectionCache` owns one exact `WorldModels`/`WorldVisibility` epoch at a time. Within it, section keys contain exact extent and section limits. Matching dimensions or input hashes alone do not mix different native snapshots, per-cell choices, visibility masks or atlas layouts.
+
+`prepare(scenePlan)` checks whether the complete planned scene can fit before evicting anything. `reserve(sectionPlan, workingLimit)` either leases an existing immutable section or charges an incomplete reservation before new section arrays are allocated. Array bytes, face/cell/marker counts, entry count and shared source payload remain charged while reserved or leased. A reservation accepts only a successful mesh matching its admitted inputs, extent and usage receipt.
+
+Unleased completed entries may be evicted in least-recently-used order. A single bounded scan removes eligible entries; pinned/reserved entries are never treated as free space. A duplicate incomplete reservation, pinned capacity or old leased epoch reports `CACHE_BUSY`. The caller must release the owning scene rather than bypassing the limit. Closing an incomplete reservation removes its charge; releasing the last lease on a completed section makes it eligible for reuse/eviction.
+
+`clear()` succeeds only with no live tickets. `close()` retires all new admissions, immediately releases unleased entries, and leaves leased entries charged until their final releases. The last release also clears shared epoch/source references. Cache statistics expose closure, entries, leased sections, reservations, ticket count, source bytes, output bytes and metadata counts. No GPU object or direct memory allocation belongs to this cache.
+
+## Atomic scene results
+
+`WorldScene.build(plan, raster, cache, cancelled)` requires a successful raster sharing the exact atlas layout. It reserves/builds or reuses each planned section, then checks full section count, covered cells and aggregate output counts against the admitted plan. The immutable `WorldScene` retains ordered section-local meshes, the native snapshot and the raster. It does not combine their integer origins into imprecise absolute float vertices.
+
+The returned `WorldScene.Result` is an `AutoCloseable` owner of all section tickets. Keep it open while using its scene. Closing it releases tickets and clears its scene references; later `scene()` access fails. Java cannot prevent a caller from retaining previously obtained mesh/scene references, so consumers must stop using and retaining those references after releasing the owner. Arbitrary escaped references are outside cache accounting.
+
+Failed or cancelled builds release every acquired ticket and publish no partial scene. Valid completed sections from an interrupted build may remain as unleased, bounded cache entries. They are reusable only under the same epoch/key. Structured failures preserve the source generation receipt; memory recovery is best effort and does not guarantee survival under process-wide exhaustion.
+
+## One worker and one pending request
+
+`WorldSceneWorker` owns one CPU worker executor and its supplied/default section cache. It starts no UI or GPU work. `submit(Request)` returns a monotonically increasing request revision, cancels the active job cooperatively, replaces the one pending job, and closes any previously owned untaken result. It never starts overlapping scene assembly jobs. Inputs are immutable snapshots supplied by the caller; generation itself is not implemented or scheduled by this worker.
+
+The worker plans full coverage, builds admitted sections and adopts a result only if its revision is still current. Superseded/cancelled results are closed, and their failures cannot overwrite a newer request's status. `status()` reports queued/planning/building/ready/delivered/failed/closed state and structured problems. Here, READY means complete CPU scene assembly only; it is not engine parity, preview permission or GPU readiness.
+
+`take()` transfers the latest owned completion exactly once, including its revision and result lease. After transfer, the caller owns the lease and must close it. A completion is current at the instant of transfer; a future UI/render consumer must recheck the revision when adopting it and stop using an old scene when replacing its request. Outstanding transferred leases cannot be silently revoked: they may block a new epoch with `CACHE_BUSY`. Release the old owner before expecting replacement admission.
+
+Closing the worker cancels active/pending work, drops owned results, retires its cache and shuts down without waiting on a worker from the caller's thread. Transferred results remain the caller's responsibility; cache charges retire when those owners close. No callbacks into editor or renderer code execute under cache locks. Executor inputs retain at most one active and one pending request, rather than an unbounded edit queue.
+
+## Limits and scope of accounting
+
+| Resource | Default | Hard ceiling |
+| --- | --- | --- |
+| Scene section edge | 16 | 32 |
+| Scene/cache sections | 8,192 | 65,536 |
+| Scene/cache faces | 2,097,152 | Same |
+| Scene/cache emitted cell records | 2,097,152 | 4,194,304 |
+| Scene/cache placeholder markers | 1,048,576 | Same |
+| Aggregate world-section packed arrays | 256 MiB | Same |
+| Shared source plus resident/reserved section arrays | 512 MiB | Same |
+| Active section tickets | 65,536 | Same |
+| Active/pending CPU jobs | 1 / 1 | Same |
+
+Scene and cache limits can be lowered independently; both must admit the complete scene. Existing per-section limits also apply. Shared source primitive payload is charged once per epoch, including native indices/masks, retained prototypes and the existing atlas source/base-level reservation. Every cached/reserved section's primitive output is charged separately. The working ceiling includes these shared sources and resident outputs; it is not an additional allowance above the mesh cap.
+
+Object/string/collection overhead, plan metadata, captured archive bytes, caller-owned originals, incoming active/pending input bundles, escaped/obsolete results, native generator work, animation update scratch, direct staging and GPU memory remain outside this primitive-byte accounting. Counts bound metadata separately. These APIs do not confirm total application memory, change generation/preview defaults or bypass `PreviewReadiness`. The eventual application must reserve all simultaneously live generation/input/GPU resources together.
+
+## Deferred stage validation
+
+At renderer completion, verify complete nonoverlapping coverage of odd dimensions, clipped edges, full configured height, negative Y and distant origins. Compare count/emit output and exact native state/biome picking with standalone section assembly. Include empty/fully hidden cells and placeholder-only volumes; native snapshot contents must remain unchanged when redundant picking records disappear.
+
+Check aggregate counts/byte limits before emission, exact cache keys/epochs, source bytes charged once, cache reuse, unleased LRU eviction, pinned/incomplete admission rejection and complete-scene fit. Exercise reservation completion mismatch, cancellation/allocation failure cleanup, duplicate close, ticket count limits, closure with live reservations/results, and final release clearing source references. Failed scene results must expose no partial geometry even if reusable cache entries remain.
+
+Use controlled request barriers for supersession during planning, section construction and result adoption. Verify one active plus one latest pending request, no stale success/failure adoption, exactly-once ownership transfer, revision checks, release-before-epoch-replacement pressure and nonblocking shutdown. Repeated submit/take/close races must preserve every lease charge without leaking pinned entries or reviving a closed cache. Full runtime verification remains pending; no renderer tests were run for this implementation batch.

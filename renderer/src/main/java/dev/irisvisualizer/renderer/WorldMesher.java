@@ -30,15 +30,16 @@ public final class WorldMesher {
         Optional<BlockMesh.Bounds> bounds() { return minX==Float.POSITIVE_INFINITY?Optional.empty():Optional.of(new BlockMesh.Bounds(new ModelPlan.Vec3(minX,minY,minZ),new ModelPlan.Vec3(maxX,maxY,maxZ))); }
         void count() {
             for(int y=0;y<extent.height();y++)for(int z=0;z<extent.depth();z++)for(int x=0;x<extent.width();x++) {
-                WorldProblem.check(cancelled);int cell=sourceCell(x,y,z);var entry=models.entry(cell);if(entry.kind()==WorldModels.Kind.EMPTY)continue;cellCount++;
+                WorldProblem.check(cancelled);int cell=sourceCell(x,y,z);var entry=models.entry(cell);if(entry.kind()==WorldModels.Kind.EMPTY)continue;
                 if(entry.kind()==WorldModels.Kind.PLACEHOLDER) {
-                    if(++markerCount>limits.markers())throw WorldProblem.at(WorldProblem.Code.LIMIT,world.extent().position(cell),"Visual placeholder marker budget reached");continue;
+                    cellCount++;if(++markerCount>limits.markers())throw WorldProblem.at(WorldProblem.Code.LIMIT,world.extent().position(cell),"Visual placeholder marker budget reached");continue;
                 }
-                var mesh=entry.mesh().orElseThrow();
+                var mesh=entry.mesh().orElseThrow();int before=faceCount;
                 for(var face:mesh.faces()) {
                     WorldProblem.check(cancelled);if(hidden(cell,face))continue;
                     if(++faceCount>limits.faces()||(long)faceCount*MeshPacket.PACKED_BYTES_PER_QUAD>limits.meshBytes())throw WorldProblem.at(WorldProblem.Code.LIMIT,world.extent().position(cell),"World section face or packed array budget reached");
                 }
+                if(faceCount>before)cellCount++;
             }
         }
         WorldMesh build(WorldMesh.Usage usage) {
@@ -65,22 +66,38 @@ public final class WorldMesher {
                         int start=destination*6;if(rangePage>=0)ranges.add(new AtlasMesh.DrawRange(rangeStart,start-rangeStart,rangePage,rangeAlpha));rangeStart=start;rangePage=face.page();rangeAlpha=face.alpha();
                     }
                 }
-                cells.add(new WorldMesh.Cell(cell,entryIndex,first,faces.size()-first,-1));
+                if(faces.size()>first)cells.add(new WorldMesh.Cell(cell,entryIndex,first,faces.size()-first,-1));
             }
             if(rangePage>=0)ranges.add(new AtlasMesh.DrawRange(rangeStart,indices.length-rangeStart,rangePage,rangeAlpha));
+            if(faces.size()!=faceCount||markers.size()!=markerCount||cells.size()!=cellCount)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Section count and emit passes disagree");
             WorldProblem.check(cancelled);return WorldMesh.success(models,visibility,extent,vertices,indices,cells,faces,markers,ranges,bounds(),usage);
         }
     }
     public static WorldMesh assemble(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,BooleanSupplier cancelled) { return assemble(models,visibility,extent,Limits.DEFAULT,cancelled); }
     public static WorldMesh assemble(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,Limits limits,BooleanSupplier cancelled) {
-        Objects.requireNonNull(models);Objects.requireNonNull(visibility);Objects.requireNonNull(extent);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
-        try { return execute(models,visibility,extent,limits,cancelled); }
-        catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return WorldMesh.placeholder(models,visibility,extent,List.of(failure.problem)); }
-        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return WorldMesh.placeholder(models,visibility,extent,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to assemble the world section; no partial mesh was published"))); }
+        return assemble(plan(models,visibility,extent,limits,cancelled),cancelled);
     }
-    private static WorldMesh execute(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,Limits limits,BooleanSupplier cancelled) {
-        if(models.requiresPlaceholder())return WorldMesh.placeholder(models,visibility,extent,models.problems());
-        if(visibility.requiresPlaceholder())return WorldMesh.placeholder(models,visibility,extent,visibility.problems());
+    public static WorldMeshPlan plan(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(models);Objects.requireNonNull(visibility);Objects.requireNonNull(extent);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
+        try { return count(models,visibility,extent,limits,cancelled); }
+        catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return WorldMeshPlan.placeholder(models,visibility,extent,limits,List.of(failure.problem)); }
+        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return WorldMeshPlan.placeholder(models,visibility,extent,limits,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to plan the world section; no partial plan was published"))); }
+    }
+    public static WorldMesh assemble(WorldMeshPlan plan,BooleanSupplier cancelled) {
+        Objects.requireNonNull(plan);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
+        try {
+            if(plan.requiresPlaceholder())return WorldMesh.placeholder(plan.models(),plan.visibility(),plan.extent(),plan.problems());
+            return emit(plan,cancelled);
+        } catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return WorldMesh.placeholder(plan.models(),plan.visibility(),plan.extent(),List.of(failure.problem)); }
+        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return WorldMesh.placeholder(plan.models(),plan.visibility(),plan.extent(),List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to assemble the world section; no partial mesh was published"))); }
+    }
+    private static WorldMesh emit(WorldMeshPlan plan,BooleanSupplier cancelled) {
+        var work=new Work(plan.models(),plan.visibility(),plan.extent(),plan.limits(),cancelled);var usage=plan.usage().orElseThrow();
+        work.faceCount=usage.faces();work.markerCount=usage.markers();work.cellCount=usage.nonEmptyCells();return work.build(usage);
+    }
+    private static WorldMeshPlan count(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,Limits limits,BooleanSupplier cancelled) {
+        if(models.requiresPlaceholder())return WorldMeshPlan.placeholder(models,visibility,extent,limits,models.problems());
+        if(visibility.requiresPlaceholder())return WorldMeshPlan.placeholder(models,visibility,extent,limits,visibility.problems());
         if(visibility.snapshot()!=models.snapshot()||visibility.layout()!=models.layout())throw WorldProblem.fail(WorldProblem.Code.VISIBILITY,"World models and native visibility must share the exact snapshot and atlas epoch");
         if(!models.snapshot().extent().contains(extent))throw WorldProblem.fail(WorldProblem.Code.EXTENT,"Requested world section lies outside the captured native volume");
         if(extent.width()>limits.axis()||extent.height()>limits.axis()||extent.depth()>limits.axis()||extent.cells()>limits.cells())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"World section dimensions exceed the assembly budget; request explicit sections without truncating the world");
@@ -91,6 +108,6 @@ public final class WorldMesher {
         var work=new Work(models,visibility,extent,limits,cancelled);work.count();
         var usage=new WorldMesh.Usage(source,mask,models.meshBytes(),atlas,(long)work.faceCount*MeshPacket.PACKED_BYTES_PER_QUAD,(int)extent.cells(),work.cellCount,work.faceCount,work.markerCount);
         if(usage.knownPayloadBytes()>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Combined world section output payload budget reached");
-        return work.build(usage);
+        WorldProblem.check(cancelled);return WorldMeshPlan.success(models,visibility,extent,limits,usage);
     }
 }
