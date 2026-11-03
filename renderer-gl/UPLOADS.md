@@ -1,6 +1,6 @@
 # Incremental GPU upload and revision adoption
 
-Renderer implementation, 2026-11-03. The 45 CPU and 14 OpenGL Java sources compile with Java 25 against pinned LWJGL 3.4.1. No context, upload, draw, state-restoration, fence, timing or concurrency runtime test was executed for this batch. Renderer tests remain deferred until stage implementation is complete. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. The 46 CPU and 15 OpenGL Java sources compile with Java 25 against pinned LWJGL 3.4.1. No context, upload, draw, state-restoration, fence, timing or concurrency runtime test was executed for this batch. Renderer tests remain deferred until stage implementation is complete. Unsupported previews remain disabled.
 
 ## Resumable ownership
 
@@ -8,7 +8,7 @@ Renderer implementation, 2026-11-03. The 45 CPU and 14 OpenGL Java sources compi
 
 Fresh leases are consumed on every outcome after nonnull argument checks. Beginning with a lease already owned by the same device is rejected without closing its existing owner. This protects an active/retired scene against a duplicate handoff. Callers must still never reuse a transferred lease across devices or close it independently.
 
-The optional `WorldTint` overload retains/charges detached native color arrays and expands GPU vertices from eight CPU floats to eight floats plus RGBA8. See [MATERIALS.md](MATERIALS.md) for the 16-byte-per-face GPU addition, color-word chunking and separate translucent draw-plan contract.
+The optional `WorldTint` overload retains/charges detached native color arrays and expands GPU vertices from eight CPU floats to eight floats plus RGBA8. The `WorldLighting` overload adds three final RGB modulation floats, retains/charges those arrays as well, and selects a 48-byte stride. Both layouts stream through the same bounded staging arena; see [LIGHTING-VIEW.md](LIGHTING-VIEW.md). See [MATERIALS.md](MATERIALS.md) for the 16-byte-per-face GPU addition, color-word chunking and separate translucent draw-plan contract.
 
 The uploader validates one section header, face or atlas page at a time. Native tint completeness/scene-identity guards, raster epoch checks, metadata counts and hardware/staging dimensions must pass before scene GL objects/storage are created. It then upgrades the same CPU journal with the complete GPU bytes and exact name-array reservation. Admission includes active and retired allocations; no extra temporary journal slot or replacement of the CPU lease is needed.
 

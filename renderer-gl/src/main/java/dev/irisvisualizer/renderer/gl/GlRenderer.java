@@ -13,16 +13,18 @@ public final class GlRenderer implements AutoCloseable {
         layout(location=1) in vec3 normal;
         layout(location=2) in vec2 uv;
         layout(location=4) in vec4 vertexTint;
+        layout(location=5) in vec3 vertexLighting;
+        uniform bool nativeLighting;
         uniform mat4 viewProjection;
         uniform vec3 sectionOffset;
         out vec2 spriteUv;
-        out float light;
+        out vec3 lightRgb;
         out vec3 tintRgb;
         void main() {
             gl_Position=viewProjection*vec4(position+sectionOffset,1.0);
             spriteUv=uv;
             tintRgb=vertexTint.rgb;
-            light=0.55+0.45*max(dot(normalize(normal),normalize(vec3(0.3,1.0,0.2))),0.0);
+            lightRgb=nativeLighting?vertexLighting:vec3(0.55+0.45*max(dot(normalize(normal),normalize(vec3(0.3,1.0,0.2))),0.0));
         }
         """;
     private static final String GEOMETRY_FRAGMENT="""
@@ -30,14 +32,14 @@ public final class GlRenderer implements AutoCloseable {
         uniform sampler2D atlas;
         uniform int passMode;
         in vec2 spriteUv;
-        in float light;
+        in vec3 lightRgb;
         in vec3 tintRgb;
         out vec4 color;
         void main() {
             vec4 sampleColor=texture(atlas,spriteUv);
             if(passMode==1 && sampleColor.a<0.5) discard;
             if(passMode==2 && sampleColor.a<=0.0) discard;
-            color=vec4(sampleColor.rgb*light*tintRgb,passMode==2?sampleColor.a:1.0);
+            color=vec4(sampleColor.rgb*lightRgb*tintRgb,passMode==2?sampleColor.a:1.0);
         }
         """;
     private static final String MARKER_VERTEX="""
@@ -55,9 +57,9 @@ public final class GlRenderer implements AutoCloseable {
         """;
     private static final int[] EDGES={0,1,2,3,4,5,6,7,0,2,1,3,4,6,5,7,0,4,1,5,2,6,3,7,0,7,1,6,2,5,3,4};
     final GlDevice device;final GlDevice.Allocation allocation;
-    private final int geometryMatrix,geometryOffset,geometryPass,geometryAtlas,markerMatrix,markerOffset;
+    private final int geometryMatrix,geometryOffset,geometryPass,geometryAtlas,geometryLighting,markerMatrix,markerOffset;
     private GlRenderer(GlDevice device,GlDevice.Allocation allocation) {
-        this.device=device;this.allocation=allocation;geometryMatrix=uniform(allocation.programs[0],"viewProjection");geometryOffset=uniform(allocation.programs[0],"sectionOffset");geometryPass=uniform(allocation.programs[0],"passMode");geometryAtlas=uniform(allocation.programs[0],"atlas");markerMatrix=uniform(allocation.programs[1],"viewProjection");markerOffset=uniform(allocation.programs[1],"sectionOffset");
+        this.device=device;this.allocation=allocation;geometryMatrix=uniform(allocation.programs[0],"viewProjection");geometryOffset=uniform(allocation.programs[0],"sectionOffset");geometryPass=uniform(allocation.programs[0],"passMode");geometryAtlas=uniform(allocation.programs[0],"atlas");geometryLighting=uniform(allocation.programs[0],"nativeLighting");markerMatrix=uniform(allocation.programs[1],"viewProjection");markerOffset=uniform(allocation.programs[1],"sectionOffset");
     }
     public static GlRenderer create(GlDevice device) {
         Objects.requireNonNull(device);var allocation=device.reserve(224,0,2,0,0,0,0,2,4,null);
@@ -90,35 +92,53 @@ public final class GlRenderer implements AutoCloseable {
     public void render(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) {
         Objects.requireNonNull(atlas);Objects.requireNonNull(plan);draw(scene,atlas,plan,target,camera);
     }
-    private void draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) {
+    /** Submission counts are returned only after a complete draw and host-state restoration. */
+    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices) {
+        public FrameStats {
+            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0)throw new IllegalArgumentException("Invalid frame submission counts");
+        }
+    }
+    public FrameStats renderFrame(GlScene scene,GlTarget target,GlCamera camera) { return draw(scene,null,null,target,camera); }
+    /** Null atlas/order select the base raster/no order; translucent scenes still require an order. */
+    public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) { return draw(scene,atlas,plan,target,camera); }
+    private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) {
         Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");device.live(scene.allocation);device.live(target.allocation);scene.cpuScene();device.collect();
         if(plan!=null&&plan.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Face order and renderer must share one device");
         if(scene.translucentFaces>0&&plan==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Prepare a complete global translucent order for this scene and camera before drawing");
         var order=plan==null?null:plan.order(scene,camera);
         int[] textures=atlas==null?scene.allocation.textures:atlas.textures(scene);
-        float[] matrix=camera.matrix((double)target.width()/target.height());float[] offsets=new float[scene.sections.size()*3];for(int i=0;i<scene.sections.size();i++)camera.offset(scene.sections.get(i).origin(),offsets,i*3);
+        float[] matrix=camera.matrix((double)target.width()/target.height());float[] offsets=new float[scene.sections.size()*3];boolean[] visible=new boolean[scene.sections.size()];var frustum=new GlFrustum(matrix);int empty=0,shown=0,culled=0;
+        for(int i=0;i<scene.sections.size();i++) {
+            var section=scene.sections.get(i);camera.offset(section.origin(),offsets,i*3);
+            if(section.bounds().isEmpty()) { empty++;continue; }
+            visible[i]=frustum.visible(section.bounds().orElseThrow(),offsets,i*3);if(visible[i])shown++;else culled++;
+        }
+        int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0;long indices=0;
         target.complete=false;
         try(var state=new GlState(device)) {
             state.drawing();glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
-            glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);
+            glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);glUniform1i(geometryLighting,scene.nativeLighting?1:0);
             for(int i=0;i<scene.sections.size();i++) {
-                var section=scene.sections.get(i);if(section.geometryVao()==0)continue;glUniform3f(geometryOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.geometryVao());
-                for(var range:section.ranges()) { if(range.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)continue;glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryPass,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4); }
+                var section=scene.sections.get(i);if(!visible[i]||section.geometryVao()==0)continue;glUniform3f(geometryOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.geometryVao());
+                for(var range:section.ranges()) { if(range.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)continue;glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryPass,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4);solidCalls++;indices+=range.indexCount(); }
             }
             if(order!=null&&order.size()>0) {
-                state.translucent();glUniform1i(geometryPass,2);var meshes=scene.cpuScene().sections();
-                for(int at=0;at<order.size();at++) {
-                    int index=order.section(at),face=order.face(at);var section=scene.sections.get(index);
-                    glUniform3f(geometryOffset,offsets[index*3],offsets[index*3+1],offsets[index*3+2]);glBindVertexArray(section.geometryVao());
-                    glBindTexture(GL_TEXTURE_2D,textures[meshes.get(index).faces().get(face).source().page()]);glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_INT,(long)face*24);
+                state.translucent();glUniform1i(geometryPass,2);var meshes=scene.cpuScene().sections();int boundSection=-1,boundPage=-1;
+                for(int at=0;at<order.size();) {
+                    int index=order.section(at),face=order.face(at);if(!visible[index]) { at++;continue; }var section=scene.sections.get(index);var faces=meshes.get(index).faces();int page=faces.get(face).source().page(),count=1;
+                    // Merge only consecutive source indices already adjacent in the sorted order.
+                    while(at+count<order.size()&&order.section(at+count)==index&&order.face(at+count)==face+count&&faces.get(face+count).source().page()==page)count++;
+                    if(boundSection!=index) { glUniform3f(geometryOffset,offsets[index*3],offsets[index*3+1],offsets[index*3+2]);glBindVertexArray(section.geometryVao());boundSection=index; }
+                    if(boundPage!=page) { glBindTexture(GL_TEXTURE_2D,textures[page]);boundPage=page; }
+                    glDrawElements(GL_TRIANGLES,count*6,GL_UNSIGNED_INT,(long)face*24);translucentCalls++;translucentFaces+=count;indices+=(long)count*6;at+=count;
                 }
             }
             state.opaque();glUseProgram(allocation.programs[1]);glUniformMatrix4fv(markerMatrix,false,matrix);
-            for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount()); }
+            for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(!visible[i]||section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount());markerCalls++;markers+=section.markerCount(); }
             device.check("complete offscreen scene draw");
         }
-        target.complete=true;
+        target.complete=true;return new FrameStats(scene.sections.size(),empty,shown,culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices);
     }
     @Override public void close() { device.retire(allocation); }
 }

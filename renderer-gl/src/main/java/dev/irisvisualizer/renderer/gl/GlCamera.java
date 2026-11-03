@@ -15,9 +15,11 @@ public record GlCamera(WorldSnapshot.Position anchor,double eyeX,double eyeY,dou
         if(!Double.isFinite(aspect)||aspect<=0)throw new IllegalArgumentException("Invalid camera aspect");
         double fx=targetX-eyeX,fy=targetY-eyeY,fz=targetZ-eyeZ,length=Math.sqrt(fx*fx+fy*fy+fz*fz);
         if(length<1e-8)throw new GlFailure(GlFailure.Code.STATE,"Camera eye and target coincide");fx/=length;fy/=length;fz/=length;
-        double sx=-fz,sz=fx,side=Math.sqrt(sx*sx+sz*sz);if(side<1e-8)throw new GlFailure(GlFailure.Code.STATE,"Camera direction is parallel to its vertical up vector");sx/=side;sz/=side;
-        double ux=-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy;
-        double[] view={sx,ux,-fx,0, 0,uy,-fy,0, sz,uz,-fz,0, -(sx*eyeX+sz*eyeZ),-(ux*eyeX+uy*eyeY+uz*eyeZ),fx*eyeX+fy*eyeY+fz*eyeZ,1};
+        // Use Z as the reference up near the Y poles, including exact top/bottom views.
+        double upY=Math.abs(fy)>0.999999?0:1,upZ=upY==0?1:0;
+        double sx=fy*upZ-fz*upY,sy=-fx*upZ,sz=fx*upY,side=Math.sqrt(sx*sx+sy*sy+sz*sz);sx/=side;sy/=side;sz/=side;
+        double ux=sy*fz-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy-sy*fx;
+        double[] view={sx,ux,-fx,0, sy,uy,-fy,0, sz,uz,-fz,0, -(sx*eyeX+sy*eyeY+sz*eyeZ),-(ux*eyeX+uy*eyeY+uz*eyeZ),fx*eyeX+fy*eyeY+fz*eyeZ,1};
         double f=1/Math.tan(Math.toRadians(fieldOfView)/2),range=near-far;double[] projection={f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)/range,-1, 0,0,2*far*near/range,0};
         float[] matrix=new float[16];for(int column=0;column<4;column++)for(int row=0;row<4;row++) { double value=0;for(int k=0;k<4;k++)value+=projection[k*4+row]*view[column*4+k];matrix[column*4+row]=(float)value; }
         return matrix;
