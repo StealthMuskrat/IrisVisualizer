@@ -40,24 +40,28 @@ public final class AtlasFrameWorker implements AutoCloseable {
     public record Status(long revision,Phase phase,Optional<ClientAssetSnapshot.Receipt> assets,long tick,double partialTick,List<ModelPlan.Problem> problems) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(assets);problems=List.copyOf(problems); }
     }
-    public record Completion(long revision,AtlasFramePlan plan) {
-        public Completion { if(revision<1||plan.requiresPlaceholder())throw new IllegalArgumentException("Invalid complete atlas plan"); }
+    public record Completion(long revision,AtlasFramePlan plan,RenderMemory.Hold admission) implements AutoCloseable {
+        public Completion { Objects.requireNonNull(plan);Objects.requireNonNull(admission);if(revision<1||plan.requiresPlaceholder())throw new IllegalArgumentException("Invalid complete atlas plan"); }
+        public Completion(long revision,AtlasFramePlan plan) { this(revision,plan,RenderMemory.Hold.none()); }
+        @Override public void close() { admission.close(); }
     }
     private static final class Job {
-        final long revision;final Request request;final AtomicBoolean cancelled=new AtomicBoolean();
+        final long revision;final Request request;RenderMemory.Hold admission=RenderMemory.Hold.none();long retainedBytes;final AtomicBoolean cancelled=new AtomicBoolean();
         Job(long revision,Request request) { this.revision=revision;this.request=request; }
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
-    private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;
+    private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;private final RenderMemory memory;
     private long revision,completedReservation;private boolean closed,scheduled;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),0,0,List.of());
     public AtlasFrameWorker() { this(1024L*1024*1024); }
-    public AtlasFrameWorker(long workingBytes) {
-        if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Atlas worker exceeds its aggregate working bound");this.workingBytes=workingBytes;
+    public AtlasFrameWorker(long workingBytes) { this(workingBytes,null); }
+    public AtlasFrameWorker(long workingBytes,RenderMemory memory) {
+        if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Atlas worker exceeds its aggregate working bound");this.workingBytes=workingBytes;this.memory=memory;
         executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-atlas-frames");thread.setDaemon(true);return thread;});
     }
     private long next() { if(closed)throw new IllegalStateException("Atlas worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Atlas revision counter exhausted");return revision+1; }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;completed=null;completedReservation=0; }
+    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedReservation=0; }
+    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
     public long invalidate() {
         synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),0,0,List.of());cancelOwned();revision=next;status=waiting;return next; }
     }
@@ -66,8 +70,10 @@ public final class AtlasFrameWorker implements AutoCloseable {
         Objects.requireNonNull(request);synchronized(lock) {
             long next=next(),reserved=active==null?0:active.request.reservation();
             if(request.reservation()>workingBytes-reserved)throw new IllegalStateException("Active and pending atlas preparation reservations exceed the worker budget");
-            var job=new Job(next,request);var queued=state(job,Phase.QUEUED,List.of());cancelOwned();pending=job;revision=next;status=queued;
-            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;status=failed(job,failure); } }
+            var job=new Job(next,request);var queued=state(job,Phase.QUEUED,List.of());
+            job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Atlas preparation",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.admission());
+            cancelOwned();pending=job;revision=next;status=queued;
+            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;job.admission.close();status=failed(job,failure); } }
             return next;
         }
     }
@@ -97,17 +103,19 @@ public final class AtlasFrameWorker implements AutoCloseable {
                     if(plan.requiresPlaceholder())status=state(job,Phase.FAILED,plan.problems());
                     else {
                         if(plan.extraCpuBytes()!=request.extraCpuBytes())throw new IllegalStateException("Atlas plan payload differs from metadata preflight");
-                        var result=new Completion(job.revision,plan);var ready=state(job,Phase.READY,List.of());completed=result;completedReservation=request.reservation();status=ready;
+                        var ready=state(job,Phase.READY,List.of());var hold=job.admission.retain();Completion result;
+                        try { result=new Completion(job.revision,plan,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
+                        job.retainedBytes=request.reservation();completed=result;completedReservation=request.reservation();status=ready;
                     }
                 }
             }
         }catch(CancellationException cancelled) { /* Obsolete clocks never publish a partial plan. */ }
-        catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { completed=null;completedReservation=0;status=failed(job,failure); } } }
+        catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } } }
     }
     private void drain() {
         while(true) {
             Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
-            try { execute(job); }finally { synchronized(lock) { active=null; } }
+            try { execute(job); }finally { synchronized(lock) { active=null;job.admission.shrinkTo(job.retainedBytes);job.admission.close();job=null; } }
         }
     }
     /** Nonblocking cancellation; active immutable inputs remain reserved until unwinding completes. */

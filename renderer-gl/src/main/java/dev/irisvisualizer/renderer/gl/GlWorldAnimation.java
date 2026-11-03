@@ -52,8 +52,8 @@ public final class GlWorldAnimation implements AutoCloseable {
             if(clockDirty)observeClock();if(status.phase()==Phase.FAILED||request==null)return false;
             if(cpuRevision!=0) {
                 var completion=worker.take(cpuRevision);
-                if(completion.isPresent()) {
-                    var plan=completion.orElseThrow().plan();
+                if(completion.isPresent())try(var prepared=completion.orElseThrow()) {
+                    var plan=prepared.plan();
                     if(plan.expected()!=frame.raster())throw new GlFailure(GlFailure.Code.STALE,"Animation plan no longer targets the displayed atlas");
                     if(!queue.submit(sceneRevision,revision,frame,plan))throw new GlFailure(GlFailure.Code.STALE,"Animation upload rejected its current frame revision");
                     cpuRevision=0;state(Phase.UPLOADING,List.of(),null,"");

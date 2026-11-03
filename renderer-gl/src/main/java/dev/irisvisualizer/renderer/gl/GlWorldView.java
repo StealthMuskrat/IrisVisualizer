@@ -9,12 +9,16 @@ public final class GlWorldView implements AutoCloseable {
     public record Status(long worldRevision,long viewRevision,Phase phase,Optional<WorldSnapshot.Source> source,List<WorldProblem> problems,Optional<GlFailure.Code> code,String reason) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
-    private final GlRenderer renderer;private final GlDevice device;private final GlUploadQueue uploads;private final GlFrameQueue frames;private final WorldOrderWorker ordering=new WorldOrderWorker();private final AtlasFrameWorker animationWorker;
+    private final GlRenderer renderer;private final GlDevice device;private final GlUploadQueue uploads;private final GlFrameQueue frames;private final WorldOrderWorker ordering;private final AtlasFrameWorker animationWorker;
     private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean atlasClockSet,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlWorldView(GlRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlWorldView(GlRenderer renderer,long animationWorkingBytes) {
-        this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);animationWorker=new AtlasFrameWorker(animationWorkingBytes);uploads=new GlUploadQueue(renderer);frames=new GlFrameQueue(renderer);
+        this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);
+        var nextOrdering=new WorldOrderWorker(1024L*1024*1024,device.memory().orElse(null));AtlasFrameWorker nextAnimation=null;
+        try {
+            nextAnimation=new AtlasFrameWorker(animationWorkingBytes,device.memory().orElse(null));uploads=new GlUploadQueue(renderer);frames=new GlFrameQueue(renderer);ordering=nextOrdering;animationWorker=nextAnimation;
+        }catch(RuntimeException|Error failure) { nextOrdering.close();if(nextAnimation!=null)nextAnimation.close();throw failure; }
     }
     public Status status() { return status; }
     public GlUploadQueue.Status uploadStatus() { return uploads.status(); }

@@ -1,6 +1,6 @@
 # Shared renderer memory admission
 
-`RenderMemory` coordinates known payload reservations across participating renderer owners. `WorldRenderWorker`, its leased `WorldSectionCache`, and `GlDevice` can now use the same coordinator. Local limits continue to apply. Shared admission is optional in existing constructors and does not enable a preview, change native generation or establish a physical RAM/VRAM guarantee.
+`RenderMemory` coordinates known payload reservations across participating renderer owners. `WorldRenderWorker`, its leased `WorldSectionCache`, `GlDevice` and the connected map/atlas/sorting preparation workers can now use the same coordinator. Local limits continue to apply. Shared admission is optional in existing constructors and does not enable a preview, change native generation or establish a physical RAM/VRAM guarantee.
 
 ## One ceiling, explicit owners
 
@@ -32,7 +32,7 @@ Shared admission precedes publishing a new allocation journal or expanding a val
 
 Retirement, pending fences, dependencies and quarantine keep their charges. Collection decreases the shared charge only after actual deletion and CPU-owner release. If teardown or deletion fails, the remaining journals and staging remain charged for retry. Successful device close frees staging and retires its empty account. A source scene that is also pinned in a participating CPU cache is conservatively counted by both cache and device; there is no cross-account source-identity deduplication.
 
-`GlDevice.memory()` exposes the borrowed optional coordinator for host orchestration. It does not change thread/context affinity or implicitly opt other preparation workers into shared admission.
+`GlDevice.memory()` exposes the borrowed optional coordinator for host orchestration. It does not change thread/context affinity. `GlMapView` and `GlWorldView` now pass it to their map, atlas and ordering workers; see [WORKER-MEMORY.md](WORKER-MEMORY.md).
 
 ## Closing admission and external work
 
@@ -40,7 +40,7 @@ Retirement, pending fences, dependencies and quarantine keep their charges. Coll
 
 For a separately owned native or CPU task, a host may open an account and reserve its known peak before starting it. It must keep that reservation until work unwinds, then change to the retained output charge for as long as it owns the output. On failure, release only after temporary data and retained output ownership have actually ended. Account disposal alone is not evidence of resource release.
 
-This batch automatically covers world preparation/cache and device-journal payloads. Independent map colorization, animation preparation, camera sorting, picking-index workers, native generation/sampling, caller-held input catalogs/maps/plans and escaped array/raster references still need host-owned accounts or future automatic integration. Device-side adopted maps/orders/animation/readback are charged once they enter their journals. Java object headers/collections, parser/decoder scratch, native library caches, driver overhead, unrelated processes and unknown native allocations remain outside known primitive estimates. Final application admission and profiling remain pending.
+Automatic coverage now includes world preparation/cache, device journals and connected map/atlas/sorting preparation. [Owned completion holds](WORKER-MEMORY.md) preserve charges through transfer, and the GPU views close them after destination admission. Independent picking-index workers, legacy standalone scene/visual workers, native generation/sampling, caller-held input catalogs/maps/plans and escaped array/raster references still need host-owned accounts or future automatic integration. Device-side adopted maps/orders/animation/readback are charged once they enter their journals. Java object headers/collections, parser/decoder scratch, native library caches, driver overhead, unrelated processes and unknown native allocations remain outside known primitive estimates. Final application admission and profiling remain pending.
 
 ## Deferred stage verification
 

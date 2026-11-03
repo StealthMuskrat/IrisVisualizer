@@ -107,3 +107,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Shared CPU/device allowance
 
 `GlDevice(limits, memory)` now admits native staging and every live/retired journal against a shared [RenderMemory](../renderer/SHARED-MEMORY.md) coordinator before allocation. A participating `WorldRenderWorker` keeps preparation and pinned cache ownership under the same ceiling. Charge moves preserve totals; failed cleanup remains charged and successful teardown releases the device account. Other workers and external native/output owners still require separate host admission.
+
+## Connected preparation holds
+
+`GlMapView` and `GlWorldView` now pass a participating device coordinator to their map, atlas and camera-order workers. CPU completions keep shared memory holds through transfer; the views scope those owners across upload/draw-plan admission and rejection. The GPU journal is admitted before the CPU hold closes, so overlap is conservative and never creates an uncharged gap. See [WORKER-MEMORY.md](../renderer/WORKER-MEMORY.md).

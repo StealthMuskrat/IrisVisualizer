@@ -13,7 +13,7 @@ public final class GlMapView implements AutoCloseable {
     private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlMapView(GlMapRenderer renderer) { this(renderer,128L*1024*1024); }
-    public GlMapView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new MapRasterWorker(workerBytes);uploads=new GlMapQueue(device); }
+    public GlMapView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new MapRasterWorker(workerBytes,device.memory().orElse(null));uploads=new GlMapQueue(device); }
     public Status status() { return status; }
     public MapRasterWorker.Status workerStatus() { return worker.status(); }
     public long reservedCpuBytes() { return worker.reservedBytes(); }
@@ -64,8 +64,8 @@ public final class GlMapView implements AutoCloseable {
         try {
             if(cpuRevision!=0) {
                 var result=worker.take(cpuRevision);
-                if(result.isPresent()) {
-                    if(!uploads.submit(mapRevision,result.orElseThrow().raster()))throw new GlFailure(GlFailure.Code.STALE,"Map upload rejected the current CPU raster");cpuRevision=0;state(Phase.UPLOADING);
+                if(result.isPresent())try(var prepared=result.orElseThrow()) {
+                    if(!uploads.submit(mapRevision,prepared.raster()))throw new GlFailure(GlFailure.Code.STALE,"Map upload rejected the current CPU raster");cpuRevision=0;state(Phase.UPLOADING);
                 } else {
                     var cpu=worker.status();if(cpu.revision()!=cpuRevision||cpu.phase()==MapRasterWorker.Phase.CLOSED)throw new GlFailure(GlFailure.Code.STALE,"Map worker revision changed before CPU adoption");
                     if(cpu.phase()==MapRasterWorker.Phase.FAILED)status=new Status(mapRevision,viewRevision,Phase.FAILED,status.context(),cpu.problems(),Optional.empty(),"Map colorization failed");return status;

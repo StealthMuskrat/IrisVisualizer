@@ -172,3 +172,7 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 ## Shared world/device admission
 
 [RenderMemory](SHARED-MEMORY.md) now provides an optional common byte ceiling for world preparation, complete cache admission and all journals on a participating GPU device. Cancelled jobs, pinned scenes, missing section output, fences and failed cleanup retain their charges. Other preparation/native/external owners still require host admission; whole-application memory validation and editor integration remain pending.
+
+## Preparation-worker memory ownership
+
+[Shared worker holds](WORKER-MEMORY.md) now admit connected map colorization, atlas preparation and camera sorting before submission, keep cancelled work charged until unwind, and transfer charged completions to explicit owners. Map/atlas idle replacement is atomic; GPU views inherit their device coordinator and close each CPU completion after destination admission or failure. Independent picking, legacy standalone and native/external owners still require host admission.
