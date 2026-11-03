@@ -1,0 +1,24 @@
+// Compile-only source wiring for the pinned official Windows native offline module.
+gradle.projectsEvaluated {
+    if (gradle.rootProject.name != 'Iris') return
+    def root = System.getenv('IRIS_VISUALIZER_ROOT')
+    if (!root) throw new GradleException('Use scripts/Compile-NativeRenderer.ps1')
+    def lock = new groovy.json.JsonSlurper().parse(new File(root, 'iris.lock.json'))
+    def manifest = new groovy.json.JsonSlurper().parse(new File(root, 'native-renderer/bridge-sources.json'))
+    if (manifest.format != 1 || manifest.irisRevision != lock.iris.revision || manifest.volmlibRevision != lock.volmlib.revision || manifest.minecraft != lock.minecraft || manifest.java != lock.java || manifest.platform != lock.platform)
+        throw new GradleException('Native renderer bridge does not match iris.lock.json')
+    def sources = gradle.rootProject.fileTree(new File(root, 'native-renderer/src/main/java')).matching { include '**/*.java' }.files
+    def expected = manifest.files.collect { it.path }.toSet()
+    def actual = sources.collect { new File(root).toPath().relativize(it.toPath()).toString().replace('\\', '/') }.toSet()
+    if (expected != actual || manifest.files.size() != expected.size()) throw new GradleException('Native renderer source manifest does not cover its exact source set')
+    manifest.files.each { entry ->
+        if (!entry.path.startsWith('native-renderer/src/main/java/') || entry.path.contains('..')) throw new GradleException('Invalid native bridge source path')
+        def bytes = new File(root, entry.path).bytes
+        def digest = java.security.MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString()
+        if (digest != entry.sha256) throw new GradleException('Native renderer source hash mismatch: ' + entry.path)
+    }
+    def target = gradle.rootProject.project(':adapters:bukkit:nms:v26_3_R1')
+    target.sourceSets.offline.java.srcDir(new File(root, 'renderer/src/main/java'))
+    target.sourceSets.offline.java.srcDir(new File(root, 'native-renderer/src/main/java'))
+    // No JavaExec, test, run or workflow task is requested or attached here.
+}

@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "irisRevision": "c3359e0a16438b1bb8468901c6171dcefdf63f7f",
+  "volmlibRevision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
+  "minecraft": "26.3",
+  "java": 25,
+  "platform": "windows-x64",
+  "files": [
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",
+      "sha256": "3403a7b44841e05f6d52478c1c13206282265cee9e89dae041595dd7c6ce7a35"
+    },
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeMapSampler.java",
+      "sha256": "697efd33c0e2da532c1d28ed74bc5840b58481b79e350abb6cbe43d6cf50e283"
+    },
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeRenderContext.java",
+      "sha256": "88335ddbfbe0979fb7b07df3e888720a76de3d13a1f1d8f613aef1078082a2ce"
+    },
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWorldCapture.java",
+      "sha256": "cdc0977cfff7f0108e2533cf20e7081229d77e5468184dd9b1dffa91dbe18a76"
+    }
+  ],
+  "sourceReferences": [
+    {
+      "repository": "VolmitSoftware/VolmLib",
+      "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
+      "path": "native/minecraft-common/src/main/java/art/arcane/volmlib/nativelib/minecraft26_2/modded/ModdedBlockState.java",
+      "blob": "95fa87fd934ef94d1b694b5cf48e7e8786657670"
+    },
+    {
+      "repository": "VolmitSoftware/VolmLib",
+      "revision": "210705c5ab1321dc74b86b48457fd6d5e0452944",
+      "path": "native/minecraft-common/src/main/java/art/arcane/volmlib/nativelib/minecraft26_2/modded/ModdedBiome.java",
+      "blob": "23bc495fd82dafdf5e79bbeb10bfcb29864d6624"
+    }
+  ],
+  "validation": "Source reviewed; native adapter compilation and runtime validation remain pending; renderer stage tests deferred"
+}

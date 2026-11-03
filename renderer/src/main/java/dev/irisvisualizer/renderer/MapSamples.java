@@ -64,7 +64,7 @@ public final class MapSamples {
         }
         WorldProblem.check(cancelled);return new MapSamples(context,grid,kind,vertical,copiedPalette,values,scalar,coverage,List.of());
     }
-    private static MapSamples failed(Context context,Grid grid,Kind kind,Optional<Vertical> vertical,WorldProblem problem) { return new MapSamples(context,grid,kind,vertical,List.of(),new int[0],new double[0],new byte[0],List.of(problem)); }
+    static MapSamples failed(Context context,Grid grid,Kind kind,Optional<Vertical> vertical,WorldProblem problem) { return new MapSamples(context,grid,kind,vertical,List.of(),new int[0],new double[0],new byte[0],List.of(problem)); }
     private void sample(int at) { if(requiresPlaceholder())throw new IllegalStateException("Map capture failed");if(at<0||at>=present.length)throw new IndexOutOfBoundsException("Sample outside map");if(present[at]==0)throw new IllegalStateException("Native sample is absent"); }
     public Context context() { return context; }
     public Grid grid() { return grid; }
