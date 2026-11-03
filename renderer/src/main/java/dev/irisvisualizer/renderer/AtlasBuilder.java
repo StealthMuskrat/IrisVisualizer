@@ -20,6 +20,16 @@ public final class AtlasBuilder {
     static ModelFields.Failure failure(ModelPlan.Code code,AssetId id,String pointer,String reason) { return TextureMetadata.failure(code,ClientAssetSnapshot.Kind.TEXTURE,id,pointer,reason); }
     static ModelFields.Failure blockFailure(ModelPlan.Code code,AssetId id,String reason) { return TextureMetadata.failure(code,ClientAssetSnapshot.Kind.BLOCKSTATE,id,"",reason); }
     static void check(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("CPU atlas work cancelled"); }
+    /** Explicit no-texture epoch for all-empty/placeholder scenes, without inventing an admitted mesh. */
+    public static AtlasLayout empty(ClientAssetSnapshot assets,AssetId owner,BooleanSupplier cancelled) { return empty(assets,owner,Limits.DEFAULT,cancelled); }
+    public static AtlasLayout empty(ClientAssetSnapshot assets,AssetId owner,Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);check(cancelled);var receipt=assets.receipt();
+        try {
+            if(!receipt.version().equals(BlockModels.PROFILE)||!receipt.expectedVersion().equals(BlockModels.PROFILE))throw blockFailure(ModelPlan.Code.VERSION,owner,"Empty visual atlas still requires the pinned selected-client profile");
+            var usage=new AtlasLayout.Usage(0,0,0,0,0,0,0,0,0,0);check(cancelled);return AtlasLayout.success(receipt,owner,limits,List.of(),List.of(),Map.of(),usage);
+        }catch(ModelFields.Failure failure) { check(cancelled);return AtlasLayout.placeholder(receipt,owner,limits,List.of(failure.problem)); }
+        catch(OutOfMemoryError exhausted) { check(cancelled);return AtlasLayout.placeholder(receipt,owner,limits,List.of(blockFailure(ModelPlan.Code.MEMORY,owner,"Not enough memory to create an empty visual atlas").problem)); }
+    }
     public static AtlasLayout plan(List<TexturePreparation> preparations,BooleanSupplier cancelled) { return plan(preparations,Limits.DEFAULT,cancelled); }
     public static AtlasLayout plan(List<TexturePreparation> preparations,Limits limits,BooleanSupplier cancelled) {
         Objects.requireNonNull(preparations);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);check(cancelled);

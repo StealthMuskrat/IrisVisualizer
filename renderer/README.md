@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its fifty-five main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its fifty-seven main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -89,7 +89,7 @@ World inputs, prototypes, atlas payload and section arrays are checked together;
 
 ## Separate OpenGL backend
 
-The [OpenGL module](../renderer-gl/README.md) now adds twenty-one LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 76 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
+The [OpenGL module](../renderer-gl/README.md) now adds twenty-one LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 78 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
 
 The [incremental upload layer](../renderer-gl/UPLOADS.md) validates and transfers across explicit per-step byte/action/work limits with a cooperative time target. It charges paused CPU input, restores state at each yield, and permits exactly-once complete-scene adoption guarded by the application's latest revision. Synchronous upload delegates to the same state machine. Driver allocation/cleanup latency is not a hard frame-time guarantee.
 
@@ -110,6 +110,10 @@ This backend requires an externally owned GLFW OpenGL 3.3 core context. It is no
 ## Complete-frame replacement
 
 The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private targets and retains exact source/atlas/camera receipts. A failed redraw or resize can leave the prior caller-owned image intact. Reference-counted image owners pin source dependencies and retain CPU inspection context; a latest-revision queue transfers only complete current frames. Multi-epoch cache preflight now admits the complete replacement alongside pinned older scenes under unchanged aggregate limits. Upload queues also require explicit active/READY phases after cleanup failures. This layer is not wired to editor presentation or readiness.
+
+## Native visual geometry and layer composition
+
+`NativeGeometry.capture` now accepts supplied vanilla native block/fluid/special quads with block-local positions, source UVs, normals/material metadata and detached exact capture/position provenance. `combine` preserves a JSON base and native layers atomically, including waterlogged-style compositions without replacing the native block/state. World assignments reject cross-capture/cell reuse; texture/atlas/world/GL/picking stages preserve native face provenance. `AtlasBuilder.empty` supports all-empty/placeholder scenes without a dummy mesh or texture. See [NATIVE-GEOMETRY.md](NATIVE-GEOMETRY.md). Native geometry producers and actual fluid/special visual verification remain pending; this adds no renderer simulation, client execution or preview readiness.
 
 ## Still to implement
 

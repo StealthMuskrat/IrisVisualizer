@@ -1,6 +1,6 @@
 # CPU atlas layout, binding and animation
 
-Implemented during the renderer stage on 2026-11-03. All 43 CPU renderer sources compile with Java 25. Renderer runtime tests remain deferred until implementation is complete. No real client atlas, native filtering, GPU upload or visible rendering has been validated for this batch. Unsupported previews remain disabled.
+Implemented during the renderer stage on 2026-11-03. All 57 CPU renderer sources compile with Java 25. Renderer runtime tests remain deferred until implementation is complete. No real client atlas, native filtering, GPU upload or visible rendering has been validated for this batch. Unsupported previews remain disabled.
 
 ## One layout epoch
 
@@ -77,3 +77,5 @@ Check exact source vertex/index/face preservation, atlas UV edges/mirrors/rotati
 Check static and custom animated tiles, frame/cycle boundaries, large integer clocks, skipped/repeated frames, clock seeking, gutter/corner extrusion and unused transparent pixels. Include multi-frame interpolation guards and retained filter metadata. Patches must contain only changed slots, with correct offsets/row layout and unchanged base pages. Applying a transaction must equal a full CPU recapture at the same supported clock. Reapplying to a newer or foreign snapshot must fail without changing either raster.
 
 Exercise cancellation in every phase, simulated allocation failure, initial/patch/copy-on-write peak reservations, unchanged-page sharing, and absence of partial output. Actual GPU upload/subimage alignment, sampler/mipmap behavior, native RGB/alpha interpolation, render-pass ordering, native block/biome agreement, native world integration and visible Windows checks remain separate unfinished renderer requirements. The later [world-section assembler](WORLD-MESH.md) now consumes atlas-bound prototypes without enabling previews. No renderer tests were executed for this batch.
+
+`AtlasBuilder.empty` now creates an explicit zero-input/page/sprite atlas epoch for all-empty or placeholder-only scenes using a version-matched selected-client receipt. It admits no geometry and uploads no dummy texture. See [NATIVE-GEOMETRY.md](NATIVE-GEOMETRY.md).

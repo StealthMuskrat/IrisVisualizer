@@ -41,22 +41,25 @@ public final class WorldModels {
         if(bytes>limits.indexBytes()||bytes+snapshot.indexBytes()>limits.sourceBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"World state, biome and visual-choice index budget reached");
         if(input.isEmpty()||input.size()>limits.entries())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Visual assignment palette count is outside its budget");
         var nativeStates=new HashMap<Integer,Integer>();for(int i=0;i<snapshot.states().size();i++)nativeStates.put(snapshot.states().get(i).nativeStateId(),i);
-        var captured=new ArrayList<Entry>();var stateIndices=new ArrayList<Integer>();var meshes=new IdentityHashMap<AtlasMesh,Boolean>();long meshBytes=0;
+        var captured=new ArrayList<Entry>();var stateIndices=new ArrayList<Integer>();var nativeSources=new ArrayList<Optional<NativeMeshSource>>();var meshes=new IdentityHashMap<AtlasMesh,Boolean>();long meshBytes=0;
         for(var entry:input) {
             WorldProblem.check(cancelled);Objects.requireNonNull(entry);if(captured.size()>=limits.entries())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Visual assignment palette budget reached");
             var index=nativeStates.get(entry.state().nativeStateId());
             if(index==null||!snapshot.states().get(index).equals(entry.state()))throw WorldProblem.fail(WorldProblem.Code.STATE,"Visual entry does not preserve an exact native state in the captured palette");
-            if(entry.kind()==Kind.MESH) {
+            Optional<NativeMeshSource> nativeSource=Optional.empty();if(entry.kind()==Kind.MESH) {
                 var mesh=entry.mesh().orElseThrow();if(mesh.layout()!=layout)throw WorldProblem.fail(WorldProblem.Code.ATLAS,"World prototypes must use the exact atlas layout epoch");
+                nativeSource=mesh.preparation().mesh().nativeSource();
+                if(nativeSource.isPresent()) { var origin=nativeSource.orElseThrow();if(!origin.snapshotId().equals(snapshot.id())||!origin.generation().equals(snapshot.source())||origin.nativeStateId()!=entry.state().nativeStateId())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Native visual belongs to another exact snapshot or native state"); }
                 if(meshes.put(mesh,Boolean.TRUE)==null)meshBytes+=mesh.packedBytes();
                 if(meshBytes>limits.meshBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Unique atlas-bound prototype payload budget reached");
             }
-            captured.add(entry);stateIndices.add(index);
+            captured.add(entry);stateIndices.add(index);nativeSources.add(nativeSource);
         }
         int[] indices=new int[cells.length];
         for(int i=0;i<cells.length;i++) {
             if((i&4095)==0)WorldProblem.check(cancelled);int choice=cells[i];
-            if(choice<0||choice>=captured.size()||stateIndices.get(choice)!=snapshot.stateIndex(i))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Per-cell visual choice is absent or belongs to a different native block state");indices[i]=choice;
+            if(choice<0||choice>=captured.size()||stateIndices.get(choice)!=snapshot.stateIndex(i))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Per-cell visual choice is absent or belongs to a different native block state");
+            var origin=nativeSources.get(choice);if(origin.isPresent()&&origin.orElseThrow().position().isPresent()&&!origin.orElseThrow().position().orElseThrow().equals(snapshot.extent().position(i)))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Position-dependent native visual was assigned to a different cell");indices[i]=choice;
         }
         WorldProblem.check(cancelled);return new WorldModels(snapshot,layout,captured,indices,meshBytes,List.of());
     }

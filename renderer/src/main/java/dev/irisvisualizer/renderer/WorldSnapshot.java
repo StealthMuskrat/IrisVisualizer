@@ -5,6 +5,7 @@ import java.util.function.BooleanSupplier;
 
 /** Detached native block/biome palette indices. This data receipt does not establish world parity. */
 public final class WorldSnapshot {
+    private final UUID id=UUID.randomUUID();
     public record Source(UUID generationId,String inputSha256,String backendBuild,String minecraftVersion,AssetId dimension,long seed) {
         public Source {
             Objects.requireNonNull(generationId);Objects.requireNonNull(inputSha256);Objects.requireNonNull(backendBuild);Objects.requireNonNull(minecraftVersion);Objects.requireNonNull(dimension);
@@ -70,6 +71,8 @@ public final class WorldSnapshot {
         WorldProblem.check(cancelled);return new WorldSnapshot(source,extent,capturedStates,capturedBiomes,stateCopy,biomeCopy,List.of());
     }
     private static WorldSnapshot placeholder(Source source,Extent extent,WorldProblem problem) { return new WorldSnapshot(source,extent,List.of(),List.of(),new int[0],new int[0],List.of(problem)); }
+    /** Exact capture identity, independent of caller-supplied generation receipt values. */
+    public UUID id() { return id; }
     public Source source() { return source; }
     public Extent extent() { return extent; }
     public List<RenderBlockState> states() { return states; }

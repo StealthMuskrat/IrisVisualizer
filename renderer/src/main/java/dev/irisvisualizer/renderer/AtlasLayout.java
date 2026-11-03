@@ -20,7 +20,7 @@ public final class AtlasLayout {
     /** Known primitive payloads only; object/metadata, captured ZIP and native/world memory are excluded. */
     public record Usage(int inputs,int faces,int sprites,int scheduleEntries,long sourceRgbaBytes,long sourcePackedBytes,
                         long atlasBytes,long boundMeshBytes,long paddedPixels,long packingChecks) {
-        public Usage { if(inputs<1||faces<0||sprites<0||scheduleEntries<0||sourceRgbaBytes<0||sourcePackedBytes<0||atlasBytes<0||boundMeshBytes<0||paddedPixels<0||packingChecks<0)throw new IllegalArgumentException("Invalid atlas usage"); }
+        public Usage { if(inputs<0||faces<0||sprites<0||scheduleEntries<0||sourceRgbaBytes<0||sourcePackedBytes<0||atlasBytes<0||boundMeshBytes<0||paddedPixels<0||packingChecks<0||inputs==0&&(faces!=0||sprites!=0||scheduleEntries!=0||sourceRgbaBytes!=0||sourcePackedBytes!=0||atlasBytes!=0||boundMeshBytes!=0||paddedPixels!=0||packingChecks!=0))throw new IllegalArgumentException("Invalid atlas usage"); }
         public long knownPayloadBytes() { return sourceRgbaBytes+sourcePackedBytes+atlasBytes+boundMeshBytes; }
     }
     private final ClientAssetSnapshot.Receipt assets;private final AssetId owner;private final AtlasBuilder.Limits limits;

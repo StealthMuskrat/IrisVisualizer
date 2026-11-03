@@ -1,6 +1,6 @@
 # Native-data CPU world sections
 
-Renderer implementation, 2026-11-03. All 43 CPU renderer sources compile with Java 25. Runtime tests remain deferred until the renderer stage is implemented. No native generated-volume comparison, GPU rendering or visible Windows validation was executed for this batch. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 57 CPU renderer sources compile with Java 25. Runtime tests remain deferred until the renderer stage is implemented. No native generated-volume comparison, GPU rendering or visible Windows validation was executed for this batch. Unsupported previews remain disabled.
 
 ## Immutable native inputs
 
@@ -79,3 +79,5 @@ Exercise multiple per-position native choices for the same state, mismatched ass
 Check source face/index/normal/UV order, section-relative translation at distant origins, negative heights, cell picking, biome lookup, cull-only suppression, complete range coverage, bounds including markers, all-hidden/empty geometry and native-state retention for every visual failure. Compare count and emit passes, guard every output/combined-memory threshold, and verify cancellation/failure cannot publish partial data.
 
 Full native model/occlusion/tint/fluid handling, application world generation/scene integration, GPU marker/mesh drawing, transparency/filtering, UI result adoption and visible Windows checks remain unfinished renderer/integration work. No renderer tests were executed for this implementation batch.
+
+Atlas-bound supplied native quads now carry detached capture/state/position provenance. World assignment validates the exact snapshot capture UUID and position-dependent cell before section assembly. JSON/native compositions preserve original block and biome identity; failed visuals can use an explicit empty atlas and markers. See [NATIVE-GEOMETRY.md](NATIVE-GEOMETRY.md).

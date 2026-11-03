@@ -1,6 +1,6 @@
 # Completed frames and bounded scene replacement
 
-Renderer implementation, 2026-11-03. All 76 main Java sources compile with Java 25 and pinned LWJGL 3.4.1: 55 CPU and 21 OpenGL. No frame, multi-epoch cache, cleanup/adoption, GL, concurrency, pixel or interactive Windows tests have run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
+Renderer implementation, 2026-11-03. All 78 main Java sources compile with Java 25 and pinned LWJGL 3.4.1: 57 CPU and 21 OpenGL. No frame, multi-epoch cache, cleanup/adoption, GL, concurrency, pixel or interactive Windows tests have run. Renderer tests remain deferred until implementation is complete; unsupported previews remain disabled.
 
 ## Replacing a scene while retaining its previous image
 
