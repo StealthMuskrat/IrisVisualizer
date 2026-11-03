@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its seventy main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its seventy-one main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -137,7 +137,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its ten native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 99 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its eleven native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 100 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
@@ -145,7 +145,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native hidden-face masks and scene capture
 
-`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Ten native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
+`NativeVisibility` now produces block-direction masks from the vanilla native face predicate, with explicit boundary retention and bounded primitive memoization. `WorldVisibility.Input.read` streams the privately owned mask without an additional source-array copy. `NativeSceneInputs` combines model and visibility capture into a detached scene-worker request under one primitive working budget; no native context reaches the render queue. See [NATIVE-VISIBILITY.md](NATIVE-VISIBILITY.md). Eleven native adapter sources still require genuine Windows compilation and runtime validation; no preview gate is enabled.
 
 ## Native model offsets
 
@@ -164,3 +164,7 @@ End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncat
 ## Captured native tint layers
 
 The [native tint input path](TINT-INPUTS.md) now carries bounded, exact-snapshot RGB palettes through deterministic/weighted model inspection, shared mesh prototypes and scene/GPU admission. A zero-copy scene view supplies GPU colors, and missing layers retain original-state placeholders. The host must supply and verify the native resolver, resources and blending policy; genuine native compilation and pixel comparisons remain pending.
+
+## Streaming native visual producers
+
+The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer decisions over a complete frozen model request, interns shared choices, preserves original native state/biome/position and transfers the edited request to the existing scene worker. Native quads can stream without a separate input list. Original/scratch/copy indices and new packets share bounded admission; producer selection and actual native/GPU fidelity remain pending.

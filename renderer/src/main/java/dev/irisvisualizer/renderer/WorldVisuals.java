@@ -64,11 +64,14 @@ public final class WorldVisuals {
             }
             WorldProblem.check(cancelled);return new Request(assets,snapshot,offsets,tints,frozen,captured,limits,tick,partialTick,base+packed,packed);
         }
-        private static void validateNative(ClientAssetSnapshot assets,WorldSnapshot snapshot,int stateIndex,BlockMesh mesh) {
+        static void validateNative(ClientAssetSnapshot assets,WorldSnapshot snapshot,int stateIndex,BlockMesh mesh) {
             if(!mesh.state().equals(snapshot.states().get(stateIndex))||!AtlasLayout.sameAssets(assets.receipt(),mesh.assets()))throw new IllegalArgumentException("Native visual state or asset capture differs from its request");
             if(mesh.requiresPlaceholder())return;var source=mesh.nativeSource().orElseThrow(()->new IllegalArgumentException("Native choices/layers require captured native provenance"));
             if(!source.snapshotId().equals(snapshot.id())||!source.generation().equals(snapshot.source())||source.nativeStateId()!=mesh.state().nativeStateId())throw new IllegalArgumentException("Native visual belongs to a different exact world capture");
         }
+        public ClientAssetSnapshot assets() { return assets; }
+        public long tick() { return tick; }
+        public double partialTick() { return partialTick; }
         public WorldSnapshot.Source source() { return snapshot.source(); }
         public UUID snapshotId() { return snapshot.id(); }
         public Limits limits() { return limits; }

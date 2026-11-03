@@ -39,6 +39,10 @@
       "sha256": "6bd33015912fd122529e5f4bda239b4fa270f5b99c83fceb2e7898b92ebe54fe"
     },
     {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeVisualInputs.java",
+      "sha256": "912ad7ae7e291ae54ea77e82ace9e78c8ebd6c5cc49dc9b7e18967d3edc1eff4"
+    },
+    {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWeightedInputs.java",
       "sha256": "5ee15db7d3e8c35aa3806f44fcb3a3c23d88946f05036a7e2e5ea7e48b15cf4e"
     },

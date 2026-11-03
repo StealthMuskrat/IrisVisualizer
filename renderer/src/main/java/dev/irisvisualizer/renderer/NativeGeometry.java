@@ -14,28 +14,45 @@ public final class NativeGeometry {
     public record Quad(ModelPlan.Direction face,Optional<ModelPlan.Direction> cullface,ModelPlan.Vec3 normal,ModelPlan.Material material,int tintIndex,int lightEmission,boolean ambientOcclusion,Optional<ModelPlan.Direction> shadeDirectionOverride,List<BlockMesh.Vertex> vertices) {
         public Quad { Objects.requireNonNull(face);Objects.requireNonNull(cullface);Objects.requireNonNull(normal);Objects.requireNonNull(material);Objects.requireNonNull(shadeDirectionOverride);Objects.requireNonNull(vertices);if(vertices.size()!=4||tintIndex< -1||lightEmission<0||lightEmission>15)throw new IllegalArgumentException("Invalid native quad description");vertices=List.copyOf(vertices); }
     }
+    /** Caller freezes the native producer until both completion checks return; no reader escapes. */
+    public interface Reader {
+        int size();
+        Quad quad(int index);
+        default void complete() {}
+    }
     private static void require(boolean valid,RenderBlockState state,String pointer,ModelPlan.Code code,String reason) { if(!valid)throw TextureMetadata.failure(code,ClientAssetSnapshot.Kind.BLOCKSTATE,state.block(),pointer,reason); }
     public static BlockMesh capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,int cell,NativeMeshSource.Kind kind,String policy,List<Quad> quads,BooleanSupplier cancelled) { return capture(assets,snapshot,cell,kind,policy,quads,true,Limits.DEFAULT,cancelled); }
     /** Only explicitly position-independent native output can be reused at other cells of this exact snapshot. */
     public static BlockMesh capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,int cell,NativeMeshSource.Kind kind,String policy,List<Quad> quads,boolean positionDependent,Limits limits,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(kind);Objects.requireNonNull(policy);Objects.requireNonNull(quads);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
+        Objects.requireNonNull(quads);return read(assets,snapshot,cell,kind,policy,new Reader() {
+            @Override public int size() { return quads.size(); }
+            @Override public Quad quad(int index) { return quads.get(index); }
+        },positionDependent,limits,cancelled);
+    }
+    /** Streams a declared bounded number of native quads without retaining an intermediate input list. */
+    public static BlockMesh read(ClientAssetSnapshot assets,WorldSnapshot snapshot,int cell,NativeMeshSource.Kind kind,String policy,Reader reader,boolean positionDependent,Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(kind);Objects.requireNonNull(policy);Objects.requireNonNull(reader);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         if(snapshot.requiresPlaceholder())throw new IllegalArgumentException("A complete native snapshot is required before capturing visual quads");var state=snapshot.state(cell);
-        try { AtlasBuilder.check(cancelled);var origin=new NativeMeshSource(snapshot.id(),snapshot.source(),state.nativeStateId(),positionDependent?Optional.of(snapshot.extent().position(cell)):Optional.empty(),kind,policy);return captureQuads(assets,state,origin,quads,limits,cancelled); }
+        try {
+            AtlasBuilder.check(cancelled);var origin=new NativeMeshSource(snapshot.id(),snapshot.source(),state.nativeStateId(),positionDependent?Optional.of(snapshot.extent().position(cell)):Optional.empty(),kind,policy);
+            var result=captureQuads(assets,state,origin,reader,limits,cancelled);reader.complete();AtlasBuilder.check(cancelled);require(reader.size()==result.quads().size(),state,"/native",ModelPlan.Code.SELECTION,"Native quad count changed before final publication");return result;
+        }
         catch(ModelFields.Failure failure) { AtlasBuilder.check(cancelled);return BlockMesh.placeholder(assets.receipt(),state,List.of(failure.problem)); }
         catch(OutOfMemoryError exhausted) { AtlasBuilder.check(cancelled);return BlockMesh.placeholder(assets.receipt(),state,List.of(AtlasBuilder.blockFailure(ModelPlan.Code.MEMORY,state.block(),"Not enough memory to capture native geometry; no partial visual was published").problem)); }
     }
-    private static BlockMesh captureQuads(ClientAssetSnapshot assets,RenderBlockState state,NativeMeshSource origin,List<Quad> input,Limits limits,BooleanSupplier cancelled) {
+    private static BlockMesh captureQuads(ClientAssetSnapshot assets,RenderBlockState state,NativeMeshSource origin,Reader reader,Limits limits,BooleanSupplier cancelled) {
         var receipt=assets.receipt();require(state.block().namespace().equals("minecraft"),state,"/native",ModelPlan.Code.EXTERNAL_ASSET,"External block visuals remain unsupported; preserve the original native block/state");
         require(receipt.version().equals(BlockModels.PROFILE)&&receipt.expectedVersion().equals(BlockModels.PROFILE)&&origin.generation().minecraftVersion().equals(receipt.version()),state,"/native",ModelPlan.Code.VERSION,"Native visual and user-selected assets must target the pinned Minecraft profile");
-        long bytes=(long)input.size()*MeshPacket.PACKED_BYTES_PER_QUAD;require(input.size()<=limits.quads()&&bytes<=limits.packedBytes()&&bytes<=limits.workingBytes(),state,"/native",ModelPlan.Code.LIMIT,"Native visual quad or packed payload budget exceeded");
-        var output=new ArrayList<BlockMesh.Quad>(input.size());var bounds=new Bounds();var provenance=Optional.of(origin);
-        for(int at=0;at<input.size();at++) {
-            AtlasBuilder.check(cancelled);require(at<limits.quads(),state,"/native",ModelPlan.Code.LIMIT,"Native quad count changed beyond its frozen-input budget");var value=Objects.requireNonNull(input.get(at));String pointer="/native/quads/"+at;
+        int count=reader.size();long bytes=(long)count*MeshPacket.PACKED_BYTES_PER_QUAD;require(count>=0&&count<=limits.quads()&&bytes<=limits.packedBytes()&&bytes<=limits.workingBytes(),state,"/native",ModelPlan.Code.LIMIT,"Native visual quad or packed payload budget exceeded");
+        var output=new ArrayList<BlockMesh.Quad>(count);var bounds=new Bounds();var provenance=Optional.of(origin);
+        for(int at=0;at<count;at++) {
+            AtlasBuilder.check(cancelled);var value=Objects.requireNonNull(reader.quad(at));String pointer="/native/quads/"+at;
             require(value.material().sprite().namespace().equals("minecraft")&&assets.find(ClientAssetSnapshot.Kind.TEXTURE,value.material().sprite()).isPresent(),state,pointer,ModelPlan.Code.MISSING_ASSET,"Native visual sprite must be present in the selected vanilla client archive");
             validate(state,pointer,value.vertices(),value.normal(),limits,bounds,cancelled);
             output.add(new BlockMesh.Quad(new ModelPlan.Source(ClientAssetSnapshot.Kind.BLOCKSTATE,state.block(),pointer),-1,value.face(),value.cullface(),value.normal(),value.material(),value.tintIndex(),value.lightEmission(),value.ambientOcclusion(),value.shadeDirectionOverride(),value.vertices(),provenance));
         }
-        AtlasBuilder.check(cancelled);var packet=MeshPacket.pack(receipt,state,output,limits.packedBytes(),cancelled);return BlockMesh.captured(receipt,state,List.of(),output,bounds.value(),packet,origin);
+        reader.complete();AtlasBuilder.check(cancelled);require(reader.size()==count,state,"/native",ModelPlan.Code.SELECTION,"Native quad count changed during its frozen capture");
+        var packet=MeshPacket.pack(receipt,state,output,limits.packedBytes(),cancelled);return BlockMesh.captured(receipt,state,List.of(),output,bounds.value(),packet,origin);
     }
     public static BlockMesh combine(BlockMesh base,BlockMesh nativeLayer,BooleanSupplier cancelled) { return combine(base,nativeLayer,Limits.DEFAULT,cancelled); }
     /** Atomic ordered composition, such as a JSON waterlogged model followed by supplied fluid quads. */

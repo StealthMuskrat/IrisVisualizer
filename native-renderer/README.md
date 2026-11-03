@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These ten native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These eleven native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -99,3 +99,7 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 ## Explicit native tint resolver boundary
 
 `NativeTintInputs` detaches bounded RGB layer tables from a host-supplied native resolver using original registry states, biomes and world positions. The deterministic/weighted scene capture overloads share those inputs through scene preparation; missing tint coverage remains guarded. See [TINT-INPUTS.md](../renderer/TINT-INPUTS.md) for identity, resource/blending responsibility, primitive admission and GPU handoff. No default native color factory is implemented or verified. Genuine pinned Windows API compilation and actual native/pixel comparisons remain pending.
+
+## Streaming native visual producer handoff
+
+`NativeVisualInputs` visits a complete captured scene request under a borrowed native session and supplies actual original state, biome and position to an explicitly provided producer. Its detached edited request preserves the baseline mask, offsets, tint inputs and scene limits. [VISUAL-EDITS.md](../renderer/VISUAL-EDITS.md) describes streaming quads, complete replacement versus layering, packet/assignment-copy admission and producer/resource responsibilities. No fluid/special renderer factory is inferred; genuine native API compilation and actual native/GPU output remain unverified.
