@@ -2,7 +2,7 @@
 
 Java 25 library, separate from the editor and generation engine. UI implementation and automated validation finished before this stage; see [UI-VALIDATION.md](../docs/UI-VALIDATION.md).
 
-The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, bounded blockstate/model resolution, CPU geometry baking, PNG decoding, animation schedules and conservative mapped-area alpha classification for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
+The renderer currently implements read-only capture of a **user-selected** client JAR/ZIP, an immutable vanilla asset catalog, bounded blockstate/model resolution, CPU geometry baking, PNG decoding, animation schedules, conservative mapped-area alpha classification, shared CPU atlas layout/rasters and atlas-bound mesh buffers for the pinned 26.3 profile. It does not open a preview, download assets, execute client classes, modify a pack or change generation readiness.
 
 Build sources with a Java 25 JDK:
 
@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its twenty-three main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its thirty-one main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -63,8 +63,16 @@ Texture metadata retains blur/clamp, mipmap strategy and cutoff bias. Animation 
 
 Alpha scans cover only each face's conservative UV pixel rectangle across all distinct referenced frames, with shared-region caching and aggregate pixel-visit limits. Force-translucent materials override classification; potentially blended binary animation masks are conservatively marked. This does not certify the native UV boundary, mipmap, interpolation or render-pass policy. No alpha test, blending, atlas or GPU upload runs. Defaults cap unique sprites at 256, faces at 24,576, dimension at 8,192, pixels per image at 16,777,216, aggregate RGBA at 128 MiB, encoded assets at 32 MiB, metadata at 1 MiB/65,536 nodes, schedule entries at 16,384, regions at 8,192 and alpha visits at 64 Mi. See [TEXTURES.md](TEXTURES.md) for the contract, exclusions and deferred validation matrix. These are CPU preparation budgets, not combined generation/GPU memory approval.
 
+## Shared CPU atlas and frame updates
+
+`AtlasBuilder.plan(preparations, cancelled)` admits bounded texture preparations from the same archive, shares matching sprite IDs and creates deterministic multi-page power-of-two layouts with edge gutters. Source images/mesh arrays are charged by retained object identity, including independent duplicate decodes; aggregate schedule counts and source/prospective bound mesh/page payloads are checked together. No texture is rescaled or omitted to make a layout fit.
+
+`AtlasMeshes.bind(layout, admittedPreparation, cancelled)` retains position/normal/index/face order and original native metadata while mapping sprite-local UVs into the assigned page. Consecutive page/alpha candidate ranges are recorded without reordering faces. Read-only heap buffers remain separate from the source packets. Bound meshes and rasters must share the exact layout object, not merely a matching archive hash.
+
+`AtlasImages.capture(layout, tick, partialTick, cancelled)` creates immutable base-level CPU RGBA pages with frame-edge/corner extrusion. `updates` creates bounded whole-slot patches only for changed scheduled tiles; `apply` checks the exact prior raster identity and creates a new snapshot by cloning changed pages once and sharing untouched pages. All partial output is withheld on failure, and cancellation is separate. Multi-frame native interpolation stays guarded; filtering/mipmaps and GPU uploads are not implemented. See [ATLAS.md](ATLAS.md) for the contracts, numerical budgets, exclusions and deferred verification matrix.
+
 ## Still to implement
 
-Native geometry/UV/texture comparison and guarded cases, native weighted-choice seeding, tint/lighting, actual cutout/transparency rendering, fluids and special render shapes, native animation interpolation/mipmap/atlas management, world-mesh assembly/culling, GPU lifetime/budgets, and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV/texture comparison and guarded cases, native weighted-choice seeding, tint/lighting, actual cutout/transparency rendering, fluids and special render shapes, native animation interpolation/mipmap/filtering, active atlas/GPU lifetime and staging budgets, world-mesh assembly/culling, and map/3D presentation remain pending. Missing or unsupported visual models must later draw explicit visual placeholders while retaining the original generated block ID/state. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.

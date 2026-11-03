@@ -1,6 +1,6 @@
 # CPU texture preparation
 
-Renderer-stage implementation, 2026-11-03. All 23 renderer sources compile with Java 25. Runtime tests remain deferred until renderer implementation is complete. No user-selected client archive, native decoder, animation or GPU result has been exercised for this batch. Unsupported previews remain disabled.
+Renderer-stage implementation, 2026-11-03. All 31 renderer sources compile with Java 25, including the later [CPU atlas layer](ATLAS.md). Runtime tests remain deferred until renderer implementation is complete. No user-selected client archive, native decoder, animation or GPU result has been exercised for this batch. Unsupported previews remain disabled.
 
 ## Snapshot-bound contract
 
@@ -43,7 +43,7 @@ Each face's normalized UV extrema form a frame-local pixel rectangle. The scan i
 
 Only distinct referenced animation frames are scanned, including later frames and custom schedules; unused sheet tiles do not affect classification. Each unique sprite/quantized rectangle shares one cached scan within the preparation call. Results retain the presence of zero, partial and full alpha. Partial samples select a translucent candidate; zero-only/binary samples select cutout; fully opaque samples select opaque. `force_translucent` overrides every source result. Interpolated animations with multiple referenced frames and mixed zero/full alpha conservatively retain a possible blended-alpha flag and translucent candidate, even if the native interpolation policy or spatial masks ultimately would not require it.
 
-These candidates describe source pixels and possible interpolation, not a certified native render pass. Mipmap cutoff bias, texture blur, atlas gutters, UV shrinking, derivatives, transparent-color bleed, native interpolation and actual fragment alpha tests/blending are not applied. Fully transparent or degenerate faces are not removed. No neighbor culling, tint, AO or lighting is inferred.
+These candidates describe source pixels and possible interpolation, not a certified native render pass. Mipmap cutoff bias, texture blur, UV shrinking, derivatives, transparent-color bleed, native interpolation and actual fragment alpha tests/blending are not applied. The separate [CPU atlas layer](ATLAS.md) now packs these sprites and extrudes frame-edge gutters; it does not alter the alpha analysis or certify filtered sampling. Fully transparent or degenerate faces are not removed. No neighbor culling, tint, AO or lighting is inferred.
 
 ## Resource limits
 

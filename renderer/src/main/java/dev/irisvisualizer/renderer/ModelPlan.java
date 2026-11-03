@@ -7,7 +7,7 @@ public record ModelPlan(ClientAssetSnapshot.Receipt assets,RenderBlockState stat
     public ModelPlan { Objects.requireNonNull(assets);Objects.requireNonNull(state);parts=List.copyOf(parts);problems=List.copyOf(problems);if(!problems.isEmpty() && !parts.isEmpty())throw new IllegalArgumentException("A placeholder plan must not publish partial geometry"); }
     public enum Code { VERSION, MISSING_ASSET, EXTERNAL_ASSET, FORMAT, UNSUPPORTED_FIELD, BUILTIN_MODEL, LIMIT,
         PARENT_CYCLE, TEXTURE_CYCLE, MISSING_TEXTURE_VARIABLE, PROPERTY, NO_VARIANT, AMBIGUOUS_VARIANT, UNSUPPORTED_INHERITANCE,
-        SELECTION, UNSUPPORTED_GEOMETRY, GEOMETRY_RANGE, UV_RANGE, TEXTURE_FORMAT, ANIMATION, MEMORY }
+        SELECTION, UNSUPPORTED_GEOMETRY, GEOMETRY_RANGE, UV_RANGE, TEXTURE_FORMAT, ANIMATION, ATLAS, STALE_ATLAS, MEMORY }
     public record Problem(Code code,ClientAssetSnapshot.Kind kind,AssetId asset,String pointer,String reason) {
         public Problem { Objects.requireNonNull(code);Objects.requireNonNull(kind);Objects.requireNonNull(asset);Objects.requireNonNull(pointer);Objects.requireNonNull(reason); }
     }
