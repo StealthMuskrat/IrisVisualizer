@@ -46,7 +46,7 @@ A directly constructed `GlWorldAnimation` still borrows the worker supplied by i
 
 ## Remaining scope and validation
 
-These additions automatically cover the connected map, atlas and sorting preparation paths when the device participates. Native generation/sampling and producer scratch, independent picking-index workers, legacy standalone scene/visual preparation workers, caller-retained input catalogs/maps/plans and escaped arrays still require separate host admission or further automatic wiring. Java object/collection overhead, parser/decoder scratch, native caches and driver storage overhead are not measured by primitive reservations. Whole-application memory profiling and final editor integration remain pending.
+These additions automatically cover the connected map, atlas and sorting preparation paths when the device participates. [Picking and standalone visual/scene preparation](PICKING-MEMORY.md) now also provide optional shared admission. Native generation/sampling and producer scratch, caller-retained input catalogs/maps/plans, custom caches and escaped arrays still require separate host admission or further wiring. Java object/collection overhead, parser/decoder scratch, native caches and driver storage overhead are not measured by primitive reservations. Whole-application memory profiling and final editor integration remain pending.
 
 All 101 independent renderer/OpenGL sources compile with Java 25 and LWJGL 3.4.1 (72 CPU, 29 GL). Eleven native adapters remain syntax-parsed/source-manifest checked only, pending genuine Windows API compilation/execution. No renderer tests, reservation/worker execution, native query, GL context, GPU upload or workflow ran for this batch.
 

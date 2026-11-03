@@ -37,6 +37,8 @@ public final class RenderMemory implements AutoCloseable {
         private Hold(Holding holding) { this.holding=holding; }
         public static Hold none() { return NONE; }
         public boolean tracked() { return holding!=null; }
+        /** Untracked compatibility handles may be used with any coordinator. */
+        public boolean belongsTo(RenderMemory memory) { return holding==null||holding.memory==memory; }
         public long bytes() { if(holding==null)return 0;synchronized(holding.memory) { return closed?0:Math.max(holding.account.retained,holding.account.reserved); } }
         public Hold retain() {
             if(holding==null)return NONE;

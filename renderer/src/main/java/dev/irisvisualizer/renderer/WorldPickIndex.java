@@ -17,30 +17,33 @@ public final class WorldPickIndex implements AutoCloseable {
         public static final Options DEFAULT=new Options(131071,262144,65536,false,Alpha.DISPLAYED_BASE_LEVEL);
         public Options { Objects.requireNonNull(alpha);if(nodeTests<0||nodeTests>131071||faceTests<0||faceTests>2097152||markerTests<0||markerTests>1048576)throw new IllegalArgumentException("Picking query limits exceed renderer bounds"); }
     }
-    private final UUID id=UUID.randomUUID();private final WorldSnapshot.Source source;private final WorldSnapshot.Position anchor;private final long bytes;private final List<WorldProblem> problems;
+    private final UUID id=UUID.randomUUID();private final WorldSnapshot.Source source;private final WorldSnapshot.Position anchor;private final long bytes;private final List<WorldProblem> problems;private final RenderMemory memory;private final RenderMemory.Hold admission;
     private WorldScene.Result owner;private WorldScene scene;private double[] bounds;private int[] left,right,section;private volatile boolean closed;private boolean released;private int queries;
-    private WorldPickIndex(WorldSnapshot.Source source,WorldSnapshot.Position anchor,WorldScene.Result owner,WorldScene scene,double[] bounds,int[] left,int[] right,int[] section,List<WorldProblem> problems) {
-        this.source=source;this.anchor=anchor;this.owner=owner;this.scene=scene;this.bounds=bounds;this.left=left;this.right=right;this.section=section;bytes=(long)bounds.length*8+(long)(left.length+right.length+section.length)*4;this.problems=List.copyOf(problems);released=owner==null;
+    private WorldPickIndex(WorldSnapshot.Source source,WorldSnapshot.Position anchor,WorldScene.Result owner,WorldScene scene,double[] bounds,int[] left,int[] right,int[] section,List<WorldProblem> problems,RenderMemory memory,RenderMemory.Hold admission) {
+        this.source=source;this.anchor=anchor;this.memory=memory;this.admission=admission;this.owner=owner;this.scene=scene;this.bounds=bounds;this.left=left;this.right=right;this.section=section;bytes=(long)bounds.length*8+(long)(left.length+right.length+section.length)*4;this.problems=List.copyOf(problems);released=owner==null;
     }
     /** Consumes this fresh Result owner on all outcomes after nonnull checks; pass retain() for a shared scene. */
     public static WorldPickIndex prepare(WorldScene.Result owner,BooleanSupplier cancelled) { return prepare(owner,Limits.DEFAULT,cancelled); }
-    public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,BooleanSupplier cancelled) {
-        Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();
+    public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,BooleanSupplier cancelled) { return prepare(owner,limits,null,cancelled); }
+    public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();RenderMemory.Hold admission=RenderMemory.Hold.none();
         try {
             WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0;
             for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++; }
-            int nodes=count==0?0:count*2-1;long bytes=(long)nodes*60,peak=bytes+(long)count*4;
+            int nodes=count==0?0:count*2-1;long bytes=(long)nodes*60,peak=bytes+(long)count*4+(count==0?0:4);
             if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking section hierarchy or combined CPU payload budget exceeded");
+            if(memory!=null)try { admission=memory.hold("World picking index",scene.usage().knownPayloadBytes()+peak); }
+            catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
             var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());int[] admitted=new int[count];int at=0;
             for(int i=0;i<scene.sections().size();i++) { WorldProblem.check(cancelled);if(scene.sections().get(i).bounds().isPresent())admitted[at++]=i; }
-            var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],List.of());Arrays.fill(result.section,-1);
-            if(count>0)result.build(admitted,0,count,new int[1],cancelled);WorldProblem.check(cancelled);transferred=true;return result;
+            var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],List.of(),memory,admission);Arrays.fill(result.section,-1);
+            if(count>0)result.build(admitted,0,count,new int[1],cancelled);WorldProblem.check(cancelled);admitted=null;admission.shrinkTo(scene.usage().knownPayloadBytes()+bytes);transferred=true;return result;
         }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(source,List.of(failure.problem)); }
         catch(ArithmeticException overflow) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Picking index anchor subtraction exceeds exact coordinate bounds"))); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to index the complete scene; no partial picking index was published"))); }
-        finally { if(!transferred)owner.close(); }
+        finally { if(!transferred) { owner.close();admission.close(); } }
     }
-    private static WorldPickIndex failed(WorldSnapshot.Source source,List<WorldProblem> problems) { return new WorldPickIndex(source,new WorldSnapshot.Position(0,0,0),null,null,EMPTY_BOUNDS,EMPTY_NODES,EMPTY_NODES,EMPTY_NODES,problems); }
+    private static WorldPickIndex failed(WorldSnapshot.Source source,List<WorldProblem> problems) { return new WorldPickIndex(source,new WorldSnapshot.Position(0,0,0),null,null,EMPTY_BOUNDS,EMPTY_NODES,EMPTY_NODES,EMPTY_NODES,problems,null,RenderMemory.Hold.none()); }
     private static double relative(long value,long origin) { long difference=Math.subtractExact(value,origin);if(Math.abs((double)difference)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Picking coordinates exceed the relative precision bound");return difference; }
     private int build(int[] admitted,int from,int to,int[] next,BooleanSupplier cancelled) {
         WorldProblem.check(cancelled);int node=next[0]++,offset=node*6;
@@ -58,6 +61,19 @@ public final class WorldPickIndex implements AutoCloseable {
     public List<WorldProblem> problems() { return problems; }
     public boolean requiresPlaceholder() { return !problems.isEmpty(); }
     public synchronized long retainedBytes() { return released?0:bytes; }
+    /** Includes the source scene for tracked indices; retainedBytes() still reports hierarchy arrays only. */
+    public long admittedBytes() { return admission.bytes(); }
+    private long displayedBytes(AtlasRaster displayed) {
+        if(displayed==null)return 0;
+        if(displayed.requiresPlaceholder()||displayed.layout()!=scene.layout())throw WorldProblem.fail(WorldProblem.Code.ATLAS,"Picking raster must match the exact displayed scene layout");
+        var known=new IdentityHashMap<RgbaImage,Boolean>();for(var page:scene.raster().pages())known.put(page,Boolean.TRUE);long bytes=0;
+        for(var page:displayed.pages())if(known.put(page,Boolean.TRUE)==null)bytes+=page.bytes();return bytes;
+    }
+    /** Full immutable request source bound for an independently admitted pointer worker. */
+    synchronized long queryPayloadBytes(AtlasRaster displayed) {
+        if(closed)throw new IllegalStateException("Picking index is closed");
+        if(requiresPlaceholder())return 0;return scene.usage().knownPayloadBytes()+bytes+displayedBytes(displayed);
+    }
     public boolean closed() { return closed; }
     public synchronized boolean released() { return released; }
     public WorldPick query(WorldRay ray,BooleanSupplier cancelled) { return query(ray,Options.DEFAULT,null,cancelled); }
@@ -65,15 +81,21 @@ public final class WorldPickIndex implements AutoCloseable {
     public WorldPick query(WorldRay ray,Options options,AtlasRaster displayed,BooleanSupplier cancelled) {
         Objects.requireNonNull(ray);Objects.requireNonNull(options);Objects.requireNonNull(cancelled);if(cancelled.getAsBoolean())throw new CancellationException("Scene picking cancelled");
         synchronized(this) { if(closed)throw new IllegalStateException("Picking index is closed");if(requiresPlaceholder())return new WorldPick(id,source,ray,Optional.empty(),new WorldPick.Stats(0,0,0,0,0),problems);if(queries>=64)throw new IllegalStateException("Concurrent picking query limit reached");queries++; }
-        Query work=null;
-        try { work=new Query(ray,options,displayed,cancelled);return work.execute(); }
+        Query work=null;RenderMemory.Hold displayAdmission=RenderMemory.Hold.none();
+        try {
+            if(memory!=null) {
+                long extra=displayedBytes(displayed);
+                if(extra>0)try { displayAdmission=memory.hold("Picking displayed atlas",extra); }
+                catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
+            }
+            work=new Query(ray,options,displayed,cancelled);return work.execute(); }
         catch(WorldProblem.Failure failure) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(failure.problem)); }
         catch(ArithmeticException overflow) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Ray and picking index anchors exceed exact coordinate bounds"))); }
         catch(OutOfMemoryError exhausted) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to complete picking; no partial hit was published"))); }
-        finally { synchronized(this) { queries--;releaseIfIdle(); } }
+        finally { try { synchronized(this) { queries--;releaseIfIdle(); } }finally { displayAdmission.close(); } }
     }
     private void checkQuery(BooleanSupplier cancelled) { if(closed||cancelled.getAsBoolean())throw new CancellationException("Scene picking cancelled"); }
-    private void releaseIfIdle() { if(closed&&queries==0&&!released) { owner.close();owner=null;scene=null;bounds=EMPTY_BOUNDS;left=EMPTY_NODES;right=EMPTY_NODES;section=EMPTY_NODES;released=true; } }
+    private void releaseIfIdle() { if(closed&&queries==0&&!released) { owner.close();owner=null;scene=null;bounds=EMPTY_BOUNDS;left=EMPTY_NODES;right=EMPTY_NODES;section=EMPTY_NODES;released=true;admission.close(); } }
     @Override public synchronized void close() { closed=true;releaseIfIdle(); }
     private final class Query {
         final WorldRay ray;final Options options;final AtlasRaster raster;final BooleanSupplier cancelled;final double ox,oy,oz;double nearest,hitU,hitV,normalX,normalY,normalZ;int hitSection=-1,hitFace=-1,hitMarker=-1;int nodes,sections,faces,markers,alphaRejected;

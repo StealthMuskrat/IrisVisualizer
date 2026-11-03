@@ -1,6 +1,6 @@
 # Shared renderer memory admission
 
-`RenderMemory` coordinates known payload reservations across participating renderer owners. `WorldRenderWorker`, its leased `WorldSectionCache`, `GlDevice` and the connected map/atlas/sorting preparation workers can now use the same coordinator. Local limits continue to apply. Shared admission is optional in existing constructors and does not enable a preview, change native generation or establish a physical RAM/VRAM guarantee.
+`RenderMemory` coordinates known payload reservations across participating renderer owners. `WorldRenderWorker`, its leased `WorldSectionCache`, `GlDevice`, picking indices/queries and the CPU preparation workers can now use the same coordinator. Local limits continue to apply. Shared admission is optional in existing constructors and does not enable a preview, change native generation or establish a physical RAM/VRAM guarantee.
 
 ## One ceiling, explicit owners
 
@@ -40,7 +40,7 @@ Retirement, pending fences, dependencies and quarantine keep their charges. Coll
 
 For a separately owned native or CPU task, a host may open an account and reserve its known peak before starting it. It must keep that reservation until work unwinds, then change to the retained output charge for as long as it owns the output. On failure, release only after temporary data and retained output ownership have actually ended. Account disposal alone is not evidence of resource release.
 
-Automatic coverage now includes world preparation/cache, device journals and connected map/atlas/sorting preparation. [Owned completion holds](WORKER-MEMORY.md) preserve charges through transfer, and the GPU views close them after destination admission. Independent picking-index workers, legacy standalone scene/visual workers, native generation/sampling, caller-held input catalogs/maps/plans and escaped array/raster references still need host-owned accounts or future automatic integration. Device-side adopted maps/orders/animation/readback are charged once they enter their journals. Java object headers/collections, parser/decoder scratch, native library caches, driver overhead, unrelated processes and unknown native allocations remain outside known primitive estimates. Final application admission and profiling remain pending.
+Automatic coverage now includes world preparation/cache, device journals and connected map/atlas/sorting preparation. [Owned completion holds](WORKER-MEMORY.md) preserve charges through transfer, and the GPU views close them after destination admission. [Picking and standalone visual/scene workers](PICKING-MEMORY.md) now have matching optional admission, including retained indices, pending pointer sources and visual-to-scene handoff. Native generation/sampling, caller-held input catalogs/maps/plans and escaped array/raster references still need host-owned accounts or further integration. Device-side adopted maps/orders/animation/readback are charged once they enter their journals. Java object headers/collections, parser/decoder scratch, native library caches, driver overhead, unrelated processes and unknown native allocations remain outside known primitive estimates. Final application admission and profiling remain pending.
 
 ## Deferred stage verification
 

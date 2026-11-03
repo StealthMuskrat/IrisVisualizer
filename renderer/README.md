@@ -176,3 +176,7 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 ## Preparation-worker memory ownership
 
 [Shared worker holds](WORKER-MEMORY.md) now admit connected map colorization, atlas preparation and camera sorting before submission, keep cancelled work charged until unwind, and transfer charged completions to explicit owners. Map/atlas idle replacement is atomic; GPU views inherit their device coordinator and close each CPU completion after destination admission or failure. Independent picking, legacy standalone and native/external owners still require host admission.
+
+## Picking and standalone worker admission
+
+[Picking and standalone preparation](PICKING-MEMORY.md) now optionally share the renderer coordinator: index build/source lifetime and animated alpha-query pages, queued pointer requests, visual completion holds and managed standalone scene/cache output. Visual-to-scene handoff admits the destination before closing its source hold. Scene invalidation and revision-specific transfer now reject stale adoption explicitly. Native/external scratch and whole-application profiling remain pending.

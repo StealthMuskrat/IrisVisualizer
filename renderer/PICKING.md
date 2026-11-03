@@ -72,3 +72,7 @@ Compare opaque/cutout/translucent picking with actual current-frame GPU pixels, 
 Verify camera basis and center/corner rays over FOV/aspect extremes and vertical poles, near/far plane intersection, stable orbit wrap, finite pan/dolly limits, focus and exact-anchor rebase. Frame actual emitted extents and full empty dimensions without hiding unsupported coordinates. Profile the bounded worst-case face scan and interactive latest-query responsiveness on Windows. No renderer tests were run for this batch.
 
 Reference for the current sampling boundary: [Khronos texture parameter contract](https://wikis.khronos.org/opengl/GLAPI/glTexParameter). Native model/collision policies, filtered alpha rules and visible GPU parity remain unverified.
+
+## Shared index/query admission
+
+The optional [picking-memory path](PICKING-MEMORY.md) now charges index build/source payload before array allocation, shrinks to retained hierarchy data after building and holds it until closed in-flight queries finish. Changed displayed atlas pages are admitted by identity for synchronous queries. `WorldPickWorker(memory)` also covers pending pointer sources, while detached hits need no source-array hold. Existing overloads remain available; full native/GPU picking parity and renderer-stage execution are still pending.
