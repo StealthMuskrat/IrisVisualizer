@@ -14,8 +14,9 @@ public final class GlRenderer implements AutoCloseable {
         layout(location=0) in vec3 position;
         layout(location=1) in vec3 normal;
         layout(location=2) in vec2 uv;
-        layout(location=4) in vec4 vertexTint;
+        layout(location=4) in vec3 vertexTint;
         layout(location=5) in vec3 vertexLighting;
+        layout(location=6) in uint shadingFlags;
         uniform bool nativeLighting;
         uniform mat4 viewProjection;
         uniform vec3 sectionOffset;
@@ -27,8 +28,13 @@ public final class GlRenderer implements AutoCloseable {
             worldPosition=position+sectionOffset;
             gl_Position=viewProjection*vec4(worldPosition,1.0);
             spriteUv=uv;
-            tintRgb=vertexTint.rgb;
-            lightRgb=nativeLighting?vertexLighting:vec3(0.55+0.45*max(dot(normalize(normal),normalize(vec3(0.3,1.0,0.2))),0.0));
+            tintRgb=vertexTint;
+            const vec3 directions[6]=vec3[6](vec3(0,-1,0),vec3(0,1,0),vec3(0,0,-1),vec3(0,0,1),vec3(-1,0,0),vec3(1,0,0));
+            uint shade=shadingFlags&7u;
+            vec3 lightNormal=shade==0u?normal:directions[int(shade)-1];
+            float simple=0.55+0.45*max(dot(normalize(lightNormal),normalize(vec3(0.3,1.0,0.2))),0.0);
+            float emission=float(shadingFlags>>3u)/15.0;
+            lightRgb=nativeLighting?vertexLighting:vec3(max(simple,emission));
         }
         """;
     private static final String GEOMETRY_FRAGMENT="""

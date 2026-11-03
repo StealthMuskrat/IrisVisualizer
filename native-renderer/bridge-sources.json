@@ -15,6 +15,10 @@
       "sha256": "3403a7b44841e05f6d52478c1c13206282265cee9e89dae041595dd7c6ce7a35"
     },
     {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeLightingInputs.java",
+      "sha256": "6a50f08e0a1fd889ccbb990230afce8ab471c679bf0e2ffbf341db222f25dfee"
+    },
+    {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeMapSampler.java",
       "sha256": "697efd33c0e2da532c1d28ed74bc5840b58481b79e350abb6cbe43d6cf50e283"
     },

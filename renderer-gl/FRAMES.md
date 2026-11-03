@@ -65,3 +65,7 @@ The [bounded readback path](READBACK.md) now retains complete world or map image
 ## Captured geometric scope
 
 Frame requests now optionally carry [WorldClip](../renderer/CLIPPING.md); legacy constructors select no clipping. `GlFrame.Info.clip` preserves the exact display box in independently retained images and readback receipts. `Info.pickOptions` applies it to CPU query options, while the frame's source, camera, raster and revision ownership stay unchanged. Clip changes invalidate untaken view frames and leave transferred images intact. Shader/CPU boundary parity remains unverified until renderer-stage testing.
+
+## Lighting receipt
+
+Completed world `Info.lighting()` now records the actual scene's simple/supplied RGB mode and bounded producer policy. It is detached metadata without sample arrays/provider ownership and follows the image through readback. Existing Info constructors default to simple lighting. Policy labels do not prove native fidelity; see [MATERIAL-LIGHTING.md](MATERIAL-LIGHTING.md).

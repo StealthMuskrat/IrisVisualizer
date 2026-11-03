@@ -139,7 +139,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its thirteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 116 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its fourteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 116 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
@@ -194,3 +194,7 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 ## Full-height scalar volumes
 
 [Native scalar volume capture](NOISE-VOLUME.md) now detaches original generator/expression samples across the entire configured Y interval, separately from block/biome worlds. An explicit opaque display interval builds compact outward boundary faces with shared-face culling and original-value inspection; one latest-request worker owns background preparation and shared source/output admission. The pinned generator currently ignores Y internally, and that native behavior is preserved. The [dedicated scalar GPU view](../renderer-gl/NOISE-VIEW.md) now uploads compact face instances and produces immutable images/readback with bounded original-value inspection. Real-driver/native validation and final editor routing remain pending; unsupported previews stay disabled.
+
+## Streamed final lighting
+
+`WorldLighting.read` now captures scoped final RGB components directly, and `readOwned` optionally charges the exact scene plus final arrays through shared ownership. The [material-lighting path](../renderer-gl/MATERIAL-LIGHTING.md) adds the explicit native resolver bridge, owned GPU handoff, unchanged-stride simple shade/emission flags and detached frame policy receipts. No native lighting factory is inferred; real native/GPU validation remains pending.

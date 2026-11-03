@@ -10,8 +10,13 @@ import static org.lwjgl.opengl.GL33C.*;
 /** Immutable GPU snapshot. Upload consumes fresh CPU leases; already-transferred leases stay intact. */
 public final class GlScene implements AutoCloseable {
     record Section(WorldSnapshot.Position origin,Optional<BlockMesh.Bounds> bounds,List<AtlasMesh.DrawRange> ranges,int geometryVao,int markerVao,int markerCount) {}
-    final GlDevice device;final GlDevice.Allocation allocation;final int translucentFaces;final boolean nativeLighting;List<Section> sections;
-    GlScene(GlDevice device,GlDevice.Allocation allocation,List<Section> sections,int translucentFaces,boolean nativeLighting) { this.device=device;this.allocation=allocation;this.sections=List.copyOf(sections);this.translucentFaces=translucentFaces;this.nativeLighting=nativeLighting; }
+    public record LightingInfo(boolean supplied,String policy) {
+        public static final LightingInfo SIMPLE=new LightingInfo(false,"IrisVisualizer simple directional lighting; declared shade direction and display emission floor");
+        public LightingInfo { Objects.requireNonNull(policy);if(policy.isBlank()||policy.length()>256)throw new IllegalArgumentException("Invalid lighting receipt policy"); }
+    }
+    final GlDevice device;final GlDevice.Allocation allocation;final int translucentFaces;final boolean nativeLighting;private final LightingInfo lightingInfo;List<Section> sections;
+    GlScene(GlDevice device,GlDevice.Allocation allocation,List<Section> sections,int translucentFaces,boolean nativeLighting) { this(device,allocation,sections,translucentFaces,nativeLighting?new LightingInfo(true,"Supplied final RGB lighting"):LightingInfo.SIMPLE); }
+    GlScene(GlDevice device,GlDevice.Allocation allocation,List<Section> sections,int translucentFaces,LightingInfo lightingInfo) { this.device=device;this.allocation=allocation;this.sections=List.copyOf(sections);this.translucentFaces=translucentFaces;this.lightingInfo=Objects.requireNonNull(lightingInfo);nativeLighting=lightingInfo.supplied(); }
     private static void cancelled(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("GPU scene upload cancelled"); }
     /** Synchronous convenience; use GlUpload for an explicit per-frame upload budget. */
     public static GlScene upload(GlRenderer renderer,WorldScene.Result cpuOwner,BooleanSupplier cancelled) {
@@ -43,6 +48,7 @@ public final class GlScene implements AutoCloseable {
     /** Independent CPU owner for asynchronous inspection; close it or transfer it to WorldPickIndex.prepare. */
     public WorldScene.Result retainCpuScene() { device.live(allocation);return allocation.owner.retain(); }
     public boolean hasNativeLighting() { device.live(allocation);return nativeLighting; }
+    public LightingInfo lightingInfo() { device.live(allocation);return lightingInfo; }
     public WorldScene cpuScene() { device.live(allocation);return allocation.owner.scene().orElseThrow(); }
     @Override public void close() { try { device.retire(allocation); }finally { if(allocation.retired||allocation.released)sections=List.of(); } }
 }

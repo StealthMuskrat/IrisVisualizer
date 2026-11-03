@@ -49,6 +49,18 @@ public final class GlWorldView implements AutoCloseable {
     }
     public boolean submit(WorldRenderWorker.Completion completion) { Objects.requireNonNull(completion);return submit(completion.revision(),completion.owner(),completion.tint().orElse(null),null); }
     public boolean submit(long revision,WorldScene.Result owner) { return submit(revision,owner,null,null); }
+    /** Consumes a fresh CPU scene and admitted lighting input, preserving source charge through upload admission. */
+    public boolean submitLit(long revision,WorldScene.Result owner,WorldTint tint,RenderInput<WorldLighting> input) {
+        Objects.requireNonNull(owner);Objects.requireNonNull(input);boolean handedOff=false;
+        try {
+            current();if(device.ownsCpu(owner)) { handedOff=true;return false; }
+            try(var source=input.retain()) {
+                var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Lighting requires the same managed world-view coordinator");
+                var lighting=source.value();if(lighting.requiresPlaceholder()||lighting.scene()!=owner.scene().orElseThrow())throw new GlFailure(GlFailure.Code.STALE,"Lighting belongs to another successful exact CPU scene");
+                handedOff=true;return submit(revision,owner,tint,lighting);
+            }
+        }finally { input.close();if(!handedOff)owner.close(); }
+    }
     /** Consumes fresh CPU scene owners on every outcome; optional native colors belong to this exact scene. */
     public boolean submit(long revision,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {
         Objects.requireNonNull(owner);boolean handedOff=false;

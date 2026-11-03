@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These thirteen native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These fourteen native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -115,3 +115,7 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 ## Native three-coordinate scalar resources
 
 `NativeNoiseSampler` and `NativeCapture.generatorVolume` / `expressionVolume` now supply admitted [full-height scalar volumes](../renderer/NOISE-VOLUME.md). They validate exact resource/loader/policy/session identity and preserve original finite doubles, configured world Y and native dimensional behavior. The pinned generator ignores Y internally; expression streams use their actual three-coordinate evaluator. Inline two-coordinate noise layers gain no invented 3D algorithm. Results contain owned detached samples, with no native resource/stream retained. Scalar display surfaces are distinct from Minecraft block IDs. The [dedicated scalar GPU path](../renderer-gl/NOISE-VIEW.md) now consumes these display meshes. Genuine native compilation and native/GPU runtime fidelity remain pending.
+
+## Streamed final lighting
+
+`NativeLightingInputs` now streams explicit native per-vertex final RGB into owned `WorldLighting` output. Shared scene/sample admission precedes native callbacks; original state/biome/position, asset receipt, full height and healthy-session gates are validated, and no native/provider graph escapes. `GlUpload.beginLit` and `GlWorldView.submitLit` keep that source charged through destination admission. See [MATERIAL-LIGHTING.md](../renderer-gl/MATERIAL-LIGHTING.md). No default light/AO factory, propagation or biome blending policy is implemented or verified. Genuine pinned Windows compilation and actual native/pixel comparisons remain pending.

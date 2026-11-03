@@ -7,9 +7,10 @@ import java.util.function.BooleanSupplier;
 
 /** Independently owned immutable completed world image; replacement never redraws its target. */
 public final class GlFrame implements AutoCloseable {
-    public record Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats,WorldClip clip) {
-        public Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats) { this(id,revision,source,camera,width,height,atlasTick,partialTick,stats,WorldClip.NONE); }
-        public Info { Objects.requireNonNull(clip);Objects.requireNonNull(id);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid completed frame receipt"); }
+    public record Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats,WorldClip clip,GlScene.LightingInfo lighting) {
+        public Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats) { this(id,revision,source,camera,width,height,atlasTick,partialTick,stats,WorldClip.NONE,GlScene.LightingInfo.SIMPLE); }
+        public Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats,WorldClip clip) { this(id,revision,source,camera,width,height,atlasTick,partialTick,stats,clip,GlScene.LightingInfo.SIMPLE); }
+        public Info { Objects.requireNonNull(lighting);Objects.requireNonNull(clip);Objects.requireNonNull(id);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid completed frame receipt"); }
         public WorldRay ray(double x,double y) { return camera.ray(x,y,width,height); }
         public WorldPickIndex.Options pickOptions(WorldPickIndex.Options options) { return Objects.requireNonNull(options).withClip(clip); }
     }
@@ -34,7 +35,7 @@ public final class GlFrame implements AutoCloseable {
             owner=scene.retainCpuScene();journal=device.reserve(0,extraCpu,0,0,0,0,0,0,0,owner);owner=null;journal.retained=raster;device.depend(journal,scene.allocation);
             current(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);current(obsolete);
             var stats=renderer.renderFrame(scene,atlas,order,target,camera,clip);current(obsolete);
-            var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats,clip);return new GlFrame(new Shared(device,journal,target,info));
+            var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats,clip,scene.lightingInfo());return new GlFrame(new Shared(device,journal,target,info));
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(target!=null)try { target.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
