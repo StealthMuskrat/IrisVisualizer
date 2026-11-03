@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-one Java sources to the 60-source CPU renderer. All 81 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-two Java sources to the 62-source CPU renderer. All 84 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -87,3 +87,7 @@ Exercise streaming across every chunk/row boundary, hostile host unpack/PBO/text
 Control fence completion to prove retired resources and CPU leases stay charged; test timeout, failed fence, deletion/quarantine, dependency-pinned shared buffers/pages, repeated close, device teardown and partial-upload cleanup. Check every configured/hardware/object/working limit, multiple live scenes/targets, allocation failure and staging reclamation. Verify/profile incremental scene and atlas scheduling under actual driver stalls before application integration. Native material fidelity, interpolation/mipmap behavior, transparent intersection/OIT handling, editor adoption/readiness and visible GPU QA remain unfinished. No renderer tests were executed in this batch.
 
 API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl/opengl/GL33C.html), [Khronos sync wait contract](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glClientWaitSync.xhtml). Pinned method signatures were checked from the local 3.4.1 JARs; Java compilation does not validate GL execution or GLSL programs.
+
+## Connected world view
+
+`GlWorldView` now owns the route from a fresh complete CPU scene lease through bounded upload and asynchronous transparent sorting to a revision-checked completed image. `WorldRenderWorker` provides the matching single CPU visual/visibility/scene path. World and display revisions are separate; camera/viewport changes do not regenerate voxels, and transferred frames remain independent during replacement. See [PIPELINE.md](../renderer/PIPELINE.md) for native material requirements, CPU/GPU handoff, memory scope, failure/retry and deferred validation. This endpoint draws the initial atlas snapshot and adds no editor integration or readiness change.

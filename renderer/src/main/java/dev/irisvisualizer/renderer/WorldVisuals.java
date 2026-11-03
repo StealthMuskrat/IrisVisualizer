@@ -69,6 +69,13 @@ public final class WorldVisuals {
         public UUID snapshotId() { return snapshot.id(); }
         public Limits limits() { return limits; }
         public long inputBytes() { return inputBytes; }
+        public WorldSnapshot snapshot() { return snapshot; }
+        /** Lower admission without copying or exposing the frozen native inputs. */
+        public Request withWorkingBytes(long bytes) {
+            if(bytes<inputBytes||bytes>limits.workingBytes())throw new IllegalArgumentException("Reduced visual working budget cannot hold its captured inputs");
+            var bounded=new Limits(limits.choices(),limits.modelStates(),limits.meshVariants(),limits.ticketReferences(),limits.problemReferences(),limits.sourcePackedBytes(),bytes);
+            return new Request(assets,snapshot,choices,assignments,bounded,tick,partialTick,inputBytes,sourcePackedBytes);
+        }
         public int choiceAt(int cell) { return assignments[cell]; }
     }
     /** Primitive payload accounting, not a total Java heap/native/GPU memory measurement. */

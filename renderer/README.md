@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its sixty main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its sixty-two main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -89,7 +89,7 @@ World inputs, prototypes, atlas payload and section arrays are checked together;
 
 ## Separate OpenGL backend
 
-The [OpenGL module](../renderer-gl/README.md) now adds twenty-one LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 81 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
+The [OpenGL module](../renderer-gl/README.md) now adds twenty-two LWJGL 3.4.1 sources for context-owned GPU admission, bounded native staging, incremental atlas/mesh/marker uploads, initialized offscreen targets, opaque/cutout/translucent shaders with native vertex tint inputs and an instanced diagnostic marker pass. It retains CPU scene leases through fenced resource retirement, including failed uploads, with shared resource dependencies and quarantined cleanup failures kept charged. All 84 CPU/backend Java sources compile; no GL context, shader or runtime test has been executed.
 
 The [incremental upload layer](../renderer-gl/UPLOADS.md) validates and transfers across explicit per-step byte/action/work limits with a cooperative time target. It charges paused CPU input, restores state at each yield, and permits exactly-once complete-scene adoption guarded by the application's latest revision. Synchronous upload delegates to the same state machine. Driver allocation/cleanup latency is not a hard frame-time guarantee.
 
@@ -118,6 +118,10 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 ## Complete native-choice visual assembly
 
 `WorldVisuals` now connects explicit per-cell native model tickets, captured native geometry/layers, empty decisions and visual problems to model resolution, shared texture decoding, atlas binding/rasterization and complete `WorldModels` assignments. It resolves each model state once per request, shares sprites/alpha scans across variants, preserves original native identity and isolates unsupported visuals as placeholders. Fatal resource/version/atlas errors withhold the whole result. Its frozen request and `WorldVisualWorker` add combined CPU payload admission, cancellation, revision-checked exactly-once transfer and invalidation without enabling a preview. See [VISUALS.md](VISUALS.md) for inputs, limits, ownership and deferred verification. Native producers and application integration remain pending.
+
+## Connected CPU and GPU world path
+
+`WorldRenderWorker` now runs visual preparation, frozen native visibility binding and complete leased scene assembly on one CPU thread, with one latest pending request and phase budgets that include resident scenes and retained native input. `WorldOrderWorker` sorts transparent faces asynchronously while owning its exact source lease. The separate `GlWorldView` endpoint connects bounded GPU uploads, camera revisions, sort adoption and immutable completed-frame transfer; navigation does not regenerate the world, and caller-held images survive replacements. See [PIPELINE.md](PIPELINE.md) for the handoff, admission, lifetime and deferred verification contracts. Native producers, combined application admission and editor integration remain pending; unsupported previews stay disabled.
 
 ## Still to implement
 

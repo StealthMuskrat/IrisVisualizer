@@ -112,6 +112,12 @@ public final class WorldSectionCache implements AutoCloseable {
     private void clearEntries() { entries.clear();epochs.clear();prepared=null;preparedKeys=Set.of();sourceBytes=0;meshBytes=0;faces=0;cellRecords=0;markers=0; }
     /** Returns false while any output reservation or scene lease is still live. */
     public synchronized boolean clear() { if(leases!=0)return false;clearEntries();return true; }
+    /** Worker-owned epoch transition: discard prior admission and only unleased data before decoding. */
+    synchronized void retireUnleased() {
+        if(closed)throw new IllegalStateException("Section cache is closed");prepared=null;preparedKeys=Set.of();var iterator=entries.values().iterator();
+        while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0) { subtract(slot);iterator.remove(); } }
+        var unused=epochs.iterator();while(unused.hasNext()) { var epoch=unused.next();if(epoch.slots==0) { sourceBytes-=epoch.sourceBytes;unused.remove(); } }
+    }
     /** Retires admissions immediately; still-leased entries stay charged until their last release. */
     @Override public synchronized void close() {
         closed=true;prepared=null;preparedKeys=Set.of();var iterator=entries.values().iterator();while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0) { subtract(slot);iterator.remove(); } }
