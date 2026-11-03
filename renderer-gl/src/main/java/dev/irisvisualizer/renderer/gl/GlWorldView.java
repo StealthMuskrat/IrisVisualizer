@@ -10,7 +10,7 @@ public final class GlWorldView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlRenderer renderer;private final GlDevice device;private final GlUploadQueue uploads;private final GlFrameQueue frames;private final WorldOrderWorker ordering;private final AtlasFrameWorker animationWorker;
-    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean atlasClockSet,dirty,closed,disposed;
+    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean atlasClockSet,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlWorldView(GlRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlWorldView(GlRenderer renderer,long animationWorkingBytes) {
@@ -63,6 +63,14 @@ public final class GlWorldView implements AutoCloseable {
         }
         finally { if(!handedOff)owner.close(); }
     }
+    public WorldClip clip() { current();return clip; }
+    /** Geometric display clipping preserves source meshes and the existing complete transparent order. */
+    public long clip(WorldClip clip) {
+        Objects.requireNonNull(clip);current();if(clip.equals(this.clip))return viewRevision;long next=nextView();
+        this.clip=clip;viewRevision=next;dirty=true;
+        try { frames.invalidate(viewRevision);state(scene==null?status.phase():Phase.WAITING_VIEW);return viewRevision; }
+        catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
     /** Display-only camera/size changes never regenerate or rebake the native world. */
     public long view(GlCamera camera,int width,int height) {
         Objects.requireNonNull(camera);current();
@@ -106,7 +114,7 @@ public final class GlWorldView implements AutoCloseable {
                     state(Phase.SORTING);return status;
                 }
             }
-            boolean rendered=frames.render(viewRevision,new GlFrameQueue.Request(scene,Optional.of(animation.frame()),Optional.ofNullable(order),camera,width,height),()->false);
+            boolean rendered=frames.render(viewRevision,new GlFrameQueue.Request(scene,Optional.of(animation.frame()),Optional.ofNullable(order),camera,width,height,clip),()->false);
             if(!rendered)throw new GlFailure(GlFailure.Code.STATE,"Completed-frame queue rejected the current view revision");dirty=false;state(Phase.FRAME_READY);return status;
         }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }

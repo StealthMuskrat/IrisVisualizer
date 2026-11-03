@@ -61,3 +61,7 @@ Exercise queue invalidation during cleanup failure, ready-before-take, obsolete 
 ## Detached pixel capture
 
 The [bounded readback path](READBACK.md) now retains complete world or map images independently, reads actual framebuffer pixels through journaled pixel-pack/fence work, and transfers immutable top-left RGBA with the original image receipt. Closing/replacing the caller's image does not alter its in-flight capture. Ready CPU output remains admitted until transfer/drop; no GL/native owner remains in a taken packet. Native/driver pixel comparison and renderer tests remain deferred.
+
+## Captured geometric scope
+
+Frame requests now optionally carry [WorldClip](../renderer/CLIPPING.md); legacy constructors select no clipping. `GlFrame.Info.clip` preserves the exact display box in independently retained images and readback receipts. `Info.pickOptions` applies it to CPU query options, while the frame's source, camera, raster and revision ownership stay unchanged. Clip changes invalidate untaken view frames and leave transferred images intact. Shader/CPU boundary parity remains unverified until renderer-stage testing.

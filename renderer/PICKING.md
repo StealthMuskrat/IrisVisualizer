@@ -76,3 +76,7 @@ Reference for the current sampling boundary: [Khronos texture parameter contract
 ## Shared index/query admission
 
 The optional [picking-memory path](PICKING-MEMORY.md) now charges index build/source payload before array allocation, shrinks to retained hierarchy data after building and holds it until closed in-flight queries finish. Changed displayed atlas pages are admitted by identity for synchronous queries. `WorldPickWorker(memory)` also covers pending pointer sources, while detached hits need no source-array hold. Existing overloads remain available; full native/GPU picking parity and renderer-stage execution are still pending.
+
+## Matching clipped world images
+
+`Options.withClip` now scopes node/marker traversal and candidate triangle hits to a [geometric clip box](CLIPPING.md). `GlFrame.Info.pickOptions` applies a completed image's exact captured clip, and `WorldPick.clip` records it on detached hit/failure receipts. Original native identity, query limits, alpha/back-face behavior and index ownership remain intact. Marker hits keep their clipped unit-box approximation; real GPU boundary parity remains pending.

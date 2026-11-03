@@ -1,15 +1,17 @@
 package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.WorldSnapshot;
+import dev.irisvisualizer.renderer.WorldClip;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
 /** Latest-revision completed-frame adoption. Displayed caller-owned frames are never modified. */
 public final class GlFrameQueue implements AutoCloseable {
-    public record Request(GlScene scene,Optional<GlAtlasFrame> atlas,Optional<GlDrawPlan> order,GlCamera camera,int width,int height) {
-        public Request { Objects.requireNonNull(scene);Objects.requireNonNull(atlas);Objects.requireNonNull(order);Objects.requireNonNull(camera);if(width<1||height<1)throw new IllegalArgumentException("Invalid requested frame dimensions"); }
-        public Request(GlScene scene,GlCamera camera,int width,int height) { this(scene,Optional.empty(),Optional.empty(),camera,width,height); }
+    public record Request(GlScene scene,Optional<GlAtlasFrame> atlas,Optional<GlDrawPlan> order,GlCamera camera,int width,int height,WorldClip clip) {
+        public Request { Objects.requireNonNull(scene);Objects.requireNonNull(atlas);Objects.requireNonNull(order);Objects.requireNonNull(camera);Objects.requireNonNull(clip);if(width<1||height<1)throw new IllegalArgumentException("Invalid requested frame dimensions"); }
+        public Request(GlScene scene,Optional<GlAtlasFrame> atlas,Optional<GlDrawPlan> order,GlCamera camera,int width,int height) { this(scene,atlas,order,camera,width,height,WorldClip.NONE); }
+        public Request(GlScene scene,GlCamera camera,int width,int height) { this(scene,Optional.empty(),Optional.empty(),camera,width,height,WorldClip.NONE); }
     }
     public enum Phase { IDLE, WAITING, RENDERING, READY, DELIVERED, CANCELLED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<WorldSnapshot.Source> source,Optional<GlFrame.Info> frame,Optional<GlFailure.Code> code,String reason) {
@@ -32,7 +34,7 @@ public final class GlFrameQueue implements AutoCloseable {
         rendering=true;GlFrame result=null;
         try {
             status=new Status(revision,Phase.RENDERING,Optional.of(request.scene().cpuScene().snapshot().source()),Optional.empty(),Optional.empty(),"");
-            result=GlFrame.render(renderer,next,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height(),obsolete);
+            result=GlFrame.render(renderer,next,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height(),request.clip(),obsolete);
             if(obsolete.getAsBoolean())throw new CancellationException("Completed frame became obsolete before queue adoption");var ready=new Status(revision,Phase.READY,status.source(),Optional.of(result.info()),Optional.empty(),"");completed=result;result=null;status=ready;return true;
         }catch(RuntimeException|Error failure) { if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }
         finally { rendering=false; }

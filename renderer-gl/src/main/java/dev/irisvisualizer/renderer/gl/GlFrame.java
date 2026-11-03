@@ -7,9 +7,11 @@ import java.util.function.BooleanSupplier;
 
 /** Independently owned immutable completed world image; replacement never redraws its target. */
 public final class GlFrame implements AutoCloseable {
-    public record Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats) {
-        public Info { Objects.requireNonNull(id);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid completed frame receipt"); }
+    public record Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats,WorldClip clip) {
+        public Info(UUID id,long revision,WorldSnapshot.Source source,GlCamera camera,int width,int height,long atlasTick,double partialTick,GlRenderer.FrameStats stats) { this(id,revision,source,camera,width,height,atlasTick,partialTick,stats,WorldClip.NONE); }
+        public Info { Objects.requireNonNull(clip);Objects.requireNonNull(id);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid completed frame receipt"); }
         public WorldRay ray(double x,double y) { return camera.ray(x,y,width,height); }
+        public WorldPickIndex.Options pickOptions(WorldPickIndex.Options options) { return Objects.requireNonNull(options).withClip(clip); }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final Info info;int references=1;boolean closing;
@@ -19,8 +21,9 @@ public final class GlFrame implements AutoCloseable {
     private GlFrame(Shared shared) { this.shared=shared;info=shared.info; }
     private static void current(BooleanSupplier obsolete) { if(obsolete.getAsBoolean())throw new CancellationException("Completed frame request is obsolete"); }
     /** Inputs are borrowed for this call. The returned frame owns a fresh target and retained CPU scene. */
-    public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,BooleanSupplier obsolete) {
-        Objects.requireNonNull(renderer);Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid frame revision or dimensions");
+    public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,BooleanSupplier obsolete) { return render(renderer,revision,scene,atlas,order,camera,width,height,WorldClip.NONE,obsolete); }
+    public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,BooleanSupplier obsolete) {
+        Objects.requireNonNull(clip);Objects.requireNonNull(renderer);Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid frame revision or dimensions");
         var device=renderer.device;device.live(renderer.allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame inputs must share one renderer device");device.live(scene.allocation);current(obsolete);
         if(scene.translucentFaces>0&&order==null)throw new GlFailure(GlFailure.Code.MATERIAL,"A complete camera-bound translucent order is required");
         if(order!=null) { if(order.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame order belongs to another device");order.order(scene,camera); }
@@ -30,8 +33,8 @@ public final class GlFrame implements AutoCloseable {
         try {
             owner=scene.retainCpuScene();journal=device.reserve(0,extraCpu,0,0,0,0,0,0,0,owner);owner=null;journal.retained=raster;device.depend(journal,scene.allocation);
             current(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);current(obsolete);
-            var stats=renderer.renderFrame(scene,atlas,order,target,camera);current(obsolete);
-            var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats);return new GlFrame(new Shared(device,journal,target,info));
+            var stats=renderer.renderFrame(scene,atlas,order,target,camera,clip);current(obsolete);
+            var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats,clip);return new GlFrame(new Shared(device,journal,target,info));
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(target!=null)try { target.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
