@@ -16,7 +16,11 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeModelInputs.java",
-      "sha256": "40bd5035fa1c671c7368befb94cf5f40ae680d7ce8acd234df929b6b236620c3"
+      "sha256": "f718fdee7ddc8112595511ade95fbbe29a0e36085d05733b06db6260172973af"
+    },
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeOffsets.java",
+      "sha256": "537138e4b6ca5593e1f4ffdc91f7572f40aac7cce4bad272dd3dc76c80b451fd"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeRenderContext.java",
@@ -24,7 +28,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeSceneInputs.java",
-      "sha256": "da71d956e474291448bab8fdd48b39fa338309198bbf40f08f13f9378a9ffd0b"
+      "sha256": "58261d490f89598570a2b8b32b00c4a6f6f2d8271254dd34ac396b2f364bd4c7"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeVisibility.java",
@@ -61,6 +65,13 @@
       "path": "gradle.properties",
       "blob": "6b5d54103b839e353df9228d96d4b85adc2607dc",
       "scope": "Minecraft 26.3 source target for the reviewed vanilla signature"
+    },
+    {
+      "repository": "neoforged/NeoForge",
+      "revision": "b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4",
+      "path": "patches/net/minecraft/client/renderer/block/ModelBlockRenderer.java.patch",
+      "blob": "3bb9df86777f2e0a47805ef8c679050b415d357b",
+      "scope": "Unmodified vanilla BlockState.getOffset(BlockPos) call before native model rendering; no client classes or NeoForge code executed"
     }
   ],
   "validation": "Source reviewed; native adapter compilation and runtime validation remain pending; renderer stage tests deferred"

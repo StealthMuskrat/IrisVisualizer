@@ -20,28 +20,31 @@ public final class WorldModels {
         public static final Limits DEFAULT=new Limits(65536,64L*1024*1024,64L*1024*1024,256L*1024*1024);
         public Limits { if(entries<1||entries>65536||indexBytes<0||indexBytes>64L*1024*1024||meshBytes<0||meshBytes>64L*1024*1024||sourceBytes<0||sourceBytes>256L*1024*1024)throw new IllegalArgumentException("World assignment limits exceed renderer bounds"); }
     }
-    private final WorldSnapshot snapshot;private final AtlasLayout layout;private final List<Entry> entries;private final int[] indices;private final long meshBytes;private final List<WorldProblem> problems;
-    private WorldModels(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] ownedIndices,long meshBytes,List<WorldProblem> problems) {
-        this.snapshot=snapshot;this.layout=layout;this.entries=List.copyOf(entries);indices=ownedIndices;this.meshBytes=meshBytes;this.problems=List.copyOf(problems);
+    private final WorldSnapshot snapshot;private final WorldOffsets offsets;private final AtlasLayout layout;private final List<Entry> entries;private final int[] indices;private final long meshBytes;private final List<WorldProblem> problems;
+    private WorldModels(WorldSnapshot snapshot,WorldOffsets offsets,AtlasLayout layout,List<Entry> entries,int[] ownedIndices,long meshBytes,List<WorldProblem> problems) {
+        this.snapshot=snapshot;this.offsets=offsets;this.layout=layout;this.entries=List.copyOf(entries);indices=ownedIndices;this.meshBytes=meshBytes;this.problems=List.copyOf(problems);
         if(!problems.isEmpty()&&(!entries.isEmpty()||indices.length!=0||meshBytes!=0))throw new IllegalArgumentException("Partial visual assignments escaped failure");
     }
     public static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,Limits.DEFAULT,cancelled); }
-    public static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,limits,true,cancelled); }
+    public static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,WorldOffsets.none(snapshot),limits,true,cancelled); }
     /** Package-only sharing of the visual request's privately captured immutable assignment array. */
-    static WorldModels captureShared(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,limits,false,cancelled); }
-    private static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,Limits limits,boolean copy,BooleanSupplier cancelled) {
-        Objects.requireNonNull(snapshot);Objects.requireNonNull(layout);Objects.requireNonNull(entries);Objects.requireNonNull(cellAssignments);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
-        try { return execute(snapshot,layout,entries,cellAssignments,limits,copy,cancelled); }
+    static WorldModels captureShared(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,WorldOffsets offsets,Limits limits,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,offsets,limits,false,cancelled); }
+    public static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,WorldOffsets offsets,Limits limits,BooleanSupplier cancelled) { return capture(snapshot,layout,entries,cellAssignments,offsets,limits,true,cancelled); }
+    private static WorldModels capture(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> entries,int[] cellAssignments,WorldOffsets offsets,Limits limits,boolean copy,BooleanSupplier cancelled) {
+        Objects.requireNonNull(snapshot);Objects.requireNonNull(offsets);Objects.requireNonNull(layout);Objects.requireNonNull(entries);Objects.requireNonNull(cellAssignments);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
+        try { return execute(snapshot,layout,entries,cellAssignments,offsets,limits,copy,cancelled); }
         catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return placeholder(snapshot,layout,List.of(failure.problem)); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return placeholder(snapshot,layout,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to capture per-cell model choices; no partial assignments were published"))); }
     }
-    private static WorldModels execute(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> input,int[] cells,Limits limits,boolean copy,BooleanSupplier cancelled) {
+    private static WorldModels execute(WorldSnapshot snapshot,AtlasLayout layout,List<Entry> input,int[] cells,WorldOffsets offsets,Limits limits,boolean copy,BooleanSupplier cancelled) {
         if(snapshot.requiresPlaceholder())return placeholder(snapshot,layout,snapshot.problems());
+        if(offsets.snapshot()!=snapshot)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Offsets belong to a different exact native snapshot");
+        if(offsets.requiresPlaceholder())return placeholder(snapshot,layout,offsets.problems());
         if(layout.requiresPlaceholder())throw WorldProblem.fail(WorldProblem.Code.ATLAS,"World model assignments require a successful CPU atlas; inspect its asset problems");
         if(!snapshot.source().minecraftVersion().equals(layout.assets().version()))throw WorldProblem.fail(WorldProblem.Code.VERSION,"World snapshot and captured visual assets target different Minecraft versions");
         long bytes=(long)cells.length*4;
         if(cells.length!=snapshot.cellCount())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Supply one native visual choice for every captured cell");
-        if(bytes>limits.indexBytes()||bytes+snapshot.indexBytes()>limits.sourceBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"World state, biome and visual-choice index budget reached");
+        if(bytes>limits.indexBytes()||bytes+snapshot.indexBytes()+offsets.bytes()>limits.sourceBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"World state, biome and visual-choice index budget reached");
         if(input.isEmpty()||input.size()>limits.entries())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Visual assignment palette count is outside its budget");
         var nativeStates=new HashMap<Integer,Integer>();for(int i=0;i<snapshot.states().size();i++)nativeStates.put(snapshot.states().get(i).nativeStateId(),i);
         var captured=new ArrayList<Entry>();var stateIndices=new ArrayList<Integer>();var nativeSources=new ArrayList<Optional<NativeMeshSource>>();var meshes=new IdentityHashMap<AtlasMesh,Boolean>();long meshBytes=0;
@@ -64,10 +67,11 @@ public final class WorldModels {
             if(choice<0||choice>=captured.size()||stateIndices.get(choice)!=snapshot.stateIndex(i))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Per-cell visual choice is absent or belongs to a different native block state");
             var origin=nativeSources.get(choice);if(origin.isPresent()&&origin.orElseThrow().position().isPresent()&&!origin.orElseThrow().position().orElseThrow().equals(snapshot.extent().position(i)))throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,snapshot.extent().position(i),"Position-dependent native visual was assigned to a different cell");if(copy)indices[i]=choice;
         }
-        WorldProblem.check(cancelled);return new WorldModels(snapshot,layout,captured,indices,meshBytes,List.of());
+        WorldProblem.check(cancelled);return new WorldModels(snapshot,offsets,layout,captured,indices,meshBytes,List.of());
     }
-    private static WorldModels placeholder(WorldSnapshot snapshot,AtlasLayout layout,List<WorldProblem> problems) { return new WorldModels(snapshot,layout,List.of(),new int[0],0,problems); }
+    private static WorldModels placeholder(WorldSnapshot snapshot,AtlasLayout layout,List<WorldProblem> problems) { return new WorldModels(snapshot,WorldOffsets.none(snapshot),layout,List.of(),new int[0],0,problems); }
     public WorldSnapshot snapshot() { return snapshot; }
+    public WorldOffsets offsets() { return offsets; }
     public AtlasLayout layout() { return layout; }
     public List<Entry> entries() { return entries; }
     public int entryIndex(int cell) { return indices[cell]; }

@@ -33,7 +33,7 @@ public final class WorldRenderWorker implements AutoCloseable {
         long inputBytes() { return ready!=null?ready.inputBytes():model.inputBytes(); }
         long frozenBytes() { return ready!=null?ready.visuals().inputBytes():model.inputs().inputBytes(); }
         long visualBudget() { return ready!=null?ready.visuals().limits().workingBytes():model.inputs().limits().visuals().workingBytes(); }
-        long extraSceneBytes() { return ready!=null?ready.visuals().inputBytes()-snapshot().indexBytes()-(long)snapshot().cellCount()*4:model.inputs().extraSceneBytes(); }
+        long extraSceneBytes() { return ready!=null?ready.visuals().inputBytes()-snapshot().indexBytes()-(long)snapshot().cellCount()*4-ready.visuals().offsets().bytes():model.inputs().extraSceneBytes(); }
     }
     public enum Phase { IDLE, QUEUED, INSPECTING, VISUALS, PLANNING, BUILDING, READY, DELIVERED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<WorldSnapshot.Source> source,Optional<UUID> snapshotId,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) {

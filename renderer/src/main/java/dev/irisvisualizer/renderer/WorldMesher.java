@@ -53,11 +53,12 @@ public final class WorldMesher {
                     cells.add(new WorldMesh.Cell(cell,entryIndex,first,0,markers.size()));markers.add(new WorldMesh.Marker(cellRecord,world.extent().position(cell),entry.state(),entry.problems()));bounds(x,y,z,cell);bounds(x+1,y+1,z+1,cell);continue;
                 }
                 var mesh=entry.mesh().orElseThrow();var source=buffers.computeIfAbsent(mesh,Buffers::new);
+                double offsetX=x+models.offsets().component(cell,0),offsetY=y+models.offsets().component(cell,1),offsetZ=z+models.offsets().component(cell,2);
                 for(int f=0;f<mesh.faces().size();f++) {
                     WorldProblem.check(cancelled);var face=mesh.faces().get(f);if(hidden(cell,face))continue;int destination=faces.size(),sourceBase=f*4*MeshPacket.STRIDE_FLOATS,destinationBase=destination*4*MeshPacket.STRIDE_FLOATS;
                     for(int vertex=0;vertex<4;vertex++) {
                         int from=sourceBase+vertex*MeshPacket.STRIDE_FLOATS,to=destinationBase+vertex*MeshPacket.STRIDE_FLOATS;
-                        float px=(float)((double)x+source.vertices().get(from)),py=(float)((double)y+source.vertices().get(from+1)),pz=(float)((double)z+source.vertices().get(from+2));bounds(px,py,pz,cell);
+                        float px=(float)(offsetX+source.vertices().get(from)),py=(float)(offsetY+source.vertices().get(from+1)),pz=(float)(offsetZ+source.vertices().get(from+2));bounds(px,py,pz,cell);
                         vertices[to]=px;vertices[to+1]=py;vertices[to+2]=pz;for(int component=3;component<8;component++)vertices[to+component]=source.vertices().get(from+component);
                     }
                     for(int i=0;i<6;i++) { int corner=source.indices().get(f*6+i)-f*4;if(corner<0||corner>=4)throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,world.extent().position(cell),"Prototype indices cross their source quad");indices[destination*6+i]=destination*4+corner; }
@@ -101,7 +102,7 @@ public final class WorldMesher {
         if(visibility.snapshot()!=models.snapshot()||visibility.layout()!=models.layout())throw WorldProblem.fail(WorldProblem.Code.VISIBILITY,"World models and native visibility must share the exact snapshot and atlas epoch");
         if(!models.snapshot().extent().contains(extent))throw WorldProblem.fail(WorldProblem.Code.EXTENT,"Requested world section lies outside the captured native volume");
         if(extent.width()>limits.axis()||extent.height()>limits.axis()||extent.depth()>limits.axis()||extent.cells()>limits.cells())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"World section dimensions exceed the assembly budget; request explicit sections without truncating the world");
-        long source=models.snapshot().indexBytes()+models.indexBytes(),mask=visibility.bytes();
+        long source=models.snapshot().indexBytes()+models.indexBytes()+models.offsets().bytes(),mask=visibility.bytes();
         if(source+mask>limits.sourceIndexBytes()||models.meshBytes()>limits.prototypeBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Retained native indices, visibility or prototype mesh budget reached");
         long atlas=models.layout().usage().orElseThrow().knownPayloadBytes()-models.layout().usage().orElseThrow().boundMeshBytes();
         if(source+mask+models.meshBytes()+atlas>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Combined world, prototype and atlas payload budget reached");

@@ -8,9 +8,10 @@ import java.util.function.BooleanSupplier;
 /** One native-session handoff to the detached single-worker model/visibility/scene renderer path. */
 public final class NativeSceneInputs {
     private NativeSceneInputs() {}
-    public record Limits(WorldModelInputs.Limits models,NativeVisibility.Limits visibility,WorldScenePlan.Limits scene,WorldMesher.Limits section,long workingBytes) {
-        public static final Limits DEFAULT=new Limits(WorldModelInputs.Limits.DEFAULT,NativeVisibility.Limits.DEFAULT,WorldScenePlan.Limits.DEFAULT,WorldMesher.Limits.DEFAULT,512L*1024*1024);
-        public Limits { Objects.requireNonNull(models);Objects.requireNonNull(visibility);Objects.requireNonNull(scene);Objects.requireNonNull(section);if(workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Native scene input working limit exceeded"); }
+    public record Limits(WorldModelInputs.Limits models,NativeVisibility.Limits visibility,WorldOffsets.Limits offsets,WorldScenePlan.Limits scene,WorldMesher.Limits section,long workingBytes) {
+        public static final Limits DEFAULT=new Limits(WorldModelInputs.Limits.DEFAULT,NativeVisibility.Limits.DEFAULT,WorldOffsets.Limits.DEFAULT,WorldScenePlan.Limits.DEFAULT,WorldMesher.Limits.DEFAULT,512L*1024*1024);
+        public Limits { Objects.requireNonNull(models);Objects.requireNonNull(visibility);Objects.requireNonNull(offsets);Objects.requireNonNull(scene);Objects.requireNonNull(section);if(workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Native scene input working limit exceeded"); }
+        public Limits(WorldModelInputs.Limits models,NativeVisibility.Limits visibility,WorldScenePlan.Limits scene,WorldMesher.Limits section,long workingBytes) { this(models,visibility,WorldOffsets.Limits.DEFAULT,scene,section,workingBytes); }
     }
     public record Result(WorldSnapshot.Source source,UUID snapshotId,Optional<WorldRenderWorker.ModelRequest> request,Optional<NativeVisibility.Usage> visibilityUsage,List<WorldProblem> problems) {
         public Result {
@@ -28,12 +29,16 @@ public final class NativeSceneInputs {
             long catalog=assets.receipt().capturedAssetBytes(),source=catalog+snapshot.indexBytes();
             // One retained mask plus prospective assignment/copy arrays; no full height is omitted.
             if(source+(long)snapshot.cellCount()*9>limits.workingBytes())throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native scene catalog/world/mask/choice-copy working budget reached");
+            var o=limits.offsets();long offsetWorking=Math.min(o.workingBytes(),limits.workingBytes()-catalog);
+            var capturedOffsets=NativeOffsets.capture(context,snapshot,new WorldOffsets.Limits(o.translations(),o.payloadBytes(),offsetWorking,o.componentBlocks()),cancelled);if(capturedOffsets.requiresPlaceholder())return failed(snapshot,capturedOffsets.problems());
+            var offsets=capturedOffsets.offsets().orElseThrow();
+            if(source+offsets.bytes()+(long)snapshot.cellCount()*9>limits.workingBytes())throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native scene offsets/mask/choice-copy peak exceeds its working budget");
             var original=limits.models();var v=original.visuals();long modelWorking=Math.min(v.workingBytes(),limits.workingBytes());
             var visualLimits=new WorldVisuals.Limits(v.choices(),v.modelStates(),v.meshVariants(),v.ticketReferences(),v.problemReferences(),v.sourcePackedBytes(),modelWorking);
             var modelLimits=new WorldModelInputs.Limits(visualLimits,original.models(),original.inspectedStates(),original.inspectedFaces());
-            var models=NativeModelInputs.capture(context,assets,snapshot,tick,partialTick,modelLimits,cancelled);
+            var models=NativeModelInputs.capture(context,assets,snapshot,tick,partialTick,modelLimits,offsets,cancelled);
             if(models.requiresPlaceholder())return failed(snapshot,models.problems());
-            var visibility=limits.visibility();var maskLimits=visibility.visibility();long maskWorking=Math.min(maskLimits.workingBytes(),limits.workingBytes()-catalog);
+            var visibility=limits.visibility();var maskLimits=visibility.visibility();long maskWorking=Math.min(maskLimits.workingBytes(),limits.workingBytes()-catalog-offsets.bytes());
             var boundedVisibility=new NativeVisibility.Limits(new WorldVisibility.Limits(maskLimits.maskBytes(),maskWorking),visibility.cachedPairs(),visibility.nativeQueries(),visibility.pairProbes());
             var masks=NativeVisibility.capture(context,snapshot,boundedVisibility,cancelled);if(masks.requiresPlaceholder())return failed(snapshot,masks.problems());
             var input=models.inputs().orElseThrow();var mask=masks.input().orElseThrow();long available=Math.min(input.limits().visuals().workingBytes(),limits.workingBytes()-mask.bytes());

@@ -25,18 +25,20 @@ public final class WorldVisuals {
     }
     /** Captured before scheduling. The assignment backing array is private and never exposed or mutated. */
     public static final class Request {
-        private final ClientAssetSnapshot assets;private final WorldSnapshot snapshot;private final List<Choice> choices;private final int[] assignments;
+        private final ClientAssetSnapshot assets;private final WorldSnapshot snapshot;private final WorldOffsets offsets;private final List<Choice> choices;private final int[] assignments;
         private final Limits limits;private final long tick;private final double partialTick;private final long inputBytes,sourcePackedBytes;
-        private Request(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Choice> choices,int[] owned,Limits limits,long tick,double partialTick,long inputBytes,long sourcePackedBytes) {
-            this.assets=assets;this.snapshot=snapshot;this.choices=choices;assignments=owned;this.limits=limits;this.tick=tick;this.partialTick=partialTick;this.inputBytes=inputBytes;this.sourcePackedBytes=sourcePackedBytes;
+        private Request(ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOffsets offsets,List<Choice> choices,int[] owned,Limits limits,long tick,double partialTick,long inputBytes,long sourcePackedBytes) {
+            this.assets=assets;this.snapshot=snapshot;this.offsets=offsets;this.choices=choices;assignments=owned;this.limits=limits;this.tick=tick;this.partialTick=partialTick;this.inputBytes=inputBytes;this.sourcePackedBytes=sourcePackedBytes;
         }
         public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Choice> choices,int[] assignments,long tick,double partialTick,BooleanSupplier cancelled) { return capture(assets,snapshot,choices,assignments,tick,partialTick,Limits.DEFAULT,cancelled); }
-        public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Choice> choices,int[] assignments,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) {
-            Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(choices);Objects.requireNonNull(assignments);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
+        public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Choice> choices,int[] assignments,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return capture(assets,snapshot,choices,assignments,tick,partialTick,limits,WorldOffsets.none(snapshot),cancelled); }
+        public static Request capture(ClientAssetSnapshot assets,WorldSnapshot snapshot,List<Choice> choices,int[] assignments,long tick,double partialTick,Limits limits,WorldOffsets offsets,BooleanSupplier cancelled) {
+            Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(offsets);Objects.requireNonNull(choices);Objects.requireNonNull(assignments);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
             if(snapshot.requiresPlaceholder()||!snapshot.source().minecraftVersion().equals(BlockModels.PROFILE)||!assets.receipt().version().equals(BlockModels.PROFILE)||!assets.receipt().expectedVersion().equals(BlockModels.PROFILE))throw new IllegalArgumentException("Visual requests require a complete pinned native snapshot and selected client assets");
+            if(offsets.snapshot()!=snapshot||offsets.requiresPlaceholder())throw new IllegalArgumentException("Visual offsets must belong to the exact successful native snapshot");
             if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid visual animation clock");
             if(choices.isEmpty()||choices.size()>limits.choices()||assignments.length!=snapshot.cellCount())throw new IllegalArgumentException("Supply a bounded choice palette and exactly one choice per captured cell");
-            long base=assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+(long)assignments.length*4;
+            long base=assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+offsets.bytes()+(long)assignments.length*4;
             if(base+(long)assignments.length*4>limits.workingBytes())throw new IllegalArgumentException("Visual input capture and assignment copy exceed the working budget");
             var frozen=List.copyOf(choices);var packets=new IdentityHashMap<MeshPacket,Boolean>();long packed=0,tickets=0,problems=0;var states=new HashSet<Integer>();var variants=new HashSet<Choice>();
             for(var choice:frozen) {
@@ -58,7 +60,7 @@ public final class WorldVisuals {
                 var choice=frozen.get(index);var mesh=choice instanceof NativeChoice n?n.mesh():choice instanceof ModelChoice m?m.nativeLayer().orElse(null):null;
                 if(mesh!=null&&mesh.nativeSource().isPresent()) { var position=mesh.nativeSource().orElseThrow().position();if(position.isPresent()&&!position.orElseThrow().equals(snapshot.extent().position(cell)))throw new IllegalArgumentException("Position-dependent native visual assigned to another cell"); }
             }
-            WorldProblem.check(cancelled);return new Request(assets,snapshot,frozen,captured,limits,tick,partialTick,base+packed,packed);
+            WorldProblem.check(cancelled);return new Request(assets,snapshot,offsets,frozen,captured,limits,tick,partialTick,base+packed,packed);
         }
         private static void validateNative(ClientAssetSnapshot assets,WorldSnapshot snapshot,int stateIndex,BlockMesh mesh) {
             if(!mesh.state().equals(snapshot.states().get(stateIndex))||!AtlasLayout.sameAssets(assets.receipt(),mesh.assets()))throw new IllegalArgumentException("Native visual state or asset capture differs from its request");
@@ -72,11 +74,12 @@ public final class WorldVisuals {
         /** Immutable native decision palette, including original-state unsupported visual diagnostics. */
         public List<Choice> choices() { return choices; }
         public WorldSnapshot snapshot() { return snapshot; }
+        public WorldOffsets offsets() { return offsets; }
         /** Lower admission without copying or exposing the frozen native inputs. */
         public Request withWorkingBytes(long bytes) {
             if(bytes<inputBytes||bytes>limits.workingBytes())throw new IllegalArgumentException("Reduced visual working budget cannot hold its captured inputs");
             var bounded=new Limits(limits.choices(),limits.modelStates(),limits.meshVariants(),limits.ticketReferences(),limits.problemReferences(),limits.sourcePackedBytes(),bytes);
-            return new Request(assets,snapshot,choices,assignments,bounded,tick,partialTick,inputBytes,sourcePackedBytes);
+            return new Request(assets,snapshot,offsets,choices,assignments,bounded,tick,partialTick,inputBytes,sourcePackedBytes);
         }
         public int choiceAt(int cell) { return assignments[cell]; }
     }
@@ -170,7 +173,7 @@ public final class WorldVisuals {
                 else if(entries[i]==null) { var prep=textures.preparations().get(ordinals.get(meshes[i]));var problems=rejected.get(prep);entries[i]=problems==null?bound.get(prep):WorldModels.Entry.placeholder(state(i),problems); }
                 switch(entries[i].kind()) { case MESH->meshCount++;case EMPTY->emptyCount++;case PLACEHOLDER->placeholderCount++; }
             }
-            var models=WorldModels.captureShared(request.snapshot,layout,Arrays.asList(entries),request.assignments,WorldModels.Limits.DEFAULT,cancelled);
+            var models=WorldModels.captureShared(request.snapshot,layout,Arrays.asList(entries),request.assignments,request.offsets,WorldModels.Limits.DEFAULT,cancelled);
             if(models.requiresPlaceholder())return Result.failed(request,models.problems(),List.of());
             var raster=AtlasImages.capture(layout,request.tick,request.partialTick,cancelled);if(raster.requiresPlaceholder())return Result.failed(request,List.of(),raster.problems());
             var atlasUsage=layout.usage().orElseThrow();known+=atlasUsage.boundMeshBytes()+atlasUsage.atlasBytes();
