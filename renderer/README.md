@@ -137,7 +137,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its twelve native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 103 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its twelve native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 105 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 

@@ -32,11 +32,11 @@ public final class GlMapUpload implements AutoCloseable {
         try { return advance(budget,cancelled); }catch(RuntimeException|Error failure) { try { dispose(failure instanceof CancellationException?Phase.CANCELLED:Phase.FAILED); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
-        long start=System.nanoTime(),storage=0;int bytes=0,actions=0,work=0;boolean finish=false;GlState state=null;
+        long start=System.nanoTime(),storage=0;int bytes=0,actions=0,work=0;boolean finish=false;GlTransferState state=null;
         try {
             steps:while(work<budget.workUnits()&&(work==0||System.nanoTime()-start<budget.nanoseconds())) {
                 check(cancelled);boolean gpu=phase==Phase.STORAGE||phase==Phase.ROWS;if(gpu&&actions>=budget.actions())break;
-                if(gpu&&state==null) { state=new GlState(device);GlState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
+                if(gpu&&state==null) { state=new GlTransferState(device);GlTransferState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
                 switch(phase) {
                     case STORAGE -> {
                         device.expand(allocation,totalBytes,0,1,0);allocation.textures[0]=glGenTextures();glBindTexture(GL_TEXTURE_2D,allocation.textures[0]);

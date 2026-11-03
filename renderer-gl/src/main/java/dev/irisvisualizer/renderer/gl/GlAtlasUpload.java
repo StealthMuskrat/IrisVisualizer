@@ -44,12 +44,12 @@ public final class GlAtlasUpload implements AutoCloseable {
         catch(RuntimeException|Error failure) { try { dispose(failure instanceof CancellationException?Phase.CANCELLED:Phase.FAILED); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
-        long start=System.nanoTime(),storage=0;int copiedNow=0,uploadedNow=0,actions=0,units=0;boolean finish=false;GlState state=null;
+        long start=System.nanoTime(),storage=0;int copiedNow=0,uploadedNow=0,actions=0,units=0;boolean finish=false;GlTransferState state=null;
         try {
             device.live(scene.allocation);device.live(work);source.raster();
             steps:while(units<budget.workUnits()&&(units==0||System.nanoTime()-start<budget.nanoseconds())) {
                 check(cancelled);boolean gpu=phase!=Phase.VALIDATING&&phase!=Phase.FINISHING;if(gpu&&actions>=budget.actions())break;
-                if(gpu&&state==null) { state=new GlState(device);GlState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
+                if(gpu&&state==null) { state=new GlTransferState(device);GlTransferState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
                 switch(phase) {
                     case VALIDATING -> {
                         if(validation<changedCount) {

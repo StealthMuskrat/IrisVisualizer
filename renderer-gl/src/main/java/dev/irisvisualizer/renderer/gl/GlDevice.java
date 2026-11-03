@@ -64,6 +64,20 @@ public final class GlDevice implements AutoCloseable {
     boolean indexedViewports() { return capabilities.OpenGL41||capabilities.GL_ARB_viewport_array; }
     boolean coreIndexedBlend() { return capabilities.OpenGL40; }
     boolean indexedBlend() { return coreIndexedBlend()||capabilities.GL_ARB_draw_buffers_blend; }
+    boolean clipControl() { return capabilities.OpenGL45||capabilities.GL_ARB_clip_control; }
+    boolean coreClipControl() { return capabilities.OpenGL45; }
+    boolean depthBounds() { return capabilities.GL_EXT_depth_bounds_test; }
+    boolean fixedRestart() { return capabilities.OpenGL43||capabilities.GL_ARB_ES3_compatibility; }
+    boolean sampleShading() { return capabilities.OpenGL40||capabilities.GL_ARB_sample_shading; }
+    void drawingAllowed() {
+        current();
+        if(capabilities.OpenGL40||capabilities.GL_ARB_transform_feedback2) {
+            boolean active=glGetBoolean(org.lwjgl.opengl.ARBTransformFeedback2.GL_TRANSFORM_FEEDBACK_BUFFER_ACTIVE);
+            boolean paused=glGetBoolean(org.lwjgl.opengl.ARBTransformFeedback2.GL_TRANSFORM_FEEDBACK_BUFFER_PAUSED);
+            check("transform feedback draw preflight");
+            if(active&&!paused)throw new GlFailure(GlFailure.Code.STATE,"End or pause host transform feedback before offscreen drawing");
+        }
+    }
     void current() {
         if(closed)throw new GlFailure(GlFailure.Code.STATE,"GPU device is closed");
         if(Thread.currentThread()!=thread||glfwGetCurrentContext()!=context)throw new GlFailure(GlFailure.Code.CONTEXT,"GPU work must use its original thread and GLFW context");

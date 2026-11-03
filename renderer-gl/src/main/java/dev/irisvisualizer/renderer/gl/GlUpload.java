@@ -61,12 +61,12 @@ public final class GlUpload implements AutoCloseable {
         }
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
-        long start=System.nanoTime(),storage=0;int bytes=0,actions=0,work=0;boolean finish=false;GlState state=null;
+        long start=System.nanoTime(),storage=0;int bytes=0,actions=0,work=0;boolean finish=false;GlTransferState state=null;
         try {
             device.live(renderer.allocation);check(cancelled);
             units:while(work<budget.workUnits()&&(work==0||System.nanoTime()-start<budget.nanoseconds())) {
                 check(cancelled);boolean gpu=gpuPhase();if(gpu&&actions>=budget.actions())break;
-                if(gpu&&state==null) { state=new GlState(device);GlState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
+                if(gpu&&state==null) { state=new GlTransferState(device);GlTransferState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
                 int transferred=0;
                 switch(phase) {
                     case VALIDATING -> validateUnit();

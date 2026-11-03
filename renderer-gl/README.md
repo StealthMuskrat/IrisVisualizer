@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds twenty-nine Java sources to the 74-source CPU renderer. All 103 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds thirty-one Java sources to the 74-source CPU renderer. All 105 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -36,7 +36,7 @@ Sections now use actual emitted geometry/marker bounds for conservative frustum 
 
 A second shader draws placeholder markers as instanced magenta unit-cell wire boxes with crossed diagonals. Instance order maps to the source marker list; original block IDs, states and asset problems remain available through the CPU scene. Markers use depth testing rather than replacing terrain data with another block type. The shared cube buffers remain dependency-pinned until all referencing scene VAOs are released.
 
-Before drawing, the target becomes incomplete. Only a successful draw **and** host-state restoration marks it complete again. `textureId()` rejects an incomplete, retired or released target. Its returned GL texture name is borrowed: consumers must not retain/use it after a failed update or target retirement. A later UI integration must adopt only successful frames, using separate targets when it needs to retain an old frame atomically.
+After successful host-state capture and drawing-state normalization, the target becomes incomplete immediately before target binding/clearing. Rejected preflight leaves an existing completed target usable. Only a successful draw **and** host-state restoration marks it complete again. `textureId()` rejects an incomplete, retired or released target. Its returned GL texture name is borrowed: consumers must not retain/use it after a failed update or target retirement. A later UI integration must adopt only successful frames, using separate targets when it needs to retain an old frame atomically.
 
 The backend snapshots/restores the core state it changes: program, framebuffer/read/renderbuffer bindings, VAO/array/unpack buffers, texture/sampler unit zero, pixel unpack alignment/rows/skips, depth/cull/polygon/line state, color mask/blending at draw buffer zero, relevant enable flags, clip distances, and viewport/scissor/depth-range arrays where supported. It edits only its own texture/FBO/VAO objects. Other extension interactions and actual host-state isolation remain runtime validation requirements. Enter with a clean GL error state; errors are reported rather than silently consumed as success.
 
@@ -119,3 +119,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Geometric clipping
 
 [WorldClip](../renderer/CLIPPING.md) now drives conservative section rejection and fragment clipping in mesh and marker shaders. The world view redraws on clip changes while reusing geometry and complete camera ordering. Frame/readback receipts retain clipping for matching CPU picking; old overloads default to no clipping. No cap geometry, native data reduction or preview gate change is introduced. Real Windows shader and boundary-pixel checks remain deferred.
+
+## Host-state isolation
+
+[Host-state guards](HOST-STATE.md) now separate transfer/creation bindings from full draw state. Upload steps no longer query or rewrite program, viewport, raster or blend state. Pack/unpack use complete core pixel-store groups. World/map draws normalize supported clip-control conventions, depth-bounds testing, fixed restart, sample shading and additional core coverage/polygon flags, then restore them. Detectable unpaused transform feedback is rejected before invalidating an existing target. OpenGL 3.3 remains the minimum; optional enums/functions are used only with their advertised core/extension capability. Real Windows restoration/pixel checks remain deferred.

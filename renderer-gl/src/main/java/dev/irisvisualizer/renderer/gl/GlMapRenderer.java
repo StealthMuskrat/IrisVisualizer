@@ -29,7 +29,7 @@ public final class GlMapRenderer implements AutoCloseable {
     private int uniform(String name) { int location=glGetUniformLocation(allocation.programs[0],name);if(location<0)throw new GlFailure(GlFailure.Code.SHADER,"Required map uniform is absent: "+name);return location; }
     public static GlMapRenderer create(GlDevice device) {
         Objects.requireNonNull(device);var allocation=device.reserve(0,0,0,0,1,0,0,1,2,null);
-        try(var state=new GlState(device)) {
+        try(var state=new GlTransferState(device)) {
             shader(allocation,0,GL_VERTEX_SHADER,VERTEX);shader(allocation,1,GL_FRAGMENT_SHADER,FRAGMENT);allocation.programs[0]=glCreateProgram();
             for(int shader:allocation.shaders)glAttachShader(allocation.programs[0],shader);glLinkProgram(allocation.programs[0]);
             if(glGetProgrami(allocation.programs[0],GL_LINK_STATUS)==GL_FALSE)throw new GlFailure(GlFailure.Code.SHADER,"Map program linking failed: "+glGetProgramInfoLog(allocation.programs[0],4096));
@@ -46,9 +46,8 @@ public final class GlMapRenderer implements AutoCloseable {
         if(map.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Map, target and renderer must share their original device");
         int texture=map.textureId();device.live(target.allocation);if(view.width()!=map.width()||view.height()!=map.height())throw new GlFailure(GlFailure.Code.STALE,"Map transform dimensions differ from its exact uploaded image");
         double left=Math.max(0,view.left()),top=Math.max(0,view.top()),right=Math.min(target.width(),view.right()),bottom=Math.min(target.height(),view.bottom());
-        target.complete=false;
         try(var state=new GlState(device)) {
-            state.drawing();glDisable(GL_DEPTH_TEST);glDepthMask(false);glDisable(GL_CULL_FACE);glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0,0,0,0});
+            state.drawing();target.complete=false;glDisable(GL_DEPTH_TEST);glDepthMask(false);glDisable(GL_CULL_FACE);glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0,0,0,0});
             if(left<right&&top<bottom) {
                 double spanX=view.width()*view.pixelsPerSample(),spanY=view.height()*view.pixelsPerSample();
                 glUseProgram(allocation.programs[0]);glBindVertexArray(allocation.vaos[0]);glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glBindTexture(GL_TEXTURE_2D,texture);glUniform1i(image,0);

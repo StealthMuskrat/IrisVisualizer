@@ -91,7 +91,7 @@ public final class GlRenderer implements AutoCloseable {
     }
     public static GlRenderer create(GlDevice device) {
         Objects.requireNonNull(device);var allocation=device.reserve(224,0,2,0,0,0,0,2,4,null);
-        try(var state=new GlState(device)) {
+        try(var state=new GlTransferState(device)) {
             program(device,allocation,0,GEOMETRY_VERTEX,GEOMETRY_FRAGMENT);program(device,allocation,1,MARKER_VERTEX,MARKER_FRAGMENT);
             allocation.buffers[0]=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);float[] corners=new float[24];for(int i=0;i<8;i++) { corners[i*3]=i&1;corners[i*3+1]=(i>>>1)&1;corners[i*3+2]=(i>>>2)&1; }
             GlScene.floats(device,GL_ARRAY_BUFFER,FloatBuffer.wrap(corners),()->false);
@@ -145,9 +145,8 @@ public final class GlRenderer implements AutoCloseable {
             visible[i]=frustum.visible(section.bounds().orElseThrow(),offsets,i*3)&&(!clip.enabled()||clipVisible(clipBounds,section.bounds().orElseThrow(),offsets,i*3));if(visible[i])shown++;else culled++;
         }
         int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0;long indices=0;
-        target.complete=false;
         try(var state=new GlState(device)) {
-            state.drawing();glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
+            state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
             glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);glUniform1i(geometryLighting,scene.nativeLighting?1:0);geometryClip.set(clip.enabled(),clipBounds);
             for(int i=0;i<scene.sections.size();i++) {
                 var section=scene.sections.get(i);if(!visible[i]||section.geometryVao()==0)continue;glUniform3f(geometryOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.geometryVao());
