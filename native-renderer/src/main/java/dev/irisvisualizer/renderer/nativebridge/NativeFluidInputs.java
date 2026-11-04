@@ -36,12 +36,20 @@ public final class NativeFluidInputs {
     private static final class Missing extends RuntimeException { Missing(String reason) { super(reason); } }
     /** Additional detached neighbors are borrowed only; no absent sample is replaced with air. */
     public static NativeVisualInputs.Result capture(NativeRenderContext context,WorldRenderWorker.Request original,Optional<WorldSnapshot> neighbors,Limits limits,BooleanSupplier cancelled) {
+        return capture(context,original,neighbors,limits,false,cancelled);
+    }
+    /** Combined capture already subtracts borrowed neighbors from the ready request's phase ceiling. */
+    static NativeVisualInputs.Result captureReservedNeighbors(NativeRenderContext context,WorldRenderWorker.Request original,Optional<WorldSnapshot> neighbors,Limits limits,BooleanSupplier cancelled) {
+        return capture(context,original,neighbors,limits,true,cancelled);
+    }
+    private static NativeVisualInputs.Result capture(NativeRenderContext context,WorldRenderWorker.Request original,Optional<WorldSnapshot> neighbors,Limits limits,boolean reservedNeighbors,BooleanSupplier cancelled) {
         Objects.requireNonNull(context);Objects.requireNonNull(original);Objects.requireNonNull(neighbors);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);var input=original.visuals();var snapshot=input.snapshot();
         try {
             check(cancelled);context.check();if(!snapshot.source().equals(context.source()))throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Fluid capture requires its exact native context");
             var halo=neighbors.orElse(snapshot);
             if(halo.requiresPlaceholder()||!halo.source().equals(snapshot.source())||halo.extent().minY()!=snapshot.extent().minY()||halo.extent().height()!=snapshot.extent().height())throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Fluid neighbor capture has another native epoch or height");
-            long extra=halo==snapshot?0:halo.indexBytes(),working=Math.min(Math.min(original.workingBytes()-original.visibility().bytes(),input.limits().workingBytes()),limits.edits().workingBytes())-extra;
+            long extra=halo==snapshot?0:halo.indexBytes(),known=Math.min(original.workingBytes()-original.visibility().bytes(),input.limits().workingBytes());
+            long working=Math.min(known-(reservedNeighbors?0:extra),limits.edits().workingBytes()-extra);
             if(working<0||input.inputBytes()+(long)snapshot.cellCount()*8>working)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid neighbors and visual edit copy peak exceed the working allowance");
             var view=new View(context,snapshot,halo,limits.queries(),cancelled);var cache=new HashMap<Key,WorldVisuals.Choice>();var layers=new HashMap<LayerKey,WorldVisuals.Choice>();var missing=new HashMap<ProblemKey,WorldVisuals.Choice>();var empty=new HashMap<Integer,WorldVisuals.Choice>();var missingAssets=new EnumMap<FluidGeometry.Kind,Optional<AssetId>>(FluidGeometry.Kind.class);var budget=new Budget();
             var edits=new WorldVisualEdits.Limits(limits.edits().cells(),limits.edits().changes(),limits.edits().packets(),limits.edits().addedPackedBytes(),working);
@@ -51,10 +59,8 @@ public final class NativeFluidInputs {
                 var kind=kind(fluid);boolean base=prior instanceof WorldVisuals.ModelChoice&&modelBase(state);
                 if(kind==null||state.hasBlockEntity()||!base&&state.getRenderShape()!=RenderShape.INVISIBLE)return prior;
                 if(prior instanceof WorldVisuals.ModelChoice model&&(!base||model.nativeLayer().isPresent()))return prior;
-                for(int axis=0;axis<3;axis++)if(input.offsets().component(cell,axis)!=0) {
-                    if(!base)return prior;
-                    return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),"Fluid base offset"),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,snapshot.state(cell).block(),"/native/fluid/offset","Fluid and base model require independent placement for nonzero offsets"))));
-                }
+                if(base&&state.hasOffsetFunction()&&input.offsets().mode()!=WorldOffsets.Mode.NATIVE)
+                    return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),"Missing fluid base offset"),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,snapshot.state(cell).block(),"/native/fluid/offset","Fluid base requires captured native model offsets"))));
                 try {
                     var sample=sample(view,state,fluid,position,kind,biome);if(sample.faces()==0&&base)return prior;if(sample.faces()==0)return empty.computeIfAbsent(prior.stateIndex(),WorldVisuals.EmptyChoice::new);
                     var absentAsset=missingAssets.computeIfAbsent(kind,value->missingAsset(input.assets(),value));
@@ -81,9 +87,9 @@ public final class NativeFluidInputs {
         if(layers.size()>=limit)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid/base composition palette allowance reached");
         var choice=new WorldVisuals.ModelChoice(model.stateIndex(),model.tickets(),Optional.of(nativeChoice.mesh()));layers.put(key,choice);return choice;
     }
-    /** Only complete vanilla JSON bases without special ownership or independent placement are admitted. */
+    /** Complete vanilla JSON bases still require actual native offsets when their state uses them. */
     static boolean modelBase(BlockState state) {
-        return kind(state.getFluidState())!=null&&state.getRenderShape()==RenderShape.MODEL&&!state.hasBlockEntity()&&!state.hasOffsetFunction();
+        return kind(state.getFluidState())!=null&&state.getRenderShape()==RenderShape.MODEL&&!state.hasBlockEntity();
     }
     private static Optional<AssetId> missingAsset(ClientAssetSnapshot assets,FluidGeometry.Kind kind) {
         if(assets.find(ClientAssetSnapshot.Kind.TEXTURE,kind.still()).isEmpty())return Optional.of(kind.still());

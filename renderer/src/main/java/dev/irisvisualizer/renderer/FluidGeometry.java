@@ -67,9 +67,9 @@ public final class FluidGeometry {
     private static void add(List<NativeGeometry.Quad> result,Cell cell,ModelPlan.Direction face,AssetId sprite,List<BlockMesh.Vertex> vertices,boolean back,BooleanSupplier cancelled) {
         if(cancelled.getAsBoolean())throw new java.util.concurrent.CancellationException("Fluid geometry cancelled");var normal=ModelTransforms.normal(face);
         var material=new ModelPlan.Material(sprite,false,cell.rgb());var shade=Optional.of(face);
-        result.add(new NativeGeometry.Quad(face,Optional.empty(),new ModelPlan.Vec3((float)normal.x(),(float)normal.y(),(float)normal.z()),material,-1,cell.emission(),false,shade,vertices));
+        result.add(new NativeGeometry.Quad(face,Optional.empty(),new ModelPlan.Vec3((float)normal.x(),(float)normal.y(),(float)normal.z()),material,-1,cell.emission(),false,shade,vertices,BlockMesh.Placement.CELL));
         if(back) {
-            var opposite=FaceGeometry.opposite(face);result.add(new NativeGeometry.Quad(opposite,Optional.empty(),new ModelPlan.Vec3((float)-normal.x(),(float)-normal.y(),(float)-normal.z()),material,-1,cell.emission(),false,shade,List.of(vertices.get(0),vertices.get(3),vertices.get(2),vertices.get(1))));
+            var opposite=FaceGeometry.opposite(face);result.add(new NativeGeometry.Quad(opposite,Optional.empty(),new ModelPlan.Vec3((float)-normal.x(),(float)-normal.y(),(float)-normal.z()),material,-1,cell.emission(),false,shade,List.of(vertices.get(0),vertices.get(3),vertices.get(2),vertices.get(1)),BlockMesh.Placement.CELL));
         }
     }
 }

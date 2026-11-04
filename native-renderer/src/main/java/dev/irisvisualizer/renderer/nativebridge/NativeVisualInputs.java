@@ -61,7 +61,7 @@ public final class NativeVisualInputs {
         catch(RuntimeException failure) { check(cancelled);return failed(snapshot,provider.policy(),List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Native visual producer capture failed: "+failure.getClass().getSimpleName()))); }
         catch(OutOfMemoryError exhausted) { check(cancelled);return failed(snapshot,provider.policy(),List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory for native visual producer capture"))); }
     }
-    /** The supplied quads are complete native output in the existing pre-offset block-local contract. */
+    /** Supplied quads explicitly select pre-model-offset or cell-origin placement; no placement is inferred. */
     public static WorldVisuals.Choice geometry(ClientAssetSnapshot assets,WorldSnapshot snapshot,int cell,WorldVisuals.Choice original,NativeMeshSource.Kind kind,String policy,List<NativeGeometry.Quad> quads,boolean positionDependent,boolean additionalLayer,NativeGeometry.Limits limits,BooleanSupplier cancelled) {
         Objects.requireNonNull(original);if(original.stateIndex()!=snapshot.stateIndex(cell))throw new IllegalArgumentException("Native geometry must preserve the original cell/state");
         var mesh=NativeGeometry.capture(assets,snapshot,cell,kind,policy,quads,positionDependent,limits,cancelled);

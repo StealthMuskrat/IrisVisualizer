@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
-      "sha256": "7fbac83b02d7adfd0be6346a5f3af5f305c0d3c3834a69977de6ac414c6b9c64"
+      "sha256": "d60a6458afd7e8623f3a1072596e0d542ed41bb8d7a6f0f813835d13ac584d8a"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeColormapTints.java",
@@ -16,7 +16,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeFluidInputs.java",
-      "sha256": "1d6e1b6dcb2236b3686ad972f0f595c12c493e39f82ae0d445a695a7bf8c23ba"
+      "sha256": "d7f424a678a4d10a3e96a7fec0dcdba9aadaefe902b00a678bf09c86ede709d9"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",
@@ -60,7 +60,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeVisualInputs.java",
-      "sha256": "912ad7ae7e291ae54ea77e82ace9e78c8ebd6c5cc49dc9b7e18967d3edc1eff4"
+      "sha256": "399eca1f30a1ae9921cbaf4466ab4412e274591640bf12ce864d6407e4ead5d8"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWeightedInputs.java",

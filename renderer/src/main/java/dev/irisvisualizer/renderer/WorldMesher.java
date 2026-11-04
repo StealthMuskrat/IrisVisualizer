@@ -56,9 +56,11 @@ public final class WorldMesher {
                 double offsetX=x+models.offsets().component(cell,0),offsetY=y+models.offsets().component(cell,1),offsetZ=z+models.offsets().component(cell,2);
                 for(int f=0;f<mesh.faces().size();f++) {
                     WorldProblem.check(cancelled);var face=mesh.faces().get(f);if(hidden(cell,face))continue;int destination=faces.size(),sourceBase=f*4*MeshPacket.STRIDE_FLOATS,destinationBase=destination*4*MeshPacket.STRIDE_FLOATS;
+                    boolean model=face.source().placement()==BlockMesh.Placement.MODEL;
+                    double placedX=model?offsetX:x,placedY=model?offsetY:y,placedZ=model?offsetZ:z;
                     for(int vertex=0;vertex<4;vertex++) {
                         int from=sourceBase+vertex*MeshPacket.STRIDE_FLOATS,to=destinationBase+vertex*MeshPacket.STRIDE_FLOATS;
-                        float px=(float)(offsetX+source.vertices().get(from)),py=(float)(offsetY+source.vertices().get(from+1)),pz=(float)(offsetZ+source.vertices().get(from+2));bounds(px,py,pz,cell);
+                        float px=(float)(placedX+source.vertices().get(from)),py=(float)(placedY+source.vertices().get(from+1)),pz=(float)(placedZ+source.vertices().get(from+2));bounds(px,py,pz,cell);
                         vertices[to]=px;vertices[to+1]=py;vertices[to+2]=pz;for(int component=3;component<8;component++)vertices[to+component]=source.vertices().get(from+component);
                     }
                     for(int i=0;i<6;i++) { int corner=source.indices().get(f*6+i)-f*4;if(corner<0||corner>=4)throw WorldProblem.at(WorldProblem.Code.ASSIGNMENT,world.extent().position(cell),"Prototype indices cross their source quad");indices[destination*6+i]=destination*4+corner; }

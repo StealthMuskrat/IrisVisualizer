@@ -127,19 +127,35 @@ public final class NativeCapture {
     }
     /** Consumes a loaded catalog; base choices and fluid layers are completed under one admitted phase. */
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);
-        try(var source=assets.retain()) { catalogOwner(source,memory);return fluidScene(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,fluids,memory,cancelled); }
+        return fluidScene(context,assets,extent,chunks,random,tick,partialTick,limits,options,fluids,Optional.empty(),memory,cancelled);
+    }
+    /** Additional detached neighbors stay borrowed through capture and are not retained by output. */
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);Objects.requireNonNull(neighbors);
+        try(var source=assets.retain()) { catalogOwner(source,memory);return fluidScene(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,fluids,neighbors,memory,cancelled); }
         finally { assets.close(); }
     }
     /** No detached base-only fluid request is published, even if later sampling or admission fails. */
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);Objects.requireNonNull(random);Objects.requireNonNull(limits);Objects.requireNonNull(options);Objects.requireNonNull(fluids);clock(tick,partialTick);
-        return capture(Kind.FLUID_SCENE,context,memory,worldPeak(assets,limits,options),()->{
-            client(assets,options);var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
-            var snapshot=volume.snapshot().orElseThrow();var original=limits.visuals();var colors=tint(context,assets,snapshot,options,original.scene().workingBytes(),cancelled);
-            var bounded=new NativeWeightedInputs.Limits(sceneLimits(original.scene(),options),original.parts(),original.alternatives(),original.selectionVisits(),original.weightUnits(),original.nativeQueries());
+        return fluidScene(context,assets,extent,chunks,random,tick,partialTick,limits,options,fluids,Optional.empty(),memory,cancelled);
+    }
+    /** Optional exact-source/full-height halo is charged across volume, tint, selection and fluid phases. */
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);Objects.requireNonNull(random);Objects.requireNonNull(limits);Objects.requireNonNull(options);Objects.requireNonNull(fluids);Objects.requireNonNull(neighbors);clock(tick,partialTick);
+        long extra=neighbors.map(WorldSnapshot::indexBytes).orElse(0L),peak=Math.max(worldPeak(assets,limits,options),assets.receipt().capturedAssetBytes()+limits.volume().capture().workingBytes()+colorBytes(options)+extra);
+        return capture(Kind.FLUID_SCENE,context,memory,peak,()->{
+            client(assets,options);
+            if(neighbors.isPresent()) {
+                var halo=neighbors.orElseThrow();if(halo.requiresPlaceholder()||!halo.source().equals(context.source())||halo.extent().minY()!=extent.minY()||halo.extent().height()!=extent.height())throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Fluid scene neighbors require the same native source and full height");
+            }
+            var original=limits.visuals();var scene=sceneLimits(original.scene(),options);long available=scene.workingBytes()-extra;
+            if(available<0)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid scene neighbor indices exceed the phase allowance");
+            var reserved=new NativeSceneInputs.Limits(scene.models(),scene.visibility(),scene.offsets(),scene.scene(),scene.section(),available);
+            var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
+            var snapshot=volume.snapshot().orElseThrow();var colors=tint(context,assets,snapshot,options,original.scene().workingBytes()-extra,cancelled);
+            var bounded=new NativeWeightedInputs.Limits(reserved,original.parts(),original.alternatives(),original.selectionVisits(),original.weightUnits(),original.nativeQueries());
             var base=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,bounded,colors,true,cancelled);if(base.requiresPlaceholder())return failure(base.problems(),base.assetProblems());
-            var result=NativeFluidInputs.capture(context,base.request().orElseThrow(),Optional.empty(),fluids,cancelled);
+            var result=NativeFluidInputs.captureReservedNeighbors(context,base.request().orElseThrow(),neighbors,fluids,cancelled);
             return result.requiresPlaceholder()?failure(result.problems(),List.of()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
         },cancelled);
     }

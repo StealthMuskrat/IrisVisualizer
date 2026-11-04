@@ -4,6 +4,8 @@ import java.util.*;
 
 /** Bounded local-block CPU geometry. This result grants no preview or world-generation readiness. */
 public final class BlockMesh {
+    /** CELL is explicit native geometry anchored to the cell, independent of its JSON model offset. */
+    public enum Placement { MODEL, CELL }
     public record Vertex(float x,float y,float z,float u,float v) {
         public Vertex { if(!Float.isFinite(x)||!Float.isFinite(y)||!Float.isFinite(z)||!Float.isFinite(u)||!Float.isFinite(v))throw new IllegalArgumentException("Nonfinite mesh vertex"); }
     }
@@ -12,11 +14,12 @@ public final class BlockMesh {
     }
     public record Quad(ModelPlan.Source source,int selection,ModelPlan.Direction modelFace,Optional<ModelPlan.Direction> cullface,
                        ModelPlan.Vec3 normal,ModelPlan.Material material,int tintIndex,int lightEmission,
-                       boolean ambientOcclusion,Optional<ModelPlan.Direction> shadeDirectionOverride,List<Vertex> vertices,Optional<NativeMeshSource> nativeSource) {
-        public Quad(ModelPlan.Source source,int selection,ModelPlan.Direction modelFace,Optional<ModelPlan.Direction> cullface,ModelPlan.Vec3 normal,ModelPlan.Material material,int tintIndex,int lightEmission,boolean ambientOcclusion,Optional<ModelPlan.Direction> shadeDirectionOverride,List<Vertex> vertices) { this(source,selection,modelFace,cullface,normal,material,tintIndex,lightEmission,ambientOcclusion,shadeDirectionOverride,vertices,Optional.empty()); }
+                       boolean ambientOcclusion,Optional<ModelPlan.Direction> shadeDirectionOverride,List<Vertex> vertices,Optional<NativeMeshSource> nativeSource,Placement placement) {
+        public Quad(ModelPlan.Source source,int selection,ModelPlan.Direction modelFace,Optional<ModelPlan.Direction> cullface,ModelPlan.Vec3 normal,ModelPlan.Material material,int tintIndex,int lightEmission,boolean ambientOcclusion,Optional<ModelPlan.Direction> shadeDirectionOverride,List<Vertex> vertices) { this(source,selection,modelFace,cullface,normal,material,tintIndex,lightEmission,ambientOcclusion,shadeDirectionOverride,vertices,Optional.empty(),Placement.MODEL); }
+        public Quad(ModelPlan.Source source,int selection,ModelPlan.Direction modelFace,Optional<ModelPlan.Direction> cullface,ModelPlan.Vec3 normal,ModelPlan.Material material,int tintIndex,int lightEmission,boolean ambientOcclusion,Optional<ModelPlan.Direction> shadeDirectionOverride,List<Vertex> vertices,Optional<NativeMeshSource> nativeSource) { this(source,selection,modelFace,cullface,normal,material,tintIndex,lightEmission,ambientOcclusion,shadeDirectionOverride,vertices,nativeSource,Placement.MODEL); }
         public Quad {
             Objects.requireNonNull(source);Objects.requireNonNull(modelFace);Objects.requireNonNull(cullface);Objects.requireNonNull(normal);Objects.requireNonNull(material);Objects.requireNonNull(shadeDirectionOverride);
-            Objects.requireNonNull(nativeSource);vertices=List.copyOf(vertices);if((nativeSource.isPresent()?source.kind()!=ClientAssetSnapshot.Kind.BLOCKSTATE||selection!=-1:source.kind()!=ClientAssetSnapshot.Kind.MODEL||selection<0)||vertices.size()!=4||tintIndex< -1||lightEmission<0||lightEmission>15)throw new IllegalArgumentException("Invalid mesh quad metadata");
+            Objects.requireNonNull(nativeSource);Objects.requireNonNull(placement);if(placement==Placement.CELL&&nativeSource.isEmpty())throw new IllegalArgumentException("Cell placement requires explicit native provenance");vertices=List.copyOf(vertices);if((nativeSource.isPresent()?source.kind()!=ClientAssetSnapshot.Kind.BLOCKSTATE||selection!=-1:source.kind()!=ClientAssetSnapshot.Kind.MODEL||selection<0)||vertices.size()!=4||tintIndex< -1||lightEmission<0||lightEmission>15)throw new IllegalArgumentException("Invalid mesh quad metadata");
         }
     }
     public record Bounds(ModelPlan.Vec3 min,ModelPlan.Vec3 max) {
