@@ -139,3 +139,7 @@ The [original image view](IMAGE-VIEW.md) now connects `SourceImage` background d
 ## Background scalar picking
 
 Completed scalar frames now connect to [NoisePickWorker](../renderer/SCALAR-PICKING.md) through a context-thread submission helper. Queries run on one bounded CPU worker with latest-pointer adoption, exact image/camera/clip receipts and independent full-source admission. Closing a submitted frame does not revoke an admitted CPU query or move GL cleanup off its original context. All 127 CPU/OpenGL main sources compile (86 CPU, 41 GL); runtime/worker/native/GPU tests and final editor integration remain deferred. Unsupported previews remain disabled.
+
+## JPEG source images
+
+The existing original-image GPU view now accepts complete CPU [JPEG images](../renderer/JPEG-IMAGES.md) alongside PNG. Source-format receipts follow unchanged upload, pixel inspection, completed frames and readback; JPEG stored dimensions and opaque decoded RGB remain distinct from viewport pixels. All 128 CPU/OpenGL sources compile (87 CPU, 41 GL). No codec/worker/GPU tests ran; stage validation and final editor integration remain pending, with unsupported previews disabled.

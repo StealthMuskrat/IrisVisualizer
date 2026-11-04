@@ -4,8 +4,9 @@ import java.security.*;
 import java.util.*;
 import java.util.function.BooleanSupplier;
 
-/** Detached original pack PNG pixels. No native map samples, animation schedule or world epoch is invented. */
+/** Detached original pack PNG/JPEG pixels. No native map samples, animation schedule or world epoch is invented. */
 public final class SourceImage {
+    public enum Format { PNG, JPEG }
     public record Identity(String resource,long revision) {
         public Identity {
             Objects.requireNonNull(resource);
@@ -17,20 +18,27 @@ public final class SourceImage {
         public static final Limits DEFAULT=new Limits(8192,16_777_216,32L*1024*1024,64L*1024*1024,128L*1024*1024);
         public Limits { if(dimension<1||dimension>8192||pixels<1||pixels>16_777_216||encodedBytes<0||encodedBytes>32L*1024*1024||rgbaBytes<0||rgbaBytes>64L*1024*1024||workingBytes<0||workingBytes>128L*1024*1024)throw new IllegalArgumentException("Source image limits exceed their bounds"); }
     }
-    /** Frozen caller-captured bytes. Capture performs one bounded copy, never file I/O or PNG decoding. */
+    /** Frozen caller-captured bytes. Capture performs one bounded copy, never file I/O or image decoding. */
     public static final class Encoded {
-        private final Identity identity;private final byte[] png;
-        private Encoded(Identity identity,byte[] png) { this.identity=identity;this.png=png; }
-        public static Encoded capture(Identity identity,byte[] png) {
-            Objects.requireNonNull(identity);Objects.requireNonNull(png);if(png.length>Limits.DEFAULT.encodedBytes())throw new IllegalArgumentException("Encoded image exceeds 32 MiB");return new Encoded(identity,png.clone());
+        private final Identity identity;private final byte[] encoded;
+        private Encoded(Identity identity,byte[] encoded) { this.identity=identity;this.encoded=encoded; }
+        public static Encoded capture(Identity identity,byte[] encoded) {
+            Objects.requireNonNull(identity);Objects.requireNonNull(encoded);if(encoded.length>Limits.DEFAULT.encodedBytes())throw new IllegalArgumentException("Encoded image exceeds 32 MiB");return new Encoded(identity,encoded.clone());
         }
         public Identity identity() { return identity; }
-        public int bytes() { return png.length; }
+        public int bytes() { return encoded.length; }
+        /** Constant-size signature detection; filenames never select a codec. Full validation runs on the worker. */
+        public Optional<Format> format() {
+            if(encoded.length>=2&&(encoded[0]&255)==255&&(encoded[1]&255)==216)return Optional.of(Format.JPEG);
+            if(encoded.length>=8&&(encoded[0]&255)==137&&encoded[1]==80&&encoded[2]==78&&encoded[3]==71&&encoded[4]==13&&encoded[5]==10&&encoded[6]==26&&encoded[7]==10)return Optional.of(Format.PNG);
+            return Optional.empty();
+        }
     }
     public enum Code { FORMAT, LIMIT, MEMORY, WORKER }
     public record Problem(Code code,Identity source,String reason) { public Problem { Objects.requireNonNull(code);Objects.requireNonNull(source);Objects.requireNonNull(reason);if(reason.length()>8192)throw new IllegalArgumentException("Unbounded image diagnostic"); } }
-    public record Receipt(Identity source,String sha256,int encodedBytes,int width,int height) {
-        public Receipt { Objects.requireNonNull(source);Objects.requireNonNull(sha256);if(!sha256.matches("[0-9a-f]{64}")||encodedBytes<0||encodedBytes>32L*1024*1024||width<1||height<1||width>8192||height>8192||(long)width*height>16_777_216)throw new IllegalArgumentException("Invalid original image receipt"); }
+    public record Receipt(Identity source,String sha256,int encodedBytes,int width,int height,Format format) {
+        public Receipt(Identity source,String sha256,int encodedBytes,int width,int height) { this(source,sha256,encodedBytes,width,height,Format.PNG); }
+        public Receipt { Objects.requireNonNull(format);Objects.requireNonNull(source);Objects.requireNonNull(sha256);if(!sha256.matches("[0-9a-f]{64}")||encodedBytes<0||encodedBytes>32L*1024*1024||width<1||height<1||width>8192||height>8192||(long)width*height>16_777_216)throw new IllegalArgumentException("Invalid original image receipt"); }
     }
     // Two maximum RGBA16 input rows, filter/finish bytes, bounded palette/transparency arrays and digest scratch.
     private static final long SCRATCH=2L*8192*8+2+768+768+256;
@@ -39,20 +47,22 @@ public final class SourceImage {
         this.identity=identity;this.receipt=receipt;this.image=image;this.problems=List.copyOf(problems);
         if(receipt.isPresent()!=image.isPresent()||!problems.isEmpty()&&image.isPresent())throw new IllegalArgumentException("Partial original image escaped failure");
     }
-    static long reservation(Encoded source,Limits limits) { return source.bytes()+limits.rgbaBytes()+SCRATCH; }
+    static long reservation(Encoded source,Limits limits) { return source.format().orElse(null)==Format.JPEG?Math.max(source.bytes(),limits.workingBytes()):source.bytes()+limits.rgbaBytes()+SCRATCH; }
     static SourceImage failed(Identity identity,Code code,String reason) { return new SourceImage(identity,Optional.empty(),Optional.empty(),List.of(new Problem(code,identity,reason))); }
     public static SourceImage decode(Encoded source,BooleanSupplier cancelled) { return decode(source,Limits.DEFAULT,cancelled); }
     public static SourceImage decode(Encoded source,Limits limits,BooleanSupplier cancelled) {
         Objects.requireNonNull(source);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
         try {
             if(source.bytes()>limits.encodedBytes()||reservation(source,limits)>limits.workingBytes())return failed(source.identity(),Code.LIMIT,"Original image encoded/output/scratch allowance exceeds its budget");
+            var format=source.format();if(format.isEmpty())return failed(source.identity(),Code.FORMAT,"Only PNG and JPEG original image signatures are supported");
             var bounds=new TextureMaterials.Limits(1,1,limits.dimension(),limits.pixels(),limits.rgbaBytes(),limits.encodedBytes(),0,1,1,1,0);
-            var image=PngDecoder.decode(AssetId.minecraft("original_image"),source.png,bounds,limits.rgbaBytes(),cancelled);
+            var image=format.orElseThrow()==Format.JPEG?JpegDecoder.decode(source.encoded,limits,cancelled):PngDecoder.decode(AssetId.minecraft("original_image"),source.encoded,bounds,limits.rgbaBytes(),cancelled);
             MessageDigest digest;try { digest=MessageDigest.getInstance("SHA-256"); }catch(NoSuchAlgorithmException unavailable) { throw new IllegalStateException(unavailable); }
-            for(int at=0;at<source.png.length;) { WorldProblem.check(cancelled);int count=Math.min(65536,source.png.length-at);digest.update(source.png,at,count);at+=count; }
-            var receipt=new Receipt(source.identity(),HexFormat.of().formatHex(digest.digest()),source.bytes(),image.width(),image.height());WorldProblem.check(cancelled);
+            for(int at=0;at<source.encoded.length;) { WorldProblem.check(cancelled);int count=Math.min(65536,source.encoded.length-at);digest.update(source.encoded,at,count);at+=count; }
+            var receipt=new Receipt(source.identity(),HexFormat.of().formatHex(digest.digest()),source.bytes(),image.width(),image.height(),format.orElseThrow());WorldProblem.check(cancelled);
             return new SourceImage(source.identity(),Optional.of(receipt),Optional.of(image),List.of());
         }catch(ModelFields.Failure failure) { WorldProblem.check(cancelled);return failed(source.identity(),failure.problem.code()==ModelPlan.Code.LIMIT?Code.LIMIT:Code.FORMAT,failure.problem.reason()); }
+        catch(JpegDecoder.Failure failure) { WorldProblem.check(cancelled);return failed(source.identity(),failure.code,failure.getMessage()); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(source.identity(),Code.MEMORY,"Not enough memory to decode the original image; no partial pixels were published"); }
     }
     public Identity identity() { return identity; }

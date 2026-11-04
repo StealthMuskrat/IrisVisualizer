@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its eighty-six main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its eighty-seven main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -236,3 +236,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Background scalar inspection
 
 [NoisePickWorker](SCALAR-PICKING.md) now schedules one active and one latest pending pointer query with bounded full-source admission, cancellation ownership and detached completions. Completed scalar frames submit their exact camera/clip/image identity without scanning faces on the context thread; admitted requests survive independent GPU frame closure. Image UUID and pointer revisions guard adoption. All 127 CPU/OpenGL main sources compile; renderer-stage runtime tests and Windows/native/GPU verification remain deferred, and unsupported previews stay disabled.
+
+## Original JPEG images
+
+[Bounded JPEG decoding](JPEG-IMAGES.md) now extends original-image viewing to common eight-bit grayscale/RGB/YCbCr inputs, including progressive images, through the standard Java codec. Background marker/table/scan and working-memory preflight rejects unsupported or incomplete data before publication; source-format receipts follow pixel inspection, GPU frames and readback. Atlas textures remain PNG-only. All 128 CPU/OpenGL sources compile; renderer-stage runtime tests, Windows/GPU comparison and final editor routing remain deferred. Unsupported previews remain disabled.

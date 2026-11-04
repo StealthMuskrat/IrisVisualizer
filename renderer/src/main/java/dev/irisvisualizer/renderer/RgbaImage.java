@@ -3,7 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-/** Top-left origin, unpremultiplied source samples in RGBA byte order. No color conversion. */
+/** Top-left origin, unpremultiplied RGBA8 supplied by its producer. This container performs no color conversion. */
 public final class RgbaImage {
     private final int width,height;private final byte[] pixels;
     private RgbaImage(int width,int height,byte[] owned) {

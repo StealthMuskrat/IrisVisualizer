@@ -1,0 +1,23 @@
+{
+  "profile": "Java 25 original-image JPEG",
+  "reviewedOn": "2026-11-04",
+  "sourceTag": "jdk-25+36",
+  "scope": "Official OpenJDK source inspection only; not executed runtime or vendor/pixel certification",
+  "sources": [
+    {
+      "name": "JPEGImageReader.java",
+      "url": "https://github.com/openjdk/jdk/blob/jdk-25+36/src/java.desktop/share/classes/com/sun/imageio/plugins/jpeg/JPEGImageReader.java",
+      "sha256": "0e1c0bc94bcc9bd8838f3baecd505091f1a50eb0c23f2ef2397ad6b7def36e4d"
+    },
+    {
+      "name": "jdcoefct.c",
+      "url": "https://github.com/openjdk/jdk/blob/jdk-25+36/src/java.desktop/share/native/libjavajpeg/jdcoefct.c",
+      "sha256": "2b00fa9a0404072298401a86aa9913f9fb809db92dec578eb4461772e2cf1b02"
+    },
+    {
+      "name": "jmemnobs.c",
+      "url": "https://github.com/openjdk/jdk/blob/jdk-25+36/src/java.desktop/share/native/libjavajpeg/jmemnobs.c",
+      "sha256": "cb16512ed2df808bbef1015d9a95928defe5d332e8516b8f13b796ec849a2e53"
+    }
+  ]
+}

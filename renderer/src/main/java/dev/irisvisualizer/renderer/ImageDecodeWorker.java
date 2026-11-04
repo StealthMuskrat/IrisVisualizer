@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** One active PNG decode and one latest pending request; immutable original pixels only. */
+/** One active PNG/JPEG decode and one latest pending request; immutable original pixels only. */
 public final class ImageDecodeWorker implements AutoCloseable {
     public record Request(SourceImage.Encoded source,SourceImage.Limits limits) {
         public Request { Objects.requireNonNull(source);Objects.requireNonNull(limits); }
