@@ -164,3 +164,7 @@ World camera sorting now consumes [prepared translucent face indices and centers
 ## World solid-face ranges
 
 [Prepared world face bounds](WORLD-RANGES.md) now support conservative frustum/clip rejection inside visible opaque/cutout sections. Adjacent visible groups keep one original material draw; frame/readback stats report tested/rejected intersections and skipped faces, with a low-level comparison mode. CPU metadata stays charged to source ownership and never enters GPU geometry storage. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU checks remain deferred and unsupported previews stay disabled.
+
+## Current-source adoption guards
+
+[Source/display failure handling](SOURCE-FAILURES.md) now distinguishes a completed current upload from an old GPU owner retained for cleanup across world, map, scalar and image views. Navigation preserves upstream diagnostics; redraw/frame transfer and world animation require current source adoption. Cleanup charges and caller-held old frames retain their existing lifetimes. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); failure injection, runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.

@@ -65,3 +65,7 @@ On Windows GL, compare source RGBA, uploaded maps and output canvas pixels at na
 ## Captured colorization and terrain relief
 
 `GlMapFrame.Info` now records optional `MapRaster.Style` and Summary as a pair. New rendered frames capture the exact successful raster metadata, including [terrain relief](../renderer/TERRAIN-RELIEF.md), native extrema and eligible-stencil counts. The prior eight-argument receipt constructor leaves this metadata unknown. Kind/grid/style consistency is validated, and readback retains the same frozen receipt rather than current pending options. CPU map lighting changes no shader/texture layout or native sampling; original sample inspection and independent old-frame ownership remain intact. Runtime/GPU/worker validation stays deferred.
+
+## Current source and failure recovery
+
+Map navigation now preserves upstream failure problems/codes/reasons. Redraw, draw and frame transfer require a complete current upload, even if a previous map remains held after cleanup failure. Grid framing during pending work, admission rejection and caller-held frames keep their existing contracts. See [current-source adoption guards](SOURCE-FAILURES.md) for lifecycle and deferred verification. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation remains deferred and unsupported previews stay disabled.

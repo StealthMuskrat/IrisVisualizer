@@ -10,7 +10,7 @@ public final class GlWorldView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlRenderer renderer;private final GlDevice device;private final GlUploadQueue uploads;private final GlFrameQueue frames;private final WorldOrderWorker ordering;private final AtlasFrameWorker animationWorker;
-    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean atlasClockSet,dirty,closed,disposed;
+    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean sourceReady,atlasClockSet,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlWorldView(GlRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlWorldView(GlRenderer renderer,long animationWorkingBytes) {
@@ -30,11 +30,16 @@ public final class GlWorldView implements AutoCloseable {
     /** Display-only atlas clock; no generation, model bake, camera-order invalidation or internal timer. */
     public void clock(long tick,double partialTick) {
         current();if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid world atlas clock");
-        atlasTick=tick;atlasPartialTick=partialTick;atlasClockSet=true;if(animation!=null)animation.clock(tick,partialTick);
+        atlasTick=tick;atlasPartialTick=partialTick;atlasClockSet=true;if(sourceReady&&animation!=null)animation.clock(tick,partialTick);
     }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"World view is closed"); }
     private long nextView() { if(viewRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"View revision counter exhausted");return viewRevision+1; }
     private void state(Phase phase) { status=new Status(worldRevision,viewRevision,phase,status.source(),List.of(),Optional.empty(),""); }
+    /** A retained cleanup owner is not proof that this revision completed upload. */
+    private Status displayStatus(long next) {
+        boolean sourceFailure=!sourceReady&&status.phase()==Phase.FAILED;
+        return new Status(worldRevision,next,sourceReady?Phase.WAITING_VIEW:status.phase(),status.source(),sourceFailure?status.problems():List.of(),sourceFailure?status.code():Optional.empty(),sourceFailure?status.reason():"");
+    }
     private void failed(Throwable error) {
         String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
         var code=error instanceof GlFailure failure?failure.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;
@@ -43,7 +48,8 @@ public final class GlWorldView implements AutoCloseable {
     /** Notify immediately when native input changes, before the replacement CPU scene exists. */
     public boolean invalidate(long nextWorldRevision) {
         current();if(nextWorldRevision<1)throw new IllegalArgumentException("Invalid world revision");if(nextWorldRevision<=worldRevision)return false;long nextView=nextView();
-        worldRevision=nextWorldRevision;viewRevision=nextView;dirty=false;sortRevision=0;status=new Status(worldRevision,viewRevision,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");
+        var waiting=new Status(nextWorldRevision,nextView,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");
+        worldRevision=nextWorldRevision;viewRevision=nextView;sourceReady=false;dirty=false;sortRevision=0;status=waiting;
         try { ordering.invalidate();frames.invalidate(viewRevision);uploads.invalidate(worldRevision);releaseScene();return true; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -78,9 +84,9 @@ public final class GlWorldView implements AutoCloseable {
     public WorldClip clip() { current();return clip; }
     /** Geometric display clipping preserves source meshes and the existing complete transparent order. */
     public long clip(WorldClip clip) {
-        Objects.requireNonNull(clip);current();if(clip.equals(this.clip))return viewRevision;long next=nextView();
-        this.clip=clip;viewRevision=next;dirty=true;
-        try { frames.invalidate(viewRevision);state(scene==null?status.phase():Phase.WAITING_VIEW);return viewRevision; }
+        Objects.requireNonNull(clip);current();if(clip.equals(this.clip))return viewRevision;long next=nextView();var changed=displayStatus(next);
+        this.clip=clip;viewRevision=next;dirty=true;status=changed;
+        try { frames.invalidate(viewRevision);return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Display-only camera/size changes never regenerate or rebake the native world. */
@@ -88,14 +94,14 @@ public final class GlWorldView implements AutoCloseable {
         Objects.requireNonNull(camera);current();
         if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||(long)width*height>device.limits().targetPixels()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize()))throw new GlFailure(GlFailure.Code.LIMIT,"Requested world view exceeds device target bounds");
         camera.matrix((double)width/height);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
-        long next=nextView();boolean poseChanged=this.camera==null||!camera.drawView().equals(this.camera.drawView());this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;
-        try { frames.invalidate(viewRevision);if(poseChanged)resetOrder();state(scene==null?status.phase():Phase.WAITING_VIEW);return viewRevision; }
+        long next=nextView();var changed=displayStatus(next);boolean poseChanged=this.camera==null||!camera.drawView().equals(this.camera.drawView());this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
+        try { frames.invalidate(viewRevision);if(poseChanged)resetOrder();return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Explicit redraw/retry after a view failure; keeps the same complete world and native data. */
     public long redraw() {
-        current();if(camera==null)throw new GlFailure(GlFailure.Code.STATE,"Configure a camera and viewport before redrawing");long next=nextView();viewRevision=next;dirty=true;
-        try { frames.invalidate(viewRevision);if(order==null)resetOrder();state(scene==null?status.phase():Phase.WAITING_VIEW);return viewRevision; }
+        current();if(!sourceReady||scene==null||camera==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current world upload and camera are required to redraw");long next=nextView();var changed=displayStatus(next);viewRevision=next;dirty=true;status=changed;
+        try { frames.invalidate(viewRevision);if(order==null)resetOrder();return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     private void resetOrder() { ordering.invalidate();sortRevision=0;if(order!=null) { order.close();order=null; } }
@@ -107,14 +113,14 @@ public final class GlWorldView implements AutoCloseable {
             if(status.phase()==Phase.UPLOADING) {
                 sceneUploadStepped=true;
                 uploads.advance(budget,worldRevision);var completion=uploads.take(worldRevision);
-                if(completion.isPresent()) { scene=completion.orElseThrow().scene();dirty=true;state(Phase.WAITING_VIEW); }
+                if(completion.isPresent()) { scene=completion.orElseThrow().scene();sourceReady=true;dirty=true;state(Phase.WAITING_VIEW); }
             }
-            if(scene!=null&&animation==null) { animation=new GlWorldAnimation(scene,worldRevision,animationWorker);if(atlasClockSet)animation.clock(atlasTick,atlasPartialTick); }
+            if(sourceReady&&scene!=null&&animation==null) { animation=new GlWorldAnimation(scene,worldRevision,animationWorker);if(atlasClockSet)animation.clock(atlasTick,atlasPartialTick); }
             // Full-scene and animated-atlas upload never each spend the same caller budget in one advance.
-            if(animation!=null&&!sceneUploadStepped&&animation.advance(budget)) {
+            if(sourceReady&&animation!=null&&!sceneUploadStepped&&animation.advance(budget)) {
                 viewRevision=nextView();dirty=true;frames.invalidate(viewRevision);state(Phase.WAITING_VIEW);
             }
-            if(scene==null||camera==null||!dirty)return status;
+            if(!sourceReady||scene==null||camera==null||!dirty)return status;
             if(scene.translucentFaces>0&&order==null) {
                 if(sortRevision==0)sortRevision=ordering.submit(scene.retainCpuScene(),camera.drawView());
                 var completion=ordering.take(sortRevision);
@@ -132,7 +138,7 @@ public final class GlWorldView implements AutoCloseable {
     }
     /** Caller owns the returned image; it survives later world, camera, resize and failed replacement work. */
     public Optional<GlFrame> take(long expectedWorldRevision,long expectedViewRevision) {
-        current();if(expectedWorldRevision!=worldRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY)return Optional.empty();var frame=frames.take(viewRevision);if(frame.isPresent())state(Phase.DELIVERED);return frame;
+        current();if(!sourceReady||expectedWorldRevision!=worldRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY)return Optional.empty();var delivered=new Status(worldRevision,viewRevision,Phase.DELIVERED,status.source(),List.of(),Optional.empty(),"");var frame=frames.take(viewRevision);if(frame.isPresent())status=delivered;return frame;
     }
     private void releaseScene() {
         Throwable failure=null;
@@ -145,7 +151,7 @@ public final class GlWorldView implements AutoCloseable {
     /** The renderer/device and all caller-transferred images remain caller-owned. Retry failed retirement. */
     @Override public void close() {
         if(disposed)return;
-        device.current();closed=true;ordering.close();Throwable failure=null;
+        device.current();closed=true;sourceReady=false;ordering.close();Throwable failure=null;
         try { frames.close(); }catch(RuntimeException|Error error) { failure=error; }
         try { uploads.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         try { releaseScene(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }

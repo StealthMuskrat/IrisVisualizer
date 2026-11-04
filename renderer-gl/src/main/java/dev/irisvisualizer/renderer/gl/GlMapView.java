@@ -10,7 +10,7 @@ public final class GlMapView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlMapRenderer renderer;private final GlDevice device;private final MapRasterWorker worker;private final GlMapQueue uploads;
-    private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean dirty,closed,disposed;
+    private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlMapView(GlMapRenderer renderer) { this(renderer,128L*1024*1024); }
     public GlMapView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new MapRasterWorker(workerBytes,device.memory().orElse(null));uploads=new GlMapQueue(device); }
@@ -22,6 +22,11 @@ public final class GlMapView implements AutoCloseable {
     private long nextMap() { if(mapRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"Map revision counter exhausted");return mapRevision+1; }
     private long nextView() { if(viewRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"Map view revision counter exhausted");return viewRevision+1; }
     private void state(Phase phase) { status=new Status(mapRevision,viewRevision,phase,status.context(),List.of(),Optional.empty(),""); }
+    /** Preserve upstream diagnostics even when a prior map owner remains for cleanup. */
+    private Status displayStatus(long next) {
+        boolean sourceFailure=!sourceReady&&status.phase()==Phase.FAILED;
+        return new Status(mapRevision,next,sourceReady?Phase.WAITING_VIEW:status.phase(),status.context(),sourceFailure?status.problems():List.of(),sourceFailure?status.code():Optional.empty(),sourceFailure?status.reason():"");
+    }
     private void failed(Throwable error) {
         String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
         status=new Status(mapRevision,viewRevision,Phase.FAILED,status.context(),List.of(),Optional.of(error instanceof GlFailure gpu?gpu.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE),reason);
@@ -29,13 +34,13 @@ public final class GlMapView implements AutoCloseable {
     /** Invalidate immediately when native/resource inputs change, before replacement samples arrive. */
     public long invalidate() {
         current();long next=nextMap(),nextView=nextView();var waiting=new Status(next,nextView,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");
-        worker.invalidate();mapRevision=next;viewRevision=nextView;cpuRevision=0;dirty=false;status=waiting;
+        worker.invalidate();mapRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;status=waiting;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Worker admission occurs first; a budget rejection leaves the current view, tokens and work intact. */
     public long submit(MapRasterWorker.Request request) {
         Objects.requireNonNull(request);current();long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;dirty=false;status=queued;grid=request.samples().grid();
+        long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;status=queued;grid=request.samples().grid();
         if(view!=null&&(view.width()!=grid.width()||view.height()!=grid.height()))view=null;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -55,7 +60,7 @@ public final class GlMapView implements AutoCloseable {
     /** Display-only framing; the source grid, sampling scale and native values are never changed. */
     public long view(MapView view,int width,int height) {
         Objects.requireNonNull(view);current();dimensions(width,height);if(grid==null||view.width()!=grid.width()||view.height()!=grid.height())throw new GlFailure(GlFailure.Code.STALE,"Map view dimensions must match the latest submitted native grid");
-        if(view.equals(this.view)&&width==this.width&&height==this.height)return viewRevision;long next=nextView();var changed=new Status(mapRevision,next,map==null?status.phase():Phase.WAITING_VIEW,status.context(),List.of(),Optional.empty(),"");
+        if(view.equals(this.view)&&width==this.width&&height==this.height)return viewRevision;long next=nextView();var changed=displayStatus(next);
         this.view=view;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
         try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -64,7 +69,7 @@ public final class GlMapView implements AutoCloseable {
     public long zoomAt(double factor,double x,double y) { current();if(view==null)throw new GlFailure(GlFailure.Code.STATE,"Configure a map viewport before zooming");return view(view.zoomAt(factor,x,y),width,height); }
     /** Retry drawing the existing complete map after a display failure. CPU/upload failures require resubmission. */
     public long redraw() {
-        current();if(map==null||view==null)throw new GlFailure(GlFailure.Code.STATE,"A complete map and configured viewport are required to redraw");long next=nextView();var waiting=new Status(mapRevision,next,Phase.WAITING_VIEW,status.context(),List.of(),Optional.empty(),"");viewRevision=next;dirty=true;status=waiting;
+        current();if(!sourceReady||map==null||view==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current map upload and configured viewport are required to redraw");long next=nextView();var waiting=displayStatus(next);viewRevision=next;dirty=true;status=waiting;
         try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Colorization is off-thread; upload is bounded and one complete frame draw is synchronous. */
@@ -80,8 +85,8 @@ public final class GlMapView implements AutoCloseable {
                     if(cpu.phase()==MapRasterWorker.Phase.FAILED)status=new Status(mapRevision,viewRevision,Phase.FAILED,status.context(),cpu.problems(),Optional.empty(),"Map colorization failed");return status;
                 }
             }
-            if(status.phase()==Phase.UPLOADING) { uploads.advance(budget,mapRevision);var result=uploads.take(mapRevision);if(result.isPresent()) { map=result.orElseThrow().map();dirty=true;state(Phase.WAITING_VIEW); } }
-            if(map==null||view==null||!dirty)return status;
+            if(status.phase()==Phase.UPLOADING) { uploads.advance(budget,mapRevision);var result=uploads.take(mapRevision);if(result.isPresent()) { map=result.orElseThrow().map();sourceReady=true;dirty=true;state(Phase.WAITING_VIEW); } }
+            if(!sourceReady||map==null||view==null||!dirty)return status;
             if(completed!=null)throw new GlFailure(GlFailure.Code.STATE,"An untaken map frame survived view invalidation");
             var frame=GlMapFrame.render(renderer,viewRevision,map,view,width,height,()->false);
             try { var ready=new Status(mapRevision,viewRevision,Phase.FRAME_READY,status.context(),List.of(),Optional.empty(),"");completed=frame;dirty=false;status=ready; }
@@ -90,7 +95,7 @@ public final class GlMapView implements AutoCloseable {
         }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     public Optional<GlMapFrame> take(long expectedMapRevision,long expectedViewRevision) {
-        current();if(expectedMapRevision!=mapRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY||completed==null||completed.info().revision()!=viewRevision)return Optional.empty();var result=Optional.of(completed);var delivered=new Status(mapRevision,viewRevision,Phase.DELIVERED,status.context(),List.of(),Optional.empty(),"");completed=null;status=delivered;return result;
+        current();if(!sourceReady||expectedMapRevision!=mapRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY||completed==null||completed.info().revision()!=viewRevision)return Optional.empty();var result=Optional.of(completed);var delivered=new Status(mapRevision,viewRevision,Phase.DELIVERED,status.context(),List.of(),Optional.empty(),"");completed=null;status=delivered;return result;
     }
     private void releaseFrame() { if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.closed())completed=null;throw error; } }
     private void releaseDisplay() {
@@ -100,7 +105,7 @@ public final class GlMapView implements AutoCloseable {
     }
     /** Leaves the borrowed renderer/device and caller-transferred frames owned by their callers. */
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;worker.close();Throwable failure=null;
+        if(disposed)return;device.current();closed=true;sourceReady=false;worker.close();Throwable failure=null;
         try { uploads.close(); }catch(RuntimeException|Error error) { failure=error; }
         try { releaseDisplay(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         status=new Status(mapRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");disposed=failure==null;
