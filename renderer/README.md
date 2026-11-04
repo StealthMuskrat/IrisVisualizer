@@ -139,7 +139,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its fourteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 116 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its fifteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 117 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
@@ -198,3 +198,7 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 ## Streamed final lighting
 
 `WorldLighting.read` now captures scoped final RGB components directly, and `readOwned` optionally charges the exact scene plus final arrays through shared ownership. The [material-lighting path](../renderer-gl/MATERIAL-LIGHTING.md) adds the explicit native resolver bridge, owned GPU handoff, unchanged-stride simple shade/emission flags and detached frame policy receipts. No native lighting factory is inferred; real native/GPU validation remains pending.
+
+## Selected-client vanilla tint resources
+
+`ClientColormaps` now decodes grass, foliage and dry-foliage PNGs into immutable, version-bound ARGB tables with bounded scratch and optional shared ownership. The native bridge adds radius-zero world-model tint sources and connects them through complete deterministic/weighted capture. Native global tables remain untouched; unknown model tint layers, neighboring-biome blending and fluid rendering remain guarded or unfinished. See [VANILLA-TINTS.md](VANILLA-TINTS.md) for supported blocks, admission and validation boundaries.

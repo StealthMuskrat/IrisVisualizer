@@ -8,7 +8,11 @@
   "files": [
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
-      "sha256": "03110ca052b1aa1d2f40ddf25bbdca02b18283d41406ed4adaf2640ec0fcedb4"
+      "sha256": "2ac2ec92df65129fb60025981df7d2f6c0852219bd23715cbeae42b896219e7d"
+    },
+    {
+      "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeColormapTints.java",
+      "sha256": "4d95a63292a881fb58312efdfb193764f2eef496c348dd84eb5abeef1c6b6b31"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",

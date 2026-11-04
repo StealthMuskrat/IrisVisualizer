@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These fourteen native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These fifteen native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -119,3 +119,7 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 ## Streamed final lighting
 
 `NativeLightingInputs` now streams explicit native per-vertex final RGB into owned `WorldLighting` output. Shared scene/sample admission precedes native callbacks; original state/biome/position, asset receipt, full height and healthy-session gates are validated, and no native/provider graph escapes. `GlUpload.beginLit` and `GlWorldView.submitLit` keep that source charged through destination admission. See [MATERIAL-LIGHTING.md](../renderer-gl/MATERIAL-LIGHTING.md). No default light/AO factory, propagation or biome blending policy is implemented or verified. Genuine pinned Windows compilation and actual native/pixel comparisons remain pending.
+
+## Selected vanilla colormap tint sources
+
+`NativeColormapTints.capture` now derives radius-zero world-model tints from version-matched `ClientColormaps`, actual native biome climate/effects/modifiers and native redstone/state properties. `NativeCapture.WorldOptions.vanillaUnblended(maps)` connects it to deterministic and weighted capture with source/copy/palette admission. It does not install global color tables or load selected archive classes. Particle-only water sources, fluid geometry, neighboring-biome blending and actual Windows native/GPU validation remain pending. See [VANILLA-TINTS.md](../renderer/VANILLA-TINTS.md).

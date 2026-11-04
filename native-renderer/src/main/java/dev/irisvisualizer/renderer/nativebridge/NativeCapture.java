@@ -18,9 +18,15 @@ public final class NativeCapture {
         public static final WorldLimits DEFAULT=new WorldLimits(NativeWorldCapture.Limits.DEFAULT,NativeWeightedInputs.Limits.DEFAULT);
         public WorldLimits { Objects.requireNonNull(volume);Objects.requireNonNull(visuals); }
     }
-    public record WorldOptions(Optional<NativeTintInputs.Provider> tint,WorldTintInput.Limits tintLimits) {
+    public record WorldOptions(Optional<NativeTintInputs.Provider> tint,WorldTintInput.Limits tintLimits,Optional<ClientColormaps> colormaps) {
         public static final WorldOptions NONE=new WorldOptions(Optional.empty(),WorldTintInput.Limits.DEFAULT);
-        public WorldOptions { Objects.requireNonNull(tint);Objects.requireNonNull(tintLimits); }
+        public WorldOptions(Optional<NativeTintInputs.Provider> tint,WorldTintInput.Limits tintLimits) { this(tint,tintLimits,Optional.empty()); }
+        public WorldOptions {
+            Objects.requireNonNull(tint);Objects.requireNonNull(tintLimits);Objects.requireNonNull(colormaps);
+            if(tint.isPresent()&&colormaps.isPresent()||colormaps.isPresent()&&colormaps.orElseThrow().requiresPlaceholder())throw new IllegalArgumentException("Choose one successful explicit or vanilla colormap tint source");
+        }
+        /** Explicit radius-zero profile; does not claim neighboring-biome blending. */
+        public static WorldOptions vanillaUnblended(ClientColormaps maps) { return new WorldOptions(Optional.empty(),WorldTintInput.Limits.DEFAULT,Optional.of(maps)); }
     }
     /** Successful input owns only detached data and admission; no engine, reader, RNG or provider escapes. */
     public record Result<T>(Kind kind,WorldSnapshot.Source source,Optional<RenderInput<T>> input,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) implements AutoCloseable {
@@ -64,16 +70,25 @@ public final class NativeCapture {
         },cancelled);
     }
     private static WorldTintInput tint(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOptions options,long working,BooleanSupplier cancelled) {
-        if(options.tint().isEmpty())return WorldTintInput.none(snapshot);
+        if(options.tint().isEmpty()&&options.colormaps().isEmpty())return WorldTintInput.none(snapshot);
         var t=options.tintLimits();var limits=new WorldTintInput.Limits(t.tables(),t.layers(),t.payloadBytes(),Math.min(working,t.workingBytes()));
-        var result=NativeTintInputs.capture(context,assets,snapshot,options.tint().orElseThrow(),limits,cancelled);
+        var result=options.colormaps().isPresent()?NativeColormapTints.capture(context,assets,snapshot,options.colormaps().orElseThrow(),limits,cancelled):NativeTintInputs.capture(context,assets,snapshot,options.tint().orElseThrow(),limits,cancelled);
         if(result.requiresPlaceholder())throw new WorldCapture.ReadFailure(result.problems().getFirst());return result.input().orElseThrow();
     }
     private static void clock(long tick,double partialTick) { if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid native capture animation clock"); }
     private static void client(ClientAssetSnapshot assets) {
         if(!assets.receipt().version().equals(BlockModels.PROFILE)||!assets.receipt().expectedVersion().equals(BlockModels.PROFILE))throw NativeIdentities.failure(WorldProblem.Code.VERSION,"Native capture requires the selected pinned client profile");
     }
-    private static long worldPeak(ClientAssetSnapshot assets,WorldLimits limits) { return Math.max(assets.receipt().capturedAssetBytes()+limits.volume().capture().workingBytes(),limits.visuals().scene().workingBytes()); }
+    private static void client(ClientAssetSnapshot assets,WorldOptions options) {
+        client(assets);if(options.colormaps().isPresent()&&!options.colormaps().orElseThrow().matchesAssets(assets.receipt()))throw NativeIdentities.failure(WorldProblem.Code.VERSION,"Vanilla tint colormaps belong to another client archive");
+    }
+    private static long colorBytes(WorldOptions options) { return options.colormaps().map(ClientColormaps::bytes).orElse(0L); }
+    private static long worldPeak(ClientAssetSnapshot assets,WorldLimits limits,WorldOptions options) { return Math.max(assets.receipt().capturedAssetBytes()+limits.volume().capture().workingBytes()+colorBytes(options),limits.visuals().scene().workingBytes()); }
+    /** Borrowed source tables remain live through scene capture and consume its existing ceiling. */
+    private static NativeSceneInputs.Limits sceneLimits(NativeSceneInputs.Limits source,WorldOptions options) {
+        long working=source.workingBytes()-colorBytes(options);if(working<0)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Colormap tables exceed native scene working allowance");
+        return new NativeSceneInputs.Limits(source.models(),source.visibility(),source.offsets(),source.scene(),source.section(),working);
+    }
     private static void catalogOwner(RenderInput<ClientAssetSnapshot> assets,RenderMemory memory) {
         if(assets.admission().tracked()&&(memory==null||!assets.admission().belongsTo(memory)))throw new IllegalArgumentException("Native capture requires the loaded catalog's shared coordinator");
     }
@@ -92,20 +107,21 @@ public final class NativeCapture {
     /** Unit-weight inspection remains deferred to WorldRenderWorker; missing native producers stay guarded. */
     public static Result<WorldRenderWorker.ModelRequest> models(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(limits);Objects.requireNonNull(options);clock(tick,partialTick);
-        return capture(Kind.MODELS,context,memory,worldPeak(assets,limits),()->{
-            client(assets);var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
+        return capture(Kind.MODELS,context,memory,worldPeak(assets,limits,options),()->{
+            client(assets,options);var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
             var snapshot=volume.snapshot().orElseThrow();var scene=limits.visuals().scene();var colors=tint(context,assets,snapshot,options,scene.workingBytes(),cancelled);
-            var result=NativeSceneInputs.capture(context,assets,snapshot,tick,partialTick,scene,colors,cancelled);
+            var result=NativeSceneInputs.capture(context,assets,snapshot,tick,partialTick,sceneLimits(scene,options),colors,cancelled);
             return result.requiresPlaceholder()?failure(result.problems(),List.of()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
         },cancelled);
     }
     /** The native renderer-matching RNG remains explicitly supplied and exclusively owned by the caller. */
     public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(random);Objects.requireNonNull(limits);Objects.requireNonNull(options);clock(tick,partialTick);
-        return capture(Kind.WEIGHTED,context,memory,worldPeak(assets,limits),()->{
-            client(assets);var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
+        return capture(Kind.WEIGHTED,context,memory,worldPeak(assets,limits,options),()->{
+            client(assets,options);var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
             var snapshot=volume.snapshot().orElseThrow();var colors=tint(context,assets,snapshot,options,limits.visuals().scene().workingBytes(),cancelled);
-            var result=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,limits.visuals(),colors,cancelled);
+            var original=limits.visuals();var bounded=new NativeWeightedInputs.Limits(sceneLimits(original.scene(),options),original.parts(),original.alternatives(),original.selectionVisits(),original.weightUnits(),original.nativeQueries());
+            var result=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,bounded,colors,cancelled);
             return result.requiresPlaceholder()?failure(result.problems(),result.assetProblems()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
         },cancelled);
     }

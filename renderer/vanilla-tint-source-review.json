@@ -1,0 +1,33 @@
+{
+  "profile": "26.3",
+  "reviewedOn": "2026-11-03",
+  "officialPatch": "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/color/block/BlockColors.java.patch",
+  "mirrorProvenance": "Unofficial decompiled method bodies; not authentication of the selected archive or native API execution",
+  "mirrors": [
+    {
+      "class": "BlockColors",
+      "url": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/color/block/blockcolors/",
+      "reviewedRepresentation": ".txt",
+      "sha256": "667b2e7c8e5f86e4331452f9722ca059eb8c266e7be65e8e9615ae0edd3181d3"
+    },
+    {
+      "class": "BlockTintSources",
+      "url": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/color/block/blocktintsources/",
+      "reviewedRepresentation": ".html",
+      "sha256": "50ce2ee27f31fe424f48902d0095abc82d883b599e3a68ffe25977470036eec6"
+    },
+    {
+      "class": "ColorMapColorUtil",
+      "url": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/level/colormapcolorutil/",
+      "reviewedRepresentation": ".txt",
+      "sha256": "71e3ebf857ef70cb30f50be4683ff32d4c1ed5c438f7f05e950841bc330f39e6"
+    },
+    {
+      "class": "Biome",
+      "url": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/level/biome/biome/",
+      "reviewedRepresentation": "web source body for native climate codec and effects accessors"
+    }
+  ],
+  "nativeValidation": "genuine Windows classpath compilation and execution pending",
+  "testsExecuted": false
+}
