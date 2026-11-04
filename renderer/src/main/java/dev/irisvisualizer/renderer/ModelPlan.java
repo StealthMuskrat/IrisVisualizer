@@ -27,10 +27,15 @@ public record ModelPlan(ClientAssetSnapshot.Receipt assets,RenderBlockState stat
     public record Rotation(Vec3 origin,float x,float y,float z,boolean rescale) {
         public Rotation { Objects.requireNonNull(origin);if(!Float.isFinite(x)||!Float.isFinite(y)||!Float.isFinite(z))throw new IllegalArgumentException("Nonfinite element rotation"); }
     }
-    /** Native visual base RGB is separate from any original block-model tint index. */
-    public record Material(AssetId sprite,boolean forceTranslucent,int colorRgb) {
-        public Material(AssetId sprite,boolean forceTranslucent) { this(sprite,forceTranslucent,0xffffff); }
-        public Material { Objects.requireNonNull(sprite);if((colorRgb&0xff000000)!=0)throw new IllegalArgumentException("Material color must be RGB24"); }
+    /** Native RGB is independent of model tint. Nonempty alphaSprites select whole-source group alpha. */
+    public record Material(AssetId sprite,boolean forceTranslucent,int colorRgb,List<AssetId> alphaSprites) {
+        public Material(AssetId sprite,boolean forceTranslucent) { this(sprite,forceTranslucent,0xffffff,List.of()); }
+        public Material(AssetId sprite,boolean forceTranslucent,int colorRgb) { this(sprite,forceTranslucent,colorRgb,List.of()); }
+        public Material {
+            Objects.requireNonNull(sprite);Objects.requireNonNull(alphaSprites);if((colorRgb&0xff000000)!=0)throw new IllegalArgumentException("Material color must be RGB24");
+            if(alphaSprites.size()>16)throw new IllegalArgumentException("Material alpha dependencies exceed their bound");alphaSprites=List.copyOf(alphaSprites);
+            if(!alphaSprites.isEmpty()&&(!alphaSprites.contains(sprite)||new HashSet<>(alphaSprites).size()!=alphaSprites.size()))throw new IllegalArgumentException("Material alpha group must contain its sprite and no duplicates");
+        }
         public int multiplyRgb(int tint) {
             if((tint&0xff000000)!=0)throw new IllegalArgumentException("Tint must be RGB24");if(colorRgb==0xffffff)return tint;if(tint==0xffffff)return colorRgb;
             int r=(((colorRgb>>>16)*(tint>>>16)+127)/255),g=((((colorRgb>>>8)&255)*((tint>>>8)&255)+127)/255),b=(((colorRgb&255)*(tint&255)+127)/255);

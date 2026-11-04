@@ -1,0 +1,31 @@
+# Fluid material alpha groups
+
+Renderer implementation, 2026-11-04. All 119 CPU/OpenGL main sources compile with Java 25 and LWJGL 3.4.1. Sixteen native adapter sources pass syntax parsing only; genuine pinned Windows dependency compilation remains pending. Renderer runtime tests and GitHub workflows remain deferred until implementation is complete. Unsupported previews remain disabled.
+
+## Source scope and pass selection
+
+The reviewed vanilla 26.3 `FluidModel` combines whole-source transparency from still, flowing and optional overlay materials before selecting one chunk layer. `SpriteContents` computes that transparency from the complete original decoded image. `NativeImage` distinguishes zero alpha from alpha between zero and 255; `ChunkSectionLayer` selects translucent when any partial alpha exists, otherwise cutout when any zero alpha exists, otherwise solid. See [source receipts](fluid-source-review.json). The official pinned NeoForge patch corroborates the fluid material union; complete method bodies were inspected through an unofficial source mirror. This is source evidence, not authentication of the selected client archive or proof of native pixel parity. No source bodies or texture assets are bundled.
+
+`FluidGeometry.Kind.WATER` now declares still, flowing and overlay texture IDs as one immutable alpha group. Lava declares still and flowing. Every emitted face, including reverse faces, carries its kind's group even when its UV region samples only one sprite. A partial-alpha pixel outside that region, in another member or in an unused sheet tile therefore selects translucent for every face of that kind in this exact asset preparation. Fully hidden fluid output needs no group because it emits no fluid faces.
+
+`ModelPlan.Material.alphaSprites` is an explicit CPU material contract. An empty list preserves the existing mapped-region analysis used by ordinary JSON models. A nonempty list must contain the material's own sprite, contain no duplicates and contain at most 16 IDs; construction makes an immutable copy. Existing two/three-argument constructors select the empty policy. Resource JSON cannot declare groups. Native geometry intake requires each dependency to be a captured vanilla texture in the selected archive. The per-face force-translucent flag remains an override; it is not a flag inherited from other materials.
+
+## Preparation and diagnostics
+
+Both standalone and shared texture preparation enumerate every alpha dependency before decoding and admission. A missing or malformed member makes the complete visual a placeholder, including any composed JSON base. There is no fallback that publishes only a successful fluid face or base layer. The complete dependency bank survives into atlas planning, so retained images, schedules and padded atlas space are accounted even for a member not directly sampled by an emitted face.
+
+Within one preparation/catalog, each unique member's whole decoded PNG is scanned once, and immutable ID-list groups share their union summary. Complete sheets include tiles omitted by animation schedules. Group classification does not change with playback. It follows raw source alpha: binary source masks remain cutout even when interpolation can produce partial displayed alpha. Ordinary mapped-region materials retain their conservative interpolation flag and existing classification behavior.
+
+`TexturePreparation.Face.alpha` still reports the mapped-region scan, including interpolation uncertainty. The optional `materialAlpha` separately records the whole-source group used for classification. Constructor checks require that optional receipt to agree with the declared scope, include every mapped raw alpha category and produce the published class. Interpolation uncertainty is intentionally independent of the native whole-source policy. Original face order, UVs, pixels, RGB, tint indices, provenance and placement remain unchanged.
+
+The existing atlas binding propagates the resulting class into section ranges, translucent ordering, draw passes and displayed-alpha picking. Animation reuses that fixed class and the original source geometry. No GPU vertex field, shader or primitive buffer is added; the existing 36/48-byte block vertex layouts remain unchanged.
+
+## Bounds and ownership
+
+Group members count against ordinary per-mesh sprite admission (256 by default), shared sprite admission (4,096), encoded bytes, decoded RGBA, metadata, schedule, atlas, scene and GPU budgets. Whole-sheet scans and mapped scans use distinct cache keys but share the existing 8,192 scan limit and 64 Mi pixel-visit limit. A sheet visit costs width times height, charged before scanning, with cancellation checked per row and periodically within rows. Cached scans are not charged twice. Per-mesh usage includes each unique group sheet plus its unique mapped regions; shared usage records actual cached work once across meshes.
+
+Group-summary metadata has a separate bound of at most the configured scan limit, with at most 16 IDs per key. Existing encoded/RGBA ceilings remain 32/128 MiB. No resource ceiling is raised, and no cross-archive cache or additional decoded pixel copy is introduced. Collection/object overhead and total application admission retain the existing host responsibilities. Failures and cancellation publish no incomplete texture result.
+
+## Deferred stage validation
+
+At renderer completion, compare still/flow/overlay groups with different alpha categories; narrow UV regions with partial alpha outside them; unused animated tiles; opaque, binary and partial sheets; binary-mask interpolation; static and forced-translucent materials; and ordinary JSON materials retaining mapped behavior. Verify standalone/shared agreement, duplicate-group caching, immutable input copies, dependency presence, missing/malformed member failure, composed-base failure, archive replacement and cancellation during sheet scans. Exercise sprite, region, group, pixel, byte, atlas and shared working ceilings, including repeated groups across meshes. Compare real native material layers and animated pixels, section ranges, global translucent ordering and displayed-alpha picking on the pinned Windows/driver path. Genuine native API compilation, full renderer testing and integration remain pending.

@@ -49,6 +49,7 @@ public final class NativeGeometry {
         for(int at=0;at<count;at++) {
             AtlasBuilder.check(cancelled);var value=Objects.requireNonNull(reader.quad(at));String pointer="/native/quads/"+at;
             require(value.material().sprite().namespace().equals("minecraft")&&assets.find(ClientAssetSnapshot.Kind.TEXTURE,value.material().sprite()).isPresent(),state,pointer,ModelPlan.Code.MISSING_ASSET,"Native visual sprite must be present in the selected vanilla client archive");
+            for(var dependency:value.material().alphaSprites())require(dependency.namespace().equals("minecraft")&&assets.find(ClientAssetSnapshot.Kind.TEXTURE,dependency).isPresent(),state,pointer,ModelPlan.Code.MISSING_ASSET,"Native material alpha dependency must be present in the selected vanilla client archive");
             validate(state,pointer,value.vertices(),value.normal(),limits,bounds,cancelled);
             output.add(new BlockMesh.Quad(new ModelPlan.Source(ClientAssetSnapshot.Kind.BLOCKSTATE,state.block(),pointer),-1,value.face(),value.cullface(),value.normal(),value.material(),value.tintIndex(),value.lightEmission(),value.ambientOcclusion(),value.shadeDirectionOverride(),value.vertices(),provenance,value.placement()));
         }

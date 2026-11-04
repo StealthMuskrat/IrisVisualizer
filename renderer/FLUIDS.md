@@ -1,6 +1,6 @@
 # Vanilla fluid surfaces and waterlogged model composition
 
-Renderer implementation, 2026-11-03. All 119 CPU/OpenGL main Java sources compile with Java 25 and LWJGL 3.4.1. Sixteen native adapters pass syntax parsing only; genuine pinned Windows native API compilation remains pending. No renderer tests, native sampling, GL contexts, pixel comparisons or workflows ran. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-04. All 119 CPU/OpenGL main Java sources compile with Java 25 and LWJGL 3.4.1. Sixteen native adapters pass syntax parsing only; genuine pinned Windows native API compilation remains pending. No renderer tests, native sampling, GL contexts, pixel comparisons or workflows ran. Unsupported previews remain disabled.
 
 ## Capture and ownership
 
@@ -38,9 +38,9 @@ The same fluid recipe and selected base can remain shared across cells with diff
 
 Shared prototypes require the exact original state index and complete cell recipe within the same source snapshot. Geometry intake retains native provenance and validates every vertex, UV, normal, winding and packet bound. Quad objects are created lazily after count admission. Fully hidden pure-fluid cells become explicit empty choices without requiring sprite assets. A fully hidden fluid layer on a verified model retains the entire selected base. Visible fluids require all sprites of their kind in the selected client archive: water still/flow/overlay or lava still/flow. Missing assets remain reported placeholders.
 
-The new material RGB defaults to white for existing block models. GPU upload multiplies it with an existing block tint if present, using bounded RGB24 channel arithmetic. Fluid faces carry the actual radius-zero native water RGB as material color and tint index -1; lava uses white. No artificial block-model tint layer is reserved. Existing 36/48-byte GPU vertex layouts, alpha candidates, atlas animation and picking retain their existing paths.
+The new material RGB defaults to white for existing block models. GPU upload multiplies it with an existing block tint if present, using bounded RGB24 channel arithmetic. Fluid faces carry the actual radius-zero native water RGB as material color and tint index -1; lava uses white. No artificial block-model tint layer is reserved. Existing 36/48-byte GPU vertex layouts, atlas animation and picking retain their existing paths. [Fluid material groups](FLUID-MATERIALS.md) now select one alpha class from the complete still/flow/overlay source sheets, shared across every emitted face of the fluid kind.
 
-Simple display lighting uses geometric normals, cardinal shade overrides and the captured emission floor. Explicit final scene RGB remains authoritative through the existing lighting path. Native lightmap/AO, native fluid pass selection across all sprites, UV filtering/shrink behavior and exact pixel parity are not established by source review. Neighbor-biome color blending is not implemented; the policy explicitly records radius zero.
+Simple display lighting uses geometric normals, cardinal shade overrides and the captured emission floor. Explicit final scene RGB remains authoritative through the existing lighting path. Whole-source fluid material union and pass selection are implemented from reviewed source; native execution and pixel comparison remain pending. Native lightmap/AO, UV filtering/shrink behavior and exact pixel parity are not established by source review. Neighbor-biome color blending is not implemented; the policy explicitly records radius zero.
 
 ## Bounds and validation
 

@@ -11,11 +11,13 @@ public final class TexturePreparation {
     }
     public record Alpha(boolean transparent,boolean partial,boolean opaque,boolean interpolationMayBlendAlpha) {
         public Alpha { if(!transparent&&!partial&&!opaque||interpolationMayBlendAlpha&&(!transparent||!opaque))throw new IllegalArgumentException("Invalid nonempty-region alpha summary"); }
+        public Alpha or(Alpha other) { Objects.requireNonNull(other);return new Alpha(transparent||other.transparent,partial||other.partial,opaque||other.opaque,interpolationMayBlendAlpha||other.interpolationMayBlendAlpha); }
         public AlphaClass classification(boolean forceTranslucent) { return forceTranslucent||partial||interpolationMayBlendAlpha?AlphaClass.TRANSLUCENT:transparent?AlphaClass.CUTOUT:AlphaClass.OPAQUE; }
     }
-    /** Index is shared with BlockMesh.quads and MeshPacket.faces; no face reordering occurs. */
-    public record Face(int index,ModelPlan.Source source,ModelPlan.Material material,Region region,Alpha alpha,AlphaClass classification) {
-        public Face { if(index<0)throw new IllegalArgumentException("Invalid texture face index");Objects.requireNonNull(source);Objects.requireNonNull(material);Objects.requireNonNull(region);Objects.requireNonNull(alpha);Objects.requireNonNull(classification);if(classification!=alpha.classification(material.forceTranslucent()))throw new IllegalArgumentException("Inconsistent face alpha classification"); }
+    /** Original face order; alpha describes mapped pixels, materialAlpha an optional whole-source group. */
+    public record Face(int index,ModelPlan.Source source,ModelPlan.Material material,Region region,Alpha alpha,AlphaClass classification,Optional<Alpha> materialAlpha) {
+        public Face(int index,ModelPlan.Source source,ModelPlan.Material material,Region region,Alpha alpha,AlphaClass classification) { this(index,source,material,region,alpha,classification,Optional.empty()); }
+        public Face { if(index<0)throw new IllegalArgumentException("Invalid texture face index");Objects.requireNonNull(source);Objects.requireNonNull(material);Objects.requireNonNull(region);Objects.requireNonNull(alpha);Objects.requireNonNull(classification);Objects.requireNonNull(materialAlpha);if(material.alphaSprites().isEmpty()==materialAlpha.isPresent())throw new IllegalArgumentException("Material alpha scope differs from its declared dependencies");var resolved=materialAlpha.orElse(alpha);if(materialAlpha.isPresent()&&(alpha.transparent()&&!resolved.transparent()||alpha.partial()&&!resolved.partial()||alpha.opaque()&&!resolved.opaque()))throw new IllegalArgumentException("Material alpha summary excludes mapped source pixels");if(classification!=resolved.classification(material.forceTranslucent()))throw new IllegalArgumentException("Inconsistent face alpha classification"); }
     }
     public record Usage(int sprites,long encodedBytes,long rgbaBytes,int metadataBytes,int metadataNodes,int frames,int regions,long alphaPixelVisits) {
         public Usage { if(sprites<0||encodedBytes<0||rgbaBytes<0||metadataBytes<0||metadataNodes<0||frames<0||regions<0||alphaPixelVisits<0||metadataBytes>encodedBytes)throw new IllegalArgumentException("Invalid texture resource usage"); }

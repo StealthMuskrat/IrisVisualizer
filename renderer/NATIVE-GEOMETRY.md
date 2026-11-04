@@ -1,6 +1,6 @@
 # Native visual quads and ordered composition
 
-Renderer implementation, 2026-11-03. All 118 main Java sources compile with Java 25 and pinned LWJGL 3.4.1: 82 CPU and 36 OpenGL. Sixteen native adapters pass syntax parsing only; genuine pinned Windows compilation remains pending. No native geometry, texture/atlas/world/picking, GPU pixel, allocation, cancellation or interactive Windows tests have run. Tests remain deferred until renderer implementation is complete; unsupported previews remain disabled.
+Renderer implementation, 2026-11-04. All 119 main Java sources compile with Java 25 and pinned LWJGL 3.4.1: 83 CPU and 36 OpenGL. Sixteen native adapters pass syntax parsing only; genuine pinned Windows compilation remains pending. No native geometry, texture/atlas/world/picking, GPU pixel, allocation, cancellation or interactive Windows tests have run. Tests remain deferred until renderer implementation is complete; unsupported previews remain disabled.
 
 ## A visual input path beyond JSON elements
 
@@ -12,7 +12,9 @@ Each quad has four block-local vertices in **blocks**, sprite-local UV in `[0,1]
 
 The producer must provide sprite-local UVs from its known native sprite mapping. The renderer does not rescale a face's observed UV range or guess a native atlas rectangle. Per-vertex normals/alpha, triangle-only layouts and geometry needing another triangulation are not represented by this interface; a producer must report those unsupported requirements instead of dropping attributes. A double-sided visual must include its supplied back-facing quads explicitly. Unsupported local coordinates, UVs, normals or winding yield a whole visual placeholder rather than reordered faces or approximated geometry.
 
-Every referenced sprite must exist in the version-matched user-selected vanilla client archive. The existing decoder then checks PNG/metadata, alpha and animation limits. No asset/runtime is downloaded, no generated texture is invented, and no missing sprite is replaced. Unsupported dynamic textures still produce visual problems while preserving native IDs/states.
+Materials may additionally declare bounded [whole-source alpha dependencies](FLUID-MATERIALS.md), preserving their own sprite UVs and mapped alpha diagnostic. Intake validates every dependency; later preparation admits/decodes them together and publishes their shared alpha class. Existing constructors retain mapped-face behavior.
+
+Every referenced sprite and alpha dependency must exist in the version-matched user-selected vanilla client archive. The existing decoder then checks PNG/metadata, alpha and animation limits. No asset/runtime is downloaded, no generated texture is invented, and no missing sprite is replaced. Unsupported dynamic textures still produce visual problems while preserving native IDs/states.
 
 ## Exact capture and position provenance
 

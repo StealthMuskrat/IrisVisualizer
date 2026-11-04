@@ -8,9 +8,9 @@ public final class FluidGeometry {
     private FluidGeometry() {}
     public enum Kind {
         WATER("water_still","water_flow","water_overlay"),LAVA("lava_still","lava_flow",null);
-        private final AssetId still,flow;private final Optional<AssetId> overlay;
-        Kind(String still,String flow,String overlay) { this.still=AssetId.minecraft("block/"+still);this.flow=AssetId.minecraft("block/"+flow);this.overlay=Optional.ofNullable(overlay).map(value->AssetId.minecraft("block/"+value)); }
-        public AssetId still() { return still; }public AssetId flow() { return flow; }public Optional<AssetId> overlay() { return overlay; }
+        private final AssetId still,flow;private final Optional<AssetId> overlay;private final List<AssetId> alphaSprites;
+        Kind(String still,String flow,String overlay) { this.still=AssetId.minecraft("block/"+still);this.flow=AssetId.minecraft("block/"+flow);this.overlay=Optional.ofNullable(overlay).map(value->AssetId.minecraft("block/"+value));alphaSprites=this.overlay.isPresent()?List.of(this.still,this.flow,this.overlay.orElseThrow()):List.of(this.still,this.flow); }
+        public AssetId still() { return still; }public AssetId flow() { return flow; }public Optional<AssetId> overlay() { return overlay; }public List<AssetId> alphaSprites() { return alphaSprites; }
     }
     /** Heights precede the top inset. Faces/overlays use ModelPlan.Direction ordinal bits. */
     public record Cell(Kind kind,float northWest,float southWest,float southEast,float northEast,int faces,int overlays,
@@ -66,7 +66,7 @@ public final class FluidGeometry {
     private static BlockMesh.Vertex v(float x,float y,float z,float u,float v) { return new BlockMesh.Vertex(x,y,z,u,v); }
     private static void add(List<NativeGeometry.Quad> result,Cell cell,ModelPlan.Direction face,AssetId sprite,List<BlockMesh.Vertex> vertices,boolean back,BooleanSupplier cancelled) {
         if(cancelled.getAsBoolean())throw new java.util.concurrent.CancellationException("Fluid geometry cancelled");var normal=ModelTransforms.normal(face);
-        var material=new ModelPlan.Material(sprite,false,cell.rgb());var shade=Optional.of(face);
+        var material=new ModelPlan.Material(sprite,false,cell.rgb(),cell.kind().alphaSprites());var shade=Optional.of(face);
         result.add(new NativeGeometry.Quad(face,Optional.empty(),new ModelPlan.Vec3((float)normal.x(),(float)normal.y(),(float)normal.z()),material,-1,cell.emission(),false,shade,vertices,BlockMesh.Placement.CELL));
         if(back) {
             var opposite=FaceGeometry.opposite(face);result.add(new NativeGeometry.Quad(opposite,Optional.empty(),new ModelPlan.Vec3((float)-normal.x(),(float)-normal.y(),(float)-normal.z()),material,-1,cell.emission(),false,shade,List.of(vertices.get(0),vertices.get(3),vertices.get(2),vertices.get(1)),BlockMesh.Placement.CELL));

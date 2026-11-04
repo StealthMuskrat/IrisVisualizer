@@ -24,5 +24,21 @@
   "testsExecuted": false,
   "composition": "Internal weighted base decisions feed NativeCapture.fluidScene; complete native fluid layers are attached before owned request publication. Source bodies/texture assets are not bundled; native/GPU parity remains pending.",
   "placement": "Per-face MODEL/CELL metadata survives intake/composition/packing/atlas binding; world emission applies captured native offset only to MODEL faces. Optional same-source/full-height neighbors are borrowed and admitted across combined capture phases, then discarded.",
-  "modelPolicy": "See model-policy-source-review.json for source-reviewed default native RNG factory and the separately pinned 23-block JSON-only entity allowlist."
+  "modelPolicy": "See model-policy-source-review.json for source-reviewed default native RNG factory and the separately pinned 23-block JSON-only entity allowlist.",
+  "materialAlphaReview": {
+    "reviewedOn": "2026-11-04",
+    "officialFluidModelPatch": "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/renderer/block/FluidModel.java.patch",
+    "completeBodyMirrors": {
+      "FluidModel": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/block/fluidmodel/",
+      "SpriteContents": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/texture/spritecontents/",
+      "NativeImage": "https://mc-packet-reference.netlify.app/26.x/source/com/mojang/blaze3d/platform/nativeimage/",
+      "Transparency": "https://mc-packet-reference.netlify.app/26.x/source/com/mojang/blaze3d/platform/transparency/",
+      "ChunkSectionLayer": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/chunk/chunksectionlayer/"
+    },
+    "reviewedPolicy": "FluidModel unions still, flowing and optional overlay SpriteContents transparency; SpriteContents records complete original-image transparency; NativeImage scans zero/partial alpha and ChunkSectionLayer selects translucent, then cutout, then solid. Whole sheets include unused tiles; interpolation uncertainty does not alter this raw-source fluid layer policy.",
+    "implementation": "FluidGeometry material alpha dependencies; TextureMaterials bounded raw-sheet/group caches in standalone/shared preparation; TexturePreparation.Face retains mapped and optional material-wide summaries. Ordinary JSON mapped analysis unchanged.",
+    "provenance": "Official patch context plus complete unofficial decompiled method bodies; no selected archive authentication, native API compatibility or runtime/pixel parity established. No source bodies or texture assets bundled.",
+    "testsExecuted": false,
+    "openGlContextCreated": false
+  }
 }
