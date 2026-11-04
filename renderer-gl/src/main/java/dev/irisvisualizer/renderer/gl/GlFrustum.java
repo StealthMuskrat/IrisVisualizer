@@ -1,6 +1,7 @@
 package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.BlockMesh;
+import dev.irisvisualizer.renderer.NoiseSurface;
 
 /** Conservative section AABB rejection using the exact float matrix submitted to the GPU. */
 final class GlFrustum {
@@ -15,6 +16,14 @@ final class GlFrustum {
     boolean visible(BlockMesh.Bounds bounds,float[] offsets,int at) {
         double minX=(double)offsets[at]+bounds.min().x(),minY=(double)offsets[at+1]+bounds.min().y(),minZ=(double)offsets[at+2]+bounds.min().z();
         double maxX=(double)offsets[at]+bounds.max().x(),maxY=(double)offsets[at+1]+bounds.max().y(),maxZ=(double)offsets[at+2]+bounds.max().z();
+        return visible(minX,minY,minZ,maxX,maxY,maxZ);
+    }
+    /** Bounds follow the scalar shader's integer-grid float product and float anchor addition. */
+    boolean visible(NoiseSurface surface,int batch,float scale,float[] offset) {
+        return visible(offset[0]+surface.batchMinimum(batch,0)*scale,offset[1]+surface.batchMinimum(batch,1),offset[2]+surface.batchMinimum(batch,2)*scale,
+            offset[0]+surface.batchMaximum(batch,0)*scale,offset[1]+surface.batchMaximum(batch,1),offset[2]+surface.batchMaximum(batch,2)*scale);
+    }
+    private boolean visible(double minX,double minY,double minZ,double maxX,double maxY,double maxZ) {
         for(var p:planes) {
             double x=p[0]>=0?maxX:minX,y=p[1]>=0?maxY:minY,z=p[2]>=0?maxZ:minZ;
             double distance=p[0]*x+p[1]*y+p[2]*z+p[3];

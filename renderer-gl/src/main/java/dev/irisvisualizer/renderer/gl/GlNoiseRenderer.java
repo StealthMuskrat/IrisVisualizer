@@ -40,7 +40,10 @@ public final class GlNoiseRenderer implements AutoCloseable {
         out vec4 color;
         void main() { color=vec4(faceColor,1.0); }
         """;
-    public record Stats(int drawCalls,int submittedFaces,long triangles) {}
+    public record Stats(int drawCalls,int submittedFaces,long triangles,int totalBatches,int visibleBatches,int culledBatches,int culledFaces) {
+        public Stats(int drawCalls,int submittedFaces,long triangles) { this(drawCalls,submittedFaces,triangles,(submittedFaces+NoiseSurface.BATCH_FACES-1)/NoiseSurface.BATCH_FACES,(submittedFaces+NoiseSurface.BATCH_FACES-1)/NoiseSurface.BATCH_FACES,0,0); }
+        public Stats { if(drawCalls<0||submittedFaces<0||submittedFaces>1048576||culledFaces>1048576-submittedFaces||triangles!=2L*submittedFaces||totalBatches>1024||totalBatches<0||visibleBatches<0||culledBatches<0||culledFaces<0||(long)visibleBatches+culledBatches!=totalBatches||drawCalls>visibleBatches)throw new IllegalArgumentException("Invalid scalar submission counts"); }
+    }
     final GlDevice device;final GlDevice.Allocation allocation;private final int matrix,offset,size,scale;
     private GlNoiseRenderer(GlDevice device,GlDevice.Allocation allocation) { this.device=device;this.allocation=allocation;matrix=uniform("viewProjection");offset=uniform("gridOffset");size=uniform("gridSize");scale=uniform("horizontalScale"); }
     private int uniform(String name) { int value=glGetUniformLocation(allocation.programs[0],name);if(value<0)throw new GlFailure(GlFailure.Code.SHADER,"Missing scalar uniform: "+name);return value; }
@@ -59,11 +62,22 @@ public final class GlNoiseRenderer implements AutoCloseable {
         var surface=scene.surface();var grid=surface.volume().grid();float[] transform=camera.matrix((double)target.width()/target.height()),relative=new float[3];camera.offset(new WorldSnapshot.Position(grid.horizontal().originX(),grid.vertical().minY(),grid.horizontal().originZ()),relative,0);
         float step=(float)grid.horizontal().blocksPerSample();double magnitude=Math.max(Math.abs((double)relative[0])+grid.width()*(double)step,Math.abs((double)relative[2])+grid.depth()*(double)step);
         if(step<4*Math.ulp((float)magnitude))throw new GlFailure(GlFailure.Code.LIMIT,"Scalar sample spacing is too small for this camera anchor's float precision");
+        var frustum=new GlFrustum(transform);int calls=0,submitted=0,visible=0,culled=0,culledFaces=0;
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
-            if(surface.size()>0) { glUseProgram(allocation.programs[0]);glUniformMatrix4fv(matrix,false,transform);glUniform3f(offset,relative[0],relative[1],relative[2]);glUniform2ui(size,grid.width(),grid.depth());glUniform1f(scale,step);glBindVertexArray(scene.allocation.vaos[0]);glDrawArraysInstanced(GL_TRIANGLES,0,6,surface.size()); }device.check("complete scalar draw");
+            if(surface.size()>0) { glUseProgram(allocation.programs[0]);glUniformMatrix4fv(matrix,false,transform);glUniform3f(offset,relative[0],relative[1],relative[2]);glUniform2ui(size,grid.width(),grid.depth());glUniform1f(scale,step);glBindVertexArray(scene.allocation.vaos[0]);glBindBuffer(GL_ARRAY_BUFFER,scene.allocation.buffers[0]);
+                int first=-1,count=0;
+                for(int batch=0;batch<=surface.batchCount();batch++) {
+                    boolean show=batch<surface.batchCount()&&frustum.visible(surface,batch,step,relative);
+                    if(show) { visible++;if(first<0)first=surface.batchFirst(batch);count+=surface.batchSize(batch); }
+                    else {
+                        if(batch<surface.batchCount()) { culled++;culledFaces+=surface.batchSize(batch); }
+                        if(first>=0) { glVertexAttribIPointer(0,3,GL_UNSIGNED_INT,GlNoiseUpload.INSTANCE_BYTES,(long)first*GlNoiseUpload.INSTANCE_BYTES);glDrawArraysInstanced(GL_TRIANGLES,0,6,count);calls++;submitted+=count;first=-1;count=0; }
+                    }
+                }
+            }device.check("complete scalar draw");
         }
-        target.complete=true;return new Stats(surface.size()==0?0:1,surface.size(),(long)surface.size()*2);
+        target.complete=true;return new Stats(calls,submitted,(long)submitted*2,surface.batchCount(),visible,culled,culledFaces);
     }
     @Override public void close() { device.retire(allocation); }
 }

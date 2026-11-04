@@ -37,7 +37,7 @@ Each included present sample occupies one display bin: `[sampleX, sampleX + hori
 
 `NoiseSurface.prepare` now defaults to [greedy scalar rectangles](SCALAR-GREEDY.md): a full scan determines selected samples/bounds, then bounded plane count/emission passes merge compatible outward faces. Explicit `Meshing.CELLS` preserves the original two-pass unit-face representation. Both reject count/source/working limits before output arrays. A face shared by two included present samples is omitted. Volume edges, absent neighbors and excluded neighbors are display boundaries. No native opacity, fluid height or hidden block-face policy is inferred.
 
-Greedy rectangles are stored deterministically by direction, plane and tangent rows/columns; unit mode keeps original sample/direction order. Unit output uses five bytes per face; greedy output adds a four-byte span word for nine bytes per rectangle. Only exactly equal original scalar bits merge. A bounded integer plane mask is discarded after preparation, and no expanded vertex/index arrays are created. The surface retains its exact volume/style. `face(index)` inspects the anchor, while `face(index,u,v)` and picking recover any covered original sample with its UUID, coordinate/value, direction and RGBA.
+Greedy rectangles are stored deterministically by direction, plane and tangent rows/columns; unit mode keeps original sample/direction order. Unit output uses five bytes per face; greedy output adds a four-byte span word for nine bytes per rectangle. Both now add 24 bytes per original-order range of at most 1,024 faces for [bounded GPU/query culling](SCALAR-CULLING.md). Only exactly equal original scalar bits merge. A bounded integer plane mask is discarded after preparation, and no expanded vertex/index arrays are created. The surface retains its exact volume/style. `face(index)` inspects the anchor, while `face(index,u,v)` and picking recover any covered original sample with its UUID, coordinate/value, direction and RGBA.
 
 Empty/all-excluded/absent volumes produce successful zero-face surfaces with no bounds, while retaining their full captured data. A failure publishes no partial mesh/usage/bounds. Threshold/color changes rebuild only display surfaces from the same immutable samples; they do not call a native sampler. Current block/biome world meshing and material/picking paths remain unchanged.
 
@@ -58,6 +58,7 @@ The consuming `submit(RenderInput<NoiseVolume>, style, limits)` overload retains
 | Sampling arrays plus validating copy | 18 bytes per sample | 512 MiB configured capture working bound |
 | Display boundary faces | 262,144 | 1,048,576 |
 | Display mesh arrays | 5 bytes/unit face or 9 bytes/greedy rectangle | Source + output + plane-scratch working bound |
+| Face-range bounds | 24 bytes per 1,024 emitted faces | 24 KiB; included in mesh payload and preparation peak |
 | Greedy scratch | Largest selected-bounds plane, 4 bytes/entry | 64 MiB maximum; full-grid upper bound reserved by worker |
 | Surface job working ceiling | 512 MiB | Same |
 | Active plus pending surface jobs | 1 GiB | Same; lowerable |

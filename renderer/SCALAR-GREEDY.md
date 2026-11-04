@@ -40,12 +40,13 @@ Camera fit and bounds remain those of selected display bins. Completed frames an
 | --- | --- |
 | Greedy output | Nine primitive bytes per emitted rectangle |
 | Unit output | Five primitive bytes per unit face |
+| Face-range bounds | 24 bytes per 1,024-face original-order range; at most 24 KiB |
 | Plane scratch | Four bytes times the largest selected-bounds plane; at most 64 MiB |
 | GPU instances | Twelve bytes per emitted rectangle in either mode |
 | Output count | Existing 262,144 default / 1,048,576 hard primitive limit |
 | Working peak | Original source + actual plane scratch + prospective exact output, within the existing 512 MiB ceiling |
 
-Worker admission reserves the full-grid scratch upper bound plus configured output maximum, clamped to its working ceiling. Actual preparation preflights selected-bounds scratch and checks every output growth against that ceiling. READY output shrinks to retained source/mesh bytes after stack unwind; no mask escapes. Active cancellation stays charged until unwind, and pending/completed replacement follows existing shared ownership. A fragmented selection may fail a count/byte bound; no sample, height, face or value is silently discarded. Explicit unit mode remains available when its representation better fits a caller's admitted working allowance.
+[Scalar range culling](SCALAR-CULLING.md) now adds bounded integer face-plane bounds for GPU frustum rejection and CPU ray pruning without changing original face order. Worker admission reserves the full-grid scratch upper bound plus configured output and range-bound maximum, clamped to its working ceiling. Actual preparation preflights selected-bounds scratch and checks every output growth against that ceiling. READY output shrinks to retained source/mesh bytes after stack unwind; no mask escapes. Active cancellation stays charged until unwind, and pending/completed replacement follows existing shared ownership. A fragmented selection may fail a count/byte bound; no sample, height, face or value is silently discarded. Explicit unit mode remains available when its representation better fits a caller's admitted working allowance.
 
 At renderer completion, expand greedy rectangles back into unit-face keys and compare to `CELLS` mode for all directions, uniform boxes, nonzero selected bounds, thin/maximum dimensions, stripes, holes, absent samples, equal-color different-value fields and signed zero. Compare exact selected/represented counts, bounds, deterministic order and original mapping. Exercise zero/exact/one-over count, scratch and output budgets, source-only allowances, empty selections, cancellation before each allocation and two-pass consistency.
 

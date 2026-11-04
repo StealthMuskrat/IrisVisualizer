@@ -224,3 +224,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Original pack images
 
 [Source image preparation](IMAGES.md) now detaches original PNG bytes, decodes complete source dimensions asynchronously, records exact resource/revision/SHA receipts and supports original RGBA pixel inspection. The separate [GPU image view](../renderer-gl/IMAGE-VIEW.md) connects bounded row upload, fit/pan/zoom, independent immutable frames and distinct readback receipts without fabricating native map samples. All 126 CPU/OpenGL main sources compile (85 CPU, 41 GL); 16 native adapters remain syntax-only. Tests and editor integration remain deferred; unsupported previews remain disabled.
+
+## Scalar range culling
+
+[Scalar surface ranges](SCALAR-CULLING.md) now retain charged integer bounds for at most 1,024 original-order faces each. OpenGL frustum rejection coalesces visible runs without instance copies; ray picking skips missed ranges while retaining the full-face allowance and original sample ties. Frame/query work counters expose the skipped work. All 126 CPU/OpenGL sources compile; native adapters remain syntax-only and runtime/GPU tests stay deferred until renderer implementation is complete. Unsupported previews remain disabled.

@@ -7,8 +7,9 @@ import java.util.function.BooleanSupplier;
 public final class NoisePick {
     private NoisePick() {}
     public record Hit(int face,NoiseSurface.Face sample,double distance,double localX,double localY,double localZ) {}
-    public record Result(UUID volumeId,WorldRay ray,Optional<Hit> hit,int visitedFaces,List<WorldProblem> problems) {
-        public Result { Objects.requireNonNull(volumeId);Objects.requireNonNull(ray);Objects.requireNonNull(hit);problems=List.copyOf(problems);if(!problems.isEmpty()&&hit.isPresent())throw new IllegalArgumentException("Partial scalar hit escaped failure"); }
+    public record Result(UUID volumeId,WorldRay ray,Optional<Hit> hit,int visitedFaces,int visitedBatches,int culledBatches,List<WorldProblem> problems) {
+        public Result(UUID volumeId,WorldRay ray,Optional<Hit> hit,int visitedFaces,List<WorldProblem> problems) { this(volumeId,ray,hit,visitedFaces,0,0,problems); }
+        public Result { if(visitedFaces<0||visitedFaces>1048576||visitedBatches<0||visitedBatches>1024||culledBatches<0||culledBatches>visitedBatches)throw new IllegalArgumentException("Invalid scalar query work counts");Objects.requireNonNull(volumeId);Objects.requireNonNull(ray);Objects.requireNonNull(hit);problems=List.copyOf(problems);if(!problems.isEmpty()&&hit.isPresent())throw new IllegalArgumentException("Partial scalar hit escaped failure"); }
         public boolean requiresPlaceholder() { return !problems.isEmpty(); }
     }
     public static Result query(NoiseSurface surface,WorldRay ray,int maximumFaces,BooleanSupplier cancelled) {
@@ -24,25 +25,44 @@ public final class NoisePick {
         long ox=Math.subtractExact((long)g.horizontal().originX(),ray.anchor().x()),oy=(long)g.vertical().minY()-ray.anchor().y(),oz=Math.subtractExact((long)g.horizontal().originZ(),ray.anchor().z());
         if(Math.max(Math.abs((double)ox),Math.max(Math.abs((double)oy),Math.abs((double)oz)))>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Scalar query exceeds supported relative anchor precision");
         double x=ray.x()-ox,y=ray.y()-oy,z=ray.z()-oz,scale=g.horizontal().blocksPerSample(),nearest=ray.maximum();int found=-1,foundCell=-1,foundSide=-1,foundU=0,foundV=0;
-        for(int face=0;face<surface.size();face++) {
-            if((face&255)==0)WorldProblem.check(cancelled);int cell=surface.cell(face),side=surface.direction(face).ordinal();
-            int sx=cell%g.width(),sy=(int)(cell/((long)g.width()*g.depth())),sz=cell/g.width()%g.depth();
-            double minX=sx*scale,minY=sy,minZ=sz*scale,maxX=(sx+surface.sizeX(face))*scale,maxY=sy+surface.sizeY(face),maxZ=(sz+surface.sizeZ(face))*scale;
-            int axis=side<2?1:side<4?2:0;double direction=axis==0?ray.dx():axis==1?ray.dy():ray.dz();boolean plus=(side&1)!=0;
-            if(direction*(plus?1:-1)>=0)continue;
-            double plane=axis==0?(plus?maxX:minX):axis==1?(plus?maxY:minY):(plus?maxZ:minZ),origin=axis==0?x:axis==1?y:z,t=(plane-origin)/direction;
-            if(!Double.isFinite(t)||t<ray.minimum()||t>nearest)continue;
-            double hx=x+t*ray.dx(),hy=y+t*ray.dy(),hz=z+t*ray.dz();
-            if((axis==0||hx>=minX&&hx<=maxX)&&(axis==1||hy>=minY&&hy<=maxY)&&(axis==2||hz>=minZ&&hz<=maxZ)) {
-                int su=side<4?sampleOffset(hx,sx,surface.spanU(face),scale):sampleOffset(hz,sz,surface.spanU(face),scale);
-                int sv=side<2?sampleOffset(hz,sz,surface.spanV(face),scale):sampleOffset(hy,sy,surface.spanV(face),1),sample=surface.sample(face,su,sv);
-                // Preserve original sample/direction tie order independently of rectangle traversal.
-                if(found<0||t<nearest||sample<foundCell||sample==foundCell&&side<foundSide) { found=face;foundCell=sample;foundSide=side;foundU=su;foundV=sv;nearest=t; }
+        int visited=0,visitedBatches=0,culledBatches=0;
+        for(int batch=0;batch<surface.batchCount();batch++) {
+            WorldProblem.check(cancelled);visitedBatches++;
+            if(!intersects(surface.batchBounds(batch),ray,x,y,z,nearest)) { culledBatches++;continue; }
+            for(int face=surface.batchFirst(batch),end=face+surface.batchSize(batch);face<end;face++) {
+                visited++;
+                if((face&255)==0)WorldProblem.check(cancelled);int cell=surface.cell(face),side=surface.direction(face).ordinal();
+                int sx=cell%g.width(),sy=(int)(cell/((long)g.width()*g.depth())),sz=cell/g.width()%g.depth();
+                double minX=sx*scale,minY=sy,minZ=sz*scale,maxX=(sx+surface.sizeX(face))*scale,maxY=sy+surface.sizeY(face),maxZ=(sz+surface.sizeZ(face))*scale;
+                int axis=side<2?1:side<4?2:0;double direction=axis==0?ray.dx():axis==1?ray.dy():ray.dz();boolean plus=(side&1)!=0;
+                if(direction*(plus?1:-1)>=0)continue;
+                double plane=axis==0?(plus?maxX:minX):axis==1?(plus?maxY:minY):(plus?maxZ:minZ),origin=axis==0?x:axis==1?y:z,t=(plane-origin)/direction;
+                if(!Double.isFinite(t)||t<ray.minimum()||t>nearest)continue;
+                double hx=x+t*ray.dx(),hy=y+t*ray.dy(),hz=z+t*ray.dz();
+                if((axis==0||hx>=minX&&hx<=maxX)&&(axis==1||hy>=minY&&hy<=maxY)&&(axis==2||hz>=minZ&&hz<=maxZ)) {
+                    int su=side<4?sampleOffset(hx,sx,surface.spanU(face),scale):sampleOffset(hz,sz,surface.spanU(face),scale);
+                    int sv=side<2?sampleOffset(hz,sz,surface.spanV(face),scale):sampleOffset(hy,sy,surface.spanV(face),1),sample=surface.sample(face,su,sv);
+                    // Preserve original sample/direction tie order independently of rectangle traversal.
+                    if(found<0||t<nearest||sample<foundCell||sample==foundCell&&side<foundSide) { found=face;foundCell=sample;foundSide=side;foundU=su;foundV=sv;nearest=t; }
+                }
             }
         }
         WorldProblem.check(cancelled);Optional<Hit> hit=Optional.empty();
         if(found>=0) { int cell=foundCell;double minX=(cell%g.width())*scale,minY=cell/((long)g.width()*g.depth()),minZ=(cell/g.width()%g.depth())*scale;hit=Optional.of(new Hit(found,surface.face(found,foundU,foundV),nearest,x+nearest*ray.dx()-minX,y+nearest*ray.dy()-minY,z+nearest*ray.dz()-minZ)); }
-        return new Result(volume.id(),ray,hit,surface.size(),List.of());
+        return new Result(volume.id(),ray,hit,visited,visitedBatches,culledBatches,List.of());
+    }
+    /** Expand slabs and interval rounding so a batch cannot hide an edge/corner tie. */
+    private static boolean intersects(NoiseSurface.Bounds bounds,WorldRay ray,double x,double y,double z,double nearest) {
+        double enter=ray.minimum(),exit=nearest;
+        for(int axis=0;axis<3;axis++) {
+            double lo=axis==0?bounds.minX():axis==1?bounds.minY():bounds.minZ(),hi=axis==0?bounds.maxX():axis==1?bounds.maxY():bounds.maxZ();
+            double origin=axis==0?x:axis==1?y:z,direction=axis==0?ray.dx():axis==1?ray.dy():ray.dz(),margin=8*Math.ulp(Math.max(Math.abs(origin),Math.max(Math.abs(lo),Math.abs(hi))));
+            lo=Math.nextDown(lo-margin);hi=Math.nextUp(hi+margin);
+            if(direction==0) { if(origin<lo||origin>hi)return false;continue; }
+            double a=(lo-origin)/direction,b=(hi-origin)/direction;enter=Math.max(enter,Math.nextDown(Math.min(a,b)));exit=Math.min(exit,Math.nextUp(Math.max(a,b)));
+            if(enter>exit)return false;
+        }
+        return true;
     }
     /** Inclusive shared edges select the lower original sample, as the unmerged source order did. */
     private static int sampleOffset(double coordinate,int origin,int span,double scale) {
