@@ -27,15 +27,21 @@ public record ModelPlan(ClientAssetSnapshot.Receipt assets,RenderBlockState stat
     public record Rotation(Vec3 origin,float x,float y,float z,boolean rescale) {
         public Rotation { Objects.requireNonNull(origin);if(!Float.isFinite(x)||!Float.isFinite(y)||!Float.isFinite(z))throw new IllegalArgumentException("Nonfinite element rotation"); }
     }
-    /** Native RGB is independent of model tint. Nonempty alphaSprites select whole-source group alpha. */
-    public record Material(AssetId sprite,boolean forceTranslucent,int colorRgb,List<AssetId> alphaSprites) {
+    /** Explicit alpha scope: mapped pixels by default, a whole-source group or pre-transform model UV. */
+    public record Material(AssetId sprite,boolean forceTranslucent,int colorRgb,List<AssetId> alphaSprites,Optional<Uv> alphaUv) {
         public Material(AssetId sprite,boolean forceTranslucent) { this(sprite,forceTranslucent,0xffffff,List.of()); }
         public Material(AssetId sprite,boolean forceTranslucent,int colorRgb) { this(sprite,forceTranslucent,colorRgb,List.of()); }
+        public Material(AssetId sprite,boolean forceTranslucent,int colorRgb,List<AssetId> alphaSprites) { this(sprite,forceTranslucent,colorRgb,alphaSprites,Optional.empty()); }
         public Material {
-            Objects.requireNonNull(sprite);Objects.requireNonNull(alphaSprites);if((colorRgb&0xff000000)!=0)throw new IllegalArgumentException("Material color must be RGB24");
+            Objects.requireNonNull(sprite);Objects.requireNonNull(alphaSprites);Objects.requireNonNull(alphaUv);if((colorRgb&0xff000000)!=0)throw new IllegalArgumentException("Material color must be RGB24");
             if(alphaSprites.size()>16)throw new IllegalArgumentException("Material alpha dependencies exceed their bound");alphaSprites=List.copyOf(alphaSprites);
             if(!alphaSprites.isEmpty()&&(!alphaSprites.contains(sprite)||new HashSet<>(alphaSprites).size()!=alphaSprites.size()))throw new IllegalArgumentException("Material alpha group must contain its sprite and no duplicates");
+            if(alphaUv.isPresent()) {
+                var uv=alphaUv.orElseThrow();
+                if(!alphaSprites.isEmpty()||Math.min(uv.u0(),uv.u1())<0||Math.min(uv.v0(),uv.v1())<0||Math.max(uv.u0(),uv.u1())>16||Math.max(uv.v0(),uv.v1())>16)throw new IllegalArgumentException("Model alpha UV must be within its own source sprite and exclude groups");
+            }
         }
+        Material withAlphaUv(Uv uv) { return new Material(sprite,forceTranslucent,colorRgb,alphaSprites,Optional.of(uv)); }
         public int multiplyRgb(int tint) {
             if((tint&0xff000000)!=0)throw new IllegalArgumentException("Tint must be RGB24");if(colorRgb==0xffffff)return tint;if(tint==0xffffff)return colorRgb;
             int r=(((colorRgb>>>16)*(tint>>>16)+127)/255),g=((((colorRgb>>>8)&255)*((tint>>>8)&255)+127)/255),b=(((colorRgb&255)*(tint&255)+127)/255);

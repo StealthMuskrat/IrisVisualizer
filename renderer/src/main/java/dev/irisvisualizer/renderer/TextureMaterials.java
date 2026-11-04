@@ -15,11 +15,12 @@ public final class TextureMaterials {
                 throw new IllegalArgumentException("Texture limits exceed renderer bounds");
         }
     }
-    private record ScanKey(AssetId sprite,TexturePreparation.Region region,boolean fullImage) {
-        ScanKey(AssetId sprite,TexturePreparation.Region region) { this(sprite,region,false); }
+    private enum Scope { MAPPED, MODEL, SHEET }
+    private record ScanKey(AssetId sprite,TexturePreparation.Region region,Scope scope) {
+        ScanKey(AssetId sprite,TexturePreparation.Region region) { this(sprite,region,Scope.MAPPED); }
     }
     private static List<AssetId> requiredSprites(ModelPlan.Material material) { return material.alphaSprites().isEmpty()?List.of(material.sprite()):material.alphaSprites(); }
-    private static ScanKey sheetKey(TextureSprite sprite) { return new ScanKey(sprite.id(),new TexturePreparation.Region(0,0,sprite.image().width(),sprite.image().height()),true); }
+    private static ScanKey sheetKey(TextureSprite sprite) { return new ScanKey(sprite.id(),new TexturePreparation.Region(0,0,sprite.image().width(),sprite.image().height()),Scope.SHEET); }
     static TextureBatch prepareBatch(ClientAssetSnapshot assets,List<BlockMesh> meshes,TextureBatch.Limits limits,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(meshes);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);AtlasBuilder.check(cancelled);
         try { return executeBatch(assets,meshes,limits,cancelled); }
@@ -56,7 +57,7 @@ public final class TextureMaterials {
             try {
             var prepared=new ArrayList<TexturePreparation.Face>(mesh.quads().size());var regions=new HashSet<ScanKey>();long visits=0;
             for(int face=0;face<mesh.quads().size();face++) { work.check();prepared.add(work.face(face,mesh.quads().get(face),regions)); }
-            for(var key:regions) { work.check();var region=key.region();visits+=(long)(region.x1()-region.x0())*(region.y1()-region.y0())*(key.fullImage()?1:work.sprites.get(key.sprite()).referencedFrames().size()); }
+            for(var key:regions) { work.check();var region=key.region();visits+=(long)(region.x1()-region.x0())*(region.y1()-region.y0())*(key.scope()==Scope.SHEET?1:work.sprites.get(key.sprite()).referencedFrames().size()); }
             results.add(TexturePreparation.success(mesh,sprites,prepared,new TexturePreparation.Usage(sprites.size(),encoded,rgba,metadata,nodes,frames,regions.size(),visits)));
             }catch(ModelFields.Failure failure) { if(TextureBatch.fatal(failure.problem.code()))throw failure;results.add(TexturePreparation.placeholder(mesh,List.of(failure.problem))); }
         }
@@ -99,8 +100,19 @@ public final class TextureMaterials {
             Optional<TexturePreparation.Alpha> whole=Optional.empty();
             if(!material.alphaSprites().isEmpty()) {
                 whole=Optional.of(group(material.alphaSprites()));for(var id:material.alphaSprites()) { check();used.add(sheetKey(sprites.get(id))); }
+            } else if(material.alphaUv().isPresent()) {
+                whole=Optional.of(modelAlpha(sprite,material.alphaUv().orElseThrow(),used));
             }
             return new TexturePreparation.Face(index,quad.source(),material,region,mapped,whole.orElse(mapped).classification(material.forceTranslucent()),whole);
+        }
+        TexturePreparation.Alpha modelAlpha(TextureSprite sprite,ModelPlan.Uv uv,Set<ScanKey> used) {
+            check();var whole=sheet(sprite);used.add(sheetKey(sprite));
+            float u0=Math.min(uv.u0(),uv.u1())/16f,v0=Math.min(uv.v0(),uv.v1())/16f,u1=Math.max(uv.u0(),uv.u1())/16f,v1=Math.max(uv.v0(),uv.v1())/16f;
+            if(!whole.transparent()&&!whole.partial()||u0==0&&v0==0&&u1==1&&v1==1)return whole;
+            // Match the client's float product and exclusive ceiling, before UV rotation/lock.
+            int x0=(int)Math.floor(u0*sprite.frameWidth()),y0=(int)Math.floor(v0*sprite.frameHeight()),x1=(int)Math.ceil(u1*sprite.frameWidth()),y1=(int)Math.ceil(v1*sprite.frameHeight());
+            if(x0==x1||y0==y1)return new TexturePreparation.Alpha(false,false,false,false);
+            var region=new TexturePreparation.Region(x0,y0,x1,y1);used.add(new ScanKey(sprite.id(),region,Scope.MODEL));return alpha(sprite,region,Scope.MODEL);
         }
         TexturePreparation.Alpha group(List<AssetId> ids) {
             check();var cached=groups.get(ids);if(cached!=null)return cached;
@@ -119,7 +131,10 @@ public final class TextureMaterials {
             var result=new TexturePreparation.Alpha(transparent,partial,opaque,false);scans.put(key,result);return result;
         }
         TexturePreparation.Alpha alpha(TextureSprite sprite,TexturePreparation.Region region) {
-            check();var key=new ScanKey(sprite.id(),region);var cached=scans.get(key);if(cached!=null)return cached;
+            return alpha(sprite,region,Scope.MAPPED);
+        }
+        TexturePreparation.Alpha alpha(TextureSprite sprite,TexturePreparation.Region region,Scope scope) {
+            check();var key=new ScanKey(sprite.id(),region,scope);var cached=scans.get(key);if(cached!=null)return cached;
             require(scans.size()<limits.regions(),ModelPlan.Code.LIMIT,ClientAssetSnapshot.Kind.TEXTURE,sprite.id(),"","Unique UV alpha-region budget reached");
             long visits=(long)(region.x1()-region.x0())*(region.y1()-region.y0())*sprite.referencedFrames().size();
             require(visits<=limits.alphaPixelVisits()-alphaPixelVisits,ModelPlan.Code.LIMIT,ClientAssetSnapshot.Kind.TEXTURE,sprite.id(),"","Animation-aware alpha pixel-visit budget reached");alphaPixelVisits+=visits;
@@ -134,7 +149,7 @@ public final class TextureMaterials {
             }
             // RGBA interpolation can blend binary alpha. This conservative summary includes
             // spatially separate masks; it does not claim that every transition blends alpha.
-            boolean blend=sprite.interpolate()&&sprite.referencedFrames().size()>1&&transparent&&opaque;
+            boolean blend=scope==Scope.MAPPED&&sprite.interpolate()&&sprite.referencedFrames().size()>1&&transparent&&opaque;
             var result=new TexturePreparation.Alpha(transparent,partial,opaque,blend);scans.put(key,result);return result;
         }
     }

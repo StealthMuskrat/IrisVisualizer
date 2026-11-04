@@ -42,13 +42,17 @@ Sizing and effective playback now follow the reviewed 26.3 source structure; see
 
 ## Conservative alpha candidates
 
-For ordinary materials without an explicit alpha group, each face's normalized UV extrema form a frame-local pixel rectangle. The scan includes `floor(min * size)` through `floor(max * size)`, with both clamped to the last valid pixel; upper bounds in the result are exclusive. Thus an exact interior maximum boundary also includes the adjoining pixel. Degenerate UV extents scan at least one pixel. This deliberately conservative policy has not been matched to the pinned native UV epsilon or sampling convention.
+For supplied materials without an explicit source scope, each face's normalized UV extrema form a frame-local pixel rectangle. The scan includes `floor(min * size)` through `floor(max * size)`, with both clamped to the last valid pixel; upper bounds in the result are exclusive. Thus an exact interior maximum boundary also includes the adjoining pixel. Degenerate UV extents scan at least one pixel. This deliberately conservative policy has not been matched to the pinned native UV epsilon or sampling convention.
 
 Only distinct referenced animation frames are scanned, including later frames and custom schedules; unused sheet tiles do not affect classification. Each unique sprite/quantized rectangle shares one cached scan within the preparation call. Results retain the presence of zero, partial and full alpha. Partial samples select a translucent candidate; zero-only/binary samples select cutout; fully opaque samples select opaque. `force_translucent` overrides every source result. Interpolated animations with multiple referenced frames and mixed zero/full alpha conservatively retain a possible blended-alpha flag and translucent candidate, even if the particular spatial masks or transitions would not require it.
 
 These candidates describe source pixels and possible interpolation, not a certified native render pass. Mipmap cutoff bias, texture blur, UV shrinking, derivatives, transparent-color bleed and actual fragment alpha tests/blending are not applied during classification. Atlas rasterization separately applies the reviewed base-level RGBA interpolation profile. The separate [CPU atlas layer](ATLAS.md) now packs these sprites and extrudes frame-edge gutters; it does not alter the alpha analysis or certify filtered sampling. Fully transparent or degenerate faces are not removed. No neighbor culling, tint, AO or lighting is inferred.
 
-Native fluid materials additionally declare bounded [whole-source alpha groups](FLUID-MATERIALS.md). Their dependencies are decoded/admitted together, and complete PNG sheets determine a shared class, including unused animation tiles. The mapped-region summary remains available separately from the optional material-wide summary. Whole-sheet and mapped scans share the region/pixel budgets below; group-summary metadata has its own equally sized count bound. Ordinary JSON material behavior is unchanged.
+Native fluid materials additionally declare bounded [whole-source alpha groups](FLUID-MATERIALS.md). Their dependencies are decoded/admitted together, and complete PNG sheets determine a shared class, including unused animation tiles. The mapped-region summary remains available separately from the optional material-wide summary. Whole-sheet and mapped scans share the region/pixel budgets below; group-summary metadata has its own equally sized count bound. Baked JSON faces now declare a separate [pre-transform source UV policy](MODEL-MATERIALS.md); mapped-region diagnostics remain available independently of that policy.
+
+## Model source policy
+
+[Model source alpha](MODEL-MATERIALS.md) now classifies baked JSON faces from their explicit/default UV rectangle before UV rotation/lock. Full rectangles and wholly opaque sheets use complete-sheet alpha; other regions use exclusive ceiling upper bounds and effective frames. Empty source windows contain no alpha categories, while the mapped diagnostic stays nonempty. Raw source classes remain fixed across interpolation. Source and displayed scopes can differ; they are preserved separately in the face receipt.
 
 ## Resource limits
 
@@ -59,7 +63,7 @@ Native fluid materials additionally declare bounded [whole-source alpha groups](
 | Aggregate retained RGBA / encoded PNG plus metadata | 128 MiB / 32 MiB |
 | Aggregate metadata bytes / parsed nodes | 1 MiB / 65,536 |
 | Aggregate schedule entries, including static tiles | 16,384 |
-| Combined mapped/sheet alpha scans / pixel visits | 8,192 / 64 Mi |
+| Combined mapped/model/sheet alpha scans / pixel visits | 8,192 / 64 Mi |
 | PNG chunks per image / inflated scanline bytes | 4,096 / 256 MiB |
 
 Callers can lower preparation limits. Image allocation checks the remaining aggregate RGBA budget before allocation. Metadata and encoded asset totals are checked before copying; schedule entries and scan cost across all referenced frames are checked before expansion/scanning. Cached regions do not incur duplicate pixel charges. There is no success receipt after a failed reservation.

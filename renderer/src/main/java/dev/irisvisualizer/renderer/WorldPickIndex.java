@@ -154,7 +154,7 @@ public final class WorldPickIndex implements AutoCloseable {
             double u=weight*v.get(a+6)+beta*v.get(b+6)+gamma*v.get(c+6),vv=weight*v.get(a+7)+beta*v.get(b+7)+gamma*v.get(c+7);var material=mesh.faces().get(face).source();
             if(options.alpha()==Alpha.DISPLAYED_BASE_LEVEL&&material.alpha()!=TexturePreparation.AlphaClass.OPAQUE) {
                 var image=raster.pages().get(material.page());int ix=Math.clamp((int)Math.floor(u*image.width()),0,image.width()-1),iy=Math.clamp((int)Math.floor(vv*image.height()),0,image.height()-1),alpha=image.alpha(ix,iy);
-                if(material.alpha()==TexturePreparation.AlphaClass.CUTOUT?alpha<128:alpha==0) { alphaRejected++;return; }
+                if(!material.alpha().acceptsAlpha(alpha)) { alphaRejected++;return; }
             }
             double nx=ey*fz-ez*fy,ny=ez*fx-ex*fz,nz=ex*fy-ey*fx,length=Math.hypot(Math.hypot(nx,ny),nz);
             hitSection=sectionIndex;hitFace=face;hitMarker=-1;hitU=u;hitV=vv;normalX=nx/length;normalY=ny/length;normalZ=nz/length;nearest=distance;

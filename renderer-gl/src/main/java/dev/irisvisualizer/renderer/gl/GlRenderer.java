@@ -52,11 +52,11 @@ public final class GlRenderer implements AutoCloseable {
         void main() {
             if(clipEnabled && (any(lessThan(worldPosition,clipMin)) || any(greaterThan(worldPosition,clipMax)))) discard;
             vec4 sampleColor=texture(atlas,spriteUv);
-            if(passMode==1 && sampleColor.a<0.5) discard;
-            if(passMode==2 && sampleColor.a<=0.0) discard;
+            if(passMode==1 && sampleColor.a<%s) discard;
+            if(passMode==2 && sampleColor.a<%s) discard;
             color=vec4(sampleColor.rgb*lightRgb*tintRgb,passMode==2?sampleColor.a:1.0);
         }
-        """;
+        """.formatted(TexturePreparation.AlphaClass.CUTOUT.alphaCutoff(),TexturePreparation.AlphaClass.TRANSLUCENT.alphaCutoff());
     private static final String MARKER_VERTEX="""
         #version 330 core
         layout(location=0) in vec3 corner;

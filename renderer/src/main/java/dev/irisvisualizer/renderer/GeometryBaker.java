@@ -47,6 +47,7 @@ public final class GeometryBaker {
                     check();var side=entry.getKey();var face=entry.getValue();var faceSource=new ModelPlan.Source(source.asset(),source.pointer()+"/faces/"+side.name().toLowerCase(Locale.ROOT));
                     require(quads.size()<limits.quads() && (long)(quads.size()+1)*MeshPacket.PACKED_BYTES_PER_QUAD<=limits.packedBytes(),ModelPlan.Code.LIMIT,faceSource,"Quad or packed geometry byte budget reached");
                     var rectangle=face.uv().orElseGet(()->FaceGeometry.uv(element,side));var locked=choice.uvlock()?dispatch.uvlock(side):null;
+                    require(Math.min(rectangle.u0(),rectangle.u1())>=0&&Math.min(rectangle.v0(),rectangle.v1())>=0&&Math.max(rectangle.u0(),rectangle.u1())<=16&&Math.max(rectangle.v0(),rectangle.v1())<=16,ModelPlan.Code.UV_RANGE,faceSource,"Source model UVs outside the sprite require atlas-sampling verification");
                     var vertices=new ArrayList<BlockMesh.Vertex>(4);
                     for(int vertex=0;vertex<4;vertex++) {
                         check();var position=FaceGeometry.corner(element,side,vertex);if(transform!=null)position=transform.position(position);position=dispatch.position(position).scale(1.0/16.0);bounds(position,faceSource);
@@ -61,7 +62,8 @@ public final class GeometryBaker {
                     if(transform==null&&FaceGeometry.hasArea(vertices))require(FaceGeometry.canonicalize(vertices,dispatch.direction(normalSide)),ModelPlan.Code.UNSUPPORTED_GEOMETRY,faceSource,"Axis-aligned face corners could not be reordered without changing source geometry");
                     var normal=ModelTransforms.normal(normalSide);if(transform!=null)normal=transform.normal(normal);normal=dispatch.vector(normal);double length=StrictMath.sqrt(normal.dot(normal));
                     require(normal.finite()&&Double.isFinite(length)&&length>0,ModelPlan.Code.GEOMETRY_RANGE,faceSource,"Baked normal is not finite");normal=normal.scale(1.0/length);
-                    quads.add(new BlockMesh.Quad(faceSource,selection,side,face.cullface().map(dispatch::direction),new ModelPlan.Vec3((float)normal.x(),(float)normal.y(),(float)normal.z()),face.material(),face.tintIndex(),element.lightEmission(),model.ambientOcclusion(),element.shadeDirectionOverride(),vertices));
+                    var material=face.material().alphaSprites().isEmpty()?face.material().withAlphaUv(rectangle):face.material();
+                    quads.add(new BlockMesh.Quad(faceSource,selection,side,face.cullface().map(dispatch::direction),new ModelPlan.Vec3((float)normal.x(),(float)normal.y(),(float)normal.z()),material,face.tintIndex(),element.lightEmission(),model.ambientOcclusion(),element.shadeDirectionOverride(),vertices));
                 }
             }
         }

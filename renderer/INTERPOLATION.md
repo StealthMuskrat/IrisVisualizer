@@ -18,7 +18,7 @@ Initial capture, patch generation and worker preflight all use the same `pixelSa
 
 Progress changes can produce patches while the current tile stays unchanged. Request coalescing compares full tile/progress maps against the exact expected raster. Equal quantized inputs, partial-tick-only changes and repeated tiles avoid redundant work; seeking back to displayed inputs cancels obsolete work under existing revisions. Different inputs may conservatively trigger updates even if their rounded output pixels happen to match.
 
-`WorldVisuals` now admits supported interpolated sprites through shared texture/atlas preparation instead of replacing them with animation placeholders. Conservative alpha classification still retains possible translucent transitions. No native block/state/biome identity, geometry, material ordering or generation data changes.
+`WorldVisuals` now admits supported interpolated sprites through shared texture/atlas preparation instead of replacing them with animation placeholders. Generic mapped-material diagnostics still retain possible translucent transitions. Baked JSON faces now follow the [reviewed raw source-UV alpha policy](MODEL-MATERIALS.md), and fluids follow whole-source groups; interpolation does not promote those declared passes. No native block/state/biome identity, geometry, material ordering or generation data changes.
 
 The existing GPU uploader consumes completed RGBA patches without running a second blend. Changed pages receive private replacement textures; unchanged pages share ownership. Completed images retain their exact raster for alpha picking, and readback retains their clock receipts. No displayed texture or old image is overwritten.
 

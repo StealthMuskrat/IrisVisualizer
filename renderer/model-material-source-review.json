@@ -1,0 +1,22 @@
+{
+  "reviewedOn": "2026-11-04",
+  "minecraftProfile": "26.3",
+  "officialFaceBakeryPatch": "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/resources/model/cuboid/FaceBakery.java.patch",
+  "completeBodyMirrors": {
+    "FaceBakery": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/resources/model/cuboid/facebakery/",
+    "SpriteContents": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/texture/spritecontents/",
+    "NativeImage": "https://mc-packet-reference.netlify.app/26.x/source/com/mojang/blaze3d/platform/nativeimage/",
+    "RenderPipelines": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/renderpipelines/"
+  },
+  "terrainShaderMirror": "https://github.com/InventivetalentDev/minecraft-assets/blob/e1bcd8e80b01c459b74213ba3d8709b24ff0ae4d/assets/minecraft/shaders/core/terrain.fsh",
+  "reviewedPolicies": [
+    "FaceBakery computes material transparency from sorted source/default UV extrema before corner rotation or UV lock.",
+    "SpriteContents records whole original-image transparency; opaque sheets and full source rectangles return it. Other rectangles floor float lower products and ceil float upper products; animated frames are unioned without interpolation promotion.",
+    "NativeImage empty rectangles contain no alpha samples; zero and partial alpha distinguish cutout and translucent.",
+    "RenderPipelines terrain cutout uses ALPHA_CUTOUT 0.5F and translucent terrain uses 0.1F, including multidraw variants. Terrain shader discards alpha strictly below the defined threshold."
+  ],
+  "provenance": "Official patch context and complete unofficial source/asset mirrors. No selected archive authentication, native API compilation, runtime or pixel parity established. No reproduced source bodies or shader assets bundled.",
+  "implementation": "Per-face pre-transform alphaUv metadata; distinct bounded mapped/model/sheet caches in standalone/shared preparation; empty source summaries; shared AlphaClass thresholds in GLSL generation and displayed-raster picking. Fluid groups and generic mapped material scopes retained.",
+  "testsExecuted": false,
+  "openGlContextCreated": false
+}
