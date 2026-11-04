@@ -7,25 +7,25 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** One active atlas preparation and one replaceable pending clock; never accesses a native or GL context. */
 public final class AtlasFrameWorker implements AutoCloseable {
     public static final class Request {
-        private final AtlasRaster expected;private final long tick;private final double partialTick;private final NavigableMap<AssetId,Integer> frames;
+        private final AtlasRaster expected;private final long tick;private final double partialTick;private final NavigableMap<AssetId,TextureSprite.PixelSample> samples;
         private final int changedSprites;private final long extraBytes,reservation;
-        private Request(AtlasRaster expected,long tick,double partialTick,NavigableMap<AssetId,Integer> frames,int changedSprites,long extraBytes,long reservation) {
-            this.expected=expected;this.tick=tick;this.partialTick=partialTick;this.frames=Collections.unmodifiableNavigableMap(frames);this.changedSprites=changedSprites;this.extraBytes=extraBytes;this.reservation=reservation;
+        private Request(AtlasRaster expected,long tick,double partialTick,NavigableMap<AssetId,TextureSprite.PixelSample> samples,int changedSprites,long extraBytes,long reservation) {
+            this.expected=expected;this.tick=tick;this.partialTick=partialTick;this.samples=Collections.unmodifiableNavigableMap(samples);this.changedSprites=changedSprites;this.extraBytes=extraBytes;this.reservation=reservation;
         }
         /** Metadata-only preflight. Pixel patching and page copies happen later on the worker. */
         public static Request capture(AtlasRaster expected,long tick,double partialTick) {
             Objects.requireNonNull(expected);if(expected.requiresPlaceholder())throw new IllegalArgumentException("Atlas animation requires a successful exact raster");
             if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid atlas animation clock");
-            var layout=expected.layout();var frames=new TreeMap<AssetId,Integer>();boolean[] pages=new boolean[layout.pages().size()];long patches=0,copies=0;int changed=0;
+            var layout=expected.layout();var samples=new TreeMap<AssetId,TextureSprite.PixelSample>();boolean[] pages=new boolean[layout.pages().size()];long patches=0,copies=0;int changed=0;
             for(var entry:layout.sprites().entrySet()) {
-                var slot=entry.getValue();int frame=slot.source().sample(tick,partialTick).currentFrame();frames.put(entry.getKey(),frame);
-                if(!Objects.equals(expected.frames().get(entry.getKey()),frame)) {
+                var slot=entry.getValue();var sample=slot.source().pixelSample(tick,partialTick);samples.put(entry.getKey(),sample);
+                if(!Objects.equals(expected.samples().get(entry.getKey()),sample)) {
                     changed++;patches+=slot.paddedBytes();if(!pages[slot.page()]) { pages[slot.page()]=true;copies+=layout.pages().get(slot.page()).bytes(); }
                 }
             }
             long extra=patches+copies,reservation=layout.usage().orElseThrow().knownPayloadBytes()+extra;
             if(patches>layout.limits().updateBytes()||reservation>layout.limits().workingBytes())throw new IllegalArgumentException("Atlas animation patch/copy preflight exceeds its working budget");
-            return new Request(expected,tick,partialTick,frames,changed,extra,reservation);
+            return new Request(expected,tick,partialTick,samples,changed,extra,reservation);
         }
         public AtlasRaster expected() { return expected; }
         public long tick() { return tick; }
@@ -33,8 +33,8 @@ public final class AtlasFrameWorker implements AutoCloseable {
         public int changedSprites() { return changedSprites; }
         public long extraCpuBytes() { return extraBytes; }
         public long reservation() { return reservation; }
-        /** Pixel equivalence for the supported stepped-frame path, including repeated schedule entries. */
-        public boolean samePixels(Request other) { return other!=null&&expected==other.expected&&frames.equals(other.frames); }
+        /** Equal canonical sampling inputs, including blend progress and repeated schedule entries. */
+        public boolean samePixels(Request other) { return other!=null&&expected==other.expected&&samples.equals(other.samples); }
     }
     public enum Phase { IDLE, WAITING, QUEUED, PATCHING, COPYING, READY, DELIVERED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<ClientAssetSnapshot.Receipt> assets,long tick,double partialTick,List<ModelPlan.Problem> problems) {

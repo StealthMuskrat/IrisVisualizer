@@ -103,8 +103,8 @@ public final class TextureMaterials {
                     }
                 }
             }
-            // The pinned native interpolation policy is not implemented. Conservatively retain a
-            // possible blended-alpha flag, including when binary endpoint masks differ spatially.
+            // RGBA interpolation can blend binary alpha. This conservative summary includes
+            // spatially separate masks; it does not claim that every transition blends alpha.
             boolean blend=sprite.interpolate()&&sprite.referencedFrames().size()>1&&transparent&&opaque;
             var result=new TexturePreparation.Alpha(transparent,partial,opaque,blend);scans.put(key,result);return result;
         }

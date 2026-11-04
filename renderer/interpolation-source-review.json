@@ -1,0 +1,28 @@
+{
+  "reviewedOn": "2026-11-04",
+  "minecraftProfile": "26.3",
+  "mirrorRepository": "https://github.com/InventivetalentDev/minecraft-assets",
+  "mirrorRevision": "e1bcd8e80b01c459b74213ba3d8709b24ff0ae4d",
+  "provenance": "Minecraft shader assets reproduced by an unofficial mirror; not authentication of the selected client archive",
+  "files": [
+    {
+      "path": "assets/minecraft/shaders/core/animate_sprite_interpolate.fsh",
+      "bytes": 533,
+      "sha256": "307561a222112dfb7046cb4f8191dc812f3982b6a5e61676dbb9032e2e2d0af8"
+    },
+    {
+      "path": "assets/minecraft/shaders/core/animate_sprite.vsh",
+      "bytes": 725,
+      "sha256": "0475cc3b1906af35371bbbf6f4f808eda8f8eacc0df6c56d24f3354eed6fdb3b"
+    },
+    {
+      "path": "assets/minecraft/shaders/include/animation_sprite.glsl",
+      "bytes": 248,
+      "sha256": "2b3d3099ed31c627c0c04ab2c8b741298c99e35afca0f7a69104add6d9e9af2b"
+    }
+  ],
+  "clientTimingReference": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/texture/spritecontents/",
+  "officialFeatureReference": "https://www.minecraft.net/en-us/article/minecraft-snapshot-25w44a",
+  "implementation": "Integer-tick float progress quantized to 1000 steps; unpremultiplied encoded RGBA float mix, nearest-8-bit CPU rounding; native GPU rounding/filter/mipmap parity unverified",
+  "testsExecuted": false
+}

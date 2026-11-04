@@ -19,7 +19,7 @@ Renderer implementation batch, 2026-11-03. Compilation and source inspection onl
 
 Whole-tile divisibility, positive exact dimensions, frame-index ranges and schedule budgets remain mandatory. Omitted schedules enumerate the row-major grid. Zero/one-entry schedules become static tile zero with no interpolation; source metadata digests remain unchanged. The existing sprite object carries this effective schedule through alpha classification, atlas packing, CPU raster snapshots, animation updates, GPU upload and frame-bound picking without separate layout rules.
 
-Invalid frame entries remain explicit failures. Multi-frame pixel interpolation, mipmaps, filtering and out-of-sprite UVs remain guarded or unimplemented. Static PNGs without an animation section still use the full image.
+Invalid frame entries remain explicit failures. A later [interpolation batch](INTERPOLATION.md) adds tick-quantized base-level RGBA blending; native pixel comparison, mipmaps, filtering and out-of-sprite UVs remain pending or guarded. Static PNGs without an animation section still use the full image.
 
 ## Review provenance
 

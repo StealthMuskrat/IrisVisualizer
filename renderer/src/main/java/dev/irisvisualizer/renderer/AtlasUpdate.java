@@ -10,12 +10,13 @@ public final class AtlasUpdate {
         public int rowBytes() { return pixels.width()*4; }
     }
     private final AtlasRaster expected;private final long tick;private final double partialTick;
-    private final List<Patch> patches;private final NavigableMap<AssetId,Integer> frames;private final long bytes;private final List<ModelPlan.Problem> problems;
-    private AtlasUpdate(AtlasRaster expected,long tick,double partialTick,List<Patch> patches,Map<AssetId,Integer> frames,long bytes,List<ModelPlan.Problem> problems) {
-        this.expected=Objects.requireNonNull(expected);this.tick=tick;this.partialTick=partialTick;this.patches=List.copyOf(patches);this.frames=Collections.unmodifiableNavigableMap(new TreeMap<>(frames));this.bytes=bytes;this.problems=List.copyOf(problems);
-        if(bytes<0||!problems.isEmpty()&&(!patches.isEmpty()||!frames.isEmpty()||bytes!=0))throw new IllegalArgumentException("Partial atlas update escaped failure");
+    private final List<Patch> patches;private final NavigableMap<AssetId,Integer> frames;private final NavigableMap<AssetId,TextureSprite.PixelSample> samples;private final long bytes;private final List<ModelPlan.Problem> problems;
+    private AtlasUpdate(AtlasRaster expected,long tick,double partialTick,List<Patch> patches,Map<AssetId,TextureSprite.PixelSample> samples,long bytes,List<ModelPlan.Problem> problems) {
+        this.expected=Objects.requireNonNull(expected);this.tick=tick;this.partialTick=partialTick;this.patches=List.copyOf(patches);this.samples=Collections.unmodifiableNavigableMap(new TreeMap<>(samples));this.bytes=bytes;this.problems=List.copyOf(problems);
+        var frames=new TreeMap<AssetId,Integer>();this.samples.forEach((id,sample)->frames.put(id,sample.currentFrame()));this.frames=Collections.unmodifiableNavigableMap(frames);
+        if(bytes<0||!problems.isEmpty()&&(!patches.isEmpty()||!samples.isEmpty()||bytes!=0))throw new IllegalArgumentException("Partial atlas update escaped failure");
     }
-    static AtlasUpdate success(AtlasRaster expected,long tick,double partialTick,List<Patch> patches,Map<AssetId,Integer> frames,long bytes) { return new AtlasUpdate(expected,tick,partialTick,patches,frames,bytes,List.of()); }
+    static AtlasUpdate success(AtlasRaster expected,long tick,double partialTick,List<Patch> patches,Map<AssetId,TextureSprite.PixelSample> samples,long bytes) { return new AtlasUpdate(expected,tick,partialTick,patches,samples,bytes,List.of()); }
     static AtlasUpdate placeholder(AtlasRaster expected,long tick,double partialTick,List<ModelPlan.Problem> problems) { if(problems.isEmpty())throw new IllegalArgumentException("Placeholder requires a problem");return new AtlasUpdate(expected,tick,partialTick,List.of(),Map.of(),0,problems); }
     public AtlasRaster expected() { return expected; }
     public AtlasLayout layout() { return expected.layout(); }
@@ -23,6 +24,7 @@ public final class AtlasUpdate {
     public double partialTick() { return partialTick; }
     public List<Patch> patches() { return patches; }
     public NavigableMap<AssetId,Integer> frames() { return frames; }
+    public NavigableMap<AssetId,TextureSprite.PixelSample> samples() { return samples; }
     public long bytes() { return bytes; }
     public List<ModelPlan.Problem> problems() { return problems; }
     public boolean requiresPlaceholder() { return !problems.isEmpty(); }

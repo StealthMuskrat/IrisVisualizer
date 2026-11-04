@@ -161,9 +161,6 @@ public final class WorldVisuals {
             var admitted=new ArrayList<TexturePreparation>();var rejected=new IdentityHashMap<TexturePreparation,List<ModelPlan.Problem>>();var images=new IdentityHashMap<RgbaImage,Boolean>();var sourcePackets=new IdentityHashMap<MeshPacket,Boolean>();long usedRgba=0,usedPacked=0;
             for(var prep:textures.preparations()) {
                 check();if(prep.requiresPlaceholder()) { fatal(prep.problems());rejected.put(prep,prep.problems());continue; }
-                ModelPlan.Problem unsupported=null;
-                for(var sprite:prep.sprites().values())if(sprite.interpolate()&&sprite.referencedFrames().size()>1) { unsupported=TextureMetadata.failure(ModelPlan.Code.ANIMATION,ClientAssetSnapshot.Kind.TEXTURE_METADATA,sprite.id(),"/animation/interpolate","Native multi-frame pixel interpolation remains unsupported").problem;break; }
-                if(unsupported!=null) { rejected.put(prep,List.of(unsupported));continue; }
                 admitted.add(prep);var packet=prep.mesh().packet().orElseThrow();if(sourcePackets.put(packet,Boolean.TRUE)==null)usedPacked+=packet.packedBytes();
                 for(var sprite:prep.sprites().values())if(images.put(sprite.image(),Boolean.TRUE)==null)usedRgba+=sprite.image().bytes();
             }

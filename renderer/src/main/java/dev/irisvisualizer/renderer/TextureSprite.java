@@ -15,8 +15,17 @@ public final class TextureSprite {
     public record Tile(int x,int y,int width,int height) {
         public Tile { if(x<0||y<0||width<1||height<1)throw new IllegalArgumentException("Invalid animation tile"); }
     }
-    /** Blend fraction is scheduling metadata only. Native pixel interpolation remains unimplemented. */
+    /** Continuous scheduling metadata; pixel playback uses the separately quantized pixelSample. */
     public record Sample(int sequenceIndex,int currentFrame,int nextFrame,double blend) {}
+    /** Canonical base-level pixel inputs. A zero blend selects exactly one tile. */
+    public record PixelSample(int currentFrame,int nextFrame,int blendSteps) {
+        public PixelSample {
+            if(currentFrame<0||nextFrame<0||blendSteps<0||blendSteps>1000)throw new IllegalArgumentException("Invalid sprite pixel sample");
+            if(blendSteps==1000) { currentFrame=nextFrame;blendSteps=0; }
+            if(blendSteps==0||currentFrame==nextFrame) { nextFrame=currentFrame;blendSteps=0; }
+        }
+        public boolean blended() { return blendSteps!=0; }
+    }
     private final AssetId id;private final String pngSha256;private final Optional<String> metadataSha256;
     private final RgbaImage image;private final Settings settings;private final int frameWidth,frameHeight,columns,tiles;
     private final boolean animated,interpolate;private final List<Frame> frames;private final List<Integer> referencedFrames;
@@ -51,5 +60,17 @@ public final class TextureSprite {
         while(low<high) { int middle=(low+high)>>>1;if(time<ends[middle])high=middle;else low=middle+1; }
         long start=low==0?0:ends[low-1];double blend=interpolate?Math.min(Math.nextDown(1.0),(time-start+partialTick)/frames.get(low).ticks()):0;
         return new Sample(low,frames.get(low).index(),frames.get((low+1)%frames.size()).index(),blend);
+    }
+    /**
+     * Reviewed 26.3 playback: integer sub-frame ticks, float division and thousandth quantization.
+     * Partial ticks are validated for API consistency but do not advance pixel interpolation.
+     */
+    public PixelSample pixelSample(long tick,double partialTick) {
+        var sample=sample(tick,partialTick);int slot=sample.sequenceIndex(),steps=0;
+        if(interpolate&&sample.currentFrame()!=sample.nextFrame()) {
+            long start=slot==0?0:ends[slot-1],elapsed=tick%cycleTicks-start;
+            steps=Math.clamp((int)(((float)elapsed/frames.get(slot).ticks())*1000.0f),0,1000);
+        }
+        return new PixelSample(sample.currentFrame(),sample.nextFrame(),steps);
     }
 }
