@@ -38,15 +38,16 @@ public final class WorldMesher {
                 for(var face:mesh.faces()) {
                     WorldProblem.check(cancelled);if(hidden(cell,face))continue;
                     faceCount++;if(face.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)translucentCount++;
-                    if(faceCount>limits.faces()||outputBytes()>limits.meshBytes())throw WorldProblem.at(WorldProblem.Code.LIMIT,world.extent().position(cell),"World section face, packed or translucent-metadata budget reached");
+                    if(faceCount>limits.faces()||outputBytes()>limits.meshBytes())throw WorldProblem.at(WorldProblem.Code.LIMIT,world.extent().position(cell),"World section face, packed or mesh-metadata budget reached");
                 }
                 if(faceCount>before)cellCount++;
             }
         }
-        long outputBytes() { return (long)faceCount*MeshPacket.PACKED_BYTES_PER_QUAD+(long)translucentCount*WorldMesh.TRANSLUCENT_BYTES_PER_FACE; }
+        long outputBytes() { return (long)faceCount*MeshPacket.PACKED_BYTES_PER_QUAD+(long)translucentCount*WorldMesh.TRANSLUCENT_BYTES_PER_FACE+WorldMesh.batchBytes(faceCount); }
         WorldMesh build(WorldMesh.Usage usage) {
             float[] vertices=new float[faceCount*4*MeshPacket.STRIDE_FLOATS];int[] indices=new int[faceCount*6];
             int[] translucentFaces=new int[translucentCount];double[] translucentCenters=new double[translucentCount*3];
+            float[] faceBatches=new float[(int)(WorldMesh.batchBytes(faceCount)/Float.BYTES)];
             var cells=new ArrayList<WorldMesh.Cell>(cellCount);var faces=new ArrayList<WorldMesh.Face>(faceCount);var markers=new ArrayList<WorldMesh.Marker>(markerCount);var ranges=new ArrayList<AtlasMesh.DrawRange>();
             int rangeStart=0,rangePage=-1,translucentAt=0;TexturePreparation.AlphaClass rangeAlpha=null;
             for(int y=0;y<extent.height();y++)for(int z=0;z<extent.depth();z++)for(int x=0;x<extent.width();x++) {
@@ -62,9 +63,12 @@ public final class WorldMesher {
                     boolean model=face.source().placement()==BlockMesh.Placement.MODEL;
                     boolean translucent=face.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT;double centerX=0,centerY=0,centerZ=0;
                     double placedX=model?offsetX:x,placedY=model?offsetY:y,placedZ=model?offsetZ:z;
+                    int batch=destination/WorldMesh.BATCH_FACES*6;
                     for(int vertex=0;vertex<4;vertex++) {
                         int from=sourceBase+vertex*MeshPacket.STRIDE_FLOATS,to=destinationBase+vertex*MeshPacket.STRIDE_FLOATS;
                         float px=(float)(placedX+source.vertices().get(from)),py=(float)(placedY+source.vertices().get(from+1)),pz=(float)(placedZ+source.vertices().get(from+2));bounds(px,py,pz,cell);
+                        if(destination%WorldMesh.BATCH_FACES==0&&vertex==0) { faceBatches[batch]=faceBatches[batch+3]=px;faceBatches[batch+1]=faceBatches[batch+4]=py;faceBatches[batch+2]=faceBatches[batch+5]=pz; }
+                        else { faceBatches[batch]=Math.min(faceBatches[batch],px);faceBatches[batch+1]=Math.min(faceBatches[batch+1],py);faceBatches[batch+2]=Math.min(faceBatches[batch+2],pz);faceBatches[batch+3]=Math.max(faceBatches[batch+3],px);faceBatches[batch+4]=Math.max(faceBatches[batch+4],py);faceBatches[batch+5]=Math.max(faceBatches[batch+5],pz); }
                         vertices[to]=px;vertices[to+1]=py;vertices[to+2]=pz;for(int component=3;component<8;component++)vertices[to+component]=source.vertices().get(from+component);
                         if(translucent) { centerX+=px;centerY+=py;centerZ+=pz; }
                     }
@@ -79,7 +83,7 @@ public final class WorldMesher {
             }
             if(rangePage>=0)ranges.add(new AtlasMesh.DrawRange(rangeStart,indices.length-rangeStart,rangePage,rangeAlpha));
             if(faces.size()!=faceCount||markers.size()!=markerCount||cells.size()!=cellCount||translucentAt!=translucentCount)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Section count and emit passes disagree");
-            WorldProblem.check(cancelled);return WorldMesh.success(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,cells,faces,markers,ranges,bounds(),usage);
+            WorldProblem.check(cancelled);return WorldMesh.success(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,faceBatches,cells,faces,markers,ranges,bounds(),usage);
         }
     }
     public static WorldMesh assemble(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,BooleanSupplier cancelled) { return assemble(models,visibility,extent,Limits.DEFAULT,cancelled); }

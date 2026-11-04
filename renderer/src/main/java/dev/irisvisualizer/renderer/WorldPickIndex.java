@@ -9,7 +9,7 @@ import java.util.function.BooleanSupplier;
 public final class WorldPickIndex implements AutoCloseable {
     private static final double[] EMPTY_BOUNDS=new double[0];private static final int[] EMPTY_NODES=new int[0];
     private static final float[] EMPTY_RANGE_BOUNDS=new float[0];
-    public static final int BATCH_PRIMITIVES=128;
+    public static final int BATCH_PRIMITIVES=WorldMesh.BATCH_FACES;
     private static final class Ranges {
         static final Ranges EMPTY=new Ranges(0,0);
         final float[] bounds;final int[] starts;
@@ -57,7 +57,7 @@ public final class WorldPickIndex implements AutoCloseable {
         Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();
         try {
             WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0;
-            for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=(mesh.faces().size()+BATCH_PRIMITIVES-1)/BATCH_PRIMITIVES;markers+=(mesh.markers().size()+BATCH_PRIMITIVES-1)/BATCH_PRIMITIVES; }
+            for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=(mesh.markers().size()+BATCH_PRIMITIVES-1)/BATCH_PRIMITIVES; }
             int nodes=count==0?0:count*2-1,starts=(faces==0?0:scene.sections().size()+1)+(markers==0?0:scene.sections().size()+1);
             long bytes=(long)nodes*60+((long)faces+markers)*6*Float.BYTES+(long)starts*Integer.BYTES,peak=bytes+(long)count*4+(count==0?0:4);
             if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking hierarchy/range arrays or combined CPU payload budget exceeded");
@@ -96,15 +96,9 @@ public final class WorldPickIndex implements AutoCloseable {
             WorldProblem.check(cancelled);var mesh=scene.sections().get(sectionIndex);
             if(faceRanges!=Ranges.EMPTY)faceRanges.starts[sectionIndex]=faceBatch;
             if(markerRanges!=Ranges.EMPTY)markerRanges.starts[sectionIndex]=markerBatch;
-            if(!mesh.faces().isEmpty()) {
-                var vertices=mesh.vertexBuffer();
-                for(int first=0;first<mesh.faces().size();first+=BATCH_PRIMITIVES) {
-                    WorldProblem.check(cancelled);int at=faceBatch++*6,end=Math.min(mesh.faces().size(),first+BATCH_PRIMITIVES);emptyBounds(faceRanges,at);
-                    for(int face=first;face<end;face++)for(int vertex=0;vertex<4;vertex++)for(int axis=0;axis<3;axis++) {
-                        float value=vertices.get((face*4+vertex)*MeshPacket.STRIDE_FLOATS+axis);
-                        include(faceRanges,at,axis,value,value);
-                    }
-                }
+            for(int batch=0;batch<mesh.faceBatchCount();batch++) {
+                WorldProblem.check(cancelled);int at=faceBatch++*6;
+                for(int axis=0;axis<3;axis++) { faceRanges.bounds[at+axis]=mesh.faceBatchMinimum(batch,axis);faceRanges.bounds[at+axis+3]=mesh.faceBatchMaximum(batch,axis); }
             }
             for(int first=0;first<mesh.markers().size();first+=BATCH_PRIMITIVES) {
                 WorldProblem.check(cancelled);int at=markerBatch++*6,end=Math.min(mesh.markers().size(),first+BATCH_PRIMITIVES);emptyBounds(markerRanges,at);

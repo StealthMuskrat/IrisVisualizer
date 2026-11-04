@@ -22,10 +22,11 @@ Repeated poses therefore avoid opaque/cutout face scans and vertex-buffer reads 
 | --- | --- |
 | Original packed quad vertices/indices | 152 per emitted face |
 | Retained translucent index and double XYZ center | 28 per translucent face |
+| [Prepared face bounds](../renderer-gl/WORLD-RANGES.md) | 24 per group of up to 128 emitted faces |
 | Camera order and merge scratch | 32 per translucent face during sorting |
 | Retained completed camera order | 8 per translucent face |
 
-`WorldMesh.packedBytes()` continues to report only vertices/indices; `translucentBytes()` reports the new CPU metadata. `Usage.outputBytes()` includes both, and scene planning, cache reservations, source leases, picking/worker admission and GPU source journals inherit the complete retained CPU charge. Empty metadata arrays add no primitive payload; Java array/object overhead remains outside this accounting.
+`WorldMesh.packedBytes()` continues to report only vertices/indices; `translucentBytes()` reports the new CPU metadata. `faceBatchBytes()` separately reports prepared face bounds. `Usage.outputBytes()` includes all three, and scene planning, cache reservations, source leases, picking/worker admission and GPU source journals inherit the complete retained CPU charge. Empty metadata arrays add no primitive payload; Java array/object overhead remains outside this accounting.
 
 Existing section/scene/cache/shared byte ceilings and face limits are unchanged. Metadata is charged against section mesh and combined working allowances before allocation, so heavily translucent scenes can reach an existing limit sooner. Failed planning or emission publishes a complete diagnostic result rather than truncated geometry.
 

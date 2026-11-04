@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer.gl;
 import dev.irisvisualizer.renderer.BlockMesh;
 import dev.irisvisualizer.renderer.NoiseSurface;
 import dev.irisvisualizer.renderer.WorldClip;
+import dev.irisvisualizer.renderer.WorldMesh;
 
 /** Conservative section AABB rejection using the exact float matrix submitted to the GPU. */
 final class GlFrustum {
@@ -17,6 +18,16 @@ final class GlFrustum {
     boolean visible(BlockMesh.Bounds bounds,float[] offsets,int at) {
         double minX=(double)offsets[at]+bounds.min().x(),minY=(double)offsets[at+1]+bounds.min().y(),minZ=(double)offsets[at+2]+bounds.min().z();
         double maxX=(double)offsets[at]+bounds.max().x(),maxY=(double)offsets[at+1]+bounds.max().y(),maxZ=(double)offsets[at+2]+bounds.max().z();
+        return visible(minX,minY,minZ,maxX,maxY,maxZ);
+    }
+    /** Original-order world face bounds, using the geometry shader's float anchor addition. */
+    boolean visible(WorldMesh mesh,int batch,float[] offsets,int at,WorldClip.Bounds clip) {
+        float minX=offsets[at]+mesh.faceBatchMinimum(batch,0),minY=offsets[at+1]+mesh.faceBatchMinimum(batch,1),minZ=offsets[at+2]+mesh.faceBatchMinimum(batch,2);
+        float maxX=offsets[at]+mesh.faceBatchMaximum(batch,0),maxY=offsets[at+1]+mesh.faceBatchMaximum(batch,1),maxZ=offsets[at+2]+mesh.faceBatchMaximum(batch,2);
+        if(clip!=null) {
+            double magnitude=Math.max(Math.max(Math.abs(minX),Math.abs(maxX)),Math.max(Math.max(Math.abs(minY),Math.abs(maxY)),Math.max(Math.abs(minZ),Math.abs(maxZ)))),margin=4*(double)Math.ulp((float)magnitude)+1e-6;
+            if(!clip.intersects(minX-margin,minY-margin,minZ-margin,maxX+margin,maxY+margin,maxZ+margin))return false;
+        }
         return visible(minX,minY,minZ,maxX,maxY,maxZ);
     }
     /** Bounds follow the scalar shader's integer-grid float product and float anchor addition. */

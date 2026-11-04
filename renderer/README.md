@@ -261,3 +261,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared translucent centers
 
 [Per-section transparent face metadata](TRANSLUCENT-CENTERS.md) now moves centroid calculation into mesh emission. Camera sorts visit only translucent entries while preserving exact source face keys, depth arithmetic and stable ties. The 28-byte CPU entries share existing section/cache/working limits; GPU transfer totals retain the original layouts. Sort publication failures now report the current revision and allow later requests after cleanup. All 129 CPU/OpenGL sources compile; runtime/concurrency/native/GPU checks remain deferred and unsupported previews stay disabled.
+
+## Prepared world face bounds
+
+[World solid-face ranges](../renderer-gl/WORLD-RANGES.md) now accumulate six bounds floats per 128 original emitted faces, charged before output allocation. Opaque/cutout drawing can reject hidden portions of visible sections while coalescing adjacent surviving material spans; picking-index preparation copies the prepared bounds without rescanning vertices. Source identity, transparent ordering and existing memory ceilings remain intact. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation and editor integration remain deferred, with unsupported previews disabled.

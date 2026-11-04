@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer.gl;
 import dev.irisvisualizer.renderer.TexturePreparation;
 import dev.irisvisualizer.renderer.WorldClip;
 import dev.irisvisualizer.renderer.BlockMesh;
+import dev.irisvisualizer.renderer.WorldMesh;
 import java.nio.*;
 import java.util.Objects;
 import static org.lwjgl.opengl.GL33C.*;
@@ -127,17 +128,23 @@ public final class GlRenderer implements AutoCloseable {
         Objects.requireNonNull(atlas);Objects.requireNonNull(plan);draw(scene,atlas,plan,target,camera);
     }
     /** Submission counts are returned only after a complete draw and host-state restoration. */
-    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices) {
+    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces) {
+        public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,0,0,0); }
         public FrameStats {
-            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0)throw new IllegalArgumentException("Invalid frame submission counts");
+            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0||solidRangeTests<0||culledSolidRanges<0||culledSolidRanges>solidRangeTests||culledSolidFaces<0)throw new IllegalArgumentException("Invalid frame submission counts");
         }
     }
     public FrameStats renderFrame(GlScene scene,GlTarget target,GlCamera camera) { return draw(scene,null,null,target,camera); }
     /** Null atlas/order select the base raster/no order; translucent scenes still require an order. */
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) { return draw(scene,atlas,plan,target,camera); }
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip) { return draw(scene,atlas,plan,target,camera,clip); }
+    /** Disable only solid face-range rejection for later differential pixel/submission comparisons. */
+    public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) { return draw(scene,atlas,plan,target,camera,clip,rangeCulling); }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) { return draw(scene,atlas,plan,target,camera,WorldClip.NONE); }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip) {
+        return draw(scene,atlas,plan,target,camera,clip,true);
+    }
+    private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) {
         Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");device.live(scene.allocation);device.live(target.allocation);scene.cpuScene();device.collect();
         if(plan!=null&&plan.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Face order and renderer must share one device");
@@ -150,16 +157,32 @@ public final class GlRenderer implements AutoCloseable {
             if(section.bounds().isEmpty()) { empty++;continue; }
             visible[i]=frustum.visible(section.bounds().orElseThrow(),offsets,i*3)&&(!clip.enabled()||clipVisible(clipBounds,section.bounds().orElseThrow(),offsets,i*3));if(visible[i])shown++;else culled++;
         }
-        int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0;long indices=0;
+        int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0,rangeTests=0,culledRanges=0,culledFaces=0;long indices=0;var meshes=scene.cpuScene().sections();
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
             glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);glUniform1i(geometryLighting,scene.nativeLighting?1:0);geometryClip.set(clip.enabled(),clipBounds);
             for(int i=0;i<scene.sections.size();i++) {
                 var section=scene.sections.get(i);if(!visible[i]||section.geometryVao()==0)continue;glUniform3f(geometryOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.geometryVao());
-                for(var range:section.ranges()) { if(range.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)continue;glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryPass,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4);solidCalls++;indices+=range.indexCount(); }
+                var mesh=meshes.get(i);
+                for(var range:section.ranges()) {
+                    if(range.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)continue;glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryPass,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);
+                    if(!rangeCulling) { glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4);solidCalls++;indices+=range.indexCount();continue; }
+                    int end=(range.firstIndex()+range.indexCount())/6,run=-1;
+                    for(int face=range.firstIndex()/6;face<end;) {
+                        int batch=face/WorldMesh.BATCH_FACES,stop=Math.min(end,(batch+1)*WorldMesh.BATCH_FACES);rangeTests++;
+                        if(frustum.visible(mesh,batch,offsets,i*3,clip.enabled()?clipBounds:null)) { if(run<0)run=face; }
+                        else {
+                            culledRanges++;culledFaces+=stop-face;
+                            if(run>=0) { int count=(face-run)*6;glDrawElements(GL_TRIANGLES,count,GL_UNSIGNED_INT,(long)run*24);solidCalls++;indices+=count;run=-1; }
+                        }
+                        face=stop;
+                    }
+                    // Keep adjacent surviving groups in one original material draw, without index copies.
+                    if(run>=0) { int count=(end-run)*6;glDrawElements(GL_TRIANGLES,count,GL_UNSIGNED_INT,(long)run*24);solidCalls++;indices+=count; }
+                }
             }
             if(order!=null&&order.size()>0) {
-                state.translucent();glUniform1i(geometryPass,2);var meshes=scene.cpuScene().sections();int boundSection=-1,boundPage=-1;
+                state.translucent();glUniform1i(geometryPass,2);int boundSection=-1,boundPage=-1;
                 for(int at=0;at<order.size();) {
                     int index=order.section(at),face=order.face(at);if(!visible[index]) { at++;continue; }var section=scene.sections.get(index);var faces=meshes.get(index).faces();int page=faces.get(face).source().page(),count=1;
                     // Merge only consecutive source indices already adjacent in the sorted order.
@@ -173,7 +196,7 @@ public final class GlRenderer implements AutoCloseable {
             for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(!visible[i]||section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount());markerCalls++;markers+=section.markerCount(); }
             device.check("complete offscreen scene draw");
         }
-        target.complete=true;return new FrameStats(scene.sections.size(),empty,shown,culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices);
+        target.complete=true;return new FrameStats(scene.sections.size(),empty,shown,culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices,rangeTests,culledRanges,culledFaces);
     }
     private static boolean clipVisible(WorldClip.Bounds clip,BlockMesh.Bounds bounds,float[] offsets,int at) {
         float minX=offsets[at]+bounds.min().x(),minY=offsets[at+1]+bounds.min().y(),minZ=offsets[at+2]+bounds.min().z();

@@ -23,7 +23,7 @@ public final class GlUpload implements AutoCloseable {
     private long markerBytes,uploadedBytes;private int page,pageRow,section,bufferSlot,vaoSlot,geometryVao,markerVao,vertexBuffer,indexBuffer,markerBuffer,vertexWordOffset,indexOffset,markerOffset;
     private GlUpload(GlRenderer renderer,WorldScene scene,WorldTint tint,WorldLighting lighting,GlDevice.Allocation allocation) {
         this.renderer=renderer;device=renderer.device;this.scene=scene;this.tint=tint;this.lighting=lighting;this.allocation=allocation;vertexWords=lighting==null?9:12;vertexBytes=vertexWords*4;source=scene.snapshot().source();
-        // CPU meshBytes also includes translucent centers; only packed geometry reaches GPU storage.
+        // CPU meshBytes also includes face bounds/translucent centers; only packed geometry reaches GPU storage.
         totalSections=scene.sections().size();totalFaces=scene.usage().faces();totalBytes=(long)totalFaces*(MeshPacket.PACKED_BYTES_PER_QUAD+16+(lighting==null?0:48))+(long)scene.usage().markers()*12+scene.raster().rgbaBytes();sections=new ArrayList<>(totalSections);
     }
     /** Fresh nonnull leases transfer on every outcome; re-transferring a device-owned lease is rejected intact. */

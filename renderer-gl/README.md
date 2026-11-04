@@ -160,3 +160,7 @@ The scalar view now accepts [geometry-sharing color requests](../renderer/SCALAR
 ## Prepared translucent centers
 
 World camera sorting now consumes [prepared translucent face indices and centers](../renderer/TRANSLUCENT-CENTERS.md), avoiding repeated opaque-face scans and vertex-buffer reads. CPU source journals include the metadata, while upload storage/transfer totals use only actual GPU geometry/material/lighting, markers and atlas pixels. Stable global ordering and existing vertex layouts remain intact. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
+
+## World solid-face ranges
+
+[Prepared world face bounds](WORLD-RANGES.md) now support conservative frustum/clip rejection inside visible opaque/cutout sections. Adjacent visible groups keep one original material draw; frame/readback stats report tested/rejected intersections and skipped faces, with a low-level comparison mode. CPU metadata stays charged to source ownership and never enters GPU geometry storage. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU checks remain deferred and unsupported previews stay disabled.
