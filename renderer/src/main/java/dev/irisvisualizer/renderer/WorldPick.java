@@ -9,7 +9,10 @@ public record WorldPick(UUID indexId,WorldSnapshot.Source source,WorldRay ray,Op
         public Hit { Objects.requireNonNull(position);Objects.requireNonNull(state);Objects.requireNonNull(biome);Objects.requireNonNull(surface);visualProblems=List.copyOf(visualProblems);if(section<0||face< -1||marker< -1||(face>=0)==(marker>=0)||surface.isPresent()!=(face>=0)||!Double.isFinite(distance)||distance<0||!Double.isFinite(localX)||!Double.isFinite(localY)||!Double.isFinite(localZ))throw new IllegalArgumentException("Invalid picked native hit"); }
         public boolean placeholder() { return marker>=0; }
     }
-    public record Stats(int nodes,int sections,int faces,int markers,int alphaRejected) { public Stats { if(nodes<0||sections<0||faces<0||markers<0||alphaRejected<0)throw new IllegalArgumentException("Invalid picking counts"); } }
+    public record Stats(int nodes,int sections,int faces,int markers,int alphaRejected,int batches,int culledBatches) {
+        public Stats(int nodes,int sections,int faces,int markers,int alphaRejected) { this(nodes,sections,faces,markers,alphaRejected,0,0); }
+        public Stats { if(nodes<0||sections<0||faces<0||markers<0||alphaRejected<0||batches<0||culledBatches<0||culledBatches>batches)throw new IllegalArgumentException("Invalid picking counts"); }
+    }
     public WorldPick(UUID indexId,WorldSnapshot.Source source,WorldRay ray,Optional<Hit> hit,Stats stats,List<WorldProblem> problems) { this(indexId,source,ray,hit,stats,problems,WorldClip.NONE); }
     public WorldPick { Objects.requireNonNull(clip);Objects.requireNonNull(indexId);Objects.requireNonNull(source);Objects.requireNonNull(ray);Objects.requireNonNull(hit);Objects.requireNonNull(stats);problems=List.copyOf(problems);if(!problems.isEmpty()&&hit.isPresent())throw new IllegalArgumentException("Partial picking hit escaped failure"); }
     public boolean requiresPlaceholder() { return !problems.isEmpty(); }

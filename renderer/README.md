@@ -240,3 +240,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Original JPEG images
 
 [Bounded JPEG decoding](JPEG-IMAGES.md) now extends original-image viewing to common eight-bit grayscale/RGB/YCbCr inputs, including progressive images, through the standard Java codec. Background marker/table/scan and working-memory preflight rejects unsupported or incomplete data before publication; source-format receipts follow pixel inspection, GPU frames and readback. Atlas textures remain PNG-only. All 128 CPU/OpenGL sources compile; renderer-stage runtime tests, Windows/GPU comparison and final editor routing remain deferred. Unsupported previews remain disabled.
+
+## World picking ranges
+
+[Primitive range culling](PICKING-RANGES.md) now skips missed, clipped and behind-nearest groups of up to 128 world faces or diagnostic markers before individual tests. Original primitive order, native hit identity, alpha/clip policy and failure atomicity remain intact; range counters and an exhaustive option support later comparisons. Bounds/offsets share existing index/source admission and close-with-in-flight-query ownership. All 128 CPU/OpenGL sources compile; runtime/performance/native/GPU checks and final editor routing remain deferred, with unsupported previews disabled.
