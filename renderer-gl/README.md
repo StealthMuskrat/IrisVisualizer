@@ -155,3 +155,8 @@ Native terrain maps now support [optional CPU slope lighting](../renderer/TERRAI
 ## Scalar recoloring
 
 The scalar view now accepts [geometry-sharing color requests](../renderer/SCALAR-COLORS.md), including explicit retained displayed surfaces through rapid replacements. Native volume/geometry-policy guards reject stale reuse; camera and clip remain intact. Uploads read prepared RGBA directly through the unchanged twelve-byte instance format, with old/new colors included in CPU/shared admission and old frames preserved. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); renderer-stage runtime/native/GPU checks remain deferred and unsupported previews disabled.
+
+
+## Prepared translucent centers
+
+World camera sorting now consumes [prepared translucent face indices and centers](../renderer/TRANSLUCENT-CENTERS.md), avoiding repeated opaque-face scans and vertex-buffer reads. CPU source journals include the metadata, while upload storage/transfer totals use only actual GPU geometry/material/lighting, markers and atlas pixels. Stable global ordering and existing vertex layouts remain intact. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.

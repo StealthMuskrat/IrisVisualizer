@@ -63,7 +63,7 @@ public final class WorldOrderWorker implements AutoCloseable {
     private void drain() {
         while(true) {
             Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
-            try { execute(job); }finally { synchronized(lock) { active=null;if(job.releaseAdmission) { job.admission.shrinkTo(job.retainedBytes);job.admission.close(); }job=null; } }
+            try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;boolean release=job.releaseAdmission;job=null;if(release) { hold.shrinkTo(retained);hold.close(); } } }
         }
     }
     private void execute(Job job) {
@@ -81,6 +81,8 @@ public final class WorldOrderWorker implements AutoCloseable {
                     else { if(problems.isEmpty())problems=List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Sorting ended without a complete face order"));status=status(job,Phase.FAILED,problems); }
                 }
             }
+        }catch(RuntimeException|OutOfMemoryError failure) {
+            synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,Phase.FAILED,List.of(problem(failure,"Translucent order publication failed"))); }
         }finally { if(!retained)job.owner.close();job.releaseAdmission=true; }
     }
     @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }

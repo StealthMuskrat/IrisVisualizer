@@ -256,3 +256,8 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared scalar colors
 
 [CPU color preparation and geometry-sharing recolors](SCALAR-COLORS.md) now remove scalar ramp evaluation from uploads/picking. Color-only requests reuse complete face/range/volume data on the existing worker, with explicit old/new color admission and retained-frame support during rapid replacements. CPU mesh accounting adds four bytes per face while GPU instances stay twelve bytes; existing ceilings and native samples remain unchanged. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and final editor routing remain deferred, with unsupported previews disabled.
+
+
+## Prepared translucent centers
+
+[Per-section transparent face metadata](TRANSLUCENT-CENTERS.md) now moves centroid calculation into mesh emission. Camera sorts visit only translucent entries while preserving exact source face keys, depth arithmetic and stable ties. The 28-byte CPU entries share existing section/cache/working limits; GPU transfer totals retain the original layouts. Sort publication failures now report the current revision and allow later requests after cleanup. All 129 CPU/OpenGL sources compile; runtime/concurrency/native/GPU checks remain deferred and unsupported previews stay disabled.

@@ -32,6 +32,8 @@ Map and atlas submission use `holdReplacing` to admit a new job while consuming 
 
 A ready output still sharing its account with an executing job supplies no release credit. The completion handle may be consumed, while the active job's independent handle keeps the original account fully charged until unwinding. Caller-transferred or explicitly retained handles likewise keep their charge and cannot be reclaimed by worker replacement.
 
+The sorting worker also catches completion-publication failures, preserving latest-revision reporting and allowing later requests after normal cleanup. It drops its job reference before shrinking scratch to retained output; source cleanup must succeed before admission is released. See [prepared translucent centers](TRANSLUCENT-CENTERS.md) for CPU metadata and GPU transfer accounting.
+
 Only idle payload whose ownership can be dropped without external cleanup belongs in this replacement operation. The ordering worker admits its new job before closing prior scene owners and deliberately uses conservative overlap rather than idle replacement credit. A budget failure therefore does not require destroying an old scene to make the replacement concrete.
 
 All replacement metadata, iterator and account/hold objects are allocated before old handles are consumed. Failed account insertion removes the empty account. No callback, resource deletion or native/GL work runs under the coordinator lock. Replacement is bounded to 256 supplied handles and respects the existing account-count ceiling.

@@ -1,6 +1,5 @@
 package dev.irisvisualizer.renderer;
 
-import java.nio.FloatBuffer;
 import java.util.*;
 import java.util.function.BooleanSupplier;
 
@@ -25,19 +24,19 @@ public final class WorldDrawOrder {
     }
     private static WorldDrawOrder execute(WorldScene scene,View view,Limits limits,BooleanSupplier cancelled) {
         int count=0;
-        for(var mesh:scene.sections())for(int f=0;f<mesh.faces().size();f++) { if((f&1023)==0)WorldProblem.check(cancelled);if(mesh.faces().get(f).source().alpha()==TexturePreparation.AlphaClass.TRANSLUCENT&&++count>limits.faces())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent face count exceeds the global sorting budget"); }
+        for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.translucentCount()>limits.faces()-count)throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent face count exceeds the global sorting budget");count+=mesh.translucentCount(); }
         long bytes=(long)count*32;if(bytes>limits.sortBytes()||scene.usage().knownPayloadBytes()+bytes>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent order/scratch or combined CPU payload budget exceeded");
         long[] keys=new long[count],scratchKeys=new long[count];double[] depths=new double[count],scratchDepths=new double[count];
         double fx=view.targetX()-view.eyeX(),fy=view.targetY()-view.eyeY(),fz=view.targetZ()-view.eyeZ(),length=Math.sqrt(fx*fx+fy*fy+fz*fz);if(length<1e-8)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"View direction is too small for stable sorting");fx/=length;fy/=length;fz/=length;int at=0;
         for(int section=0;section<scene.sections().size();section++) {
             WorldProblem.check(cancelled);var mesh=scene.sections().get(section);long dx=Math.subtractExact(mesh.origin().x(),view.anchor().x()),dz=Math.subtractExact(mesh.origin().z(),view.anchor().z()),dy=(long)mesh.origin().y()-view.anchor().y();
-            if(Math.abs((double)dx)>1048576||Math.abs((double)dy)>1048576||Math.abs((double)dz)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Section lies outside view-relative precision bounds");FloatBuffer vertices=mesh.vertexBuffer();
-            for(int face=0;face<mesh.faces().size();face++) {
-                if((face&1023)==0)WorldProblem.check(cancelled);if(mesh.faces().get(face).source().alpha()!=TexturePreparation.AlphaClass.TRANSLUCENT)continue;double x=0,y=0,z=0;
-                for(int vertex=0;vertex<4;vertex++) { int offset=(face*4+vertex)*MeshPacket.STRIDE_FLOATS;x+=vertices.get(offset);y+=vertices.get(offset+1);z+=vertices.get(offset+2); }
-                keys[at]=(long)section<<32|face&0xffffffffL;depths[at]=(dx+x/4-view.eyeX())*fx+(dy+y/4-view.eyeY())*fy+(dz+z/4-view.eyeZ())*fz;if(!Double.isFinite(depths[at]))throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Translucent depth is not finite");at++;
+            if(Math.abs((double)dx)>1048576||Math.abs((double)dy)>1048576||Math.abs((double)dz)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Section lies outside view-relative precision bounds");
+            for(int index=0;index<mesh.translucentCount();index++) {
+                if((index&1023)==0)WorldProblem.check(cancelled);int face=mesh.translucentFace(index);
+                keys[at]=(long)section<<32|face&0xffffffffL;depths[at]=(dx+mesh.translucentCenter(index,0)-view.eyeX())*fx+(dy+mesh.translucentCenter(index,1)-view.eyeY())*fy+(dz+mesh.translucentCenter(index,2)-view.eyeZ())*fz;if(!Double.isFinite(depths[at]))throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Translucent depth is not finite");at++;
             }
         }
+        if(at!=count)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Translucent metadata count changed during ordering");
         for(int width=1;width<count;width*=2) {
             WorldProblem.check(cancelled);
             for(int start=0;start<count;start+=width*2) {
