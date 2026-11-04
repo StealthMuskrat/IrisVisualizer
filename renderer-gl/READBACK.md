@@ -68,3 +68,5 @@ The readback guard now shares the [complete core pixel-store capture](HOST-STATE
 ## Scalar completed images
 
 Readback now also accepts `GlNoiseFrame` through both direct and queue overloads. `Pixels.noise()` retains its exact detached volume UUID, native resource/grid, display interval/colors, camera and frame statistics; it contains no scalar arrays or GL owner. Exactly one world/map/noise receipt is required. The original world/map constructor and transfer/pack/fence/journal contracts remain unchanged. See [NOISE-VIEW.md](NOISE-VIEW.md) for scalar lifetimes and deferred pixel checks.
+
+Original pack images now enter through `GlReadback.begin(GlImageFrame)` and the queue overload. `Pixels.sourceImage` carries its exact original-source receipt plus viewport transform/dimensions, exclusively with the world/map/noise receipts. Earlier constructors remain available. Readback pixels describe the rendered viewport; source PNG dimensions and original pixels remain distinct. See [IMAGE-VIEW.md](IMAGE-VIEW.md).

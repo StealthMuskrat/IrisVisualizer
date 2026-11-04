@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its eighty-three main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its eighty-five main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -220,3 +220,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Model source alpha and terrain thresholds
 
 [Baked model materials](MODEL-MATERIALS.md) now retain pre-transform source UVs for reviewed 26.3 pass selection, including exclusive region bounds, complete-sheet fast paths and empty source windows. Conservative mapped diagnostics remain separate; fluid groups retain their own scope. Shared alpha thresholds now drive GLSL and displayed-raster picking together: 0.5 for cutout and 0.1 for translucent. The existing scan/pixel and geometry/GPU budgets remain unchanged. Compilation/source inspection only; native/runtime/GPU comparison and renderer-stage tests remain deferred.
+
+## Original pack images
+
+[Source image preparation](IMAGES.md) now detaches original PNG bytes, decodes complete source dimensions asynchronously, records exact resource/revision/SHA receipts and supports original RGBA pixel inspection. The separate [GPU image view](../renderer-gl/IMAGE-VIEW.md) connects bounded row upload, fit/pan/zoom, independent immutable frames and distinct readback receipts without fabricating native map samples. All 126 CPU/OpenGL main sources compile (85 CPU, 41 GL); 16 native adapters remain syntax-only. Tests and editor integration remain deferred; unsupported previews remain disabled.

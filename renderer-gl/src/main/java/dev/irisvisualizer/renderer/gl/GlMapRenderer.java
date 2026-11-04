@@ -42,9 +42,16 @@ public final class GlMapRenderer implements AutoCloseable {
     }
     /** Inputs are borrowed. Restoration must succeed before target.frameComplete becomes true. */
     public void render(GlMap map,GlTarget target,MapView view) {
-        Objects.requireNonNull(map);Objects.requireNonNull(target);Objects.requireNonNull(view);device.live(allocation);
-        if(map.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Map, target and renderer must share their original device");
-        int texture=map.textureId();device.live(target.allocation);if(view.width()!=map.width()||view.height()!=map.height())throw new GlFailure(GlFailure.Code.STALE,"Map transform dimensions differ from its exact uploaded image");
+        Objects.requireNonNull(map);render(map.device,map.textureId(),map.width(),map.height(),target,view);
+    }
+    /** Original pack images share canvas drawing without acquiring native-map identities. */
+    public void render(GlImage source,GlTarget target,MapView view) {
+        Objects.requireNonNull(source);render(source.device,source.textureId(),source.width(),source.height(),target,view);
+    }
+    private void render(GlDevice sourceDevice,int texture,int width,int height,GlTarget target,MapView view) {
+        Objects.requireNonNull(target);Objects.requireNonNull(view);device.live(allocation);
+        if(sourceDevice!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Image, target and renderer must share their original device");
+        device.live(target.allocation);if(view.width()!=width||view.height()!=height)throw new GlFailure(GlFailure.Code.STALE,"Canvas transform dimensions differ from its exact uploaded image");
         double left=Math.max(0,view.left()),top=Math.max(0,view.top()),right=Math.min(target.width(),view.right()),bottom=Math.min(target.height(),view.bottom());
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glDisable(GL_DEPTH_TEST);glDepthMask(false);glDisable(GL_CULL_FACE);glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0,0,0,0});

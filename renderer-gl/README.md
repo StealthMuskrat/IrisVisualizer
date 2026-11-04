@@ -1,6 +1,6 @@
 # OpenGL backend
 
-Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds thirty-six Java sources to the 80-source CPU renderer. All 116 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
+Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds forty-one Java sources to the 85-source CPU renderer. All 126 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
 
@@ -131,3 +131,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Model shading and streamed final lighting
 
 [Material lighting](MATERIAL-LIGHTING.md) now connects declared shading overrides/emission to simple drawing without increasing vertex strides. Supplied final RGB remains authoritative. Scoped component readers avoid duplicate full input arrays, optional owned capture retains shared scene/sample admission, and `NativeLightingInputs` provides a guarded explicit native producer boundary. `beginLit` / `submitLit` retain input through device admission, while completed world images/readback carry their actual lighting mode/policy. Native/GPU validation remains pending and unsupported previews remain disabled.
+
+## Original image canvas
+
+The [original image view](IMAGE-VIEW.md) now connects `SourceImage` background decoding to full-dimension texture upload, the shared 2D canvas, display navigation, immutable frames, source-pixel inspection and readback. Source resources have their own receipts, independent of native map data. Hardware/admission limits fail without resizing. All 126 CPU/OpenGL main sources compile; 16 native adapters remain syntax-only, with runtime/native/GPU verification deferred until renderer implementation is complete. Unsupported previews remain disabled.
