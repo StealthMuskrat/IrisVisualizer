@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
-      "sha256": "72260d579f32f541b91980094107c1d2edf080e778e8801dc2ec4ba16b0ddb76"
+      "sha256": "7fbac83b02d7adfd0be6346a5f3af5f305c0d3c3834a69977de6ac414c6b9c64"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeColormapTints.java",
@@ -16,7 +16,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeFluidInputs.java",
-      "sha256": "a0bb99b9909b54cb2741dcdac7b52948c27b6a43607ba0ef97bab6dd4931d136"
+      "sha256": "1d6e1b6dcb2236b3686ad972f0f595c12c493e39f82ae0d445a695a7bf8c23ba"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",
@@ -32,7 +32,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeModelInputs.java",
-      "sha256": "3c81eebc58dbcef96d4886810f71cb20a773b5827d9bac7697b97dd6ff570d91"
+      "sha256": "22a7fd8c45b6a673c253b377e0558034bf0c47d343e4b2621a4659aa4da604da"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeNoiseSampler.java",
@@ -64,7 +64,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWeightedInputs.java",
-      "sha256": "5ee15db7d3e8c35aa3806f44fcb3a3c23d88946f05036a7e2e5ea7e48b15cf4e"
+      "sha256": "eb3a8ec456b947b1d3e8f6ec0dda67d52ef5224a700f8f9f4ee8f9476efe6c12"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWorldCapture.java",

@@ -31,6 +31,10 @@ public final class NativeWeightedInputs {
     public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,BooleanSupplier cancelled) { return capture(context,assets,snapshot,rendererRandom,tick,partialTick,Limits.DEFAULT,cancelled); }
     public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return capture(context,assets,snapshot,rendererRandom,tick,partialTick,limits,WorldTintInput.none(snapshot),cancelled); }
     public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,WorldTintInput tints,BooleanSupplier cancelled) {
+        return capture(context,assets,snapshot,rendererRandom,tick,partialTick,limits,tints,false,cancelled);
+    }
+    /** Package-private so incomplete waterlogged bases cannot escape the admitted combined route. */
+    static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,WorldTintInput tints,boolean fluidBases,BooleanSupplier cancelled) {
         Objects.requireNonNull(context);Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(rendererRandom);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid native weighted input clock");
         try {
@@ -44,7 +48,7 @@ public final class NativeWeightedInputs {
             var original=s.models();var v=original.visuals();long modelWorking=Math.min(v.workingBytes(),s.workingBytes());
             var visualLimits=new WorldVisuals.Limits(v.choices(),v.modelStates(),v.meshVariants(),v.ticketReferences(),v.problemReferences(),v.sourcePackedBytes(),modelWorking);
             var modelLimits=new WorldModelInputs.Limits(visualLimits,original.models(),original.inspectedStates(),original.inspectedFaces());
-            var capturedModels=NativeModelInputs.capture(context,assets,snapshot,tick,partialTick,modelLimits,offsets,tints,cancelled);if(capturedModels.requiresPlaceholder())return failed(snapshot,capturedModels.problems(),List.of());
+            var capturedModels=NativeModelInputs.capture(context,assets,snapshot,tick,partialTick,modelLimits,offsets,tints,fluidBases,cancelled);if(capturedModels.requiresPlaceholder())return failed(snapshot,capturedModels.problems(),List.of());
             var choiceLimits=new WorldModelChoices.Limits(modelLimits,limits.parts(),limits.alternatives(),limits.selectionVisits());
             var plan=WorldModelChoices.inspect(assets,snapshot,capturedModels.inputs().orElseThrow().decisions(),offsets,tints,choiceLimits,cancelled);if(plan.requiresPlaceholder())return failed(snapshot,plan.problems(),plan.assetProblems());
             long other=catalog+offsets.bytes()+tints.bytes()+plan.bytes();if(other>s.workingBytes())throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native weighted descriptors exceed combined source admission");

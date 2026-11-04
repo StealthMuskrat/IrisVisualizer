@@ -9,6 +9,7 @@
 | `volume` | Read completed caller-frozen full-height native chunks | `WorldSnapshot` |
 | `models` | Volume, optional supplied tint, native offsets/render decisions and visibility | `WorldRenderWorker.ModelRequest` |
 | `weighted` | Volume, optional supplied tint, native weighted choices/offsets/visibility | `WorldRenderWorker.Request` |
+| `fluidScene` | Full native volume, weighted JSON choices and complete pure-fluid/waterlogged layers | `WorldRenderWorker.Request` |
 | `edit` | Explicit supplied native geometry producer over an owned ready request | `WorldRenderWorker.Request` |
 | `terrain` | Native engine height with explicit fluid policy | `MapRasterWorker.Request` |
 | `biomes` | Native surface biome derivative and registry identity | `MapRasterWorker.Request` |
@@ -83,3 +84,7 @@ The model and weighted capture families now have consuming `RenderInput<ClientAs
 `generatorVolume` and `expressionVolume` now return owned `NoiseVolume` inputs through the same admitted capture protocol. The separate [scalar-volume path](NOISE-VOLUME.md) samples every configured world Y through actual pinned resource APIs, then hands immutable samples to `NoiseSurfaceWorker` with exact coordinator checks and source retention through destination admission. No native state/biome or replacement noise formula is introduced. The [dedicated scalar GPU view](../renderer-gl/NOISE-VIEW.md) now consumes that output; native/GPU validation and final editor routing remain pending.
 
 `WorldOptions.vanillaUnblended(maps)` now selects the concrete [vanilla colormap tint path](VANILLA-TINTS.md). Borrowed tables are charged during volume capture, native map copies/palette colors/output are preflighted during tinting, and the subsequent scene working allowance excludes still-borrowed map payload. The original two-argument options constructor and explicit-provider path remain available. Keep any `RenderInput<ClientColormaps>` owner alive through the call. Native API/GPU comparisons remain pending.
+
+## Complete model and fluid scene admission
+
+`fluidScene` captures eligible waterlogged JSON bases and native water/lava layers within one phase reservation, then publishes only the completed detached request. The loaded-catalog overload consumes its source on every admitted outcome and checks the shared coordinator. The borrowed overload leaves resource lifetime to its caller. Native RNG/session/registry responsibilities remain unchanged. Its volume supplies strict fluid neighbors; missing boundaries remain cell problems. The existing `fluids` method consumes an owned ready request and optionally borrows an exact-source/full-height neighbor snapshot. See [FLUIDS.md](FLUIDS.md) for base/recipe sharing, independent tint colors, bounds and unsupported hosts. No preview or test workflow is enabled.

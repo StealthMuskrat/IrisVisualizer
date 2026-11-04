@@ -29,6 +29,10 @@ public final class NativeModelInputs {
     public static Capture capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,long tick,double partialTick,WorldModelInputs.Limits limits,BooleanSupplier cancelled) { return capture(context,assets,snapshot,tick,partialTick,limits,null,cancelled); }
     public static Capture capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,long tick,double partialTick,WorldModelInputs.Limits limits,WorldOffsets offsets,BooleanSupplier cancelled) { return capture(context,assets,snapshot,tick,partialTick,limits,offsets,WorldTintInput.none(snapshot),cancelled); }
     public static Capture capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,long tick,double partialTick,WorldModelInputs.Limits limits,WorldOffsets offsets,WorldTintInput tints,BooleanSupplier cancelled) {
+        return capture(context,assets,snapshot,tick,partialTick,limits,offsets,tints,false,cancelled);
+    }
+    /** Internal base-only phase; the combined fluid route completes every fluid decision before publication. */
+    static Capture capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,long tick,double partialTick,WorldModelInputs.Limits limits,WorldOffsets offsets,WorldTintInput tints,boolean fluidBases,BooleanSupplier cancelled) {
         Objects.requireNonNull(context);Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid native visual clock");
         try {
@@ -43,7 +47,7 @@ public final class NativeModelInputs {
             for(var state:snapshot.states()) {
                 check(cancelled);context.checkSession();var handle=Block.stateById(state.nativeStateId());
                 if(Block.getId(handle)!=state.nativeStateId()||!identities.state(ModdedBlockState.of(handle,null)).equals(state))throw NativeIdentities.failure(WorldProblem.Code.STATE,"Captured state/properties do not exactly match the native visual registry");
-                if(!handle.getFluidState().isEmpty())decisions.add(unsupported(state,"/native/fluid","Native fluid/waterlogged visual producer is not supplied"));
+                if(!handle.getFluidState().isEmpty()&&!(fluidBases&&NativeFluidInputs.modelBase(handle)))decisions.add(unsupported(state,"/native/fluid","Native fluid/waterlogged visual producer is not supplied"));
                 else if(handle.hasBlockEntity())decisions.add(unsupported(state,"/native/block_entity","Native block-entity/special visual producer is not supplied"));
                 else if(handle.hasOffsetFunction()&&(offsets==null||offsets.mode()!=WorldOffsets.Mode.NATIVE))decisions.add(unsupported(state,"/native/offset","Native position-dependent model offset producer is not supplied"));
                 else if(handle.getRenderShape()==RenderShape.INVISIBLE)decisions.add(WorldModelInputs.Decision.empty());

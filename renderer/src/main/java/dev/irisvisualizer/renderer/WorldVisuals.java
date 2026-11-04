@@ -126,10 +126,16 @@ public final class WorldVisuals {
         }
         void bakeState(int stateIndex,List<Integer> variants) {
             check();modelStates++;var plan=BlockModels.resolve(request.assets,request.snapshot.states().get(stateIndex),cancelled);fatal(plan.problems());
+            // Different fluid recipes may retain the same exact selected JSON base.
+            // Keys borrow immutable tickets from the bounded choice palette, only for this state/asset plan.
+            var bases=new HashMap<List<Integer>,BlockMesh>();
             for(int index:variants) {
-                check();var choice=(ModelChoice)request.choices.get(index);int[] tickets=new int[choice.tickets().size()];for(int i=0;i<tickets.length;i++)tickets[i]=choice.tickets().get(i);
-                var defaults=GeometryBaker.Limits.DEFAULT;var limits=new GeometryBaker.Limits(defaults.parts(),defaults.elements(),defaults.quads(),packetAllowance(defaults.packedBytes()),defaults.coordinateBlocks(),defaults.angleDegrees());
-                var mesh=GeometryBaker.bake(plan,tickets,limits,cancelled);retain(mesh);
+                check();var choice=(ModelChoice)request.choices.get(index);var mesh=bases.get(choice.tickets());
+                if(mesh==null) {
+                    int[] tickets=new int[choice.tickets().size()];for(int i=0;i<tickets.length;i++)tickets[i]=choice.tickets().get(i);
+                    var defaults=GeometryBaker.Limits.DEFAULT;var limits=new GeometryBaker.Limits(defaults.parts(),defaults.elements(),defaults.quads(),packetAllowance(defaults.packedBytes()),defaults.coordinateBlocks(),defaults.angleDegrees());
+                    mesh=GeometryBaker.bake(plan,tickets,limits,cancelled);retain(mesh);bases.put(choice.tickets(),mesh);
+                }
                 if(!mesh.requiresPlaceholder()&&choice.nativeLayer().isPresent()) {
                     var layer=choice.nativeLayer().orElseThrow();fatal(layer.problems());var nativeLimits=NativeGeometry.Limits.DEFAULT;
                     long source=mesh.packet().orElseThrow().packedBytes()+layer.packet().map(MeshPacket::packedBytes).orElse(0L);

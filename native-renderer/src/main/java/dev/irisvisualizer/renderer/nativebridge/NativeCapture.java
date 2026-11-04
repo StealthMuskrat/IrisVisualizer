@@ -13,7 +13,7 @@ import java.util.function.BooleanSupplier;
 public final class NativeCapture {
     private NativeCapture() {}
     private static final long WORLD_BYTES=512L*1024*1024;
-    public enum Kind { VOLUME, MODELS, WEIGHTED, VISUAL_EDIT, TERRAIN, BIOMES, NOISE_LAYER, GENERATOR, EXPRESSION, GENERATOR_VOLUME, EXPRESSION_VOLUME, FLUIDS }
+    public enum Kind { VOLUME, MODELS, WEIGHTED, VISUAL_EDIT, TERRAIN, BIOMES, NOISE_LAYER, GENERATOR, EXPRESSION, GENERATOR_VOLUME, EXPRESSION_VOLUME, FLUIDS, FLUID_SCENE }
     public record WorldLimits(NativeWorldCapture.Limits volume,NativeWeightedInputs.Limits visuals) {
         public static final WorldLimits DEFAULT=new WorldLimits(NativeWorldCapture.Limits.DEFAULT,NativeWeightedInputs.Limits.DEFAULT);
         public WorldLimits { Objects.requireNonNull(volume);Objects.requireNonNull(visuals); }
@@ -123,6 +123,24 @@ public final class NativeCapture {
             var original=limits.visuals();var bounded=new NativeWeightedInputs.Limits(sceneLimits(original.scene(),options),original.parts(),original.alternatives(),original.selectionVisits(),original.weightUnits(),original.nativeQueries());
             var result=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,bounded,colors,cancelled);
             return result.requiresPlaceholder()?failure(result.problems(),result.assetProblems()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
+        },cancelled);
+    }
+    /** Consumes a loaded catalog; base choices and fluid layers are completed under one admitted phase. */
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);
+        try(var source=assets.retain()) { catalogOwner(source,memory);return fluidScene(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,fluids,memory,cancelled); }
+        finally { assets.close(); }
+    }
+    /** No detached base-only fluid request is published, even if later sampling or admission fails. */
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);Objects.requireNonNull(random);Objects.requireNonNull(limits);Objects.requireNonNull(options);Objects.requireNonNull(fluids);clock(tick,partialTick);
+        return capture(Kind.FLUID_SCENE,context,memory,worldPeak(assets,limits,options),()->{
+            client(assets,options);var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
+            var snapshot=volume.snapshot().orElseThrow();var original=limits.visuals();var colors=tint(context,assets,snapshot,options,original.scene().workingBytes(),cancelled);
+            var bounded=new NativeWeightedInputs.Limits(sceneLimits(original.scene(),options),original.parts(),original.alternatives(),original.selectionVisits(),original.weightUnits(),original.nativeQueries());
+            var base=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,bounded,colors,true,cancelled);if(base.requiresPlaceholder())return failure(base.problems(),base.assetProblems());
+            var result=NativeFluidInputs.capture(context,base.request().orElseThrow(),Optional.empty(),fluids,cancelled);
+            return result.requiresPlaceholder()?failure(result.problems(),List.of()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
         },cancelled);
     }
     /** Consumes a ready choice request; strict optional neighbor data stays borrowed through capture. */

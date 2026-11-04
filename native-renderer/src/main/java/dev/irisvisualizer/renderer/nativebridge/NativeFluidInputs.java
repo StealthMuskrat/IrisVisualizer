@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
-/** Source-reviewed vanilla pure-fluid producer. Waterlogged/special bases remain guarded. */
+/** Source-reviewed vanilla pure-fluid and verified JSON-base fluid layer producer. */
 public final class NativeFluidInputs {
     private NativeFluidInputs() {}
     private static final String POLICY="Vanilla water/lava surfaces; native height/flow/occlusion; radius-zero water color; simple display lighting";
@@ -31,6 +31,7 @@ public final class NativeFluidInputs {
     }
     private record Key(int state,FluidGeometry.Cell input) {}
     private record ProblemKey(int state,String reason) {}
+    private record LayerKey(WorldVisuals.ModelChoice base,BlockMesh fluid) {}
     private static final class Budget { long added; }
     private static final class Missing extends RuntimeException { Missing(String reason) { super(reason); } }
     /** Additional detached neighbors are borrowed only; no absent sample is replaced with air. */
@@ -42,22 +43,27 @@ public final class NativeFluidInputs {
             if(halo.requiresPlaceholder()||!halo.source().equals(snapshot.source())||halo.extent().minY()!=snapshot.extent().minY()||halo.extent().height()!=snapshot.extent().height())throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Fluid neighbor capture has another native epoch or height");
             long extra=halo==snapshot?0:halo.indexBytes(),working=Math.min(Math.min(original.workingBytes()-original.visibility().bytes(),input.limits().workingBytes()),limits.edits().workingBytes())-extra;
             if(working<0||input.inputBytes()+(long)snapshot.cellCount()*8>working)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid neighbors and visual edit copy peak exceed the working allowance");
-            var view=new View(context,snapshot,halo,limits.queries(),cancelled);var cache=new HashMap<Key,WorldVisuals.Choice>();var missing=new HashMap<ProblemKey,WorldVisuals.Choice>();var empty=new HashMap<Integer,WorldVisuals.Choice>();var missingAssets=new EnumMap<FluidGeometry.Kind,Optional<AssetId>>(FluidGeometry.Kind.class);var budget=new Budget();
+            var view=new View(context,snapshot,halo,limits.queries(),cancelled);var cache=new HashMap<Key,WorldVisuals.Choice>();var layers=new HashMap<LayerKey,WorldVisuals.Choice>();var missing=new HashMap<ProblemKey,WorldVisuals.Choice>();var empty=new HashMap<Integer,WorldVisuals.Choice>();var missingAssets=new EnumMap<FluidGeometry.Kind,Optional<AssetId>>(FluidGeometry.Kind.class);var budget=new Budget();
             var edits=new WorldVisualEdits.Limits(limits.edits().cells(),limits.edits().changes(),limits.edits().packets(),limits.edits().addedPackedBytes(),working);
             var provider=new NativeVisualInputs.Provider(input.assets().receipt(),POLICY,(cell,state,biome,position,prior)->{
                 check(cancelled);var fluid=state.getFluidState();if(fluid.isEmpty())return prior;
                 if(prior instanceof WorldVisuals.NativeChoice||prior instanceof WorldVisuals.EmptyChoice)return prior;
-                var kind=kind(fluid);if(kind==null||state.getRenderShape()!=RenderShape.INVISIBLE||state.hasBlockEntity())return prior;
-                for(int axis=0;axis<3;axis++)if(input.offsets().component(cell,axis)!=0)return prior;
+                var kind=kind(fluid);boolean base=prior instanceof WorldVisuals.ModelChoice&&modelBase(state);
+                if(kind==null||state.hasBlockEntity()||!base&&state.getRenderShape()!=RenderShape.INVISIBLE)return prior;
+                if(prior instanceof WorldVisuals.ModelChoice model&&(!base||model.nativeLayer().isPresent()))return prior;
+                for(int axis=0;axis<3;axis++)if(input.offsets().component(cell,axis)!=0) {
+                    if(!base)return prior;
+                    return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),"Fluid base offset"),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,snapshot.state(cell).block(),"/native/fluid/offset","Fluid and base model require independent placement for nonzero offsets"))));
+                }
                 try {
-                    var sample=sample(view,state,fluid,position,kind,biome);if(sample.faces()==0)return empty.computeIfAbsent(prior.stateIndex(),WorldVisuals.EmptyChoice::new);
+                    var sample=sample(view,state,fluid,position,kind,biome);if(sample.faces()==0&&base)return prior;if(sample.faces()==0)return empty.computeIfAbsent(prior.stateIndex(),WorldVisuals.EmptyChoice::new);
                     var absentAsset=missingAssets.computeIfAbsent(kind,value->missingAsset(input.assets(),value));
                     if(absentAsset.isPresent())return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),"Missing fluid sprites"),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.MISSING_ASSET,ClientAssetSnapshot.Kind.TEXTURE,absentAsset.orElseThrow(),"","Selected archive lacks a required vanilla fluid sprite"))));
-                    var key=new Key(prior.stateIndex(),sample);var previous=cache.get(key);if(previous!=null)return previous;
+                    var key=new Key(prior.stateIndex(),sample);var previous=cache.get(key);if(previous!=null)return layered(prior,previous,layers,input.limits().choices());
                     long bytes=FluidGeometry.packedBytes(sample);
                     if(cache.size()>=edits.packets()||bytes>edits.addedPackedBytes()-budget.added||input.inputBytes()+(long)snapshot.cellCount()*8+budget.added+bytes>working)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid prototype or packed/copy working allowance reached");
                     var mesh=FluidGeometry.bake(input.assets(),snapshot,cell,sample,limits.geometry(),cancelled);
-                    WorldVisuals.Choice choice=mesh.requiresPlaceholder()?new WorldVisuals.ProblemChoice(prior.stateIndex(),mesh.problems()):new WorldVisuals.NativeChoice(prior.stateIndex(),mesh);cache.put(key,choice);budget.added+=mesh.packet().map(MeshPacket::packedBytes).orElse(0L);return choice;
+                    WorldVisuals.Choice choice=mesh.requiresPlaceholder()?new WorldVisuals.ProblemChoice(prior.stateIndex(),mesh.problems()):new WorldVisuals.NativeChoice(prior.stateIndex(),mesh);cache.put(key,choice);budget.added+=mesh.packet().map(MeshPacket::packedBytes).orElse(0L);return layered(prior,choice,layers,input.limits().choices());
                 }catch(Missing absent) {
                     return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),absent.getMessage()),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,snapshot.state(cell).block(),"/native/fluid/neighbors",absent.getMessage()))));
                 }
@@ -67,6 +73,17 @@ public final class NativeFluidInputs {
         catch(CancellationException cancellation) { throw cancellation; }
         catch(RuntimeException failure) { check(cancelled);return failed(snapshot,List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Native fluid capture failed: "+failure.getClass().getSimpleName()))); }
         catch(OutOfMemoryError exhausted) { check(cancelled);return failed(snapshot,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory for native fluid capture"))); }
+    }
+    /** Keep the exact selected tickets; only identical fluid recipes share the native layer packet. */
+    private static WorldVisuals.Choice layered(WorldVisuals.Choice prior,WorldVisuals.Choice fluid,Map<LayerKey,WorldVisuals.Choice> layers,int limit) {
+        if(!(prior instanceof WorldVisuals.ModelChoice model)||!(fluid instanceof WorldVisuals.NativeChoice nativeChoice))return fluid;
+        var key=new LayerKey(model,nativeChoice.mesh());var present=layers.get(key);if(present!=null)return present;
+        if(layers.size()>=limit)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid/base composition palette allowance reached");
+        var choice=new WorldVisuals.ModelChoice(model.stateIndex(),model.tickets(),Optional.of(nativeChoice.mesh()));layers.put(key,choice);return choice;
+    }
+    /** Only complete vanilla JSON bases without special ownership or independent placement are admitted. */
+    static boolean modelBase(BlockState state) {
+        return kind(state.getFluidState())!=null&&state.getRenderShape()==RenderShape.MODEL&&!state.hasBlockEntity()&&!state.hasOffsetFunction();
     }
     private static Optional<AssetId> missingAsset(ClientAssetSnapshot assets,FluidGeometry.Kind kind) {
         if(assets.find(ClientAssetSnapshot.Kind.TEXTURE,kind.still()).isEmpty())return Optional.of(kind.still());
