@@ -1,0 +1,25 @@
+{
+  "minecraft": "26.3",
+  "reviewedOn": "2026-11-03",
+  "officialPatch": "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/renderer/block/FluidRenderer.java.patch",
+  "mirrors": [
+    {
+      "class": "FluidRenderer",
+      "url": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/block/fluidrenderer/",
+      "reviewedTextSha256": "92e7e89f8fc9c65f345182af8c8b7654a293e57fc6eb1a0d0d64b41f8061d12e"
+    },
+    {
+      "class": "FluidModel",
+      "url": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/block/fluidmodel/",
+      "reviewedTextSha256": "d2beeae36b1a7cad86d7b150214dde336e9aab84d68850b696791522c95a4766"
+    },
+    {
+      "class": "FluidStateModelSet",
+      "url": "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/block/fluidstatemodelset/",
+      "reviewedTextSha256": "ffab5da1cecd238b0ef08d0d979d152571d47e3e0b1aa01fbb8a4da142199784"
+    }
+  ],
+  "provenance": "Complete method bodies from an unofficial decompilation mirror; not authentication of the selected archive or native API compatibility",
+  "boundary": "Vanilla water/lava, pure invisible hosts, native common-state sampling, radius-zero water color and simple display lighting; waterlogged/special bases and missing neighbors remain guarded",
+  "testsExecuted": false
+}

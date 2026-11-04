@@ -25,7 +25,7 @@ Retained tables contain native-order ARGB pixels, preserving decoded channels an
 | Spruce/birch leaves, attached stems, lily pad | Reviewed vanilla in-world constants |
 | Redstone wire, growing stems | Original native power/age-dependent colors |
 
-Unknown tint sources return no layer, preserving existing unsupported-model handling. Particle-only water/bubble-column registrations deliberately supply no fluid-mesh layer. Fluid geometry and its color contract remain separate unfinished work. Terrain-particle and inventory colors are outside this world-model profile.
+Unknown tint sources return no layer, preserving existing unsupported-model handling. Particle-only water/bubble-column registrations deliberately supply no fluid-mesh layer. The separate [pure-fluid path](FLUIDS.md) carries native water color as material RGB without allocating a block-model tint layer; waterlogged compositions remain pending. Terrain-particle and inventory colors are outside this world-model profile.
 
 This is explicitly **biome blend radius zero**. It does not clamp missing neighbors to the current biome or claim neighboring-biome averaging. A tall-plant source requiring Y below the captured extent fails explicitly. Full configured height, original native IDs, palette identities and healthy/frozen session checks remain required. Native codec graphs are temporary native metadata, excluded from primitive byte counts; the host must include native/codec overhead in its external working allowance.
 

@@ -13,7 +13,7 @@ import java.util.function.BooleanSupplier;
 public final class NativeCapture {
     private NativeCapture() {}
     private static final long WORLD_BYTES=512L*1024*1024;
-    public enum Kind { VOLUME, MODELS, WEIGHTED, VISUAL_EDIT, TERRAIN, BIOMES, NOISE_LAYER, GENERATOR, EXPRESSION, GENERATOR_VOLUME, EXPRESSION_VOLUME }
+    public enum Kind { VOLUME, MODELS, WEIGHTED, VISUAL_EDIT, TERRAIN, BIOMES, NOISE_LAYER, GENERATOR, EXPRESSION, GENERATOR_VOLUME, EXPRESSION_VOLUME, FLUIDS }
     public record WorldLimits(NativeWorldCapture.Limits volume,NativeWeightedInputs.Limits visuals) {
         public static final WorldLimits DEFAULT=new WorldLimits(NativeWorldCapture.Limits.DEFAULT,NativeWeightedInputs.Limits.DEFAULT);
         public WorldLimits { Objects.requireNonNull(volume);Objects.requireNonNull(visuals); }
@@ -124,6 +124,17 @@ public final class NativeCapture {
             var result=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,bounded,colors,cancelled);
             return result.requiresPlaceholder()?failure(result.problems(),result.assetProblems()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
         },cancelled);
+    }
+    /** Consumes a ready choice request; strict optional neighbor data stays borrowed through capture. */
+    public static Result<WorldRenderWorker.Request> fluids(NativeRenderContext context,RenderInput<WorldRenderWorker.Request> original,Optional<WorldSnapshot> neighbors,NativeFluidInputs.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(original);Objects.requireNonNull(neighbors);Objects.requireNonNull(limits);
+        try(var source=original.retain()) {
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Fluid capture requires the same source coordinator");
+            var request=source.value();return capture(Kind.FLUIDS,context,memory,Math.min(limits.edits().workingBytes(),request.workingBytes()),()->{
+                var result=NativeFluidInputs.capture(context,request,neighbors,limits,cancelled);
+                return result.requiresPlaceholder()?failure(result.problems(),List.of()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
+            },cancelled);
+        }finally { original.close(); }
     }
     /** Consumes an owned ready request on every outcome; explicit geometry producers remain caller supplied. */
     public static Result<WorldRenderWorker.Request> edit(NativeRenderContext context,RenderInput<WorldRenderWorker.Request> original,NativeVisualInputs.Provider provider,WorldVisualEdits.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {

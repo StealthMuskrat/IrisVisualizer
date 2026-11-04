@@ -108,7 +108,7 @@ public final class GlUpload implements AutoCloseable {
                         for(int i=0;i<count;i++) {
                             if((i&1023)==0)check(cancelled);int word=vertexWordOffset+i,vertex=word/vertexWords,component=word%vertexWords;
                             if(component<8)stage.putFloat(source.get(vertex*8+component));
-                            else if(component==8) { int rgb=tint==null?0xffffff:tint.rgb(section,vertex/4,vertex%4);var material=mesh.faces().get(vertex/4).source().source();int flags=(material.lightEmission()<<3)|material.shadeDirectionOverride().map(value->value.ordinal()+1).orElse(0);stage.put((byte)(rgb>>>16)).put((byte)(rgb>>>8)).put((byte)rgb).put((byte)flags); }
+                            else if(component==8) { var material=mesh.faces().get(vertex/4).source().source();int rgb=material.material().multiplyRgb(tint==null?0xffffff:tint.rgb(section,vertex/4,vertex%4));int flags=(material.lightEmission()<<3)|material.shadeDirectionOverride().map(value->value.ordinal()+1).orElse(0);stage.put((byte)(rgb>>>16)).put((byte)(rgb>>>8)).put((byte)rgb).put((byte)flags); }
                             else stage.putFloat(lighting.component(section,vertex/4,vertex%4,component-9));
                         }
                         stage.flip();glBindBuffer(GL_ARRAY_BUFFER,vertexBuffer);glBufferSubData(GL_ARRAY_BUFFER,(long)vertexWordOffset*4,stage);device.check("incremental vertex data");vertexWordOffset+=count;transferred=count*4;if(vertexWordOffset==words)phase=Phase.INDEX_STORAGE;

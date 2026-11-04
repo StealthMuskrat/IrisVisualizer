@@ -2,7 +2,7 @@
 
 This source adapter reads the official Iris/VolmLib native objects into detached renderer data. It does not create an engine, bootstrap registries, execute client classes, generate missing chunks, start a server, alter a pack or enable a preview. The existing renderer endpoints can consume its successful snapshots/maps.
 
-**Validation status:** the dependency-free renderer/OpenGL sources compile. These fifteen native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
+**Validation status:** the dependency-free renderer/OpenGL sources compile. These sixteen native adapter sources have been reviewed against pinned upstream APIs but have **not yet been compiled against the genuine Windows native dependency classpath or executed**. That classpath is not installed in the current workspace. Native compilation, native comparisons and renderer-stage tests remain pending. No substitute native classes or mocked compilation are used as verification.
 
 ## Context and ownership
 
@@ -43,7 +43,7 @@ The terrain policy samples the native integer height API with explicit floor qua
 
 `MapCapture` preflights grid and input/copy bytes before sampling, collects exact native biome identities, and checks explicit presence, finite noise, full-height terrain bounds, text/count limits and identity conflicts. It calls native completion guards before and after immutable capture. Native samplers mark every successful queried point present; native exceptions or session faults fail the complete result. The generic sampler API can carry explicit absent samples, but an all-absent biome map without a supplied identity fails instead of inventing a palette. Cancellation propagates separately.
 
-Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Native block/fluid/special visual geometry, native tint factory/output validation and optional lighting producers remain separate pending work. The explicit weighted-selection path below supplies model choices with a caller-verified native random policy; its genuine API/runtime validation remains pending. These adapters supply no rendered approximation for them.
+Pass successful maps to `MapRasterWorker` and `GlMapQueue`; pass successful volume snapshots plus explicit native visual choices/visibility to `WorldVisuals` / `WorldRenderWorker`. Pure-fluid surfaces now have the scoped producer below. Waterlogged/special visual geometry, native tint factory/output validation and optional lighting producers remain separate pending work. The explicit weighted-selection path below supplies model choices with a caller-verified native random policy; its genuine API/runtime validation remains pending. These adapters supply no rendered approximation for them.
 
 ## Native model input decisions
 
@@ -123,3 +123,7 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 ## Selected vanilla colormap tint sources
 
 `NativeColormapTints.capture` now derives radius-zero world-model tints from version-matched `ClientColormaps`, actual native biome climate/effects/modifiers and native redstone/state properties. `NativeCapture.WorldOptions.vanillaUnblended(maps)` connects it to deterministic and weighted capture with source/copy/palette admission. It does not install global color tables or load selected archive classes. Particle-only water sources, fluid geometry, neighboring-biome blending and actual Windows native/GPU validation remain pending. See [VANILLA-TINTS.md](../renderer/VANILLA-TINTS.md).
+
+## Native pure-fluid capture
+
+`NativeCapture.fluids` consumes an owned ready-choice request, adds bounded native water/lava surfaces through `NativeFluidInputs`, and retains source admission through detached destination ownership. An optional same-source, full-height neighbor capture supplies strict lookups; absent neighbors remain reported visual problems. Native fluid APIs supply height/flow/occlusion and biome water color. Only invisible, entity-free, zero-offset hosts are accepted; existing native/empty choices are preserved and waterlogged/model/special bases remain guarded. See [FLUIDS.md](../renderer/FLUIDS.md) for the weighted capture route, exact-input prototype sharing, sprite requirements, copy/query/packet bounds, source receipts and deferred Windows/native/GPU validation.

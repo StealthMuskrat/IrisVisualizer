@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its eighty main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its eighty-two main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -139,7 +139,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its fifteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 117 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its sixteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 118 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
@@ -159,7 +159,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Still to implement
 
-Native geometry/UV/texture comparison and guarded cases, native weighted-choice factory/output validation, offset and visibility validation, native tint factory/output validation and optional native lighting production/validation, transparent intersection/OIT handling, fluids and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, native map sampling adapters, full generation/scene integration and final map/3D editor presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
+Native geometry/UV/texture comparison and guarded cases, native weighted-choice factory/output validation, offset and visibility validation, native tint factory/output validation and optional native lighting production/validation, transparent intersection/OIT handling, waterlogged fluid compositions and special render shapes, native animation interpolation/mipmap/filtering, real-driver scheduling validation, combined application/GPU admission, native map sampling adapters, full generation/scene integration and final map/3D editor presentation remain pending. The backend marker/mesh/animation code still requires real-context/native comparison and visible verification. There is currently no editor integration or ready-for-preview flag in this module.
 
 End-of-stage validation must cover normal and ZIP64 archives, duplicated/truncated/corrupt directory data, malformed/duplicate-key UTF-8 JSON, version mismatch and incomplete archives, exact resource identities, size/CRC and budget failures, cancellation/source changes/private cleanup, and captured stream/copy immutability (including `transferTo` with an output stream that modifies its input). Model contracts must cover exact native domains, selector ambiguity/negation/nesting, weighted boundaries and original case indices, parent/texture cycles and overlays, geometry provenance and stable face order, modern material/rotation/shading declarations, every budget boundary, cancellation and whole-result placeholders. Geometry tests must compare the renderer's inputs with the engine's actual block/state/biome data. Visible Windows/GPU verification remains separate from headless contracts.
 
@@ -201,4 +201,8 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 
 ## Selected-client vanilla tint resources
 
-`ClientColormaps` now decodes grass, foliage and dry-foliage PNGs into immutable, version-bound ARGB tables with bounded scratch and optional shared ownership. The native bridge adds radius-zero world-model tint sources and connects them through complete deterministic/weighted capture. Native global tables remain untouched; unknown model tint layers, neighboring-biome blending and fluid rendering remain guarded or unfinished. See [VANILLA-TINTS.md](VANILLA-TINTS.md) for supported blocks, admission and validation boundaries.
+`ClientColormaps` now decodes grass, foliage and dry-foliage PNGs into immutable, version-bound ARGB tables with bounded scratch and optional shared ownership. The native bridge adds radius-zero world-model tint sources and connects them through complete deterministic/weighted capture. Native global tables remain untouched; unknown model tint layers, neighboring-biome blending and waterlogged fluid composition remain guarded or unfinished. See [VANILLA-TINTS.md](VANILLA-TINTS.md) for supported blocks, admission and validation boundaries.
+
+## Native pure-fluid surfaces
+
+[Vanilla fluid capture](FLUIDS.md) now reads actual native water/lava heights, flow, occlusion and radius-zero water color into bounded shared surface prototypes, then transfers an owned choice request to the existing scene/GPU path. Strict optional neighbors never substitute air. Waterlogged/special bases and unsupported previews remain guarded; genuine native compilation and renderer-stage tests remain pending.
