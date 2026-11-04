@@ -210,3 +210,7 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 ## Native model factory and JSON-only entity blocks
 
 The [model policy](MODEL-POLICY.md) now creates the reviewed dedicated native RNG inside default weighted/fluid capture and admits 23 pinned JSON-only entity blocks after actual native identity/shape checks. Furnaces, hoppers, barrels and related models retain original generated state, selected assets and all tint/offset/selection guards. Entity-rendered visuals remain explicit problems. No generation RNG or entity data is invented; Windows native compilation and end-stage tests remain pending.
+
+## Greedy scalar boundary meshes
+
+[Greedy scalar rectangles](SCALAR-GREEDY.md) now merge compatible coplanar display-bin faces with exactly equal native scalar bits. Bounded selected-bounds plane scratch, exact count/emission and shared worker admission preserve the entire source volume. Twelve-byte GPU instances carry extents, and picking resolves merged faces to original sample coordinates/values with deterministic edge ties. An explicit unit mode remains available for end-stage comparisons. Native sampling, textured block meshes and preview readiness are unchanged; renderer tests and Windows shader/pixel validation remain deferred.

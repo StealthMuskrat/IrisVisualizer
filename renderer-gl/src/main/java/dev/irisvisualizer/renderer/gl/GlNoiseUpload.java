@@ -6,8 +6,9 @@ import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 import static org.lwjgl.opengl.GL33C.*;
 
-/** Eight GPU bytes per face; bounded staging writes instances without a second full CPU mesh. */
+/** Twelve GPU bytes per rectangle; bounded staging writes instances without a second full CPU mesh. */
 public final class GlNoiseUpload implements AutoCloseable {
+    public static final int INSTANCE_BYTES=12;
     public enum Phase { STORAGE, FACES, LAYOUT, FINISHING, READY, TAKEN, CANCELLED, FAILED, CLOSED }
     public record Progress(Phase phase,int completedFaces,int totalFaces,long uploadedBytes,long totalBytes) {}
     public record Step(Progress progress,int transferBytes,long storageBytes,int actions,int workUnits,long elapsedNanoseconds) {}
@@ -31,7 +32,7 @@ public final class GlNoiseUpload implements AutoCloseable {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar upload requires the same shared coordinator");return begin(device,source.value());
         }finally { input.close(); }
     }
-    public Progress progress() { return new Progress(phase,face,count,(long)face*8,(long)count*8); }
+    public Progress progress() { return new Progress(phase,face,count,(long)face*INSTANCE_BYTES,(long)count*INSTANCE_BYTES); }
     public boolean ready() { return phase==Phase.READY; }
     boolean ownsResources() { return allocation!=null; }
     private static void check(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("Scalar upload is obsolete"); }
@@ -49,16 +50,16 @@ public final class GlNoiseUpload implements AutoCloseable {
                 if(gpu&&state==null)state=new GlTransferState(device);
                 switch(phase) {
                     case STORAGE -> {
-                        device.expand(allocation,(long)count*8,count==0?0:1,0,count==0?0:1);
-                        if(count>0) { allocation.buffers[0]=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);glBufferData(GL_ARRAY_BUFFER,(long)count*8,GL_STATIC_DRAW);device.check("scalar instance storage");storage=(long)count*8; }phase=count==0?Phase.FINISHING:Phase.FACES;
+                        device.expand(allocation,(long)count*INSTANCE_BYTES,count==0?0:1,0,count==0?0:1);
+                        if(count>0) { allocation.buffers[0]=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);glBufferData(GL_ARRAY_BUFFER,(long)count*INSTANCE_BYTES,GL_STATIC_DRAW);device.check("scalar instance storage");storage=(long)count*INSTANCE_BYTES; }phase=count==0?Phase.FINISHING:Phase.FACES;
                     }
                     case FACES -> {
-                        int capacity=Math.min(65536,Math.min(device.limits().stagingBytes(),budget.transferBytes()-bytes)),n=Math.min(count-face,capacity/8);if(n==0)break steps;
-                        var surface=(NoiseSurface)allocation.retained;var stage=device.staging();stage.limit(n*8);
-                        for(int i=0;i<n;i++) { if((i&255)==0)check(cancelled);stage.putInt((surface.cell(face+i)<<3)|surface.direction(face+i).ordinal());stage.putInt(surface.rgba(face+i)); }
-                        stage.flip();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);glBufferSubData(GL_ARRAY_BUFFER,(long)face*8,stage);device.check("bounded scalar instance data");face+=n;bytes+=n*8;if(face==count)phase=Phase.LAYOUT;
+                        int capacity=Math.min(65536,Math.min(device.limits().stagingBytes(),budget.transferBytes()-bytes)),n=Math.min(count-face,capacity/INSTANCE_BYTES);if(n==0)break steps;
+                        var surface=(NoiseSurface)allocation.retained;var stage=device.staging();stage.limit(n*INSTANCE_BYTES);
+                        for(int i=0;i<n;i++) { if((i&255)==0)check(cancelled);stage.putInt((surface.cell(face+i)<<3)|surface.direction(face+i).ordinal());stage.putInt(surface.rgba(face+i));stage.putInt(surface.spanWord(face+i)); }
+                        stage.flip();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);glBufferSubData(GL_ARRAY_BUFFER,(long)face*INSTANCE_BYTES,stage);device.check("bounded scalar instance data");face+=n;bytes+=n*INSTANCE_BYTES;if(face==count)phase=Phase.LAYOUT;
                     }
-                    case LAYOUT -> { allocation.vaos[0]=glGenVertexArrays();glBindVertexArray(allocation.vaos[0]);glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);glVertexAttribIPointer(0,2,GL_UNSIGNED_INT,8,0L);glEnableVertexAttribArray(0);glVertexAttribDivisor(0,1);device.check("scalar instance layout");phase=Phase.FINISHING; }
+                    case LAYOUT -> { allocation.vaos[0]=glGenVertexArrays();glBindVertexArray(allocation.vaos[0]);glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);glVertexAttribIPointer(0,3,GL_UNSIGNED_INT,INSTANCE_BYTES,0L);glEnableVertexAttribArray(0);glVertexAttribDivisor(0,1);device.check("scalar instance layout");phase=Phase.FINISHING; }
                     case FINISHING -> { if(face!=count)throw new GlFailure(GlFailure.Code.STATE,"Scalar upload is incomplete");device.check("complete scalar upload");finish=true; }
                     default -> throw new GlFailure(GlFailure.Code.STATE,"Unexpected scalar upload phase");
                 }

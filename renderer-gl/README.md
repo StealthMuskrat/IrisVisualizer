@@ -126,7 +126,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 
 ## Connected scalar-volume images
 
-[Scalar GPU presentation](NOISE-VIEW.md) now connects background `NoiseSurfaceWorker` output to eight-byte instanced-face upload, opaque offscreen drawing, immutable `GlNoiseFrame` images and original scalar-face inspection. `GlNoiseView` separates source/display revisions and preserves caller-held images through replacement. Readback supports an exact scalar receipt alongside its existing world/map variants. Camera changes redraw without resampling native values. All shaders/driver/pixel/native checks remain deferred, and unsupported previews remain disabled.
+[Scalar GPU presentation](NOISE-VIEW.md) now connects background `NoiseSurfaceWorker` output to twelve-byte instanced-rectangle upload with [greedy scalar merging](../renderer/SCALAR-GREEDY.md) and original-sample picking, opaque offscreen drawing, immutable `GlNoiseFrame` images and original scalar-face inspection. `GlNoiseView` separates source/display revisions and preserves caller-held images through replacement. Readback supports an exact scalar receipt alongside its existing world/map variants. Camera changes redraw without resampling native values. All shaders/driver/pixel/native checks remain deferred, and unsupported previews remain disabled.
 
 ## Model shading and streamed final lighting
 

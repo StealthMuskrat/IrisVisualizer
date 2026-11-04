@@ -23,19 +23,31 @@ public final class NoisePick {
         if(surface.size()>maximumFaces)throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Complete scalar face query exceeds its allowance; no partial nearest hit returned");
         long ox=Math.subtractExact((long)g.horizontal().originX(),ray.anchor().x()),oy=(long)g.vertical().minY()-ray.anchor().y(),oz=Math.subtractExact((long)g.horizontal().originZ(),ray.anchor().z());
         if(Math.max(Math.abs((double)ox),Math.max(Math.abs((double)oy),Math.abs((double)oz)))>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Scalar query exceeds supported relative anchor precision");
-        double x=ray.x()-ox,y=ray.y()-oy,z=ray.z()-oz,scale=g.horizontal().blocksPerSample(),nearest=ray.maximum();int found=-1;
+        double x=ray.x()-ox,y=ray.y()-oy,z=ray.z()-oz,scale=g.horizontal().blocksPerSample(),nearest=ray.maximum();int found=-1,foundCell=-1,foundSide=-1,foundU=0,foundV=0;
         for(int face=0;face<surface.size();face++) {
             if((face&255)==0)WorldProblem.check(cancelled);int cell=surface.cell(face),side=surface.direction(face).ordinal();
-            double minX=(cell%g.width())*scale,minY=cell/((long)g.width()*g.depth()),minZ=(cell/g.width()%g.depth())*scale,maxX=minX+scale,maxY=minY+1,maxZ=minZ+scale;
+            int sx=cell%g.width(),sy=(int)(cell/((long)g.width()*g.depth())),sz=cell/g.width()%g.depth();
+            double minX=sx*scale,minY=sy,minZ=sz*scale,maxX=(sx+surface.sizeX(face))*scale,maxY=sy+surface.sizeY(face),maxZ=(sz+surface.sizeZ(face))*scale;
             int axis=side<2?1:side<4?2:0;double direction=axis==0?ray.dx():axis==1?ray.dy():ray.dz();boolean plus=(side&1)!=0;
             if(direction*(plus?1:-1)>=0)continue;
             double plane=axis==0?(plus?maxX:minX):axis==1?(plus?maxY:minY):(plus?maxZ:minZ),origin=axis==0?x:axis==1?y:z,t=(plane-origin)/direction;
-            if(!Double.isFinite(t)||t<ray.minimum()||t>nearest||found>=0&&t==nearest)continue;
+            if(!Double.isFinite(t)||t<ray.minimum()||t>nearest)continue;
             double hx=x+t*ray.dx(),hy=y+t*ray.dy(),hz=z+t*ray.dz();
-            if((axis==0||hx>=minX&&hx<=maxX)&&(axis==1||hy>=minY&&hy<=maxY)&&(axis==2||hz>=minZ&&hz<=maxZ)) { found=face;nearest=t; }
+            if((axis==0||hx>=minX&&hx<=maxX)&&(axis==1||hy>=minY&&hy<=maxY)&&(axis==2||hz>=minZ&&hz<=maxZ)) {
+                int su=side<4?sampleOffset(hx,sx,surface.spanU(face),scale):sampleOffset(hz,sz,surface.spanU(face),scale);
+                int sv=side<2?sampleOffset(hz,sz,surface.spanV(face),scale):sampleOffset(hy,sy,surface.spanV(face),1),sample=surface.sample(face,su,sv);
+                // Preserve original sample/direction tie order independently of rectangle traversal.
+                if(found<0||t<nearest||sample<foundCell||sample==foundCell&&side<foundSide) { found=face;foundCell=sample;foundSide=side;foundU=su;foundV=sv;nearest=t; }
+            }
         }
         WorldProblem.check(cancelled);Optional<Hit> hit=Optional.empty();
-        if(found>=0) { int cell=surface.cell(found);double minX=(cell%g.width())*scale,minY=cell/((long)g.width()*g.depth()),minZ=(cell/g.width()%g.depth())*scale;hit=Optional.of(new Hit(found,surface.face(found),nearest,x+nearest*ray.dx()-minX,y+nearest*ray.dy()-minY,z+nearest*ray.dz()-minZ)); }
+        if(found>=0) { int cell=foundCell;double minX=(cell%g.width())*scale,minY=cell/((long)g.width()*g.depth()),minZ=(cell/g.width()%g.depth())*scale;hit=Optional.of(new Hit(found,surface.face(found,foundU,foundV),nearest,x+nearest*ray.dx()-minX,y+nearest*ray.dy()-minY,z+nearest*ray.dz()-minZ)); }
         return new Result(volume.id(),ray,hit,surface.size(),List.of());
+    }
+    /** Inclusive shared edges select the lower original sample, as the unmerged source order did. */
+    private static int sampleOffset(double coordinate,int origin,int span,double scale) {
+        int low=0,high=span-1;
+        while(low<high) { int middle=(low+high)>>>1;if(coordinate<=(origin+middle+1)*scale)high=middle;else low=middle+1; }
+        return low;
     }
 }

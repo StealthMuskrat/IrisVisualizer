@@ -1,6 +1,6 @@
 # Native scalar volumes and display boundary surfaces
 
-Renderer implementation, 2026-11-03. All 116 CPU/OpenGL Java sources compile on Java 25 with LWJGL 3.4.1: 80 CPU and 36 GL. Thirteen native adapter sources are syntax-parsed and source-manifest checked only. Genuine pinned Windows native compilation remains pending. No native sampling, mesh/worker execution, tests, shader compilation or GL operations ran. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-04. All 119 CPU/OpenGL Java sources compile on Java 25 with LWJGL 3.4.1: 83 CPU and 36 GL. Sixteen native adapter sources are syntax-parsed and source-manifest checked only. Genuine pinned Windows native compilation remains pending. No native sampling, mesh/worker execution, tests, shader compilation or GL operations ran. Unsupported previews remain disabled.
 
 This batch supplies the CPU/native input and background display-mesh portion of the specified 3D noise preview. The [dedicated GPU scalar uploader/draw/frame path](../renderer-gl/NOISE-VIEW.md) now consumes this output; real-driver validation and final UI routing remain required. Scalar output is deliberately separate from `WorldSnapshot`, block meshes, vanilla material atlases and native block/biome IDs. No synthetic Minecraft state or biome is assigned to a scalar sample.
 
@@ -35,9 +35,9 @@ Primary pinned source review: [IrisGenerator](https://github.com/VolmitSoftware/
 
 Each included present sample occupies one display bin: `[sampleX, sampleX + horizontalScale]`, `[worldY, worldY + 1]`, `[sampleZ, sampleZ + horizontalScale]`. The scalar was sampled at that bin's minimum coordinate, with no hidden half-cell shift. These bins visualize discrete native values; they are neither interpolated isosurfaces nor a reconstruction of native generated voxels.
 
-`NoiseSurface.prepare` scans the whole admitted volume twice. The first pass counts included samples, outward boundary faces and actual bounds, rejecting face/source/working limits before arrays. The second emits exact-sized arrays. A face shared by two included present samples is omitted. Volume edges, absent neighbors and excluded neighbors are display boundaries. No native opacity, fluid height or hidden block-face policy is inferred.
+`NoiseSurface.prepare` now defaults to [greedy scalar rectangles](SCALAR-GREEDY.md): a full scan determines selected samples/bounds, then bounded plane count/emission passes merge compatible outward faces. Explicit `Meshing.CELLS` preserves the original two-pass unit-face representation. Both reject count/source/working limits before output arrays. A face shared by two included present samples is omitted. Volume edges, absent neighbors and excluded neighbors are display boundaries. No native opacity, fluid height or hidden block-face policy is inferred.
 
-Faces are stored deterministically by original sample order and DOWN/UP/NORTH/SOUTH/WEST/EAST direction order. Each requires one original sample index and one direction byte: five primitive bytes per face, with no intermediate packed vertex/index arrays. Colors are derived from original values when needed. The surface retains its exact volume and display style. `face(index)` gives detached inspection metadata: volume UUID, original sample index/world coordinate/value, face direction and display RGBA, with no array graph retained in that receipt.
+Greedy rectangles are stored deterministically by direction, plane and tangent rows/columns; unit mode keeps original sample/direction order. Unit output uses five bytes per face; greedy output adds a four-byte span word for nine bytes per rectangle. Only exactly equal original scalar bits merge. A bounded integer plane mask is discarded after preparation, and no expanded vertex/index arrays are created. The surface retains its exact volume/style. `face(index)` inspects the anchor, while `face(index,u,v)` and picking recover any covered original sample with its UUID, coordinate/value, direction and RGBA.
 
 Empty/all-excluded/absent volumes produce successful zero-face surfaces with no bounds, while retaining their full captured data. A failure publishes no partial mesh/usage/bounds. Threshold/color changes rebuild only display surfaces from the same immutable samples; they do not call a native sampler. Current block/biome world meshing and material/picking paths remain unchanged.
 
@@ -57,7 +57,8 @@ The consuming `submit(RenderInput<NoiseVolume>, style, limits)` overload retains
 | Detached scalar/presence arrays | 9 bytes per sample | 144 MiB |
 | Sampling arrays plus validating copy | 18 bytes per sample | 512 MiB configured capture working bound |
 | Display boundary faces | 262,144 | 1,048,576 |
-| Display mesh arrays | 5 bytes per emitted face | Also source-plus-output working bound |
+| Display mesh arrays | 5 bytes/unit face or 9 bytes/greedy rectangle | Source + output + plane-scratch working bound |
+| Greedy scratch | Largest selected-bounds plane, 4 bytes/entry | 64 MiB maximum; full-grid upper bound reserved by worker |
 | Surface job working ceiling | 512 MiB | Same |
 | Active plus pending surface jobs | 1 GiB | Same; lowerable |
 

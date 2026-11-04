@@ -8,7 +8,7 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class GlNoiseRenderer implements AutoCloseable {
     private static final String VERTEX="""
         #version 330 core
-        layout(location=0) in uvec2 instance;
+        layout(location=0) in uvec3 instance;
         uniform mat4 viewProjection;
         uniform vec3 gridOffset;
         uniform uvec2 gridSize;
@@ -26,7 +26,9 @@ public final class GlNoiseRenderer implements AutoCloseable {
         void main() {
             uint cell=instance.x>>3u,side=instance.x&7u;
             vec3 origin=vec3(float(cell%gridSize.x),float(cell/(gridSize.x*gridSize.y)),float((cell/gridSize.x)%gridSize.y));
-            vec3 local=(origin+corner[int(side)*4+triangle[gl_VertexID]])*vec3(horizontalScale,1.0,horizontalScale);
+            float u=float((instance.z&4095u)+1u),v=float((instance.z>>12u)+1u);
+            vec3 extent=side<2u?vec3(u,1.0,v):(side<4u?vec3(u,v,1.0):vec3(1.0,v,u));
+            vec3 local=(origin+corner[int(side)*4+triangle[gl_VertexID]]*extent)*vec3(horizontalScale,1.0,horizontalScale);
             gl_Position=viewProjection*vec4(gridOffset+local,1.0);
             vec3 rgb=vec3(float((instance.y>>24u)&255u),float((instance.y>>16u)&255u),float((instance.y>>8u)&255u))/255.0;
             faceColor=rgb*(0.35+0.65*max(0.0,dot(normal[int(side)],normalize(vec3(0.4,0.8,0.25)))));

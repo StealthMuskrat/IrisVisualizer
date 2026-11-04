@@ -11,7 +11,7 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
             Objects.requireNonNull(volume);Objects.requireNonNull(style);Objects.requireNonNull(limits);
             if(volume.requiresPlaceholder()||volume.payloadBytes()>limits.workingBytes())throw new IllegalArgumentException("A complete scalar source within the working bound is required");
         }
-        public long reservation() { return Math.min(limits.workingBytes(),volume.payloadBytes()+(long)limits.faces()*5); }
+        public long reservation() { return NoiseSurface.reservation(volume,style,limits); }
     }
     public enum Phase { IDLE, WAITING, QUEUED, MESHING, READY, DELIVERED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<UUID> volumeId,List<WorldProblem> problems) {
