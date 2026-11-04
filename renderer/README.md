@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its eighty-five main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its eighty-six main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -232,3 +232,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Frame-bound scalar clipping
 
 [Scalar display clipping](SCALAR-CLIPPING.md) now shares `WorldClip` across fragment/range rejection, view revisions, immutable frame/readback receipts and original-value ray picking. Clip changes redraw existing data without sampling, rebaking, upload or invented cap faces. Source-failure diagnostics and earlier unbounded APIs remain intact. All 126 CPU/OpenGL sources compile; tests and real-driver/native validation remain deferred, and unsupported previews stay disabled.
+
+## Background scalar inspection
+
+[NoisePickWorker](SCALAR-PICKING.md) now schedules one active and one latest pending pointer query with bounded full-source admission, cancellation ownership and detached completions. Completed scalar frames submit their exact camera/clip/image identity without scanning faces on the context thread; admitted requests survive independent GPU frame closure. Image UUID and pointer revisions guard adoption. All 127 CPU/OpenGL main sources compile; renderer-stage runtime tests and Windows/native/GPU verification remain deferred, and unsupported previews stay disabled.

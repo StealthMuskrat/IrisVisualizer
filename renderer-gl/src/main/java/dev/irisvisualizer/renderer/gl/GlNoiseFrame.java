@@ -12,6 +12,11 @@ public final class GlNoiseFrame implements AutoCloseable {
         public Info { Objects.requireNonNull(clip);Objects.requireNonNull(id);Objects.requireNonNull(volumeId);Objects.requireNonNull(context);Objects.requireNonNull(grid);Objects.requireNonNull(style);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid scalar frame receipt"); }
         public WorldRay ray(double x,double y) { return camera.ray(x,y,width,height); }
         public NoisePick.Options pickOptions(NoisePick.Options options) { return Objects.requireNonNull(options).withClip(clip); }
+        public NoisePickWorker.Frame pickFrame() { return new NoisePickWorker.Frame(id,revision); }
+        public boolean matches(NoisePickWorker.Completion completion) {
+            Objects.requireNonNull(completion);
+            return completion.frame().filter(pickFrame()::equals).isPresent()&&volumeId.equals(completion.result().volumeId())&&clip.equals(completion.result().clip());
+        }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final GlNoiseScene scene;final Info info;int references=1;boolean closing;
@@ -43,6 +48,13 @@ public final class GlNoiseFrame implements AutoCloseable {
     public int textureId() { return live().target.textureId(); }
     /** Capture on the context thread, then keep this frame owner live throughout off-thread immutable inspection. */
     public NoiseSurface surface() { return live().scene.surface(); }
+    /** Context-thread submission only; the admitted CPU request survives independent frame closure. */
+    public long submitPick(NoisePickWorker worker,double x,double y,NoisePick.Options options) {
+        Objects.requireNonNull(worker);Objects.requireNonNull(options);var value=live();
+        if(value.device.memory().orElse(null)!=worker.memory().orElse(null))
+            throw new IllegalArgumentException("Scalar frame and picking worker must share their memory coordinator");
+        return worker.submit(new NoisePickWorker.Request(value.scene.surface(),info.ray(x,y),info.pickOptions(options),Optional.of(info.pickFrame())));
+    }
     GlTarget readbackTarget() { return live().target; }
     GlDevice.Allocation readbackJournal() { return live().journal; }
     public GlNoiseFrame retain() { var value=live();if(value.references>=65536)throw new GlFailure(GlFailure.Code.LIMIT,"Scalar frame owner count reached");var result=new GlNoiseFrame(value);value.references++;return result; }

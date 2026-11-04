@@ -135,3 +135,7 @@ API references: [LWJGL OpenGL Java bindings](https://javadoc.lwjgl.org/org/lwjgl
 ## Original image canvas
 
 The [original image view](IMAGE-VIEW.md) now connects `SourceImage` background decoding to full-dimension texture upload, the shared 2D canvas, display navigation, immutable frames, source-pixel inspection and readback. Source resources have their own receipts, independent of native map data. Hardware/admission limits fail without resizing. All 126 CPU/OpenGL main sources compile; 16 native adapters remain syntax-only, with runtime/native/GPU verification deferred until renderer implementation is complete. Unsupported previews remain disabled.
+
+## Background scalar picking
+
+Completed scalar frames now connect to [NoisePickWorker](../renderer/SCALAR-PICKING.md) through a context-thread submission helper. Queries run on one bounded CPU worker with latest-pointer adoption, exact image/camera/clip receipts and independent full-source admission. Closing a submitted frame does not revoke an admitted CPU query or move GL cleanup off its original context. All 127 CPU/OpenGL main sources compile (86 CPU, 41 GL); runtime/worker/native/GPU tests and final editor integration remain deferred. Unsupported previews remain disabled.
