@@ -6,6 +6,8 @@ Renderer implementation batch, 2026-11-03. Compilation and source inspection onl
 
 `ModelTransforms.Element` applies positive per-axis rescaling before the existing X/Y/Z rotation around the declared origin. For each rotation-matrix column, the factor is the reciprocal of its largest absolute component. Identity rotation stays exact. Positions use `input + (R*S-I)*(input-origin)`; normals use `R*inverse(S)` before the baker normalizes them. Existing origin, angle, final-coordinate, face and byte limits still apply. UVs and declared cull labels retain their existing treatment.
 
+A later [winding batch](WINDING.md) supports reversed endpoints, derives normal orientation from source tangent axes and canonicalizes unrotated face tuples without moving their UVs.
+
 `ModelResolver` now distinguishes absent geometry from explicit empty geometry. The latter replaces parent geometry; inherited textures and ambient occlusion remain independently resolved. Native world preparation still requires an explicit native empty/render-shape decision and does not infer invisible blocks from an empty JSON mesh.
 
 ## Sprite preparation

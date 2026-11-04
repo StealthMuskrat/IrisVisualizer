@@ -34,8 +34,7 @@ public final class GeometryBaker {
             check();var choice=selected.choice();var model=choice.model();var dispatch=new ModelTransforms.Quarter(choice.x(),choice.y(),choice.z());
             require(model.elements().size()<=limits.elements()-elements,ModelPlan.Code.LIMIT,selected.part().dispatch(),"Selected model-element budget reached");elements+=model.elements().size();
             for(var element:model.elements()) {
-                check();var source=element.source();var from=element.from();var to=element.to();
-                require(from.x()<=to.x() && from.y()<=to.y() && from.z()<=to.z(),ModelPlan.Code.UNSUPPORTED_GEOMETRY,source,"Reversed element endpoints require native winding verification");
+                check();var source=element.source();
                 ModelTransforms.Element transform=null;
                 if(element.rotation().isPresent()) {
                     var rotation=element.rotation().get();
@@ -56,7 +55,11 @@ public final class GeometryBaker {
                         require(Double.isFinite(u)&&Double.isFinite(v)&&u>=0&&u<=16&&v>=0&&v<=16,ModelPlan.Code.UV_RANGE,faceSource,"UVs outside the source sprite require atlas-sampling verification");
                         vertices.add(new BlockMesh.Vertex((float)position.x(),(float)position.y(),(float)position.z(),(float)(u/16.0),(float)(v/16.0)));
                     }
-                    var normal=ModelTransforms.normal(side);if(transform!=null)normal=transform.normal(normal);normal=dispatch.vector(normal);double length=StrictMath.sqrt(normal.dot(normal));
+                    double signedArea=FaceGeometry.signedArea(element,side);var normalSide=signedArea<0?FaceGeometry.opposite(side):side;
+                    // The client canonicalizes only when no element rotation object was declared.
+                    // Reorder whole tuples so mirrored source UVs stay attached to their positions.
+                    if(transform==null&&FaceGeometry.hasArea(vertices))require(FaceGeometry.canonicalize(vertices,dispatch.direction(normalSide)),ModelPlan.Code.UNSUPPORTED_GEOMETRY,faceSource,"Axis-aligned face corners could not be reordered without changing source geometry");
+                    var normal=ModelTransforms.normal(normalSide);if(transform!=null)normal=transform.normal(normal);normal=dispatch.vector(normal);double length=StrictMath.sqrt(normal.dot(normal));
                     require(normal.finite()&&Double.isFinite(length)&&length>0,ModelPlan.Code.GEOMETRY_RANGE,faceSource,"Baked normal is not finite");normal=normal.scale(1.0/length);
                     quads.add(new BlockMesh.Quad(faceSource,selection,side,face.cullface().map(dispatch::direction),new ModelPlan.Vec3((float)normal.x(),(float)normal.y(),(float)normal.z()),face.material(),face.tintIndex(),element.lightEmission(),model.ambientOcclusion(),element.shadeDirectionOverride(),vertices));
                 }
