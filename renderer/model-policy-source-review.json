@@ -1,0 +1,28 @@
+{
+  "minecraft": "26.3",
+  "reviewedOn": "2026-11-04",
+  "officialPatchContext": [
+    "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/renderer/block/ModelBlockRenderer.java.patch",
+    "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/renderer/chunk/SectionCompiler.java.patch",
+    "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/renderer/block/dispatch/WeightedVariants.java.patch",
+    "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/renderer/block/dispatch/multipart/MultiPartModel.java.patch",
+    "https://github.com/neoforged/NeoForge/blob/b45f8c9d069cfb0099fae5bd1262b27ac4c1e7b4/patches/net/minecraft/client/renderer/blockentity/BlockEntityRenderers.java.patch"
+  ],
+  "reviewedBodies": [
+    "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/block/modelblockrenderer/",
+    "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/util/randomsource/",
+    "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/level/levelgen/singlethreadedrandomsource/",
+    "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/blockentity/blockentityrenderers/",
+    "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/level/block/entity/blockentitytypes/",
+    "https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/client/renderer/blockentity/blockentityrenderdispatcher/"
+  ],
+  "provenance": "Complete mapped vanilla code bodies reviewed from an unofficial decompilation mirror, with official patch context. Mutable mirror URLs and class names are not asset authentication or native API/runtime validation. No upstream bodies or assets bundled.",
+  "randomFactory": "RandomSource.createThreadLocalInstance(0L)",
+  "expectedRandomClass": "net.minecraft.world.level.levelgen.SingleThreadedRandomSource",
+  "policySource": "renderer/src/main/java/dev/irisvisualizer/renderer/VanillaModelPolicy.java",
+  "policySourceSha256": "e5992e93b56b9553e97da3366628748393a971ea4a747669aaef0791a49831b3",
+  "modelOnlyEntityBlockCount": 23,
+  "boundary": "Exact pinned vanilla IDs plus verified native registry identity and MODEL shape; model/tint/offset/weighted/fluid data guards remain. No entity instances or NBT invented; special producer visuals stay placeholders.",
+  "testsExecuted": false,
+  "nativeExecution": false
+}

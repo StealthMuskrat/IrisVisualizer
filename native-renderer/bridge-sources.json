@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
-      "sha256": "d60a6458afd7e8623f3a1072596e0d542ed41bb8d7a6f0f813835d13ac584d8a"
+      "sha256": "3f553ea13c895dcb975f11c63fcc1e0f08d80ca6e228dfc5c5845645f132294c"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeColormapTints.java",
@@ -16,7 +16,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeFluidInputs.java",
-      "sha256": "d7f424a678a4d10a3e96a7fec0dcdba9aadaefe902b00a678bf09c86ede709d9"
+      "sha256": "ea01c59af2d1d6454359a8ea91c11bac8f7b80088783a59a4e1737cba56882c5"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",
@@ -32,7 +32,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeModelInputs.java",
-      "sha256": "22a7fd8c45b6a673c253b377e0558034bf0c47d343e4b2621a4659aa4da604da"
+      "sha256": "09d8351daa4b62746c34576daee6e9376a23da6c8e3e99c089b6e4ae418d75c2"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeNoiseSampler.java",
@@ -52,7 +52,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeTintInputs.java",
-      "sha256": "d4ac7d9c5c82523cdfe031798b44e1892544ef285ae8ab2b12555bb2a8d67c49"
+      "sha256": "010d488e400ec2a0cd2e0886b4b5f2c191cc3010e4c4eb08c23a43df3b04bc72"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeVisibility.java",
@@ -64,7 +64,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWeightedInputs.java",
-      "sha256": "eb3a8ec456b947b1d3e8f6ec0dda67d52ef5224a700f8f9f4ee8f9476efe6c12"
+      "sha256": "3083a42b48e02d67473fa3c5872bce065f5d95ef9a63dcdd6aaf26d56278fae8"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeWorldCapture.java",

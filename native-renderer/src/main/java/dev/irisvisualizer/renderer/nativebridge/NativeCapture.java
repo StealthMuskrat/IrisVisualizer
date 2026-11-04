@@ -98,6 +98,15 @@ public final class NativeCapture {
         try(var source=assets.retain()) { catalogOwner(source,memory);return models(context,source.value(),extent,chunks,tick,partialTick,limits,options,memory,cancelled); }
         finally { assets.close(); }
     }
+    /** Default weighted capture owns a fresh pinned model-selection source inside admitted native work. */
+    public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);
+        try(var source=assets.retain()) { catalogOwner(source,memory);return weighted(context,source.value(),extent,chunks,tick,partialTick,limits,options,memory,cancelled); }
+        finally { assets.close(); }
+    }
+    public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
+        return weighted(context,assets,extent,chunks,Optional.empty(),tick,partialTick,limits,options,memory,cancelled);
+    }
     /** Same consuming catalog handoff for native weighted model selection; RNG policy remains caller-owned. */
     public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);
@@ -116,14 +125,32 @@ public final class NativeCapture {
     }
     /** The native renderer-matching RNG remains explicitly supplied and exclusively owned by the caller. */
     public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
+        return weighted(context,assets,extent,chunks,Optional.of(random),tick,partialTick,limits,options,memory,cancelled);
+    }
+    private static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,Optional<RandomSource> random,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(random);Objects.requireNonNull(limits);Objects.requireNonNull(options);clock(tick,partialTick);
         return capture(Kind.WEIGHTED,context,memory,worldPeak(assets,limits,options),()->{
             client(assets,options);var volume=NativeWorldCapture.capture(context,extent,chunks,limits.volume(),cancelled);if(volume.requiresPlaceholder())return failure(volume.problems(),List.of());
             var snapshot=volume.snapshot().orElseThrow();var colors=tint(context,assets,snapshot,options,limits.visuals().scene().workingBytes(),cancelled);
             var original=limits.visuals();var bounded=new NativeWeightedInputs.Limits(sceneLimits(original.scene(),options),original.parts(),original.alternatives(),original.selectionVisits(),original.weightUnits(),original.nativeQueries());
-            var result=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,bounded,colors,cancelled);
+            var result=NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,bounded,colors,false,cancelled);
             return result.requiresPlaceholder()?failure(result.problems(),result.assetProblems()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
         },cancelled);
+    }
+    /** The combined default route also owns its fresh native model-selection source. */
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
+        return fluidScene(context,assets,extent,chunks,tick,partialTick,limits,options,fluids,Optional.empty(),memory,cancelled);
+    }
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
+        Objects.requireNonNull(assets);Objects.requireNonNull(neighbors);
+        try(var source=assets.retain()) { catalogOwner(source,memory);return fluidScene(context,source.value(),extent,chunks,tick,partialTick,limits,options,fluids,neighbors,memory,cancelled); }
+        finally { assets.close(); }
+    }
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
+        return fluidScene(context,assets,extent,chunks,tick,partialTick,limits,options,fluids,Optional.empty(),memory,cancelled);
+    }
+    public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
+        return fluidScene(context,assets,extent,chunks,Optional.empty(),tick,partialTick,limits,options,fluids,neighbors,memory,cancelled);
     }
     /** Consumes a loaded catalog; base choices and fluid layers are completed under one admitted phase. */
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
@@ -141,6 +168,9 @@ public final class NativeCapture {
     }
     /** Optional exact-source/full-height halo is charged across volume, tint, selection and fluid phases. */
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
+        return fluidScene(context,assets,extent,chunks,Optional.of(random),tick,partialTick,limits,options,fluids,neighbors,memory,cancelled);
+    }
+    private static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,Optional<RandomSource> random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
         Objects.requireNonNull(assets);Objects.requireNonNull(random);Objects.requireNonNull(limits);Objects.requireNonNull(options);Objects.requireNonNull(fluids);Objects.requireNonNull(neighbors);clock(tick,partialTick);
         long extra=neighbors.map(WorldSnapshot::indexBytes).orElse(0L),peak=Math.max(worldPeak(assets,limits,options),assets.receipt().capturedAssetBytes()+limits.volume().capture().workingBytes()+colorBytes(options)+extra);
         return capture(Kind.FLUID_SCENE,context,memory,peak,()->{

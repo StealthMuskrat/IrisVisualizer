@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its eighty-two main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its eighty-three main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -139,7 +139,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native capture adapters
 
-`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its sixteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 118 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
+`WorldCapture` and `MapCapture` now detach streamed native identities and samples with full-volume/grid preflight, bounded palette text, cancellation and completion guards. The separate [native renderer bridge](../native-renderer/README.md) adds typed Iris/VolmLib chunk/registry capture and native terrain, biome, generator, expression and noise-layer sampling. Its sixteen native adapter sources require the genuine pinned Windows offline classpath and have not yet been compiled or executed; they are separate from the 119 compiled CPU/GL sources. Native visual producers, native validation and application admission/integration remain pending; no preview gate changes.
 
 ## Native deterministic model requests
 
@@ -155,7 +155,7 @@ The [completed frame layer](../renderer-gl/FRAMES.md) renders into fresh private
 
 ## Native weighted model choices
 
-`WorldModelChoices` now inspects bounded alternative descriptors and streams per-cell native selections into an interned choice palette. `NativeWeightedInputs` uses actual native position seeds/weighted lists and multipart seed resets with an explicitly supplied, renderer-matching dedicated native random source. It captures offsets and visibility under shared admission and returns a detached request for the existing CPU scene worker. Selected tint/empty/unsupported visuals remain guarded. See [WEIGHTED-CHOICES.md](WEIGHTED-CHOICES.md) for canonical tickets, random-source responsibility, budgets, ownership and deferred validation. Genuine Windows API compilation, factory/native/pixel comparison and readiness remain pending.
+`WorldModelChoices` now inspects bounded alternative descriptors and streams per-cell native selections into an interned choice palette. `NativeWeightedInputs` uses actual native position seeds/weighted lists and multipart seed resets with a dedicated native random source from the reviewed default factory or an explicitly supplied, renderer-matching source. It captures offsets and visibility under shared admission and returns a detached request for the existing CPU scene worker. Selected tint/empty/unsupported visuals remain guarded. See [WEIGHTED-CHOICES.md](WEIGHTED-CHOICES.md) for canonical tickets, random-source responsibility, budgets, ownership and deferred validation. Genuine Windows API compilation, factory/native/pixel comparison and readiness remain pending.
 
 ## Still to implement
 
@@ -206,3 +206,7 @@ The [visual-edit handoff](VISUAL-EDITS.md) now streams explicit native producer 
 ## Native fluid surfaces and waterlogged models
 
 [Vanilla fluid capture](FLUIDS.md) now reads actual native water/lava heights, flow, occlusion and radius-zero water color into bounded shared surface prototypes, then transfers an owned choice request to the existing scene/GPU path. Strict optional neighbors never substitute air. `NativeCapture.fluidScene` now completes weighted JSON bases and fluid layers under one admitted capture, retaining exact selections/tints and sharing base geometry across different fluid recipes. Per-face model/cell placement now keeps fluid surfaces fixed beside offset-dependent bases, and combined capture accepts admitted optional neighbor snapshots. Special bases, missing native offsets and unsupported previews remain guarded; genuine native compilation and renderer-stage tests remain pending.
+
+## Native model factory and JSON-only entity blocks
+
+The [model policy](MODEL-POLICY.md) now creates the reviewed dedicated native RNG inside default weighted/fluid capture and admits 23 pinned JSON-only entity blocks after actual native identity/shape checks. Furnaces, hoppers, barrels and related models retain original generated state, selected assets and all tint/offset/selection guards. Entity-rendered visuals remain explicit problems. No generation RNG or entity data is invented; Windows native compilation and end-stage tests remain pending.

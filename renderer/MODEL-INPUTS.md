@@ -11,7 +11,8 @@ The adapter inspects native facts in this order:
 | Native condition | Detached decision |
 | --- | --- |
 | Nonempty fluid state, including waterlogged blocks, in this default API | Placeholder: native fluid visual producer required |
-| Block entity | Placeholder: native special/block-entity visual producer required |
+| Reviewed JSON-only entity block with actual MODEL shape | Inspect the exact selected archive model under the pinned [policy](MODEL-POLICY.md) |
+| Other block entity | Placeholder: native special/block-entity visual producer required |
 | Native position offset function | Require matching successful native per-cell offset capture; otherwise placeholder |
 | Native invisible render shape, after the preceding guards | Explicit empty decision |
 | Native model render shape, after the preceding guards | Inspect the exact selected archive's JSON model |
@@ -65,6 +66,6 @@ At renderer completion, compare native shape/fluid/entity/offset decisions and o
 
 ## Explicit weighted native capture
 
-The separate [weighted-choice path](WEIGHTED-CHOICES.md) now consumes these same immutable native decisions through `WorldModelChoices` and a dedicated native selection reader. It captures actual per-cell selected alternatives, canonicalizes their interval tickets and shares repeated variants before the existing scene-worker handoff. Its native adapter requires an explicitly supplied renderer-matching random source; genuine factory/API/pixel validation remains pending. This document's unit-weight behavior remains the default deterministic path. Missing native tint coverage, fluid and special-renderer limitations remain guarded.
+The separate [weighted-choice path](WEIGHTED-CHOICES.md) now consumes these same immutable native decisions through `WorldModelChoices` and a dedicated native selection reader. It captures actual per-cell selected alternatives, canonicalizes their interval tickets and shares repeated variants before the existing scene-worker handoff. Its default native adapter creates the reviewed dedicated model RNG, while explicit-source overloads retain caller policy responsibility; genuine API/output/pixel validation remains pending. This document's unit-weight behavior remains the default deterministic path. Missing native tint coverage, fluid and special-renderer limitations remain guarded.
 
-The admitted [waterlogged scene route](FLUIDS.md) uses an internal decision overload to inspect eligible vanilla fluid-bearing JSON bases, then completes native fluid layers before publishing any detached request. It does not change this deterministic API or the default weighted guard. Offset-dependent fluid bases require successful native-mode offsets. Block entities, unknown fluids, missing offsets and failed/tinted-without-coverage bases remain guarded; native fluid faces use independent cell-origin placement.
+The admitted [waterlogged scene route](FLUIDS.md) uses an internal decision overload to inspect eligible vanilla fluid-bearing JSON bases, then completes native fluid layers before publishing any detached request. It does not change this deterministic API or the default weighted guard. Offset-dependent fluid bases require successful native-mode offsets. Entity-rendered blocks outside the reviewed JSON-only policy, unknown fluids, missing offsets and failed/tinted-without-coverage bases remain guarded; native fluid faces use independent cell-origin placement.

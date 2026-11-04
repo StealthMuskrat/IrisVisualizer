@@ -20,8 +20,9 @@
     }
   ],
   "provenance": "Complete method bodies from an unofficial decompilation mirror; not authentication of the selected archive or native API compatibility",
-  "boundary": "Vanilla water/lava; invisible pure hosts and verified JSON bases without block entities, including offset-dependent bases with captured native offsets. Explicit cell-origin fluid placement, native common-state sampling, radius-zero water color and simple display lighting. Special bases, missing offsets and missing neighbors remain guarded.",
+  "boundary": "Vanilla water/lava with invisible hosts or verified JSON bases, including reviewed model-only entity blocks and captured offset-dependent bases. Native cell-origin fluid placement, strict neighbor capture, radius-zero water color and simple lighting. Special entity-rendered bases and missing data remain guarded.",
   "testsExecuted": false,
   "composition": "Internal weighted base decisions feed NativeCapture.fluidScene; complete native fluid layers are attached before owned request publication. Source bodies/texture assets are not bundled; native/GPU parity remains pending.",
-  "placement": "Per-face MODEL/CELL metadata survives intake/composition/packing/atlas binding; world emission applies captured native offset only to MODEL faces. Optional same-source/full-height neighbors are borrowed and admitted across combined capture phases, then discarded."
+  "placement": "Per-face MODEL/CELL metadata survives intake/composition/packing/atlas binding; world emission applies captured native offset only to MODEL faces. Optional same-source/full-height neighbors are borrowed and admitted across combined capture phases, then discarded.",
+  "modelPolicy": "See model-policy-source-review.json for source-reviewed default native RNG factory and the separately pinned 23-block JSON-only entity allowlist."
 }

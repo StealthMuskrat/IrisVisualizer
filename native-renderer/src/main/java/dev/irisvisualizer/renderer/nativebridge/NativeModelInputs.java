@@ -47,8 +47,8 @@ public final class NativeModelInputs {
             for(var state:snapshot.states()) {
                 check(cancelled);context.checkSession();var handle=Block.stateById(state.nativeStateId());
                 if(Block.getId(handle)!=state.nativeStateId()||!identities.state(ModdedBlockState.of(handle,null)).equals(state))throw NativeIdentities.failure(WorldProblem.Code.STATE,"Captured state/properties do not exactly match the native visual registry");
-                if(!handle.getFluidState().isEmpty()&&!(fluidBases&&NativeFluidInputs.modelBase(handle)))decisions.add(unsupported(state,"/native/fluid","Native fluid/waterlogged visual producer is not supplied"));
-                else if(handle.hasBlockEntity())decisions.add(unsupported(state,"/native/block_entity","Native block-entity/special visual producer is not supplied"));
+                if(!handle.getFluidState().isEmpty()&&!(fluidBases&&NativeFluidInputs.modelBase(handle,state.block())))decisions.add(unsupported(state,"/native/fluid","Native fluid/waterlogged visual producer is not supplied"));
+                else if(handle.hasBlockEntity()&&!(handle.getRenderShape()==RenderShape.MODEL&&VanillaModelPolicy.modelOnlyBlockEntity(BlockModels.PROFILE,state.block())))decisions.add(unsupported(state,"/native/block_entity","Native block-entity/special visual producer is not supplied"));
                 else if(handle.hasOffsetFunction()&&(offsets==null||offsets.mode()!=WorldOffsets.Mode.NATIVE))decisions.add(unsupported(state,"/native/offset","Native position-dependent model offset producer is not supplied"));
                 else if(handle.getRenderShape()==RenderShape.INVISIBLE)decisions.add(WorldModelInputs.Decision.empty());
                 else if(handle.getRenderShape()==RenderShape.MODEL)decisions.add(WorldModelInputs.Decision.model());

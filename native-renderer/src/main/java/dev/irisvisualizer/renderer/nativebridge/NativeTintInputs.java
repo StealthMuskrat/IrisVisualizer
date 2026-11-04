@@ -52,10 +52,16 @@ public final class NativeTintInputs {
         catch(RuntimeException failure) { check(cancelled);return failed(snapshot,List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Native tint input capture failed: "+failure.getClass().getSimpleName()))); }
         catch(OutOfMemoryError exhausted) { check(cancelled);return failed(snapshot,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to capture native tint inputs"))); }
     }
+    public static NativeWeightedInputs.Result weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,Provider provider,long tick,double partialTick,NativeWeightedInputs.Limits limits,WorldTintInput.Limits tintLimits,BooleanSupplier cancelled) {
+        return weighted(context,assets,snapshot,provider,Optional.empty(),tick,partialTick,limits,tintLimits,cancelled);
+    }
     public static NativeWeightedInputs.Result weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,Provider provider,RandomSource random,long tick,double partialTick,NativeWeightedInputs.Limits limits,WorldTintInput.Limits tintLimits,BooleanSupplier cancelled) {
+        return weighted(context,assets,snapshot,provider,Optional.of(random),tick,partialTick,limits,tintLimits,cancelled);
+    }
+    private static NativeWeightedInputs.Result weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,Provider provider,Optional<RandomSource> random,long tick,double partialTick,NativeWeightedInputs.Limits limits,WorldTintInput.Limits tintLimits,BooleanSupplier cancelled) {
         var bounded=new WorldTintInput.Limits(tintLimits.tables(),tintLimits.layers(),tintLimits.payloadBytes(),Math.min(tintLimits.workingBytes(),limits.scene().workingBytes()));var captured=capture(context,assets,snapshot,provider,bounded,cancelled);
         if(captured.requiresPlaceholder())return new NativeWeightedInputs.Result(snapshot.source(),snapshot.id(),Optional.empty(),Optional.empty(),captured.problems(),List.of());
-        return NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,limits,captured.input().orElseThrow(),cancelled);
+        return NativeWeightedInputs.capture(context,assets,snapshot,random,tick,partialTick,limits,captured.input().orElseThrow(),false,cancelled);
     }
     private static Result failed(WorldSnapshot snapshot,List<WorldProblem> problems) { return new Result(snapshot.source(),snapshot.id(),Optional.empty(),problems); }
     private static void check(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("Native tint input capture cancelled"); }

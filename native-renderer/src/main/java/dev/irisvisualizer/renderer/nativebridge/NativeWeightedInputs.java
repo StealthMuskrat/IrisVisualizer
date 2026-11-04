@@ -10,7 +10,7 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
-/** Native position/weighted/multipart selection with an explicitly supplied renderer-matching native RNG. */
+/** Native model selection with a source-reviewed dedicated factory or an explicitly supplied native RNG. */
 public final class NativeWeightedInputs {
     private NativeWeightedInputs() {}
     public record Limits(NativeSceneInputs.Limits scene,int parts,int alternatives,long selectionVisits,long weightUnits,long nativeQueries) {
@@ -27,6 +27,19 @@ public final class NativeWeightedInputs {
         }
         public boolean requiresPlaceholder() { return !problems.isEmpty()||!assetProblems.isEmpty(); }
     }
+    public static final String VANILLA_RANDOM_PROFILE="26.3";
+    public static final String VANILLA_RANDOM_FACTORY="RandomSource.createThreadLocalInstance(0L)";
+    /** A fresh common-native source per capture; no generation RNG or global unique-seed factory is touched. */
+    private static RandomSource vanillaRandom(String minecraft) {
+        if(!VANILLA_RANDOM_PROFILE.equals(minecraft)||!VANILLA_RANDOM_PROFILE.equals(BlockModels.PROFILE))throw NativeIdentities.failure(WorldProblem.Code.VERSION,"Vanilla model random factory requires its separately reviewed 26.3 profile");
+        var random=RandomSource.createThreadLocalInstance(0L);
+        if(!random.getClass().getName().equals("net.minecraft.world.level.levelgen.SingleThreadedRandomSource"))throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Pinned vanilla model random factory returned an unexpected native class");
+        return random;
+    }
+    public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,long tick,double partialTick,BooleanSupplier cancelled) { return capture(context,assets,snapshot,tick,partialTick,Limits.DEFAULT,WorldTintInput.none(snapshot),cancelled); }
+    public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return capture(context,assets,snapshot,tick,partialTick,limits,WorldTintInput.none(snapshot),cancelled); }
+    /** Factory allocation remains inside the checked capture; failures retain only detached diagnostics. */
+    public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,long tick,double partialTick,Limits limits,WorldTintInput tints,BooleanSupplier cancelled) { return capture(context,assets,snapshot,Optional.empty(),tick,partialTick,limits,tints,false,cancelled); }
     /** Caller owns/freezes this dedicated RNG and verifies its algorithm matches the pinned renderer; no factory is guessed. */
     public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,BooleanSupplier cancelled) { return capture(context,assets,snapshot,rendererRandom,tick,partialTick,Limits.DEFAULT,cancelled); }
     public static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,BooleanSupplier cancelled) { return capture(context,assets,snapshot,rendererRandom,tick,partialTick,limits,WorldTintInput.none(snapshot),cancelled); }
@@ -35,10 +48,14 @@ public final class NativeWeightedInputs {
     }
     /** Package-private so incomplete waterlogged bases cannot escape the admitted combined route. */
     static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,RandomSource rendererRandom,long tick,double partialTick,Limits limits,WorldTintInput tints,boolean fluidBases,BooleanSupplier cancelled) {
-        Objects.requireNonNull(context);Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(rendererRandom);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
+        return capture(context,assets,snapshot,Optional.of(rendererRandom),tick,partialTick,limits,tints,fluidBases,cancelled);
+    }
+    /** An absent explicit source selects only the reviewed vanilla factory, never a replacement algorithm. */
+    static Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,Optional<RandomSource> suppliedRandom,long tick,double partialTick,Limits limits,WorldTintInput tints,boolean fluidBases,BooleanSupplier cancelled) {
+        Objects.requireNonNull(context);Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(suppliedRandom);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid native weighted input clock");
         try {
-            check(cancelled);context.check();if(snapshot.requiresPlaceholder())return failed(snapshot,snapshot.problems(),List.of());String randomClass=rendererRandom.getClass().getName();
+            check(cancelled);context.check();if(snapshot.requiresPlaceholder())return failed(snapshot,snapshot.problems(),List.of());var rendererRandom=suppliedRandom.orElseGet(()->vanillaRandom(snapshot.source().minecraftVersion()));String randomClass=rendererRandom.getClass().getName();
             if(!randomClass.startsWith("net.minecraft.")||randomClass.length()>128)throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Weighted inputs require an actual native renderer-matching random source, exclusively owned by the caller");
             if(tints.snapshot()!=snapshot||tints.requiresPlaceholder()||!tints.matchesAssets(assets.receipt()))throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Native weighted tints require the exact snapshot/assets");
             var s=limits.scene();long catalog=assets.receipt().capturedAssetBytes(),base=catalog+snapshot.indexBytes()+tints.bytes();
@@ -57,7 +74,7 @@ public final class NativeWeightedInputs {
             var capturedVisibility=NativeVisibility.capture(context,snapshot,boundedVisibility,cancelled);if(capturedVisibility.requiresPlaceholder())return failed(snapshot,capturedVisibility.problems(),List.of());var input=capturedVisibility.input().orElseThrow();
             long available=Math.min(modelWorking,s.workingBytes()-input.bytes());
             var reader=new NativeReader(context,snapshot,plan,rendererRandom,limits,cancelled);
-            String policy="Native BlockState seed; supplied "+randomClass+"; native WeightedList; multipart seed reset";
+            String policy="Native BlockState seed; "+(suppliedRandom.isEmpty()?"26.3 factory "+VANILLA_RANDOM_FACTORY:"supplied "+randomClass)+"; native WeightedList; multipart seed reset";
             var choices=WorldModelChoices.capture(plan,policy,reader,tick,partialTick,available,cancelled);if(choices.requiresPlaceholder())return failed(snapshot,choices.problems(),choices.assetProblems());
             var request=new WorldRenderWorker.Request(choices.request().orElseThrow(),input,s.scene(),s.section(),s.workingBytes());
             context.check();check(cancelled);var usage=new Usage(choices.usage().orElseThrow(),capturedVisibility.usage().orElseThrow(),randomClass,reader.queries,reader.multipartSeeds,reader.weights);

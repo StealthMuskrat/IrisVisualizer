@@ -56,8 +56,8 @@ public final class NativeFluidInputs {
             var provider=new NativeVisualInputs.Provider(input.assets().receipt(),POLICY,(cell,state,biome,position,prior)->{
                 check(cancelled);var fluid=state.getFluidState();if(fluid.isEmpty())return prior;
                 if(prior instanceof WorldVisuals.NativeChoice||prior instanceof WorldVisuals.EmptyChoice)return prior;
-                var kind=kind(fluid);boolean base=prior instanceof WorldVisuals.ModelChoice&&modelBase(state);
-                if(kind==null||state.hasBlockEntity()||!base&&state.getRenderShape()!=RenderShape.INVISIBLE)return prior;
+                var kind=kind(fluid);boolean base=prior instanceof WorldVisuals.ModelChoice&&modelBase(state,snapshot.state(cell).block());
+                if(kind==null||!base&&(state.hasBlockEntity()||state.getRenderShape()!=RenderShape.INVISIBLE))return prior;
                 if(prior instanceof WorldVisuals.ModelChoice model&&(!base||model.nativeLayer().isPresent()))return prior;
                 if(base&&state.hasOffsetFunction()&&input.offsets().mode()!=WorldOffsets.Mode.NATIVE)
                     return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),"Missing fluid base offset"),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,snapshot.state(cell).block(),"/native/fluid/offset","Fluid base requires captured native model offsets"))));
@@ -88,8 +88,8 @@ public final class NativeFluidInputs {
         var choice=new WorldVisuals.ModelChoice(model.stateIndex(),model.tickets(),Optional.of(nativeChoice.mesh()));layers.put(key,choice);return choice;
     }
     /** Complete vanilla JSON bases still require actual native offsets when their state uses them. */
-    static boolean modelBase(BlockState state) {
-        return kind(state.getFluidState())!=null&&state.getRenderShape()==RenderShape.MODEL&&!state.hasBlockEntity();
+    static boolean modelBase(BlockState state,AssetId block) {
+        return kind(state.getFluidState())!=null&&state.getRenderShape()==RenderShape.MODEL&&(!state.hasBlockEntity()||VanillaModelPolicy.modelOnlyBlockEntity(BlockModels.PROFILE,block));
     }
     private static Optional<AssetId> missingAsset(ClientAssetSnapshot assets,FluidGeometry.Kind kind) {
         if(assets.find(ClientAssetSnapshot.Kind.TEXTURE,kind.still()).isEmpty())return Optional.of(kind.still());
