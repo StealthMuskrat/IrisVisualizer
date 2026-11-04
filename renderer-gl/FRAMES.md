@@ -69,3 +69,7 @@ Frame requests now optionally carry [WorldClip](../renderer/CLIPPING.md); legacy
 ## Lighting receipt
 
 Completed world `Info.lighting()` now records the actual scene's simple/supplied RGB mode and bounded producer policy. It is detached metadata without sample arrays/provider ownership and follows the image through readback. Existing Info constructors default to simple lighting. Policy labels do not prove native fidelity; see [MATERIAL-LIGHTING.md](MATERIAL-LIGHTING.md).
+
+## Background inspection handoff
+
+`submitPickIndex` retains a fresh CPU scene lease into the [bounded index worker](../renderer/INDEX-WORKER.md) without scanning hierarchy/vertices on the context thread. `submitPick` checks exact scene/coordinator identity and sends this image's camera ray, clip, actual animated raster and detached UUID/revision to the pointer worker. Accepted CPU requests survive independent GL frame closure, while the caller keeps its index live. `Info.pickFrame` and `Info.matches` support exact-image adoption; the host still invalidates changed presentation/latest pointers. Workers never own or close GL resources, and manual borrowed raster access keeps its earlier lifetime rule. Runtime/GPU validation remains deferred.

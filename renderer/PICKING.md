@@ -80,3 +80,7 @@ The optional [picking-memory path](PICKING-MEMORY.md) now charges index build/so
 ## Matching clipped world images
 
 `Options.withClip` now scopes node/marker traversal and candidate triangle hits to a [geometric clip box](CLIPPING.md). `GlFrame.Info.pickOptions` applies a completed image's exact captured clip, and `WorldPick.clip` records it on detached hit/failure receipts. Original native identity, query limits, alpha/back-face behavior and index ownership remain intact. Marker hits keep their clipped unit-box approximation; real GPU boundary parity remains pending.
+
+## Background construction and frame binding
+
+The [index worker and completed-frame handoff](INDEX-WORKER.md) now schedule full hierarchy/range preparation with fresh CPU scene ownership and retained shared admission. `GlFrame.submitPickIndex` performs only context-side metadata/lease handoff. `GlFrame.submitPick` requires the exact CPU scene/coordinator and captures the actual camera, clip and displayed atlas. Pointer status/completions can retain an image UUID/revision token, and frame-aware take rejects a different image without consuming output. Earlier constructors remain available; pointer sources now have a 1 GiB aggregate active/pending ceiling even when untracked. Runtime/native/GPU tests remain deferred.

@@ -143,3 +143,7 @@ Completed scalar frames now connect to [NoisePickWorker](../renderer/SCALAR-PICK
 ## JPEG source images
 
 The existing original-image GPU view now accepts complete CPU [JPEG images](../renderer/JPEG-IMAGES.md) alongside PNG. Source-format receipts follow unchanged upload, pixel inspection, completed frames and readback; JPEG stored dimensions and opaque decoded RGB remain distinct from viewport pixels. All 128 CPU/OpenGL sources compile (87 CPU, 41 GL). No codec/worker/GPU tests ran; stage validation and final editor integration remain pending, with unsupported previews disabled.
+
+## Background world inspection
+
+World frames now connect to [background index construction and exact-image pointer queries](../renderer/INDEX-WORKER.md). Context-side helpers retain CPU leases and capture exact scene/camera/clip/animated-raster identity; CPU workers own their admission independently of GL frame lifetime. Image tokens and aggregate query bounds complement existing latest-revision guards. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); index/worker/native/GPU execution and final editor integration remain deferred. Unsupported previews stay disabled.

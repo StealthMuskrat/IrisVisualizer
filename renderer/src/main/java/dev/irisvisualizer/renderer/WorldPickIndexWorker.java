@@ -1,0 +1,125 @@
+package dev.irisvisualizer.renderer;
+
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/** Background section/range indexing. Every submission consumes one fresh CPU scene owner. */
+public final class WorldPickIndexWorker implements AutoCloseable {
+    public enum Phase { IDLE, WAITING, QUEUED, INDEXING, READY, DELIVERED, FAILED, CLOSED }
+    public record Status(long revision,Phase phase,Optional<UUID> snapshotId,List<WorldProblem> problems) {
+        public Status { Objects.requireNonNull(phase);Objects.requireNonNull(snapshotId);problems=List.copyOf(problems); }
+    }
+    /** Transfer/close the whole completion; its index independently owns source leases and admission. */
+    public record Completion(long revision,UUID snapshotId,WorldPickIndex index) implements AutoCloseable {
+        public Completion { Objects.requireNonNull(snapshotId);Objects.requireNonNull(index); }
+        @Override public void close() { index.close(); }
+    }
+    private static final class Job {
+        final long revision,reservation;final WorldScene.Result owner;final WorldPickIndex.Limits limits;final UUID snapshotId;
+        final AtomicBoolean cancelled=new AtomicBoolean();RenderMemory.Hold admission=RenderMemory.Hold.none();long retainedBytes;boolean published;
+        Job(long revision,long reservation,WorldScene.Result owner,WorldPickIndex.Limits limits,UUID snapshotId) {
+            this.revision=revision;this.reservation=reservation;this.owner=owner;this.limits=limits;this.snapshotId=snapshotId;
+        }
+        boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
+    }
+    private final Object lock=new Object();private final ExecutorService executor;private final RenderMemory memory;private final long workingBytes;
+    private long revision;private boolean closed,scheduled;private Job active,pending;private Completion completed;private WorldScene.Result completedOwner;
+    private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
+    public WorldPickIndexWorker() { this(1024L*1024*1024,null); }
+    public WorldPickIndexWorker(RenderMemory memory) { this(1024L*1024*1024,memory); }
+    public WorldPickIndexWorker(long workingBytes,RenderMemory memory) {
+        if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Picking preparation worker exceeds 1 GiB");
+        this.workingBytes=workingBytes;this.memory=memory;
+        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-pick-index");thread.setDaemon(true);return thread;});
+    }
+    public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
+    private long next() {
+        if(closed)throw new IllegalStateException("Picking preparation worker is closed");
+        if(revision==Long.MAX_VALUE)throw new IllegalStateException("Picking preparation revision exhausted");return revision+1;
+    }
+    private boolean current(Job job) { return !closed&&job.revision==revision&&!job.cancelled.get(); }
+    private static Status state(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.snapshotId),problems); }
+    private static Status failed(Job job,Throwable failure) {
+        return state(job,Phase.FAILED,List.of(new WorldProblem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,Optional.empty(),"Picking index preparation failed: "+failure.getClass().getSimpleName())));
+    }
+    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedOwner=null; }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);
+        if(pending!=null) { var old=pending;pending=null;old.cancelled.set(true);try { old.owner.close(); }finally { old.admission.close(); } }
+        dropCompleted();
+    }
+    public long submit(WorldScene.Result owner) { return submit(owner,WorldPickIndex.Limits.DEFAULT); }
+    /** Rejecting a reused worker-owned wrapper never closes it. All other outcomes consume the fresh wrapper. */
+    public long submit(WorldScene.Result owner,WorldPickIndex.Limits limits) {
+        Objects.requireNonNull(owner);boolean consumed=false;RenderMemory.Hold fresh=RenderMemory.Hold.none();
+        try {
+            synchronized(lock) {
+                if(active!=null&&active.owner==owner||pending!=null&&pending.owner==owner||completedOwner==owner) { consumed=true;throw new IllegalArgumentException("Picking worker already owns this scene wrapper; retain a fresh owner"); }
+                Objects.requireNonNull(limits);long next=next();var scene=owner.scene().orElseThrow(()->new IllegalArgumentException("Picking preparation requires a complete CPU scene"));
+                long reservation=WorldPickIndex.reservation(scene,limits);
+                if(reservation>workingBytes-(active==null?0:active.reservation))throw new IllegalStateException("Active and pending picking preparation exceed their combined allowance");
+                var job=new Job(next,reservation,owner,limits,scene.snapshot().id());var queued=state(job,Phase.QUEUED,List.of());
+                fresh=memory==null?RenderMemory.Hold.none():memory.holdReplacing("World picking preparation",reservation,
+                        pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.index().idleAdmission());
+                job.admission=fresh;cancelOwned();pending=job;consumed=true;revision=next;status=queued;
+                if(!scheduled) {
+                    scheduled=true;
+                    try { executor.execute(this::drain); }
+                    catch(RuntimeException|OutOfMemoryError failure) {
+                        scheduled=false;pending=null;try { owner.close(); }finally { job.admission.close(); }status=failed(job,failure);
+                    }
+                }
+                return next;
+            }
+        }finally { if(!consumed)try { owner.close(); }finally { fresh.close(); } }
+    }
+    public long invalidate() {
+        synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; }
+    }
+    public Status status() { synchronized(lock) { return status; } }
+    public long reservedBytes() {
+        synchronized(lock) {
+            return (active==null?0:active.reservation)+(pending==null?0:pending.reservation)+
+                    (completed==null||active!=null&&active.revision==completed.revision()?0:completed.index().queryPayloadBytes(null));
+        }
+    }
+    public Optional<Completion> take(long expectedRevision) {
+        synchronized(lock) {
+            if(closed||expectedRevision!=revision||completed==null)return Optional.empty();
+            var result=Optional.of(completed);var delivered=new Status(revision,Phase.DELIVERED,status.snapshotId(),List.of());
+            completed=null;completedOwner=null;status=delivered;return result;
+        }
+    }
+    private void execute(Job job) {
+        WorldPickIndex index=null;
+        try {
+            synchronized(lock) { if(current(job))status=state(job,Phase.INDEXING,List.of()); }
+            WorldProblem.check(job::cancelled);
+            index=WorldPickIndex.prepareAdmitted(job.owner,job.limits,memory,job.admission.retain(),job.reservation,job::cancelled);
+            synchronized(lock) {
+                if(current(job)) {
+                    if(index.requiresPlaceholder())status=state(job,Phase.FAILED,index.problems());
+                    else {
+                        long retained=index.queryPayloadBytes(null);if(retained>job.reservation)throw new IllegalStateException("Prepared picking output exceeded admitted peak");
+                        var value=new Completion(job.revision,job.snapshotId,index);var ready=state(job,Phase.READY,List.of());
+                        job.retainedBytes=retained;job.published=true;completed=value;completedOwner=job.owner;status=ready;index=null;
+                    }
+                }
+            }
+        }catch(RuntimeException|OutOfMemoryError failure) {
+            synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } }
+        }finally { if(index!=null)index.close();if(!job.published)job.owner.close(); }
+    }
+    private void drain() {
+        while(true) {
+            Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
+            try { execute(job); }
+            finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;job=null;hold.shrinkTo(retained);hold.close(); } }
+        }
+    }
+    @Override public void close() {
+        synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }
+        executor.shutdownNow();
+    }
+}

@@ -10,7 +10,7 @@ Build sources with a Java 25 JDK:
 gradle -p renderer classes
 ```
 
-The module has no external dependencies. Its eighty-seven main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
+The module has no external dependencies. Its eighty-eight main Java sources compile with `javac --release 25`. Renderer tests have not been executed; stage-wide testing remains deferred until renderer implementation is complete.
 
 ## Capturing client assets
 
@@ -244,3 +244,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## World picking ranges
 
 [Primitive range culling](PICKING-RANGES.md) now skips missed, clipped and behind-nearest groups of up to 128 world faces or diagnostic markers before individual tests. Original primitive order, native hit identity, alpha/clip policy and failure atomicity remain intact; range counters and an exhaustive option support later comparisons. Bounds/offsets share existing index/source admission and close-with-in-flight-query ownership. All 128 CPU/OpenGL sources compile; runtime/performance/native/GPU checks and final editor routing remain deferred, with unsupported previews disabled.
+
+## Background world inspection
+
+[WorldPickIndexWorker and completed-frame handoff](INDEX-WORKER.md) now build full picking indices on one bounded CPU executor and transfer their already-admitted source/index ownership. World frames submit exact-scene camera/clip/animated-atlas requests to the pointer worker, whose image tokens and aggregate source bounds guard adoption. Accepted CPU work can outlive its GL frame; caller-owned indices remain explicit. All 129 CPU/OpenGL sources compile; runtime/concurrency/native/GPU checks and final editor integration stay deferred, with unsupported previews disabled.

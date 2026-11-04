@@ -40,19 +40,37 @@ public final class WorldPickIndex implements AutoCloseable {
     public static WorldPickIndex prepare(WorldScene.Result owner,BooleanSupplier cancelled) { return prepare(owner,Limits.DEFAULT,cancelled); }
     public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,BooleanSupplier cancelled) { return prepare(owner,limits,null,cancelled); }
     public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();RenderMemory.Hold admission=RenderMemory.Hold.none();
+        return prepare(owner,limits,memory,RenderMemory.Hold.none(),-1,cancelled);
+    }
+    /** Metadata-only upper bound. Actual section/range counting remains on the preparation worker. */
+    static long reservation(WorldScene scene,Limits limits) {
+        long source=scene.usage().knownPayloadBytes();
+        if(source>limits.workingBytes())throw new IllegalArgumentException("Picking source scene exceeds the preparation allowance");
+        return Math.min(limits.workingBytes(),source+limits.indexBytes());
+    }
+    /** Consumes an independently retained worker hold; the worker keeps its original handle through unwind. */
+    static WorldPickIndex prepareAdmitted(WorldScene.Result owner,Limits limits,RenderMemory memory,RenderMemory.Hold admission,long reserved,BooleanSupplier cancelled) {
+        if(reserved<0)throw new IllegalArgumentException("Invalid admitted picking reservation");
+        return prepare(owner,limits,memory,Objects.requireNonNull(admission),reserved,cancelled);
+    }
+    private static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,RenderMemory memory,RenderMemory.Hold admission,long reserved,BooleanSupplier cancelled) {
+        Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();
         try {
             WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0;
             for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=(mesh.faces().size()+BATCH_PRIMITIVES-1)/BATCH_PRIMITIVES;markers+=(mesh.markers().size()+BATCH_PRIMITIVES-1)/BATCH_PRIMITIVES; }
             int nodes=count==0?0:count*2-1,starts=(faces==0?0:scene.sections().size()+1)+(markers==0?0:scene.sections().size()+1);
             long bytes=(long)nodes*60+((long)faces+markers)*6*Float.BYTES+(long)starts*Integer.BYTES,peak=bytes+(long)count*4+(count==0?0:4);
             if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking hierarchy/range arrays or combined CPU payload budget exceeded");
-            if(memory!=null)try { admission=memory.hold("World picking index",scene.usage().knownPayloadBytes()+peak); }
+            if(reserved>=0) {
+                if(memory!=null&&!admission.tracked()||admission.tracked()&&!admission.belongsTo(memory))throw new IllegalArgumentException("Admitted picking preparation requires its exact memory coordinator");
+                if(scene.usage().knownPayloadBytes()+peak>reserved||admission.tracked()&&scene.usage().knownPayloadBytes()+peak>admission.bytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking preparation exceeds its previously admitted source/index peak");
+            }else if(memory!=null)try { admission=memory.hold("World picking index",scene.usage().knownPayloadBytes()+peak); }
             catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
             var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());int[] admitted=new int[count];int at=0;
             for(int i=0;i<scene.sections().size();i++) { WorldProblem.check(cancelled);if(scene.sections().get(i).bounds().isPresent())admitted[at++]=i; }
             var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],faces==0?Ranges.EMPTY:new Ranges(faces,scene.sections().size()),markers==0?Ranges.EMPTY:new Ranges(markers,scene.sections().size()),List.of(),memory,admission);Arrays.fill(result.section,-1);
-            if(count>0)result.build(admitted,0,count,new int[1],cancelled);result.buildRanges(cancelled);WorldProblem.check(cancelled);admitted=null;admission.shrinkTo(scene.usage().knownPayloadBytes()+bytes);transferred=true;return result;
+            if(count>0)result.build(admitted,0,count,new int[1],cancelled);result.buildRanges(cancelled);WorldProblem.check(cancelled);admitted=null;
+            if(reserved<0)admission.shrinkTo(scene.usage().knownPayloadBytes()+bytes);transferred=true;return result;
         }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(source,List.of(failure.problem)); }
         catch(ArithmeticException overflow) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Picking index anchor subtraction exceeds exact coordinate bounds"))); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to index the complete scene; no partial picking index was published"))); }
@@ -104,6 +122,10 @@ public final class WorldPickIndex implements AutoCloseable {
     private static void emptyBounds(Ranges ranges,int at) { for(int axis=0;axis<3;axis++) { ranges.bounds[at+axis]=Float.POSITIVE_INFINITY;ranges.bounds[at+axis+3]=Float.NEGATIVE_INFINITY; } }
     private static void include(Ranges ranges,int at,int axis,float low,float high) { ranges.bounds[at+axis]=Math.min(ranges.bounds[at+axis],low);ranges.bounds[at+axis+3]=Math.max(ranges.bounds[at+axis+3],high); }
     public UUID id() { return id; }
+    public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
+    /** Exact scene identity, not just matching native source, volume or asset metadata. */
+    public synchronized boolean matches(WorldScene expected) { return !closed&&!requiresPlaceholder()&&scene==Objects.requireNonNull(expected); }
+    RenderMemory.Hold idleAdmission() { return admission; }
     public WorldSnapshot.Source source() { return source; }
     public List<WorldProblem> problems() { return problems; }
     public boolean requiresPlaceholder() { return !problems.isEmpty(); }

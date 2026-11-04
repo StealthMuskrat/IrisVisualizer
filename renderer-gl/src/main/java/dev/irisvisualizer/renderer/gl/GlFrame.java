@@ -13,6 +13,11 @@ public final class GlFrame implements AutoCloseable {
         public Info { Objects.requireNonNull(lighting);Objects.requireNonNull(clip);Objects.requireNonNull(id);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid completed frame receipt"); }
         public WorldRay ray(double x,double y) { return camera.ray(x,y,width,height); }
         public WorldPickIndex.Options pickOptions(WorldPickIndex.Options options) { return Objects.requireNonNull(options).withClip(clip); }
+        public WorldPickWorker.Frame pickFrame() { return new WorldPickWorker.Frame(id,revision); }
+        public boolean matches(WorldPickWorker.Completion completion) {
+            Objects.requireNonNull(completion);
+            return completion.frame().filter(pickFrame()::equals).isPresent()&&source.equals(completion.result().source())&&clip.equals(completion.result().clip());
+        }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final Info info;int references=1;boolean closing;
@@ -51,6 +56,20 @@ public final class GlFrame implements AutoCloseable {
     /** Borrowed exact atlas snapshot for picking; keep a retained frame owner through the query. */
     public AtlasRaster raster() { return (AtlasRaster)live().journal.retained; }
     public WorldScene.Result retainCpuScene() { return live().journal.owner.retain(); }
+    public long submitPickIndex(WorldPickIndexWorker worker) { return submitPickIndex(worker,WorldPickIndex.Limits.DEFAULT); }
+    /** Context-thread handoff only; hierarchy/vertex walks run on the worker without GL calls. */
+    public long submitPickIndex(WorldPickIndexWorker worker,WorldPickIndex.Limits limits) {
+        Objects.requireNonNull(worker);Objects.requireNonNull(limits);var value=live();
+        if(value.device.memory().orElse(null)!=worker.memory().orElse(null))throw new IllegalArgumentException("World frame and index worker must share their memory coordinator");
+        return worker.submit(value.journal.owner.retain(),limits);
+    }
+    /** The caller keeps the index live; accepted CPU queries independently own their displayed-raster charge. */
+    public long submitPick(WorldPickWorker worker,WorldPickIndex index,double x,double y,WorldPickIndex.Options options) {
+        Objects.requireNonNull(worker);Objects.requireNonNull(index);Objects.requireNonNull(options);var value=live();var memory=value.device.memory().orElse(null);
+        if(memory!=worker.memory().orElse(null)||memory!=index.memory().orElse(null))throw new IllegalArgumentException("World frame, index and pointer worker must share their memory coordinator");
+        if(!index.matches(value.journal.owner.scene().orElseThrow()))throw new IllegalArgumentException("Picking index belongs to another exact CPU scene");
+        return worker.submit(new WorldPickWorker.Request(index,info.ray(x,y),info.pickOptions(options),Optional.of((AtlasRaster)value.journal.retained),Optional.of(info.pickFrame())));
+    }
     /** Independent image/picking owner, without another target or CPU/GPU payload reservation. */
     public GlFrame retain() { var value=live();if(value.references>=65536)throw new GlFailure(GlFailure.Code.LIMIT,"Completed frame owner limit reached");var result=new GlFrame(value);value.references++;return result; }
     @Override public void close() {
