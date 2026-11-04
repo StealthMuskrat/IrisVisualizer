@@ -248,3 +248,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Background world inspection
 
 [WorldPickIndexWorker and completed-frame handoff](INDEX-WORKER.md) now build full picking indices on one bounded CPU executor and transfer their already-admitted source/index ownership. World frames submit exact-scene camera/clip/animated-atlas requests to the pointer worker, whose image tokens and aggregate source bounds guard adoption. Accepted CPU work can outlive its GL frame; caller-owned indices remain explicit. All 129 CPU/OpenGL sources compile; runtime/concurrency/native/GPU checks and final editor integration stay deferred, with unsupported previews disabled.
+
+## Terrain-map relief
+
+[Optional slope lighting](TERRAIN-RELIEF.md) now colorizes native terrain heights using declared sample spacing, complete four-neighbor stencils and explicit light/ambient/blend settings. Edges and missing neighbors retain base colors; native values/extrema and alpha remain intact. Completed map/readback receipts now carry their actual color style and summary. Existing flat gradients/defaults and memory limits remain unchanged. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and final editor routing stay deferred, with unsupported previews disabled.

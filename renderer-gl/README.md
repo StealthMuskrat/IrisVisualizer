@@ -147,3 +147,7 @@ The existing original-image GPU view now accepts complete CPU [JPEG images](../r
 ## Background world inspection
 
 World frames now connect to [background index construction and exact-image pointer queries](../renderer/INDEX-WORKER.md). Context-side helpers retain CPU leases and capture exact scene/camera/clip/animated-raster identity; CPU workers own their admission independently of GL frame lifetime. Image tokens and aggregate query bounds complement existing latest-revision guards. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); index/worker/native/GPU execution and final editor integration remain deferred. Unsupported previews stay disabled.
+
+## Terrain relief and color receipts
+
+Native terrain maps now support [optional CPU slope lighting](../renderer/TERRAIN-RELIEF.md) through the existing map worker/view/upload route. Completed map receipts retain exact style/summary metadata through readback, including terrain light settings and processed-stencil counts. Original native height inspection, alpha, frame ownership and GPU layouts remain intact; flat maps remain available. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL). Renderer-stage execution and final editor integration remain deferred, with unsupported previews disabled.

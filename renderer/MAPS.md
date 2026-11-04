@@ -79,3 +79,7 @@ On real Windows GL contexts, compare every uploaded pixel/row and orientation, o
 ## Connected map presentation
 
 The [map-view endpoint](../renderer-gl/MAP-VIEW.md) now combines this worker/uploader with a private offscreen canvas, display-only fit/pan/zoom, immutable completed images and original-sample inspection. Retained map/frame wrappers share exact source data without duplicating native payload. The source texture V=0 convention above still applies; rendered framebuffer images use a flipped V convention in a top-left widget. Native API/runtime validation, real-driver/pixel comparison, combined application admission and final editor routing remain pending.
+
+## Optional terrain relief and captured color styles
+
+[Terrain-map relief](TERRAIN-RELIEF.md) adds an explicit TERRAIN-only style over the existing scalar ramp. Central differences use original opposite-neighbor heights and declared sampling distance, with overflow-safe normal/light normalization. RGB is shaded while alpha, native samples, extrema and inspection values stay intact. Edges/missing stencils keep base colors; the old terrain helper stays flat. Summary adds an eligible-stencil count with a compatible prior constructor. Successful completed map images/readback now retain their actual style and summary; old receipt constructors explicitly leave them unknown. No source-sized array, GPU storage or default limit changes. All 129 CPU/OpenGL sources compile; runtime/worker/native/GPU tests remain deferred and unsupported previews disabled.

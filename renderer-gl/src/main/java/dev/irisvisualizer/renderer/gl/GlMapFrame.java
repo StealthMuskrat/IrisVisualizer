@@ -7,8 +7,18 @@ import java.util.function.BooleanSupplier;
 
 /** Independently owned completed map canvas, original samples and exact display transform. */
 public final class GlMapFrame implements AutoCloseable {
-    public record Info(UUID id,long revision,MapSamples.Context context,MapSamples.Kind kind,MapSamples.Grid grid,MapView view,int width,int height) {
-        public Info { Objects.requireNonNull(id);Objects.requireNonNull(context);Objects.requireNonNull(kind);Objects.requireNonNull(grid);Objects.requireNonNull(view);if(revision<1||width<1||height<1||view.width()!=grid.width()||view.height()!=grid.height())throw new IllegalArgumentException("Invalid map frame receipt"); }
+    public record Info(UUID id,long revision,MapSamples.Context context,MapSamples.Kind kind,MapSamples.Grid grid,MapView view,int width,int height,Optional<MapRaster.Style> style,Optional<MapRaster.Summary> summary) {
+        /** Legacy receipts explicitly leave colorization metadata unknown instead of inventing a style. */
+        public Info(UUID id,long revision,MapSamples.Context context,MapSamples.Kind kind,MapSamples.Grid grid,MapView view,int width,int height) { this(id,revision,context,kind,grid,view,width,height,Optional.empty(),Optional.empty()); }
+        public Info {
+            Objects.requireNonNull(style);Objects.requireNonNull(summary);Objects.requireNonNull(id);Objects.requireNonNull(context);Objects.requireNonNull(kind);Objects.requireNonNull(grid);Objects.requireNonNull(view);
+            if(revision<1||width<1||height<1||view.width()!=grid.width()||view.height()!=grid.height()||style.isPresent()!=summary.isPresent())throw new IllegalArgumentException("Invalid map frame receipt");
+            if(style.isPresent()) {
+                var colors=style.orElseThrow();var values=summary.orElseThrow();
+                boolean matching=kind==MapSamples.Kind.BIOME?colors instanceof MapRaster.BiomeStyle:colors instanceof MapRaster.ScalarStyle||kind==MapSamples.Kind.TERRAIN&&colors instanceof MapRaster.TerrainStyle;
+                if(!matching||(long)values.present()+values.absent()!=grid.count()||values.reliefSamples()>0&&!(colors instanceof MapRaster.TerrainStyle))throw new IllegalArgumentException("Map colorization receipt differs from its source kind/grid");
+            }
+        }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final GlMap map;final Info info;int references=1;boolean closing;
@@ -26,7 +36,7 @@ public final class GlMapFrame implements AutoCloseable {
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);journal.retained=raster;
             check(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);check(obsolete);renderer.render(owner,target,view);check(obsolete);
-            var info=new Info(UUID.randomUUID(),revision,raster.samples().context(),raster.samples().kind(),raster.samples().grid(),view,width,height);return new GlMapFrame(new Shared(device,journal,target,owner,info));
+            var info=new Info(UUID.randomUUID(),revision,raster.samples().context(),raster.samples().kind(),raster.samples().grid(),view,width,height,Optional.of(raster.style()),raster.summary());return new GlMapFrame(new Shared(device,journal,target,owner,info));
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(target!=null)try { target.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
