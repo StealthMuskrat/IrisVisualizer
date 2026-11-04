@@ -2,6 +2,7 @@ package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.BlockMesh;
 import dev.irisvisualizer.renderer.NoiseSurface;
+import dev.irisvisualizer.renderer.WorldClip;
 
 /** Conservative section AABB rejection using the exact float matrix submitted to the GPU. */
 final class GlFrustum {
@@ -19,9 +20,16 @@ final class GlFrustum {
         return visible(minX,minY,minZ,maxX,maxY,maxZ);
     }
     /** Bounds follow the scalar shader's integer-grid float product and float anchor addition. */
-    boolean visible(NoiseSurface surface,int batch,float scale,float[] offset) {
-        return visible(offset[0]+surface.batchMinimum(batch,0)*scale,offset[1]+surface.batchMinimum(batch,1),offset[2]+surface.batchMinimum(batch,2)*scale,
-            offset[0]+surface.batchMaximum(batch,0)*scale,offset[1]+surface.batchMaximum(batch,1),offset[2]+surface.batchMaximum(batch,2)*scale);
+    boolean visible(NoiseSurface surface,int batch,float scale,float[] offset) { return visible(surface,batch,scale,offset,null); }
+    /** Null clip retains the original unbounded frustum test. */
+    boolean visible(NoiseSurface surface,int batch,float scale,float[] offset,WorldClip.Bounds clip) {
+        float minX=offset[0]+surface.batchMinimum(batch,0)*scale,minY=offset[1]+surface.batchMinimum(batch,1),minZ=offset[2]+surface.batchMinimum(batch,2)*scale;
+        float maxX=offset[0]+surface.batchMaximum(batch,0)*scale,maxY=offset[1]+surface.batchMaximum(batch,1),maxZ=offset[2]+surface.batchMaximum(batch,2)*scale;
+        if(clip!=null) {
+            double magnitude=Math.max(Math.max(Math.abs(minX),Math.abs(maxX)),Math.max(Math.max(Math.abs(minY),Math.abs(maxY)),Math.max(Math.abs(minZ),Math.abs(maxZ)))),margin=8*(double)Math.ulp((float)magnitude);
+            if(!clip.intersects(minX-margin,minY-margin,minZ-margin,maxX+margin,maxY+margin,maxZ+margin))return false;
+        }
+        return visible(minX,minY,minZ,maxX,maxY,maxZ);
     }
     private boolean visible(double minX,double minY,double minZ,double maxX,double maxY,double maxZ) {
         for(var p:planes) {

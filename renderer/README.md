@@ -228,3 +228,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Scalar range culling
 
 [Scalar surface ranges](SCALAR-CULLING.md) now retain charged integer bounds for at most 1,024 original-order faces each. OpenGL frustum rejection coalesces visible runs without instance copies; ray picking skips missed ranges while retaining the full-face allowance and original sample ties. Frame/query work counters expose the skipped work. All 126 CPU/OpenGL sources compile; native adapters remain syntax-only and runtime/GPU tests stay deferred until renderer implementation is complete. Unsupported previews remain disabled.
+
+## Frame-bound scalar clipping
+
+[Scalar display clipping](SCALAR-CLIPPING.md) now shares `WorldClip` across fragment/range rejection, view revisions, immutable frame/readback receipts and original-value ray picking. Clip changes redraw existing data without sampling, rebaking, upload or invented cap faces. Source-failure diagnostics and earlier unbounded APIs remain intact. All 126 CPU/OpenGL sources compile; tests and real-driver/native validation remain deferred, and unsupported previews stay disabled.

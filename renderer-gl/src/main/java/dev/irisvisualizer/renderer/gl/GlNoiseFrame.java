@@ -7,9 +7,11 @@ import java.util.function.BooleanSupplier;
 
 /** Immutable completed scalar image and exact original sample/display/camera receipt. */
 public final class GlNoiseFrame implements AutoCloseable {
-    public record Info(UUID id,long revision,UUID volumeId,MapSamples.Context context,NoiseVolume.Grid grid,NoiseSurface.Style style,GlCamera camera,int width,int height,GlNoiseRenderer.Stats stats) {
-        public Info { Objects.requireNonNull(id);Objects.requireNonNull(volumeId);Objects.requireNonNull(context);Objects.requireNonNull(grid);Objects.requireNonNull(style);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid scalar frame receipt"); }
+    public record Info(UUID id,long revision,UUID volumeId,MapSamples.Context context,NoiseVolume.Grid grid,NoiseSurface.Style style,GlCamera camera,int width,int height,GlNoiseRenderer.Stats stats,WorldClip clip) {
+        public Info(UUID id,long revision,UUID volumeId,MapSamples.Context context,NoiseVolume.Grid grid,NoiseSurface.Style style,GlCamera camera,int width,int height,GlNoiseRenderer.Stats stats) { this(id,revision,volumeId,context,grid,style,camera,width,height,stats,WorldClip.NONE); }
+        public Info { Objects.requireNonNull(clip);Objects.requireNonNull(id);Objects.requireNonNull(volumeId);Objects.requireNonNull(context);Objects.requireNonNull(grid);Objects.requireNonNull(style);Objects.requireNonNull(camera);Objects.requireNonNull(stats);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid scalar frame receipt"); }
         public WorldRay ray(double x,double y) { return camera.ray(x,y,width,height); }
+        public NoisePick.Options pickOptions(NoisePick.Options options) { return Objects.requireNonNull(options).withClip(clip); }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final GlNoiseScene scene;final Info info;int references=1;boolean closing;
@@ -19,12 +21,15 @@ public final class GlNoiseFrame implements AutoCloseable {
     private GlNoiseFrame(Shared shared) { this.shared=shared;info=shared.info; }
     private static void check(BooleanSupplier obsolete) { if(obsolete.getAsBoolean())throw new CancellationException("Scalar frame is obsolete"); }
     public static GlNoiseFrame render(GlNoiseRenderer renderer,long revision,GlNoiseScene source,GlCamera camera,int width,int height,BooleanSupplier obsolete) {
-        Objects.requireNonNull(renderer);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1)throw new IllegalArgumentException("Invalid scalar frame revision");
+        return render(renderer,revision,source,camera,width,height,WorldClip.NONE,obsolete);
+    }
+    public static GlNoiseFrame render(GlNoiseRenderer renderer,long revision,GlNoiseScene source,GlCamera camera,int width,int height,WorldClip clip,BooleanSupplier obsolete) {
+        Objects.requireNonNull(clip);Objects.requireNonNull(renderer);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1)throw new IllegalArgumentException("Invalid scalar frame revision");
         var device=renderer.device;device.live(renderer.allocation);if(source.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar frame inputs must share one device");var surface=source.surface();camera.matrix((double)width/height);check(obsolete);
         GlNoiseScene owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);check(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);check(obsolete);
-            var stats=renderer.render(owner,target,camera);check(obsolete);var volume=surface.volume();var receipt=new Info(UUID.randomUUID(),revision,volume.id(),volume.context(),volume.grid(),surface.style(),camera,width,height,stats);return new GlNoiseFrame(new Shared(device,journal,target,owner,receipt));
+            var stats=renderer.render(owner,target,camera,clip);check(obsolete);var volume=surface.volume();var receipt=new Info(UUID.randomUUID(),revision,volume.id(),volume.context(),volume.grid(),surface.style(),camera,width,height,stats,clip);return new GlNoiseFrame(new Shared(device,journal,target,owner,receipt));
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(target!=null)try { target.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }

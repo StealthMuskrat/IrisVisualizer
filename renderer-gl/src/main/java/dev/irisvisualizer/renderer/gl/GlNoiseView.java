@@ -10,7 +10,7 @@ public final class GlNoiseView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlNoiseRenderer renderer;private final GlDevice device;private final NoiseSurfaceWorker worker;
-    private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean dirty,closed,disposed;
+    private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlNoiseView(GlNoiseRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlNoiseView(GlNoiseRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new NoiseSurfaceWorker(workerBytes,device.memory().orElse(null)); }
@@ -54,6 +54,14 @@ public final class GlNoiseView implements AutoCloseable {
         var changed=new Status(dataRevision,next,scene==null?status.phase():Phase.WAITING_VIEW,status.context(),sourceFailure?status.problems():List.of(),sourceFailure?status.code():Optional.empty(),sourceFailure?status.reason():"");this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
         try { releaseFrame();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
+    public WorldClip clip() { current();return clip; }
+    /** Display-only scope; pending preparation/upload and complete source data stay unchanged. */
+    public long clip(WorldClip clip) {
+        Objects.requireNonNull(clip);current();if(clip.equals(this.clip))return viewRevision;long next=nextView();boolean sourceFailure=scene==null&&status.phase()==Phase.FAILED;
+        var changed=new Status(dataRevision,next,scene==null?status.phase():Phase.WAITING_VIEW,status.context(),sourceFailure?status.problems():List.of(),sourceFailure?status.code():Optional.empty(),sourceFailure?status.reason():"");
+        this.clip=clip;viewRevision=next;dirty=true;status=changed;
+        try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
     public long fit(int width,int height) { current();dimensions(width,height);if(scene==null)throw new GlFailure(GlFailure.Code.STATE,"A complete scalar upload is required before camera fitting");return view(GlOrbitCamera.fit(scene.surface(),(double)width/height).camera(),width,height); }
     /** Display-only retry; source/CPU/upload failures require resubmission. */
     public long redraw() {
@@ -75,7 +83,7 @@ public final class GlNoiseView implements AutoCloseable {
             if(upload!=null&&status.phase()==Phase.UPLOADING) { upload.step(budget,()->false);if(upload.ready()) { scene=upload.take();upload.close();upload=null;dirty=true;state(Phase.WAITING_VIEW); } }
             if(scene==null||camera==null||!dirty)return status;
             if(completed!=null)throw new GlFailure(GlFailure.Code.STATE,"Untaken scalar frame survived view invalidation");
-            var frame=GlNoiseFrame.render(renderer,viewRevision,scene,camera,width,height,()->false);
+            var frame=GlNoiseFrame.render(renderer,viewRevision,scene,camera,width,height,clip,()->false);
             try { var ready=new Status(dataRevision,viewRevision,Phase.FRAME_READY,status.context(),List.of(),Optional.empty(),"");completed=frame;dirty=false;status=ready; }
             catch(RuntimeException|Error failure) { try { frame.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }return status;
         }catch(RuntimeException|Error failure) { failed(failure);throw failure; }

@@ -18,7 +18,7 @@ The existing CPU working, face, GPU storage and shared memory ceilings are uncha
 
 ## GPU frustum rejection
 
-`GlNoiseRenderer` now checks every range against the exact float camera matrix submitted to the shader. It converts integer bounds using the shader's float horizontal scale and float anchor addition, then uses the shared frustum plane test with its outward roundoff margin. Only a complete range outside a plane is rejected. Near-plane intersections, planar ranges and uncertain edge cases remain conservatively included. The existing world-section frustum overload delegates to the same plane test without changing its bounds arithmetic.
+`GlNoiseRenderer` now checks every range against the exact float camera matrix submitted to the shader. It converts integer bounds using the shader's float horizontal scale and float anchor addition, then uses the shared frustum plane test with its outward roundoff margin. Only a complete range outside a plane is rejected. Near-plane intersections, planar ranges and uncertain edge cases remain conservatively included. [Geometric scalar clipping](SCALAR-CLIPPING.md) now adds a second conservative whole-range rejection before the shader applies exact clip planes. The existing world-section frustum overload delegates to the same plane test without changing its bounds arithmetic.
 
 Consecutive visible ranges coalesce into one instanced draw. An all-visible surface still needs one draw; separated visible runs use bounded additional calls. Each run points the owned VAO's integer instance attribute at `firstFace * 12` in the original buffer, then uses ordinary OpenGL 3.3 instanced drawing. No base-instance extension or instance-data copy is required. The owned VAO and array-buffer bindings are selected before layout changes; existing state guards restore host bindings and state on success/failure.
 
@@ -28,7 +28,7 @@ The shader, lighting, winding, face colors, complete source height and GPU insta
 
 ## Original-value picking
 
-`NoisePick` uses the same range bounds before testing individual face planes. Its slab test expands spatial bounds using bound/origin precision and interval rounding outward, handles parallel directions and limits rejection to the current near/nearest interval. Face intersection, inclusive sample-edge lookup and original sample/direction tie ordering remain unchanged; no sorted traversal or replacement scalar is introduced.
+`NoisePick` uses the same range bounds before testing individual face planes. Its slab test expands spatial bounds using bound/origin precision and interval rounding outward, handles parallel directions and limits rejection to the current near/nearest interval. An optional frame-bound clip intersects those range slabs and filters candidate hit points. Face intersection, inclusive sample-edge lookup and original sample/direction tie ordering remain unchanged; no sorted traversal or replacement scalar is introduced.
 
 The query still checks the complete surface against `maximumFaces` before searching, even for an eventual miss. Bounds are an optimization, never permission to return a partial nearest result under a smaller allowance. Hard limits remain 1,048,576 faces and at most 1,024 range tests. Cancellation is checked per range and within visited face runs. `Result.visitedFaces` now counts actual face tests, with new tested/culled range counters. The previous result constructor remains available. Hits remain detached original UUID/sample/coordinate/value records and retain no range/source arrays.
 
