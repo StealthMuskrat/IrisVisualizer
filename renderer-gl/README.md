@@ -151,3 +151,7 @@ World frames now connect to [background index construction and exact-image point
 ## Terrain relief and color receipts
 
 Native terrain maps now support [optional CPU slope lighting](../renderer/TERRAIN-RELIEF.md) through the existing map worker/view/upload route. Completed map receipts retain exact style/summary metadata through readback, including terrain light settings and processed-stencil counts. Original native height inspection, alpha, frame ownership and GPU layouts remain intact; flat maps remain available. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL). Renderer-stage execution and final editor integration remain deferred, with unsupported previews disabled.
+
+## Scalar recoloring
+
+The scalar view now accepts [geometry-sharing color requests](../renderer/SCALAR-COLORS.md), including explicit retained displayed surfaces through rapid replacements. Native volume/geometry-policy guards reject stale reuse; camera and clip remain intact. Uploads read prepared RGBA directly through the unchanged twelve-byte instance format, with old/new colors included in CPU/shared admission and old frames preserved. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); renderer-stage runtime/native/GPU checks remain deferred and unsupported previews disabled.

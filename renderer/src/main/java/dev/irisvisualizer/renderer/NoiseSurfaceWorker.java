@@ -6,14 +6,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** One active and one latest pending scalar display mesh, without native sampling on this executor. */
 public final class NoiseSurfaceWorker implements AutoCloseable {
-    public record Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits) {
+    public record Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry) {
+        public Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits) { this(volume,style,limits,Optional.empty()); }
         public Request {
-            Objects.requireNonNull(volume);Objects.requireNonNull(style);Objects.requireNonNull(limits);
+            Objects.requireNonNull(volume);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(geometry);
             if(volume.requiresPlaceholder()||volume.payloadBytes()>limits.workingBytes())throw new IllegalArgumentException("A complete scalar source within the working bound is required");
+            if(geometry.isPresent()) {
+                var source=geometry.orElseThrow();
+                if(source.requiresPlaceholder()||source.volume()!=volume||!source.style().sameGeometry(style))throw new IllegalArgumentException("Scalar recoloring requires the exact complete volume and geometry policy");
+                if(source.size()>limits.faces()||NoiseSurface.recolorReservation(source,style.colors())>limits.workingBytes())throw new IllegalArgumentException("Scalar recolor source and replacement colors exceed their declared allowance");
+            }
         }
-        public long reservation() { return NoiseSurface.reservation(volume,style,limits); }
+        public static Request recolor(NoiseSurface source,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
+            Objects.requireNonNull(source);var old=source.style();return new Request(source.volume(),new NoiseSurface.Style(old.includeMinimum(),old.includeMaximum(),colors,old.meshing()),limits,Optional.of(source));
+        }
+        public long reservation() { return geometry.isPresent()?NoiseSurface.recolorReservation(geometry.orElseThrow(),style.colors()):NoiseSurface.reservation(volume,style,limits); }
     }
-    public enum Phase { IDLE, WAITING, QUEUED, MESHING, READY, DELIVERED, FAILED, CLOSED }
+    public enum Phase { IDLE, WAITING, QUEUED, MESHING, RECOLORING, READY, DELIVERED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<UUID> volumeId,List<WorldProblem> problems) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(volumeId);problems=List.copyOf(problems); }
     }
@@ -59,6 +68,14 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
             return submit(new Request(source.value(),style,limits));
         }finally { input.close(); }
     }
+    /** Consumes complete surface ownership only after destination admission, including rejected submissions. */
+    public long recolor(RenderInput<NoiseSurface> input,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar recoloring requires the same managed coordinator");
+            return submit(Request.recolor(source.value(),colors,limits));
+        }finally { input.close(); }
+    }
     public long invalidate() { synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; } }
     public Status status() { synchronized(lock) { return status; } }
     public long reservedBytes() { synchronized(lock) { return (active==null?0:active.request.reservation())+(pending==null?0:pending.request.reservation())+(completed==null||active!=null&&active.revision==completed.revision()?0:completedBytes); } }
@@ -68,8 +85,8 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
     private void execute(Job job) {
         RenderInput<NoiseSurface> output=null;
         try {
-            synchronized(lock) { if(current(job))status=state(job,Phase.MESHING,List.of()); }
-            var result=NoiseSurface.prepare(job.request.volume(),job.request.style(),job.request.limits(),job::cancelled);
+            synchronized(lock) { if(current(job))status=state(job,job.request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,List.of()); }
+            var request=job.request;var result=request.geometry().isPresent()?NoiseSurface.recolor(request.geometry().orElseThrow(),request.style().colors(),request.limits(),job::cancelled):NoiseSurface.prepare(request.volume(),request.style(),request.limits(),job::cancelled);
             synchronized(lock) {
                 if(current(job)) {
                     if(result.requiresPlaceholder())status=state(job,Phase.FAILED,result.problems());
@@ -87,7 +104,7 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
     private void drain() {
         while(true) {
             Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
-            try { execute(job); }finally { synchronized(lock) { active=null;job.admission.shrinkTo(job.retainedBytes);job.admission.close();job=null; } }
+            try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;job=null;hold.shrinkTo(retained);hold.close(); } }
         }
     }
     @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }

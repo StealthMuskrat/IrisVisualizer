@@ -5,12 +5,12 @@ import java.util.*;
 
 /** Connected scalar display preparation/upload/image endpoint. Native sampling and editor readiness stay external. */
 public final class GlNoiseView implements AutoCloseable {
-    public enum Phase { IDLE, WAITING_CPU, MESHING, UPLOADING, WAITING_VIEW, FRAME_READY, DELIVERED, FAILED, CLOSED }
+    public enum Phase { IDLE, WAITING_CPU, MESHING, RECOLORING, UPLOADING, WAITING_VIEW, FRAME_READY, DELIVERED, FAILED, CLOSED }
     public record Status(long dataRevision,long viewRevision,Phase phase,Optional<MapSamples.Context> context,List<WorldProblem> problems,Optional<GlFailure.Code> code,String reason) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlNoiseRenderer renderer;private final GlDevice device;private final NoiseSurfaceWorker worker;
-    private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean dirty,closed,disposed;
+    private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlNoiseView(GlNoiseRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlNoiseView(GlNoiseRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new NoiseSurfaceWorker(workerBytes,device.memory().orElse(null)); }
@@ -28,13 +28,13 @@ public final class GlNoiseView implements AutoCloseable {
     }
     /** Call when native inputs become obsolete, before replacement samples are ready. */
     public long invalidate() {
-        current();long next=nextData(),view=nextView();var waiting=new Status(next,view,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");worker.invalidate();dataRevision=next;viewRevision=view;cpuRevision=0;dirty=false;status=waiting;
+        current();long next=nextData(),view=nextView();var waiting=new Status(next,view,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");worker.invalidate();dataRevision=next;viewRevision=view;cpuRevision=0;dirty=false;latestVolume=null;latestStyle=null;status=waiting;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** CPU admission precedes token changes and disposal of the previous view-owned output. */
     public long submit(NoiseSurfaceWorker.Request request) {
-        Objects.requireNonNull(request);current();long next=nextData(),view=nextView();var queued=new Status(next,view,Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;dirty=false;status=queued;
+        Objects.requireNonNull(request);current();long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
+        long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();status=queued;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Consumes detached native samples after destination admission; retain another input for retries/style changes. */
@@ -44,6 +44,15 @@ public final class GlNoiseView implements AutoCloseable {
             current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar view requires the same tracked input coordinator");
             return submit(new NoiseSurfaceWorker.Request(source.value(),style,limits));
         }finally { input.close(); }
+    }
+    public long recolor(MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
+        current();if(scene==null)throw new GlFailure(GlFailure.Code.STATE,"Complete scalar geometry is required for recoloring");return recolor(scene.surface(),colors,limits);
+    }
+    /** Reuse a caller-held displayed surface through rapid replacements; retain its owner until admission. */
+    public long recolor(NoiseSurface source,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
+        Objects.requireNonNull(source);current();
+        if(latestStyle==null||!source.volume().id().equals(latestVolume)||!source.style().sameGeometry(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Recolor source differs from the latest scalar volume or geometry policy");
+        return submit(NoiseSurfaceWorker.Request.recolor(source,colors,limits));
     }
     private void dimensions(int width,int height) {
         if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Scalar viewport exceeds device bounds");
@@ -77,7 +86,7 @@ public final class GlNoiseView implements AutoCloseable {
                 if(result.isPresent())try(var prepared=result.orElseThrow()) { upload=GlNoiseUpload.begin(device,prepared.input());cpuRevision=0;state(Phase.UPLOADING); }
                 else {
                     var cpu=worker.status();if(cpu.revision()!=cpuRevision||cpu.phase()==NoiseSurfaceWorker.Phase.CLOSED)throw new GlFailure(GlFailure.Code.STALE,"Scalar worker changed before adoption");
-                    if(cpu.phase()==NoiseSurfaceWorker.Phase.FAILED)status=new Status(dataRevision,viewRevision,Phase.FAILED,status.context(),cpu.problems(),Optional.empty(),"Scalar mesh preparation failed");return status;
+                    if(cpu.phase()==NoiseSurfaceWorker.Phase.FAILED)status=new Status(dataRevision,viewRevision,Phase.FAILED,status.context(),cpu.problems(),Optional.empty(),"Scalar surface preparation failed");return status;
                 }
             }
             if(upload!=null&&status.phase()==Phase.UPLOADING) { upload.step(budget,()->false);if(upload.ready()) { scene=upload.take();upload.close();upload=null;dirty=true;state(Phase.WAITING_VIEW); } }
@@ -100,7 +109,7 @@ public final class GlNoiseView implements AutoCloseable {
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;worker.close();Throwable failure=null;try { releaseDisplay(); }catch(RuntimeException|Error error) { failure=error; }
+        if(disposed)return;device.current();closed=true;worker.close();latestVolume=null;latestStyle=null;Throwable failure=null;try { releaseDisplay(); }catch(RuntimeException|Error error) { failure=error; }
         status=new Status(dataRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");disposed=failure==null;
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }

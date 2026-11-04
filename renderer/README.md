@@ -252,3 +252,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Terrain-map relief
 
 [Optional slope lighting](TERRAIN-RELIEF.md) now colorizes native terrain heights using declared sample spacing, complete four-neighbor stencils and explicit light/ambient/blend settings. Edges and missing neighbors retain base colors; native values/extrema and alpha remain intact. Completed map/readback receipts now carry their actual color style and summary. Existing flat gradients/defaults and memory limits remain unchanged. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and final editor routing stay deferred, with unsupported previews disabled.
+
+## Prepared scalar colors
+
+[CPU color preparation and geometry-sharing recolors](SCALAR-COLORS.md) now remove scalar ramp evaluation from uploads/picking. Color-only requests reuse complete face/range/volume data on the existing worker, with explicit old/new color admission and retained-frame support during rapid replacements. CPU mesh accounting adds four bytes per face while GPU instances stay twelve bytes; existing ceilings and native samples remain unchanged. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and final editor routing remain deferred, with unsupported previews disabled.

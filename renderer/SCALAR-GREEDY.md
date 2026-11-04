@@ -38,8 +38,8 @@ Camera fit and bounds remain those of selected display bins. Completed frames an
 
 | Payload | Bound/accounting |
 | --- | --- |
-| Greedy output | Nine primitive bytes per emitted rectangle |
-| Unit output | Five primitive bytes per unit face |
+| Greedy output | Thirteen primitive bytes per emitted rectangle, including prepared RGBA |
+| Unit output | Nine primitive bytes per unit face, including prepared RGBA |
 | Face-range bounds | 24 bytes per 1,024-face original-order range; at most 24 KiB |
 | Plane scratch | Four bytes times the largest selected-bounds plane; at most 64 MiB |
 | GPU instances | Twelve bytes per emitted rectangle in either mode |
