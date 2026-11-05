@@ -177,7 +177,39 @@ public final class RendererCpuContracts {
         for(int face=0;face<6;face++) { equal(source.cell(face),changed.cell(face),"recolor geometry");equal(source.spanWord(face),changed.spanWord(face),"recolor spans");equal(0x112233ff,changed.rgba(face),"prepared scalar color");equal(0x555555ff,source.rgba(face),"old scalar color immutable"); }
         var failed=NoiseSurface.recolor(source,colors,new NoiseSurface.Limits(6,NoiseSurface.recolorReservation(source,colors)-1),LIVE);check(failed.requiresPlaceholder()&&failed.size()==0,"scalar peak failure atomic");
     }
+    private static NoiseSurface pickingSurface(int width,int depth,double scale,NoiseSurface.Meshing meshing) {
+        var grid=new NoiseVolume.Grid(new MapSamples.Grid(0,0,width,depth,scale),new MapSamples.Vertical(0,1));var values=new double[width*depth];Arrays.fill(values,1);
+        var volume=NoiseVolume.capture(context(),grid,values,present(values.length),NoiseVolume.Limits.DEFAULT,LIVE);
+        var surface=NoiseSurface.prepare(volume,new NoiseSurface.Style(1,1,gray(0,2),meshing),NoiseSurface.Limits.DEFAULT,LIVE);check(!surface.requiresPlaceholder(),"complete picking-plane fixture");return surface;
+    }
+    private static void scalarPickingPlanes() {
+        var anchor=new WorldSnapshot.Position(0,0,0);
+        for(var meshing:NoiseSurface.Meshing.values()) {
+            var source=pickingSurface(1,1,1,meshing);
+            for(int side=0;side<6;side++)for(double distance:new double[]{0.1,0.3,1.1,7.7,31.9,128.125,1_000_000.1,1_048_574.75}) {
+                int axis=side<2?1:side<4?2:0;boolean plus=(side&1)!=0;double plane=plus?1:0;
+                double[] origin={0.25,0.25,0.25},point={0.5,0.5,0.5};origin[axis]=plus?1+distance:-distance;point[axis]=plane;
+                double dx=point[0]-origin[0],dy=point[1]-origin[1],dz=point[2]-origin[2];
+                var clip=new WorldClip(new WorldSnapshot.Extent(axis==0?(plus?1:-1):0,axis==1?(plus?1:-1):0,axis==2?(plus?1:-1):0,1,1,1));var options=new NoisePick.Options(6,clip);
+                var ray=new WorldRay(anchor,origin[0],origin[1],origin[2],dx,dy,dz,0,2_097_152);var result=NoisePick.query(source,ray,options,LIVE);check(!result.requiresPlaceholder(),"closed-plane query complete");var hit=result.hit().orElseThrow();
+                equal(ModelPlan.Direction.values()[side],hit.sample().direction(),"closed clip retains original face direction");equal(0,hit.sample().sample(),"closed clip retains original sample");near(1,hit.sample().value(),"original scalar unchanged");near(Math.hypot(Math.hypot(dx,dy),dz),hit.distance(),"analytic plane distance");
+                double[] local={hit.localX(),hit.localY(),hit.localZ()};equal(plane,local[axis],"normal coordinate is the exact accepted plane");for(int tangent=0;tangent<3;tangent++)if(tangent!=axis)near(0.5,local[tangent],"tangent hit coordinate");
+                var endpoint=new WorldRay(anchor,origin[0],origin[1],origin[2],dx,dy,dz,hit.distance(),hit.distance());check(NoisePick.query(source,endpoint,options,LIVE).hit().isPresent(),"closed ray near/far endpoint retained");
+                check(NoisePick.query(source,new WorldRay(anchor,origin[0],origin[1],origin[2],dx,dy,dz,0,Math.nextDown(hit.distance())),options,LIVE).hit().isEmpty(),"strict far exclusion unchanged");
+                check(NoisePick.query(source,new WorldRay(anchor,origin[0],origin[1],origin[2],dx,dy,dz,Math.nextUp(hit.distance()),2_097_152),options,LIVE).hit().isEmpty(),"strict near exclusion unchanged");
+            }
+            var decimal=pickingSurface(1,1,0.1,meshing);var hit=NoisePick.query(decimal,new WorldRay(anchor,1_000_000.1,0.5,0.05,-1,0,0,0,2_097_152),6,LIVE).hit().orElseThrow();
+            equal(ModelPlan.Direction.EAST,hit.sample().direction(),"decimal-scale positive face");equal(0.1,hit.localX(),"decimal plane survives far-origin cancellation in detached receipt");near(1_000_000,hit.distance(),"decimal plane distance");
+            var limited=NoisePick.query(decimal,new WorldRay(anchor,2,0.5,0.05,-1,0,0,0,10),5,LIVE);check(limited.requiresPlaceholder()&&limited.hit().isEmpty(),"plane handling preserves atomic face allowance");
+            var merged=pickingSurface(2,2,0.1,meshing);
+            for(double z:new double[]{0.1,0.15}) {
+                var selected=NoisePick.query(merged,new WorldRay(anchor,1_000_000.2,0.5,z,-1,0,0,0,2_097_152),merged.size(),LIVE).hit().orElseThrow();
+                equal(z==0.1?1:3,selected.sample().sample(),"rectangle hit maps to original sample, including lower shared-edge tie");equal(0.1,selected.localX(),"accepted rectangle plane stays sample-local");near(z==0.1?0.1:0.05,selected.localZ(),"original sample-local tangent coordinate");equal(ModelPlan.Direction.EAST,selected.sample().direction(),"rectangle direction unchanged");
+            }
+        }
+    }
     private static void scalarPicking() {
+        scalarPickingPlanes();
         var source=cube();var g=source.volume().grid();var anchor=new WorldSnapshot.Position(g.horizontal().originX(),g.vertical().minY(),g.horizontal().originZ());
         var ray=new WorldRay(anchor,0.25,0.5,2,0,0,-1,0,10);var result=NoisePick.query(source,ray,6,LIVE);check(!result.requiresPlaceholder(),"pick complete");var hit=result.hit().orElseThrow();
         near(1.5,hit.distance(),"front plane intersection");equal(ModelPlan.Direction.SOUTH,hit.sample().direction(),"front direction");equal(0,hit.sample().sample(),"original sample");near(1,hit.sample().value(),"native scalar");

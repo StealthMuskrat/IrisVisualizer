@@ -37,7 +37,7 @@ Execution is explicit rather than a CI trigger or default script side effect. As
 | Full-height scalar capture | X-Z-Y ordering, fractional native coordinates, copied data and rejection instead of height truncation |
 | Exposed-face coverage | A separate voxel-neighbor enumerator compared with expanded CELLS/GREEDY rectangles over 18 fixed-seed fixtures, plus a uniform cuboid |
 | Scalar recoloring | Source-only equal-color admission, exact native volume, unchanged geometry, prepared colors and atomic insufficient-peak failure |
-| Scalar front-face picking | Analytic single-bin plane distance, original value/direction, no partial budget hit, clipping and inside/back-face exclusion |
+| Scalar front-face picking | Analytic plane distances, all six clipped normal planes in unit/greedy modes, closed near/far endpoints, decimal far-origin receipts, merged original-sample ties, original values and atomic face allowance |
 | RGBA builder | No incomplete publication, reversed source rows without cursor mutation, immutable pixel views and one-shot sealing |
 | Original PNG pixels and receipts | Standard-library-built tiny RGBA fixture, straight alpha/transparent RGB, unchanged original dimensions, identical-content receipts and bad CRC/limit rejection |
 | CPU admission lifetime | Retained input charge across original-input/coordinator close, lowered scratch and final account release |
