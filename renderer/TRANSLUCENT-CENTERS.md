@@ -1,6 +1,6 @@
 # Prepared translucent face centers
 
-Renderer implementation, 2026-11-04. Camera sorting now reads compact per-section translucent entries rather than scanning every source face and rereading four vertices for every camera pose. All 129 CPU/OpenGL main sources compile with Java 25 and LWJGL 3.4.1 (88 CPU, 41 GL). Runtime, concurrency, native and real-driver validation remain deferred until renderer implementation is complete; unsupported previews remain disabled.
+Renderer implementation, 2026-11-05. Camera sorting now reads compact per-section translucent entries rather than scanning every source face and rereading four vertices for every camera pose. All 129 CPU/OpenGL main sources compile with Java 25 and LWJGL 3.4.1 (88 CPU, 41 GL). Runtime, concurrency, native and real-driver validation remain deferred until renderer implementation is complete; unsupported previews remain disabled.
 
 ## Assembly and identity
 
@@ -15,6 +15,14 @@ Centers use the actual four section-relative float positions after model/fluid p
 `WorldDrawOrder` uses the [verified complete-scene translucent total](MATERIAL-COUNTS.md) before allocating its sorting arrays. Source-plus-scratch admission uses this actual count under existing ceilings; preparation still verifies section entry coverage. Depth preparation visits only those entries; it still checks every section's exact anchor subtraction and relative-coordinate precision, including sections without translucent geometry. It uses the same camera-forward depth expression and section/face key as before. Stable merge sorting and deterministic equal-depth ties remain unchanged.
 
 Repeated poses therefore avoid opaque/cutout face scans and vertex-buffer reads during depth preparation. This changes the work performed, without a measured timing claim. Sorting remains global back-to-front quad-centroid ordering; intersecting or cyclic transparent surfaces still require a different rendering solution. It introduces neither OIT nor per-pixel native parity.
+
+## Direction preflight before replacement and scratch
+
+`WorldOrderWorker.submit` now checks the supplied eye-to-target direction before job/admission creation or cancellation of earlier work. A finite nonzero direction shorter than 1e-8 is rejected synchronously, preserving the exact previous revision/status, pending or READY order and local/shared reservation totals. Fresh rejected scene wrappers are still consumed; the already-owned-wrapper guard runs first and preserves that existing owner. A corrected submission can use the next ordinary revision without a rejected request spending a token.
+
+Direct `WorldDrawOrder.prepare` keeps its structured COORDINATE problem and empty failed order, but now checks direction before allocating the key/depth scratch arrays. Existing face-count/sort/combined-limit checks still precede that direct pose check, preserving their diagnostic precedence. Direction length uses nested `Math.hypot`, matching `GlCamera.basis`, with the existing inclusive 1e-8 minimum. The requested vector, source entries, merge algorithm, section/face tie rule and memory ceilings are unchanged; no face scan or source-sized scratch is added by worker preflight.
+
+A prepared world contract covers tiny, just-below-minimum and subnormal directions, fresh-wrapper consumption, already-owned protection, pending/READY preservation, corrected revision progression, exact-threshold acceptance, axial-order equivalence and final account release. It compiles but remains unexecuted. All 63 prepared groups and wider native/GPU/order comparisons remain deferred until renderer-stage validation.
 
 ## CPU and GPU accounting
 

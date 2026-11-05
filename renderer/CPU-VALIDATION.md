@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-05. The `RendererCpuContracts` harness has 19 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 19 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 62 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-05. The `RendererCpuContracts` harness has 19 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 20 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 63 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 

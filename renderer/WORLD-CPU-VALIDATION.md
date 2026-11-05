@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 19 synthetic contract groups alongside 19 map/scalar/image/ownership groups: 38 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 62 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 20 synthetic contract groups alongside 19 map/scalar/image/ownership groups: 39 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 63 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -22,6 +22,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Geometry picking | Analytic unit-cube plane distance and exact source identities, batch/exhaustive agreement, clipping, budget failure and alpha/geometry modes |
 | Conservative picking hierarchy | Analytic edge/corner front-plane hits survive node/range rejection; exact clip/ray limits, shifted anchors, lower-section ties, atomic budget failure and unexpanded diagnostic marker boxes |
 | Translucent ordering | An independent vertex-centroid reference sort checks complete global back-to-front keys and stable ties; scratch deficit withholds the entire order |
+| Translucent view preflight | Tiny/subnormal directions preserve pending/READY status, tokens and admission; fresh rejected wrappers are consumed, existing owners protected, and the exact minimum direction keeps the ordinary axial order |
 | Empty/diagnostic visuals | Empty scenes use no dummy texture/geometry; unsupported markers preserve original state and diagnostic without fabricated block faces |
 | Index ownership | Exact source-plus-index shared admission, cache shutdown with live scenes, consumed-owner release on close/failure/cancellation and independent original owner survival |
 | Pending sort admission | Insufficient overlap preserves the exact source/status; admitted replacement releases old ownership; duplicate wrappers stay protected and close clears local/shared bytes |

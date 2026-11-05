@@ -29,12 +29,14 @@ public final class WorldDrawOrder {
         if(source>limits.workingBytes())throw new IllegalArgumentException("Sort source scene exceeds its declared working budget");
         return Math.min(limits.workingBytes(),source+Math.min(limits.sortBytes(),scratch));
     }
+    /** Constant-size pose preflight, matching the camera's overflow/underflow-safe length calculation. */
+    static double directionLength(View view) { return Math.hypot(Math.hypot(view.targetX()-view.eyeX(),view.targetY()-view.eyeY()),view.targetZ()-view.eyeZ()); }
     private static WorldDrawOrder execute(WorldScene scene,View view,Limits limits,BooleanSupplier cancelled) {
         int count=scene.usage().translucentFaces();
         if(count>limits.faces())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent face count exceeds the global sorting budget");
         long bytes=(long)count*WORKING_BYTES_PER_FACE;if(bytes>limits.sortBytes()||scene.usage().knownPayloadBytes()+bytes>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent order/scratch or combined CPU payload budget exceeded");
-        long[] keys=new long[count],scratchKeys=new long[count];double[] depths=new double[count],scratchDepths=new double[count];
-        double fx=view.targetX()-view.eyeX(),fy=view.targetY()-view.eyeY(),fz=view.targetZ()-view.eyeZ(),length=Math.sqrt(fx*fx+fy*fy+fz*fz);if(length<1e-8)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"View direction is too small for stable sorting");fx/=length;fy/=length;fz/=length;int at=0;
+        double fx=view.targetX()-view.eyeX(),fy=view.targetY()-view.eyeY(),fz=view.targetZ()-view.eyeZ(),length=directionLength(view);if(length<1e-8)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"View direction is too small for stable sorting");fx/=length;fy/=length;fz/=length;
+        long[] keys=new long[count],scratchKeys=new long[count];double[] depths=new double[count],scratchDepths=new double[count];int at=0;
         for(int section=0;section<scene.sections().size();section++) {
             WorldProblem.check(cancelled);var mesh=scene.sections().get(section);long dx=Math.subtractExact(mesh.origin().x(),view.anchor().x()),dz=Math.subtractExact(mesh.origin().z(),view.anchor().z()),dy=(long)mesh.origin().y()-view.anchor().y();
             if(Math.abs((double)dx)>1048576||Math.abs((double)dy)>1048576||Math.abs((double)dz)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Section lies outside view-relative precision bounds");

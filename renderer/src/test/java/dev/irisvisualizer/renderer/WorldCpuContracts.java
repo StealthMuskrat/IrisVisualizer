@@ -212,6 +212,25 @@ public final class WorldCpuContracts {
             }
         }
     }
+    private static void orderViewPreflight() {
+        var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+            var anchor=f.snapshot().extent().position(0);var invalid=new ArrayList<WorldDrawOrder.View>();for(double distance:new double[]{1e-9,Math.nextDown(1e-8),Double.MIN_VALUE})invalid.add(new WorldDrawOrder.View(anchor,0,0,0,0,0,distance));
+            for(var view:invalid) { var result=WorldDrawOrder.prepare(owner.scene().orElseThrow(),view,LIVE);check(result.requiresPlaceholder()&&result.size()==0&&result.bytes()==0,"invalid direction publishes no partial direct order");equal(WorldProblem.Code.COORDINATE,result.problems().getFirst().code(),"direct direction failure retains coordinate diagnostic"); }
+            try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var worker=new WorldOrderWorker(4*1024*1024,memory);var gate=new OrderGate(orderExecutor(worker))) {
+                var pending=owner.retain();long revision=worker.submit(pending,orderView(f));var before=worker.status();var admitted=memory.stats();long reserved=worker.reservedBytes();
+                for(var view:invalid) { var rejected=owner.retain();throwsType(IllegalArgumentException.class,()->worker.submit(rejected,view),"invalid view rejected before pending replacement");check(rejected.closed()&&!pending.closed()&&worker.status()==before,"view rejection consumes only fresh source and preserves exact pending status");equal(admitted,memory.stats(),"view rejection preserves shared admission");equal(reserved,worker.reservedBytes(),"view rejection preserves local reservation"); }
+                throwsType(IllegalArgumentException.class,()->worker.submit(pending,invalid.getFirst()),"already-owned wrapper stays protected before view validation");check(!pending.closed()&&worker.status()==before,"invalid duplicate view does not consume existing owner");
+                var boundary=new WorldDrawOrder.View(anchor,0,0,0,0,0,1e-8);var exact=WorldDrawOrder.prepare(owner.scene().orElseThrow(),boundary,LIVE);var ordinary=WorldDrawOrder.prepare(owner.scene().orElseThrow(),new WorldDrawOrder.View(anchor,0,0,0,0,0,1),LIVE);check(!exact.requiresPlaceholder()&&Arrays.equals(exact.copyOrder(),ordinary.copyOrder()),"exact minimum direction retains ordinary axial face order");
+                var accepted=owner.retain();equal(revision+1,worker.submit(accepted,boundary),"rejected views do not spend revisions and exact threshold is accepted");check(pending.closed()&&!accepted.closed(),"valid correction replaces only pending owner");worker.close();check(accepted.closed()&&!owner.closed(),"preflight sequence closes only worker sources");equal(0L,memory.stats().chargedBytes(),"preflight sequence releases shared bytes");equal(0,memory.stats().accounts(),"preflight sequence releases accounts");
+            }
+            try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var worker=new WorldOrderWorker(4*1024*1024,memory)) {
+                long revision=worker.submit(owner.retain(),orderView(f));orderBarrier(orderExecutor(worker));var before=worker.status();var admitted=memory.stats();long reserved=worker.reservedBytes();
+                var rejected=owner.retain();throwsType(IllegalArgumentException.class,()->worker.submit(rejected,invalid.getFirst()),"invalid view preserves ready output");check(rejected.closed()&&worker.status()==before,"ready status preserved exactly on view rejection");equal(admitted,memory.stats(),"ready shared charge preserved");equal(reserved,worker.reservedBytes(),"ready local reservation preserved");
+                try(var completion=worker.take(revision).orElseThrow()) { check(!completion.owner().closed()&&!completion.order().requiresPlaceholder(),"earlier complete order remains transferable after invalid view"); }
+                worker.close();equal(0L,memory.stats().chargedBytes(),"ready preflight sequence releases shared bytes");equal(0,memory.stats().accounts(),"ready preflight sequence releases accounts");
+            }
+        }
+    }
     private static void readyOrderAdmission() {
         var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
             long source=owner.scene().orElseThrow().usage().knownPayloadBytes(),peak=source+12*32,retained=source+12*8;
@@ -366,6 +385,7 @@ public final class WorldCpuContracts {
         group("conservative picking hierarchy boundaries",WorldCpuContracts::pickingTraversalEdges);
         group("independent translucent centroid ordering",WorldCpuContracts::ordering);
         group("pending sort replacement admission",WorldCpuContracts::pendingOrderAdmission);
+        group("translucent view preflight preservation",WorldCpuContracts::orderViewPreflight);
         group("ready sort replacement admission",WorldCpuContracts::readyOrderAdmission);
         group("transferred sort ownership and admission",WorldCpuContracts::transferredOrderAdmission);
         group("active sort cancellation and admission",WorldCpuContracts::activeOrderAdmission);

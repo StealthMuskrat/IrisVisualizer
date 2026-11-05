@@ -42,6 +42,7 @@ public final class WorldOrderWorker implements AutoCloseable {
                 if(active!=null&&active.owner==owner||pending!=null&&pending.owner==owner||completed!=null&&completed.owner()==owner) { consumed=true;throw new IllegalArgumentException("Draw-order worker already owns this scene wrapper"); }
                 Objects.requireNonNull(view);Objects.requireNonNull(limits);long next=nextRevision();
                 var scene=owner.scene().orElseThrow(()->new IllegalArgumentException("Translucent ordering requires a successful CPU scene"));
+                if(WorldDrawOrder.directionLength(view)<1e-8)throw new IllegalArgumentException("View direction is too small for stable sorting");
                 long reservation=WorldDrawOrder.reservation(scene,limits);
                 if(reservation>workingBytes-(active==null?0:active.reservation))throw new IllegalArgumentException("Active and pending sort requests exceed the worker budget");
                 var job=new Job(next,reservation,owner,view,limits,scene.snapshot().id());var queued=status(job,Phase.QUEUED,List.of());
