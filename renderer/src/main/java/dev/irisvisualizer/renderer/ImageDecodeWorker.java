@@ -16,6 +16,7 @@ public final class ImageDecodeWorker implements AutoCloseable {
     public record Completion(long revision,SourceImage image,RenderMemory.Hold admission) implements AutoCloseable {
         public Completion { if(revision<1)throw new IllegalArgumentException("Invalid image revision");Objects.requireNonNull(image);Objects.requireNonNull(admission); }
         public Completion(long revision,SourceImage image) { this(revision,image,RenderMemory.Hold.none()); }
+        public RenderInput<SourceImage> retainInput() { return RenderInput.own(image,admission.retain()); }
         @Override public void close() { admission.close(); }
     }
     private static final class Job {

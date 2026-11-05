@@ -37,3 +37,7 @@ Exercise current/stale image and view revisions, decode/upload/draw failures, ha
 Original-image redraw, drawing and frame transfer now require complete current upload adoption. A previous image retained after cleanup failure cannot serve a replacement revision; source diagnostics survive permitted display changes. Original dimensions/pixels, input admission and caller-held image owners retain their existing contracts. See [current-source adoption guards](SOURCE-FAILURES.md) for lifecycle and deferred verification. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
 
 The lower-level `GlImageQueue` now supports [explicit current-failure retry](UPLOAD-RETRY.md) using a retained decoded source image at the same queue token after cleanup. Connected-view resubmission keeps its existing revision flow. Source values/pixels and caller-held completed images retain their existing ownership.
+
+## Retained upload recovery
+
+[Image upload recovery](RASTER-RECOVERY.md) now accepts complete retained decoded pixels at the same source token after a source upload failure. The view freezes the successful CPU decode receipt before GPU handoff and requires the exact resource/revision, encoded digest/length, dimensions and format on retry. A failed decode still requires encoded-input resubmission. Image/complete-frame `retainInput`/`retainRasterInput` handoffs independently admit CPU pixels without copying; navigation and old frames retain their existing contracts. Runtime/GPU checks remain deferred.

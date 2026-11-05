@@ -1,6 +1,6 @@
 package dev.irisvisualizer.renderer.gl;
 
-import dev.irisvisualizer.renderer.SourceImage;
+import dev.irisvisualizer.renderer.*;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 
@@ -21,6 +21,13 @@ public final class GlImage implements AutoCloseable {
     /** Borrowed only while live, in the original device context. CPU row zero uses texture V=0. */
     public int textureId() { live();return allocation.textures[0]; }
     public SourceImage raster() { live();return (SourceImage)allocation.retained; }
+    /** Context-thread admission of independent CPU data, without copying pixels or retaining a GL owner. */
+    public RenderInput<SourceImage> retainInput() {
+        var source=raster();var memory=device.memory().orElse(null);
+        try { return RenderInput.own(source,memory==null?RenderMemory.Hold.none():memory.hold("Retained image raster",source.payloadBytes())); }
+        catch(RenderMemory.LimitException failure) { throw new GlFailure(GlFailure.Code.LIMIT,failure.getMessage()); }
+        catch(IllegalStateException failure) { throw new GlFailure(GlFailure.Code.STATE,failure.getMessage()); }
+    }
     private Shared live() { var value=shared;if(value==null||value.closing)throw new GlFailure(GlFailure.Code.STATE,"Image owner is closed or closing");device.live(allocation);return value; }
     public boolean closed() { return shared==null; }
     /** Independent owner of the same immutable texture/source pixels; no additional payload allocation. */

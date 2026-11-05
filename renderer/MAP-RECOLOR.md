@@ -36,3 +36,7 @@ Worker admission precedes cancellation/revision mutation. Rejection preserves pr
 ## Deferred verification
 
 At renderer completion, cover equal and changed scalar/biome/relief styles, separately constructed equal ramps, hash consistency, lowered image/working limits, wrong kind/palette, absence/alpha, cancellation and allocation failures. Check original sample identity, exact summaries, source-only versus old/new reservations, READY/take-before-unwind, rapid replacements, stale capture rejection after native replacement/invalidate, foreign coordinators, consumed-input failures and final zero charges. Compare old/new frame and readback pixels on a real Windows GL context before enabling supported previews. Native adapters and final editor integration still require their separate validation.
+
+## Independent displayed raster inputs
+
+[Map source handoff](../renderer-gl/RASTER-RECOVERY.md) now supplies `GlMap.retainInput()` and `GlMapFrame.retainRasterInput()` for CPU ownership after frame/device closure. These admit complete samples plus RGBA without copying and feed the existing consuming recolor path. Same-source upload recovery additionally checks the entire latest style and retained output limits. Runtime/GPU checks remain deferred.

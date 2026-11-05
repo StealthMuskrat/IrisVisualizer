@@ -52,6 +52,8 @@ public final class GlMapFrame implements AutoCloseable {
     GlDevice.Allocation readbackJournal() { return live().journal; }
     /** Borrowed exact native raster. Keep this frame owner live through inspection. */
     public MapRaster raster() { return live().map.raster(); }
+    /** Context-thread capture; independently admitted CPU data survives frame/device closure. */
+    public RenderInput<MapRaster> retainRasterInput() { return live().map.retainInput(); }
     public Optional<MapPick.Hit> hit(double x,double y) {
         var value=live();if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>=info.width()||y<0||y>=info.height())return Optional.empty();
         return MapPick.at(value.map.raster(),info.view(),x,y);

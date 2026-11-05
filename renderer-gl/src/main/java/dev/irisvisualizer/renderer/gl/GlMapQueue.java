@@ -23,6 +23,11 @@ public final class GlMapQueue implements AutoCloseable {
     /** Reuse retained native raster data after current failed-upload cleanup, without changing its token. */
     public boolean retry(long expectedRevision) {
         current();if(expectedRevision<1)throw new IllegalArgumentException("Invalid map revision");if(expectedRevision!=revision||status.phase()!=Phase.FAILED)return false;
+        return restart(expectedRevision);
+    }
+    /** Connected-view recovery may abandon partial work after a failure outside this queue. */
+    boolean restart(long expectedRevision) {
+        current();if(expectedRevision<1)throw new IllegalArgumentException("Invalid map revision");if(expectedRevision!=revision)return false;
         var waiting=new Status(revision,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");
         try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }

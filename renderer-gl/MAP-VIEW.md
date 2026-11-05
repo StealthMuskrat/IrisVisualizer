@@ -75,3 +75,7 @@ The lower-level `GlMapQueue` now supports [explicit current-failure retry](UPLOA
 ## Explicit recoloring of current samples
 
 [Map recoloring](../renderer/MAP-RECOLOR.md) now provides `recolor(style[, limits])` for a complete current upload and explicit retained-raster/owned-input overloads for rapid style replacement. These reject captures other than the latest submitted `MapSamples.id()`; invalidation clears that identity. Admission precedes view mutation, matching-grid transforms survive, and status reports RECOLORING. Equal value styles reuse CPU output while the ordinary revision/upload path continues. Changed styles charge native samples, old RGBA and new RGBA until worker unwind; existing working/image ceilings remain in force. Runtime/native/GPU checks stay deferred.
+
+## Retained upload recovery
+
+[Map upload recovery](RASTER-RECOVERY.md) now accepts a complete retained raster at the same current map token after a source failure, checking exact sample UUID, entire latest style and lowered output limits. It cancels obsolete CPU adoption, advances the display token and restarts GPU work after cleanup while preserving navigation. Map/complete-frame `retainInput`/`retainRasterInput` handoffs provide independent CPU ownership for retry or recoloring. Display failures with an adopted map still use redraw. Runtime/GPU checks remain deferred.

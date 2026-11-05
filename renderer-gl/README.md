@@ -196,3 +196,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Scalar upload recovery
 
 [Explicit scalar recovery](SCALAR-RECOVERY.md) now restarts a failed source upload from complete retained CPU data at the same data revision, checking exact volume/style and lowered output limits. Independent scene/frame CPU inputs survive GL closure and feed consuming recolor/retry overloads. Camera, viewport, clipping and old completed frames retain their existing contracts. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.
+
+## Retained raster upload recovery
+
+[Native-map and original-image recovery](RASTER-RECOVERY.md) now retries complete CPU rasters at the current source token, with exact map capture/style or decoded image content receipts. Independently admitted raster inputs survive GL/frame closure and feed consuming retry/recolor paths without copying pixels. Navigation and old completed frames retain their existing ownership. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.

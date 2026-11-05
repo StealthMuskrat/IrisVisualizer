@@ -45,3 +45,7 @@ For the world view, cover failures before its upload queue observed the token, p
 ## Scalar view recovery
 
 The connected scalar view now also provides [same-source upload recovery](SCALAR-RECOVERY.md), accepting a complete retained surface rather than repeating CPU preparation. It verifies exact volume/full display style and retained output limits, preserves camera/clipping and retains cleanup ownership through failure. Independently admitted CPU surface inputs support consuming retry/recolor calls after frame closure. Runtime/failure-injection/GPU checks remain deferred.
+
+## Connected map and image recovery
+
+[Retained-raster view retries](RASTER-RECOVERY.md) now preserve native-map/original-image source tokens while checking latest capture/style or successful decode receipt. Scoped queue restarts abandon partial work after view-side failures; public retry remains FAILED-only. Independent CPU source inputs survive GL closure and remain charged through destination admission. Runtime/failure-injection/GPU checks remain deferred.

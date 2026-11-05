@@ -281,3 +281,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Retained scalar recovery inputs
 
 [Scalar CPU ownership and upload recovery](../renderer-gl/SCALAR-RECOVERY.md) now allow complete displayed surfaces to outlive GL owners under independent shared admission. Consuming recolor/retry view overloads preserve ownership through destination admission; upload retries verify exact latest volume/style and retained output limits without resampling or remeshing. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
+
+## Retained map and image inputs
+
+[Raster source ownership and upload recovery](../renderer-gl/RASTER-RECOVERY.md) now extend CPU admission beyond displayed map/image frame lifetime without copying pixels. Image decode completions can retain independent input handles; connected GPU retries verify current source provenance and preserve navigation without native sampling, colorization or decoding. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.

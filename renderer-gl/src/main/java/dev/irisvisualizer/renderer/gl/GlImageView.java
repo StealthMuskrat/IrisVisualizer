@@ -10,7 +10,7 @@ public final class GlImageView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlMapRenderer renderer;private final GlDevice device;private final ImageDecodeWorker worker;private final GlImageQueue uploads;
-    private GlImage image;private GlImageFrame completed;private int imageWidth,imageHeight;private MapView view;private int width,height;private long imageRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private GlImage image;private GlImageFrame completed;private int imageWidth,imageHeight;private MapView view;private SourceImage.Receipt latestReceipt;private int width,height;private long imageRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlImageView(GlMapRenderer renderer) { this(renderer,256L*1024*1024); }
     public GlImageView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new ImageDecodeWorker(workerBytes,device.memory().orElse(null));uploads=new GlImageQueue(device); }
@@ -34,13 +34,13 @@ public final class GlImageView implements AutoCloseable {
     /** Invalidate immediately when resource inputs change, before replacement bytes arrive. */
     public long invalidate() {
         current();long next=nextImage(),nextView=nextView();var waiting=new Status(next,nextView,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");
-        worker.invalidate();imageRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;imageWidth=0;imageHeight=0;view=null;status=waiting;
+        worker.invalidate();imageRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;latestReceipt=null;imageWidth=0;imageHeight=0;view=null;status=waiting;
         try { uploads.invalidate(imageRevision);releaseDisplay();return imageRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Worker admission occurs first; a budget rejection leaves the current view, tokens and work intact. */
     public long submit(ImageDecodeWorker.Request request) {
         Objects.requireNonNull(request);current();long next=nextImage(),nextView=nextView();var queued=new Status(next,nextView,Phase.DECODING,Optional.of(request.source().identity()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);imageRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;status=queued;imageWidth=0;imageHeight=0;
+        long cpu=worker.submit(request);imageRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;latestReceipt=null;status=queued;imageWidth=0;imageHeight=0;
         view=null;
         try { uploads.invalidate(imageRevision);releaseDisplay();return imageRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -72,6 +72,27 @@ public final class GlImageView implements AutoCloseable {
         current();if(!sourceReady||image==null||view==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current image upload and configured viewport are required to redraw");long next=nextView();var waiting=displayStatus(next);viewRevision=next;dirty=true;status=waiting;
         try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
+    /** Retry GPU work from the exact decoded content receipt, preserving the source token and navigation. */
+    public boolean retryUpload(long expectedImageRevision,SourceImage source) {
+        Objects.requireNonNull(source);current();if(expectedImageRevision<1)throw new IllegalArgumentException("Invalid image revision");
+        if(expectedImageRevision!=imageRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
+        if(source.requiresPlaceholder()||latestReceipt==null||!source.receipt().orElseThrow().equals(latestReceipt))throw new GlFailure(GlFailure.Code.STALE,"Retry requires the exact latest successful decoded image receipt");
+        long next=nextView();var queued=new Status(imageRevision,next,Phase.UPLOADING,status.source(),List.of(),Optional.empty(),"");
+        worker.invalidate();cpuRevision=0;viewRevision=next;dirty=false;
+        try {
+            releaseDisplay();if(uploads.status().revision()<imageRevision)uploads.invalidate(imageRevision);
+            if(!uploads.restart(imageRevision)||!uploads.submit(imageRevision,source))throw new GlFailure(GlFailure.Code.STALE,"Image upload queue no longer matches the retry revision");
+            status=queued;return true;
+        }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
+    /** Consumes the supplied decoded CPU owner through admission, including rejection/failure. */
+    public boolean retryUpload(long expectedImageRevision,RenderInput<SourceImage> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked image retry requires the same device coordinator");
+            return retryUpload(expectedImageRevision,source.value());
+        }finally { input.close(); }
+    }
     /** Decoding is off-thread; upload is bounded and one complete frame draw is synchronous. */
     public Status advance(GlUploadBudget budget,long expectedImageRevision) {
         Objects.requireNonNull(budget);current();if(expectedImageRevision<1)throw new IllegalArgumentException("Invalid expected image revision");if(expectedImageRevision!=imageRevision||status.phase()==Phase.FAILED)return status;
@@ -79,6 +100,7 @@ public final class GlImageView implements AutoCloseable {
             if(cpuRevision!=0) {
                 var result=worker.take(cpuRevision);
                 if(result.isPresent())try(var prepared=result.orElseThrow()) {
+                    latestReceipt=prepared.image().receipt().orElseThrow();
                     if(!uploads.submit(imageRevision,prepared.image()))throw new GlFailure(GlFailure.Code.STALE,"Image upload rejected the current CPU result");cpuRevision=0;state(Phase.UPLOADING);
                 } else {
                     var cpu=worker.status();if(cpu.revision()!=cpuRevision||cpu.phase()==ImageDecodeWorker.Phase.CLOSED)throw new GlFailure(GlFailure.Code.STALE,"Image worker revision changed before CPU adoption");
@@ -105,7 +127,7 @@ public final class GlImageView implements AutoCloseable {
     }
     /** Leaves the borrowed renderer/device and caller-transferred frames owned by their callers. */
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;sourceReady=false;worker.close();Throwable failure=null;
+        if(disposed)return;device.current();closed=true;sourceReady=false;latestReceipt=null;worker.close();Throwable failure=null;
         try { uploads.close(); }catch(RuntimeException|Error error) { failure=error; }
         try { releaseDisplay(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         status=new Status(imageRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");disposed=failure==null;
