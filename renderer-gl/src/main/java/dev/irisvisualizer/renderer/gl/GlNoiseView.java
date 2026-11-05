@@ -10,7 +10,7 @@ public final class GlNoiseView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlNoiseRenderer renderer;private final GlDevice device;private final NoiseSurfaceWorker worker;
-    private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private NoiseSurface.Limits latestLimits;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlNoiseView(GlNoiseRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlNoiseView(GlNoiseRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new NoiseSurfaceWorker(workerBytes,device.memory().orElse(null)); }
@@ -33,13 +33,13 @@ public final class GlNoiseView implements AutoCloseable {
     }
     /** Call when native inputs become obsolete, before replacement samples are ready. */
     public long invalidate() {
-        current();long next=nextData(),view=nextView();var waiting=new Status(next,view,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");worker.invalidate();dataRevision=next;viewRevision=view;cpuRevision=0;sourceReady=false;dirty=false;latestVolume=null;latestStyle=null;status=waiting;
+        current();long next=nextData(),view=nextView();var waiting=new Status(next,view,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");worker.invalidate();dataRevision=next;viewRevision=view;cpuRevision=0;sourceReady=false;dirty=false;latestVolume=null;latestStyle=null;latestLimits=null;status=waiting;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** CPU admission precedes token changes and disposal of the previous view-owned output. */
     public long submit(NoiseSurfaceWorker.Request request) {
         Objects.requireNonNull(request);current();long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;sourceReady=false;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();status=queued;
+        long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;sourceReady=false;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();latestLimits=request.limits();status=queued;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Consumes detached native samples after destination admission; retain another input for retries/style changes. */
@@ -58,6 +58,16 @@ public final class GlNoiseView implements AutoCloseable {
         Objects.requireNonNull(source);current();
         if(latestStyle==null||!source.volume().id().equals(latestVolume)||!source.style().sameGeometry(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Recolor source differs from the latest scalar volume or geometry policy");
         return submit(NoiseSurfaceWorker.Request.recolor(source,colors,limits));
+    }
+    /** Consumes an independently retained CPU surface after destination admission or rejection. */
+    public long recolor(RenderInput<NoiseSurface> input,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) { tracked(source);return recolor(source.value(),colors,limits); }
+        finally { input.close(); }
+    }
+    private void tracked(RenderInput<NoiseSurface> input) {
+        current();var memory=device.memory().orElse(null);
+        if(input.admission().tracked()&&(memory==null||!input.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar view requires the same tracked surface coordinator");
     }
     private void dimensions(int width,int height) {
         if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Scalar viewport exceeds device bounds");
@@ -84,6 +94,23 @@ public final class GlNoiseView implements AutoCloseable {
     public long redraw() {
         current();if(!sourceReady||scene==null||camera==null)throw new GlFailure(GlFailure.Code.STATE,"Complete current scalar scene/camera required to redraw");long next=nextView();var waiting=displayStatus(next);viewRevision=next;dirty=true;status=waiting;
         try { releaseFrame();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
+    /** Retry a failed source upload from exact prepared data, preserving the source token and display settings. */
+    public boolean retryUpload(long expectedDataRevision,NoiseSurface source) {
+        Objects.requireNonNull(source);current();if(expectedDataRevision<1)throw new IllegalArgumentException("Invalid scalar data revision");
+        if(expectedDataRevision!=dataRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
+        if(source.requiresPlaceholder()||latestStyle==null||!source.volume().id().equals(latestVolume)||!source.style().equals(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Retry requires the exact latest scalar volume and complete display style");
+        if(source.size()>latestLimits.faces()||source.payloadBytes()>latestLimits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Retry surface exceeds the latest scalar preparation allowance");
+        long next=nextView();var queued=new Status(dataRevision,next,Phase.UPLOADING,status.context(),List.of(),Optional.empty(),"");
+        worker.invalidate();cpuRevision=0;viewRevision=next;dirty=false;
+        try { releaseDisplay();upload=GlNoiseUpload.begin(device,source);status=queued;return true; }
+        catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
+    /** Consumes retained CPU ownership through retry admission, including stale-token and failure outcomes. */
+    public boolean retryUpload(long expectedDataRevision,RenderInput<NoiseSurface> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) { tracked(source);return retryUpload(expectedDataRevision,source.value()); }
+        finally { input.close(); }
     }
     /** One bounded upload step; an admitted complete-frame draw remains synchronous. */
     public Status advance(GlUploadBudget budget,long expectedDataRevision) {
@@ -117,7 +144,7 @@ public final class GlNoiseView implements AutoCloseable {
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;sourceReady=false;worker.close();latestVolume=null;latestStyle=null;Throwable failure=null;try { releaseDisplay(); }catch(RuntimeException|Error error) { failure=error; }
+        if(disposed)return;device.current();closed=true;sourceReady=false;worker.close();latestVolume=null;latestStyle=null;latestLimits=null;Throwable failure=null;try { releaseDisplay(); }catch(RuntimeException|Error error) { failure=error; }
         status=new Status(dataRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");disposed=failure==null;
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }

@@ -192,3 +192,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Captured map recoloring
 
 `GlMapView` now supports [recoloring exact native map captures](../renderer/MAP-RECOLOR.md), including current-upload and retained-raster/owned-input forms. A capture UUID rejects obsolete sources during rapid replacements; ordinary revision/upload ownership and matching-grid pan/zoom remain in place. CPU work reserves both old/new image payloads and reuses equal value styles. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
+
+## Scalar upload recovery
+
+[Explicit scalar recovery](SCALAR-RECOVERY.md) now restarts a failed source upload from complete retained CPU data at the same data revision, checking exact volume/style and lowered output limits. Independent scene/frame CPU inputs survive GL closure and feed consuming recolor/retry overloads. Camera, viewport, clipping and old completed frames retain their existing contracts. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.

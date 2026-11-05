@@ -85,3 +85,7 @@ Scalar navigation/clipping now preserves upstream failure diagnostics even if an
 ## Clipped display fitting
 
 `fitClipped(width, height)` now uses the current clip and prepared scalar bounds; `fit(width, height)` preserves full-source behavior. Both require the complete adopted current upload. Empty surfaces use their full display-bin extent as the fitting source, then apply the selected scope. Non-intersecting/invalid fits leave the existing view untouched during preflight. See [camera fitting](CAMERA-FIT.md) for conservative bounds, exact anchors and deferred verification.
+
+## Prepared-source recovery
+
+[Explicit upload recovery](SCALAR-RECOVERY.md) now accepts complete exact-volume/style surfaces after a source failure at the same data revision. It preserves camera/viewport/clip, advances the display revision and cancels obsolete CPU adoption before cleanup and new upload admission. `GlNoiseScene.retainInput()` and `GlNoiseFrame.retainSurfaceInput()` produce independently admitted CPU ownership without copying arrays; consuming view recolor/retry overloads hold input through admission or rejection. Runtime/GPU checks remain deferred.

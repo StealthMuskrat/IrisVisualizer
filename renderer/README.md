@@ -277,3 +277,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Captured map recoloring
 
 [Explicit map recoloring](MAP-RECOLOR.md) now reuses exact native captures for scalar gradients, biome palettes and terrain relief. Equal value styles reuse the CPU raster; changed styles reserve old and new images, with owned handoffs and latest-capture guards in the connected view. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
+
+## Retained scalar recovery inputs
+
+[Scalar CPU ownership and upload recovery](../renderer-gl/SCALAR-RECOVERY.md) now allow complete displayed surfaces to outlive GL owners under independent shared admission. Consuming recolor/retry view overloads preserve ownership through destination admission; upload retries verify exact latest volume/style and retained output limits without resampling or remeshing. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.

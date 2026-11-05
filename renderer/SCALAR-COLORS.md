@@ -45,3 +45,7 @@ For connected views, cover recoloring during pending work/upload, the current-sc
 ## Gradient value equality
 
 `MapRamp` now compares immutable ordered stops by value, with matching hash codes. Separately constructed equal scalar color styles therefore use the existing scalar recolor source-only reservation and CPU no-op. Interpolation, thresholds and geometry identity remain unchanged. See [map recoloring](MAP-RECOLOR.md) for the corresponding captured-map path and deferred checks.
+
+## Independent displayed CPU sources
+
+[Scalar source handoff](../renderer-gl/SCALAR-RECOVERY.md) now admits an independent CPU input from a displayed scene/frame without copying geometry, volume or prepared colors. The input can outlive GL closure and feed consuming connected-view recolor requests. Keep a retained retry owner before consuming submission. Full-style upload recovery is separate from geometry-sharing recoloring, preserving the latest requested display colors. Runtime/GPU checks remain deferred.

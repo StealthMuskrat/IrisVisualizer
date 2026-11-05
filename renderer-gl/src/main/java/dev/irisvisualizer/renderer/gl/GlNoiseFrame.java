@@ -48,6 +48,8 @@ public final class GlNoiseFrame implements AutoCloseable {
     public int textureId() { return live().target.textureId(); }
     /** Capture on the context thread, then keep this frame owner live throughout off-thread immutable inspection. */
     public NoiseSurface surface() { return live().scene.surface(); }
+    /** Context-thread capture; the independently admitted CPU surface survives frame/device closure. */
+    public RenderInput<NoiseSurface> retainSurfaceInput() { return live().scene.retainInput(); }
     /** Context-thread submission only; the admitted CPU request survives independent frame closure. */
     public long submitPick(NoisePickWorker worker,double x,double y,NoisePick.Options options) {
         Objects.requireNonNull(worker);Objects.requireNonNull(options);var value=live();
