@@ -10,13 +10,13 @@ Face bounds come from all four emitted vertices, after actual world-mesh placeme
 
 Ranges preserve section and primitive order. Faces still use the original two indexed triangles, barycentric UVs, back-face policy, displayed atlas alpha thresholds and clipping. Markers still use their existing clipped unit-box diagnostic approximation. Equal-distance ordering remains section, geometry-before-marker, then original face/marker index. Nearest results retain the same native position/state/biome/source and original indices; the range index never appears as a substitute hit identity.
 
-Hierarchy nodes and primitive ranges now share one conservative candidate-box path. Both expand bounds at query time by 1e-6 world units plus eight double ULPs at the maximum relative origin/bound magnitude plus 128. Bounds are then rounded outward with `nextDown`/`nextUp`, and nonparallel slab entry/exit intervals receive outward rounding too. Geometric clip intersection and the ray/current-nearest interval still bound traversal. Previously, range padding could not help a ray already rejected by exact root/leaf slabs; this could lose an edge-tolerant triangle hit or change the original-section winner at a shared-edge tie.
+Hierarchy nodes and primitive ranges now share one conservative candidate-box path. Both expand bounds at query time by 1e-6 world units plus eight double ULPs at the maximum relative origin/bound magnitude plus 128. Candidate bounds and candidate clip planes are rounded outward with `nextDown`/`nextUp` using that same margin, and nonparallel slab entry/exit intervals receive outward rounding too. Expanding the traversal clip covers rounding while converting a ray through the index frame; exact geometric clipping is applied to the section-local primitives. The unchanged ray/current-nearest interval still bounds traversal. Previously, range padding could not help a ray already rejected by exact root/leaf slabs; this could lose an edge-tolerant triangle hit or change the original-section winner at a shared-edge tie.
 
 The fixed margin exceeds the existing barycentric edge tolerance over admitted +/-128 section geometry; the ULP term accounts for relative slab arithmetic. Expansion affects candidate rejection only:
 
 | Stage | Boundary policy |
 | --- | --- |
-| Section hierarchy and primitive ranges | Shared padded bounds and outward slab intervals |
+| Section hierarchy and primitive ranges | Shared padded bounds/clip planes and outward slab intervals |
 | Actual triangles | Existing barycentric tolerance, back-face/alpha policy, exact geometric clip and ray-distance checks |
 | Actual diagnostic markers | Existing clipped unit-box slab test with no added padding or interval rounding |
 

@@ -176,18 +176,16 @@ public final class WorldPickIndex implements AutoCloseable {
         void check() { checkQuery(cancelled); }
         WorldPick.Stats stats() { return new WorldPick.Stats(nodes,sections,faces,markers,alphaRejected,batches,culledBatches); }
         WorldPick execute() { check();if(section.length>0)visit(0,nodeEntry(0));check();return new WorldPick(id,source,ray,Optional.ofNullable(hit()),stats(),List.of(),options.clip()); }
-        double box(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z) {
-            return box(minX,minY,minZ,maxX,maxY,maxZ,x,y,z,false);
-        }
         /** Traversal only: include triangle edge tolerance and round slab intervals outward. */
         double candidate(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z) {
             double magnitude=Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z)));
             magnitude=Math.max(magnitude,Math.max(Math.abs(minX),Math.abs(maxX)));magnitude=Math.max(magnitude,Math.max(Math.abs(minY),Math.abs(maxY)));magnitude=Math.max(magnitude,Math.max(Math.abs(minZ),Math.abs(maxZ)));
             double margin=1e-6+8*Math.ulp(magnitude+128);
-            return box(Math.nextDown(minX-margin),Math.nextDown(minY-margin),Math.nextDown(minZ-margin),Math.nextUp(maxX+margin),Math.nextUp(maxY+margin),Math.nextUp(maxZ+margin),x,y,z,true);
+            return box(Math.nextDown(minX-margin),Math.nextDown(minY-margin),Math.nextDown(minZ-margin),Math.nextUp(maxX+margin),Math.nextUp(maxY+margin),Math.nextUp(maxZ+margin),x,y,z,true,clip,margin);
         }
-        double box(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z,boolean outward) {
-            minX=Math.max(minX,clip.minX());minY=Math.max(minY,clip.minY());minZ=Math.max(minZ,clip.minZ());maxX=Math.min(maxX,clip.maxX());maxY=Math.min(maxY,clip.maxY());maxZ=Math.min(maxZ,clip.maxZ());
+        double box(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z,boolean outward,WorldClip.Bounds scope,double margin) {
+            // Traversal's clip must cover index-frame rounding too; primitive scopes remain exact.
+            minX=Math.max(minX,outward?Math.nextDown(scope.minX()-margin):scope.minX());minY=Math.max(minY,outward?Math.nextDown(scope.minY()-margin):scope.minY());minZ=Math.max(minZ,outward?Math.nextDown(scope.minZ()-margin):scope.minZ());maxX=Math.min(maxX,outward?Math.nextUp(scope.maxX()+margin):scope.maxX());maxY=Math.min(maxY,outward?Math.nextUp(scope.maxY()+margin):scope.maxY());maxZ=Math.min(maxZ,outward?Math.nextUp(scope.maxZ()+margin):scope.maxZ());
             if(minX>maxX||minY>maxY||minZ>maxZ)return Double.POSITIVE_INFINITY;
             double low=ray.minimum(),high=nearest;
             if(ray.dx()==0) { if(x<minX||x>maxX)return Double.POSITIVE_INFINITY; }else { double a=(minX-x)/ray.dx(),b=(maxX-x)/ray.dx();low=Math.max(low,outward?Math.nextDown(Math.min(a,b)):Math.min(a,b));high=Math.min(high,outward?Math.nextUp(Math.max(a,b)):Math.max(a,b)); }
@@ -207,53 +205,56 @@ public final class WorldPickIndex implements AutoCloseable {
         }
         void mesh(int sectionIndex) {
             sections++;var mesh=scene.sections().get(sectionIndex);var vertices=mesh.vertexBuffer();var indices=mesh.indexBuffer();double x=relative(mesh.origin().x(),anchor.x()),y=relative(mesh.origin().y(),anchor.y()),z=relative(mesh.origin().z(),anchor.z());
+            // Subtract exact anchors before adding fractional ray coordinates; the index frame can erase them.
+            double rx=Math.subtractExact(ray.anchor().x(),mesh.origin().x())+ray.x(),ry=((long)ray.anchor().y()-mesh.origin().y())+ray.y(),rz=Math.subtractExact(ray.anchor().z(),mesh.origin().z())+ray.z();var scope=options.clip().relative(mesh.origin());
             if(options.batchCulling()&&!mesh.faces().isEmpty()) {
                 int start=faceRanges.starts[sectionIndex];
                 for(int batch=start;batch<faceRanges.starts[sectionIndex+1];batch++) {
                     check();batches++;if(!range(faceRanges,batch,x,y,z)) { culledBatches++;continue; }
                     int first=(batch-start)*BATCH_PRIMITIVES;
-                    faceRange(mesh,sectionIndex,first,Math.min(mesh.faces().size(),first+BATCH_PRIMITIVES),vertices,indices,ox-x,oy-y,oz-z);
+                    faceRange(mesh,sectionIndex,first,Math.min(mesh.faces().size(),first+BATCH_PRIMITIVES),vertices,indices,rx,ry,rz,scope);
                 }
-            }else faceRange(mesh,sectionIndex,0,mesh.faces().size(),vertices,indices,ox-x,oy-y,oz-z);
+            }else faceRange(mesh,sectionIndex,0,mesh.faces().size(),vertices,indices,rx,ry,rz,scope);
             if(options.batchCulling()&&!mesh.markers().isEmpty()) {
                 int start=markerRanges.starts[sectionIndex];
                 for(int batch=start;batch<markerRanges.starts[sectionIndex+1];batch++) {
                     check();batches++;if(!range(markerRanges,batch,x,y,z)) { culledBatches++;continue; }
-                    int first=(batch-start)*BATCH_PRIMITIVES;markerRange(mesh,sectionIndex,first,Math.min(mesh.markers().size(),first+BATCH_PRIMITIVES));
+                    int first=(batch-start)*BATCH_PRIMITIVES;markerRange(mesh,sectionIndex,first,Math.min(mesh.markers().size(),first+BATCH_PRIMITIVES),rx,ry,rz,scope);
                 }
-            }else markerRange(mesh,sectionIndex,0,mesh.markers().size());
+            }else markerRange(mesh,sectionIndex,0,mesh.markers().size(),rx,ry,rz,scope);
         }
         boolean range(Ranges ranges,int batch,double x,double y,double z) {
             int at=batch*6;var b=ranges.bounds;
             double entry=candidate(x+b[at],y+b[at+1],z+b[at+2],x+b[at+3],y+b[at+4],z+b[at+5],ox,oy,oz);
             return Double.isFinite(entry)&&entry<=nearest;
         }
-        void markerRange(WorldMesh mesh,int sectionIndex,int first,int end) {
+        void markerRange(WorldMesh mesh,int sectionIndex,int first,int end,double x,double y,double z,WorldClip.Bounds scope) {
             for(int marker=first;marker<end;marker++) {
-                if((marker&255)==0)check();if(++markers>options.markerTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking marker-test budget exceeded; no partial hit was published");var value=mesh.markers().get(marker);var position=value.position();double px=Math.subtractExact(position.x(),anchor.x()),py=(long)position.y()-anchor.y(),pz=Math.subtractExact(position.z(),anchor.z());double distance=box(px,py,pz,px+1,py+1,pz+1,ox,oy,oz);
+                if((marker&255)==0)check();if(++markers>options.markerTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking marker-test budget exceeded; no partial hit was published");var value=mesh.markers().get(marker);var position=value.position();double px=Math.subtractExact(position.x(),mesh.origin().x()),py=(long)position.y()-mesh.origin().y(),pz=Math.subtractExact(position.z(),mesh.origin().z());double distance=box(px,py,pz,px+1,py+1,pz+1,x,y,z,false,scope,0);
                 if(!Double.isFinite(distance)||!better(distance,sectionIndex,-1,marker))continue;hitSection=sectionIndex;hitFace=-1;hitMarker=marker;nearest=distance;
+                hitX=boxCoordinate(x,ray.dx(),distance,Math.max(px,scope.minX()),Math.min(px+1,scope.maxX()));hitY=boxCoordinate(y,ray.dy(),distance,Math.max(py,scope.minY()),Math.min(py+1,scope.maxY()));hitZ=boxCoordinate(z,ray.dz(),distance,Math.max(pz,scope.minZ()),Math.min(pz+1,scope.maxZ()));
             }
         }
-        void faceRange(WorldMesh mesh,int sectionIndex,int first,int end,FloatBuffer vertices,IntBuffer indices,double x,double y,double z) {
+        /** Reuse the exact slab plane when it supplied the accepted distance, without extending the unit box. */
+        double boxCoordinate(double origin,double direction,double distance,double low,double high) {
+            if(direction!=0) { if(distance==(low-origin)/direction)return low;if(distance==(high-origin)/direction)return high; }
+            return Math.fma(direction,distance,origin);
+        }
+        void faceRange(WorldMesh mesh,int sectionIndex,int first,int end,FloatBuffer vertices,IntBuffer indices,double x,double y,double z,WorldClip.Bounds scope) {
             for(int face=first;face<end;face++) {
                 if((face&255)==0)check();if(++faces>options.faceTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking face-test budget exceeded; no partial hit was published");
-                for(int triangle=0;triangle<2;triangle++)triangle(mesh,sectionIndex,face,triangle,vertices,indices,x,y,z);
+                for(int triangle=0;triangle<2;triangle++)triangle(mesh,sectionIndex,face,triangle,vertices,indices,x,y,z,scope);
             }
         }
         WorldPick.Hit hit() {
             if(hitSection<0)return null;var mesh=scene.sections().get(hitSection);WorldSnapshot.Position position;RenderBlockState state;WorldSnapshot.Biome biome;Optional<WorldPick.Surface> surface;List<ModelPlan.Problem> visualProblems;
             if(hitFace>=0) { position=mesh.positionForFace(hitFace);state=mesh.stateForFace(hitFace);biome=mesh.biomeForFace(hitFace);surface=Optional.of(new WorldPick.Surface(mesh.faces().get(hitFace).source().source(),hitU,hitV,normalX,normalY,normalZ));visualProblems=List.of(); }
             else { var marker=mesh.markers().get(hitMarker);position=marker.position();state=marker.state();biome=mesh.snapshot().biome(mesh.cells().get(marker.cell()).sourceCell());surface=Optional.empty();visualProblems=marker.problems(); }
-            double x,y,z;
-            if(hitFace>=0) {
-                // Keep the accepted section-local point through detachment; do not reconstruct it at the index anchor.
-                x=hitX-Math.subtractExact(position.x(),mesh.origin().x());y=hitY-((long)position.y()-mesh.origin().y());z=hitZ-Math.subtractExact(position.z(),mesh.origin().z());
-            }else {
-                x=ox+ray.dx()*nearest-Math.subtractExact(position.x(),anchor.x());y=oy+ray.dy()*nearest-((long)position.y()-anchor.y());z=oz+ray.dz()*nearest-Math.subtractExact(position.z(),anchor.z());
-            }
+            // Both triangle and marker winners retain their accepted section-local point through detachment.
+            double x=hitX-Math.subtractExact(position.x(),mesh.origin().x()),y=hitY-((long)position.y()-mesh.origin().y()),z=hitZ-Math.subtractExact(position.z(),mesh.origin().z());
             return new WorldPick.Hit(position,state,biome,hitSection,hitFace,hitMarker,nearest,x,y,z,surface,visualProblems);
         }
-        void triangle(WorldMesh mesh,int sectionIndex,int face,int triangle,FloatBuffer v,IntBuffer indices,double x,double y,double z) {
+        void triangle(WorldMesh mesh,int sectionIndex,int face,int triangle,FloatBuffer v,IntBuffer indices,double x,double y,double z,WorldClip.Bounds scope) {
             int start=face*6+triangle*3,a=indices.get(start)*8,b=indices.get(start+1)*8,c=indices.get(start+2)*8;
             double ax=v.get(a),ay=v.get(a+1),az=v.get(a+2),ex=v.get(b)-ax,ey=v.get(b+1)-ay,ez=v.get(b+2)-az,fx=v.get(c)-ax,fy=v.get(c+1)-ay,fz=v.get(c+2)-az;
             double px=ray.dy()*fz-ray.dz()*fy,py=ray.dz()*fx-ray.dx()*fz,pz=ray.dx()*fy-ray.dy()*fx,det=ex*px+ey*py+ez*pz;
@@ -262,7 +263,7 @@ public final class WorldPickIndex implements AutoCloseable {
             if(beta< -1e-10||gamma< -1e-10||beta+gamma>1+1e-10)return;double distance=(fx*qx+fy*qy+fz*qz)/det;if(!better(distance,sectionIndex,face,-1))return;
             // Constant vertex axes are known planes, even when ray reconstruction rounds across a closed clip.
             double hx=ex==0&&fx==0?ax:Math.fma(ray.dx(),distance,x),hy=ey==0&&fy==0?ay:Math.fma(ray.dy(),distance,y),hz=ez==0&&fz==0?az:Math.fma(ray.dz(),distance,z);
-            if(!clip.contains(relative(mesh.origin().x(),anchor.x())+hx,relative(mesh.origin().y(),anchor.y())+hy,relative(mesh.origin().z(),anchor.z())+hz))return;
+            if(!scope.contains(hx,hy,hz))return;
             beta=Math.max(0,beta);gamma=Math.max(0,gamma);double sum=beta+gamma;if(sum>1) { beta/=sum;gamma/=sum; }double weight=1-beta-gamma;
             double u=weight*v.get(a+6)+beta*v.get(b+6)+gamma*v.get(c+6),vv=weight*v.get(a+7)+beta*v.get(b+7)+gamma*v.get(c+7);var material=mesh.faces().get(face).source();
             if(options.alpha()==Alpha.DISPLAYED_BASE_LEVEL&&material.alpha()!=TexturePreparation.AlphaClass.OPAQUE) {

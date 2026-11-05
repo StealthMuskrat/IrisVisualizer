@@ -201,7 +201,44 @@ public final class WorldCpuContracts {
             }
         }
     }
+    private static void pickingSectionFrames() {
+        var f=fixture(1,255,false);var extent=f.snapshot().extent();
+        var snapshot=WorldSnapshot.capture(f.snapshot().source(),new WorldSnapshot.Extent(extent.minX(),extent.minY(),extent.minZ(),2,2,2),List.of(state(407)),List.of(BIOME),new int[8],new int[8],LIVE);var position=snapshot.extent().position(7);
+        var diagnostic=new ModelPlan.Problem(ModelPlan.Code.BUILTIN_MODEL,ClientAssetSnapshot.Kind.MODEL,MODEL,"","synthetic section-frame marker");
+        for(boolean marker:new boolean[]{false,true}) {
+            var entry=marker?WorldModels.Entry.placeholder(state(407),List.of(diagnostic)):WorldModels.Entry.from(f.prototype());var choices=new int[8];choices[7]=1;
+            var models=WorldModels.capture(snapshot,f.layout(),List.of(WorldModels.Entry.empty(state(407)),entry),choices,LIVE);var visibility=WorldVisibility.keepAll(snapshot,f.layout());var plan=WorldScenePlan.plan(models,visibility,f.plan().limits(),f.plan().sectionLimits(),LIVE);
+            check(!plan.requiresPlaceholder(),"offset section-frame plan complete");
+            try(var cache=new WorldSectionCache();var owner=WorldScene.build(plan,f.raster(),cache,LIVE);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+                check(!owner.requiresPlaceholder()&&!index.requiresPlaceholder(),"offset section-frame index complete");equal(8,owner.scene().orElseThrow().sections().size(),"empty source sections retain original coverage");
+                var clip=new WorldClip(new WorldSnapshot.Extent(position.x(),position.y(),position.z(),1,1,1));double epsilon=Math.scalb(1.0,-60);
+                for(int axis=0;axis<3;axis++)for(boolean culling:new boolean[]{false,true}) {
+                    int normal=(axis+1)%3;var options=WorldPickIndex.Options.DEFAULT.withClip(clip).withBatchCulling(culling);
+                    for(boolean inside:new boolean[]{false,true}) {
+                        double[] origin={0.5,0.5,0.5},direction={0,0,0};origin[axis]=inside?epsilon:-epsilon;origin[normal]=3;direction[normal]=-1;
+                        var ray=new WorldRay(position,origin[0],origin[1],origin[2],direction[0],direction[1],direction[2],0,10);var result=index.query(ray,options,null,LIVE);check(!result.requiresPlaceholder(),"tiny section-frame query complete");
+                        if(!inside) { check(result.hit().isEmpty(),"sub-ULP point outside exact section clip remains excluded");continue; }
+                        var hit=result.hit().orElseThrow();double[] local={hit.localX(),hit.localY(),hit.localZ()};equal(epsilon,local[axis],"tiny section-local tangent survives index-frame rounding");equal(1.0,local[normal],"section-local normal remains exact");equal(position,hit.position(),"section-frame hit retains exact native cell");equal(state(407),hit.state(),"section-frame hit retains native state");equal(BIOME,hit.biome(),"section-frame hit retains native biome");equal(marker,hit.placeholder(),"actual primitive kind retained");near(2,hit.distance(),"section-frame analytic front distance");
+                    }
+                }
+                if(marker) {
+                    for(int side=0;side<6;side++)for(double distance:new double[]{0.1,0.3,7.7,1_000_000.1,1_048_574.75}) {
+                        int axis=side<2?1:side<4?2:0;boolean plus=(side&1)!=0;double plane=plus?1:0;double[] origin={0.25,0.25,0.25},point={0.375,0.375,0.375};point[(axis+1)%3]=0.625;origin[axis]=plus?1+distance:-distance;point[axis]=plane;
+                        double dx=point[0]-origin[0],dy=point[1]-origin[1],dz=point[2]-origin[2];var touching=new WorldClip(new WorldSnapshot.Extent(position.x()+(axis==0?(plus?1:-1):0),position.y()+(axis==1?(plus?1:-1):0),position.z()+(axis==2?(plus?1:-1):0),1,1,1));
+                        for(boolean culling:new boolean[]{false,true}) {
+                            var options=WorldPickIndex.Options.DEFAULT.withClip(touching).withBatchCulling(culling);var ray=new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,0,2_097_152);var hit=index.query(ray,options,null,LIVE).hit().orElseThrow();double[] local={hit.localX(),hit.localY(),hit.localZ()};equal(plane,local[axis],"marker receipt preserves exact accepted slab plane");equal(List.of(diagnostic),hit.visualProblems(),"marker section frame retains diagnostic");near(Math.hypot(Math.hypot(dx,dy),dz),hit.distance(),"marker analytic plane distance");
+                            check(index.query(new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,hit.distance(),hit.distance()),options,null,LIVE).hit().isPresent(),"marker closed endpoint retained");
+                            check(index.query(new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,0,Math.nextDown(hit.distance())),options,null,LIVE).hit().isEmpty(),"marker strict far limit retained");
+                            check(index.query(new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,Math.nextUp(hit.distance()),2_097_152),options,null,LIVE).hit().isEmpty(),"marker strict near limit retained");
+                        }
+                    }
+                    for(double minimum:new double[]{0,0.25,0.5}) { var hit=index.query(new WorldRay(position,0.5,0.5,0.5,1,0,0,minimum,1),LIVE).hit().orElseThrow();equal(minimum,hit.distance(),"inside marker starts at requested near distance");equal(0.5+minimum,hit.localX(),"inside marker receipt follows near distance");equal(0.5,hit.localY(),"inside marker tangent retained"); }
+                }
+            }
+        }
+    }
     private static void pickingTraversalEdges() {
+        pickingSectionFrames();
         pickingPlanes();
         double edge=2e-11;var f=fixture(1,255,false);var position=f.snapshot().extent().position(0);
         try(var cache=new WorldSectionCache();var owner=build(f,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
