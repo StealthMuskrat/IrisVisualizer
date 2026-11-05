@@ -9,9 +9,10 @@ public final class WorldScenePlan {
         public static final Limits DEFAULT=new Limits(16,8192,2097152,2097152,1048576,256L*1024*1024,512L*1024*1024);
         public Limits { if(sectionEdge<1||sectionEdge>32||sections<1||sections>65536||faces<1||faces>2097152||cellRecords<0||cellRecords>4194304||markers<0||markers>1048576||meshBytes<0||meshBytes>256L*1024*1024||workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Scene limits exceed renderer bounds"); }
     }
-    public record Usage(int sections,long coveredCells,long sourcePayloadBytes,long meshBytes,int faces,int cellRecords,int markers,int translucentFaces,int tintedFaces) {
+    public record Usage(int sections,long coveredCells,long sourcePayloadBytes,long meshBytes,int faces,int cellRecords,int markers,int translucentFaces,int tintedFaces,int drawableSections,int faceBatches,int markerBatches) {
         public Usage(int sections,long coveredCells,long sourcePayloadBytes,long meshBytes,int faces,int cellRecords,int markers) { this(sections,coveredCells,sourcePayloadBytes,meshBytes,faces,cellRecords,markers,0,0); }
-        public Usage { if(sections<1||coveredCells<1||sourcePayloadBytes<0||meshBytes<0||faces<0||cellRecords<0||markers<0||translucentFaces<0||translucentFaces>faces||tintedFaces<0||tintedFaces>faces)throw new IllegalArgumentException("Invalid scene usage"); }
+        public Usage(int sections,long coveredCells,long sourcePayloadBytes,long meshBytes,int faces,int cellRecords,int markers,int translucentFaces,int tintedFaces) { this(sections,coveredCells,sourcePayloadBytes,meshBytes,faces,cellRecords,markers,translucentFaces,tintedFaces,0,0,0); }
+        public Usage { if(sections<1||coveredCells<1||sourcePayloadBytes<0||meshBytes<0||faces<0||cellRecords<0||markers<0||translucentFaces<0||translucentFaces>faces||tintedFaces<0||tintedFaces>faces||drawableSections<0||drawableSections>sections||faceBatches<0||faceBatches>faces||markerBatches<0||markerBatches>markers)throw new IllegalArgumentException("Invalid scene usage"); }
         public long knownPayloadBytes() { return sourcePayloadBytes+meshBytes; }
     }
     private final WorldModels models;private final WorldVisibility visibility;private final Limits limits;private final WorldMesher.Limits sectionLimits;
@@ -35,7 +36,7 @@ public final class WorldScenePlan {
         int edge=limits.sectionEdge();if(edge>sectionLimits.axis()||(long)edge*edge*edge>sectionLimits.cells())throw WorldProblem.fail(WorldProblem.Code.EXTENT,"Scene tile size exceeds the explicit section assembly limits");
         var extent=models.snapshot().extent();long nx=((long)extent.width()+edge-1)/edge,ny=((long)extent.height()+edge-1)/edge,nz=((long)extent.depth()+edge-1)/edge;
         long count=nx*ny*nz;if(count>limits.sections())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Complete scene section count exceeds its budget; no vertical coverage was truncated");
-        var sections=new ArrayList<WorldMeshPlan>((int)count);long bytes=0,faces=0,cells=0,markers=0,translucent=0,tinted=0,covered=0,source=-1;
+        var sections=new ArrayList<WorldMeshPlan>((int)count);long bytes=0,faces=0,cells=0,markers=0,translucent=0,tinted=0,covered=0,source=-1;int drawable=0,faceBatches=0,markerBatches=0;
         for(long iy=0;iy<ny;iy++)for(long iz=0;iz<nz;iz++)for(long ix=0;ix<nx;ix++) {
             WorldProblem.check(cancelled);int dx=(int)(ix*edge),dy=(int)(iy*edge),dz=(int)(iz*edge);
             var tile=new WorldSnapshot.Extent(extent.minX()+dx,Math.toIntExact((long)extent.minY()+dy),extent.minZ()+dz,Math.min(edge,extent.width()-dx),Math.min(edge,extent.height()-dy),Math.min(edge,extent.depth()-dz));
@@ -43,11 +44,12 @@ public final class WorldScenePlan {
             var usage=section.usage().orElseThrow();long common=usage.knownPayloadBytes()-usage.outputBytes();
             if(source<0)source=common;else if(source!=common)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Scene sections disagree on shared source payload");
             bytes+=usage.outputBytes();faces+=usage.faces();cells+=usage.nonEmptyCells();markers+=usage.markers();translucent+=usage.translucentFaces();tinted+=usage.tintedFaces();covered+=tile.cells();
+            if(usage.faces()>0||usage.markers()>0)drawable++;faceBatches+=WorldMesh.batchCount(usage.faces());markerBatches+=WorldMesh.batchCount(usage.markers());
             if(bytes>limits.meshBytes()||faces>limits.faces()||cells>limits.cellRecords()||markers>limits.markers()||source+bytes>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Complete scene mesh, metadata or combined payload budget exceeded; no partial scene was published");
             sections.add(section);
         }
         if(covered!=extent.cells()||sections.size()!=count)throw WorldProblem.fail(WorldProblem.Code.EXTENT,"Scene section coverage does not equal the complete native volume");
-        var usage=new Usage(sections.size(),covered,source,bytes,(int)faces,(int)cells,(int)markers,(int)translucent,(int)tinted);WorldProblem.check(cancelled);
+        var usage=new Usage(sections.size(),covered,source,bytes,(int)faces,(int)cells,(int)markers,(int)translucent,(int)tinted,drawable,faceBatches,markerBatches);WorldProblem.check(cancelled);
         return new WorldScenePlan(models,visibility,limits,sectionLimits,sections,Optional.of(usage),List.of());
     }
     public WorldModels models() { return models; }

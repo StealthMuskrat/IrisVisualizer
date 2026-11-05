@@ -59,3 +59,7 @@ Exercise standalone visual setup/preparation/publication failures, take/close be
 ## Admitted index-worker transfer
 
 [Background index preparation](INDEX-WORKER.md) now retains the worker peak hold directly in successful index ownership, keeping the original job handle until unwind and then shrinking to actual retained source/arrays. Idle pending/untaken output can supply atomic replacement credit; active/shared handles cannot. Completed indices survive worker shutdown until the caller closes them. Frame-based pointer submission independently charges the exact displayed CPU atlas through existing request admission and requires matching device/index/query coordinators. Both worker families enforce aggregate active/pending ceilings even without tracking. All 129 CPU/OpenGL sources compile; no index/query/worker/native/GPU execution or tests ran. Unsupported previews remain disabled.
+
+## Actual index-worker demand
+
+[Prepared picking-size counts](PICKING-SIZES.md) now provide exact drawable-section/range/offset/build demand for valid index-worker submissions. Source plus actual arrays replaces source plus full configured index slack, with the same index/combined/local/shared ceilings and rejection-before-mutation contract. Actual preparation independently rechecks the scene receipt and admitted peak before allocating; cancellation/unwind, retained source/index charge and query/close ownership remain intact.

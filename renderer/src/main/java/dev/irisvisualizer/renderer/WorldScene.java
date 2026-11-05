@@ -56,15 +56,16 @@ public final class WorldScene {
         if(raster.requiresPlaceholder()||raster.layout()!=plan.layout())throw WorldProblem.fail(WorldProblem.Code.ATLAS,"Scene raster must be successful and share the exact planned atlas epoch");
         WorldProblem.check(cancelled);cache.prepare(plan,cancelled);
         try(var work=new Work(plan.sections().size())) {
-            long bytes=0,covered=0;int faces=0,cells=0,markers=0,translucent=0,tinted=0;
+            long bytes=0,covered=0;int faces=0,cells=0,markers=0,translucent=0,tinted=0,drawable=0,faceBatches=0,markerBatches=0;
             for(var section:plan.sections()) {
                 WorldProblem.check(cancelled);var ticket=cache.reserve(section,plan.limits().workingBytes());work.own(ticket);
                 if(!ticket.cached())ticket.complete(WorldMesher.assemble(section,cancelled));var mesh=ticket.mesh();
                 if(mesh.models()!=plan.models()||mesh.visibility()!=plan.visibility()||!mesh.extent().equals(section.extent())||!mesh.usage().equals(section.usage()))throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Cached section does not match the complete scene plan");
                 var usage=mesh.usage().orElseThrow();bytes+=usage.outputBytes();covered+=mesh.extent().cells();faces+=usage.faces();cells+=usage.nonEmptyCells();markers+=usage.markers();translucent+=usage.translucentFaces();tinted+=usage.tintedFaces();work.sections.add(mesh);
+                if(mesh.bounds().isPresent())drawable++;faceBatches+=mesh.faceBatchCount();markerBatches+=WorldMesh.batchCount(mesh.markers().size());
             }
             var usage=plan.usage().orElseThrow();
-            if(work.sections.size()!=usage.sections()||covered!=usage.coveredCells()||bytes!=usage.meshBytes()||faces!=usage.faces()||cells!=usage.cellRecords()||markers!=usage.markers()||translucent!=usage.translucentFaces()||tinted!=usage.tintedFaces())throw WorldProblem.fail(WorldProblem.Code.EXTENT,"Completed scene coverage or payload differs from the admitted plan");
+            if(work.sections.size()!=usage.sections()||covered!=usage.coveredCells()||bytes!=usage.meshBytes()||faces!=usage.faces()||cells!=usage.cellRecords()||markers!=usage.markers()||translucent!=usage.translucentFaces()||tinted!=usage.tintedFaces()||drawable!=usage.drawableSections()||faceBatches!=usage.faceBatches()||markerBatches!=usage.markerBatches())throw WorldProblem.fail(WorldProblem.Code.EXTENT,"Completed scene coverage or payload differs from the admitted plan");
             WorldProblem.check(cancelled);var scene=new WorldScene(plan,raster,work.sections);var result=new Result(plan.snapshot().source(),scene,work.tickets,List.of());WorldProblem.check(cancelled);work.transferred=true;return result;
         }
     }

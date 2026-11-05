@@ -42,11 +42,16 @@ public final class WorldPickIndex implements AutoCloseable {
     public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
         return prepare(owner,limits,memory,RenderMemory.Hold.none(),-1,cancelled);
     }
-    /** Metadata-only upper bound. Actual section/range counting remains on the preparation worker. */
+    private static long indexBytes(int sections,int drawable,int faceBatches,int markerBatches) {
+        int nodes=drawable==0?0:drawable*2-1,starts=(faceBatches==0?0:sections+1)+(markerBatches==0?0:sections+1);
+        return (long)nodes*(6*Double.BYTES+3*Integer.BYTES)+((long)faceBatches+markerBatches)*6*Float.BYTES+(long)starts*Integer.BYTES;
+    }
+    private static long preparationBytes(int sections,int drawable,int faceBatches,int markerBatches) { return indexBytes(sections,drawable,faceBatches,markerBatches)+(long)drawable*Integer.BYTES+(drawable==0?0:Integer.BYTES); }
+    /** Verified scene counters size the peak in constant time; actual counts are rechecked on the worker. */
     static long reservation(WorldScene scene,Limits limits) {
-        long source=scene.usage().knownPayloadBytes();
+        var usage=scene.usage();long source=usage.knownPayloadBytes(),peak=preparationBytes(usage.sections(),usage.drawableSections(),usage.faceBatches(),usage.markerBatches());
         if(source>limits.workingBytes())throw new IllegalArgumentException("Picking source scene exceeds the preparation allowance");
-        return Math.min(limits.workingBytes(),source+limits.indexBytes());
+        return Math.min(limits.workingBytes(),source+Math.min(limits.indexBytes(),peak));
     }
     /** Consumes an independently retained worker hold; the worker keeps its original handle through unwind. */
     static WorldPickIndex prepareAdmitted(WorldScene.Result owner,Limits limits,RenderMemory memory,RenderMemory.Hold admission,long reserved,BooleanSupplier cancelled) {
@@ -57,9 +62,10 @@ public final class WorldPickIndex implements AutoCloseable {
         Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();
         try {
             WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0;
-            for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=(mesh.markers().size()+BATCH_PRIMITIVES-1)/BATCH_PRIMITIVES; }
-            int nodes=count==0?0:count*2-1,starts=(faces==0?0:scene.sections().size()+1)+(markers==0?0:scene.sections().size()+1);
-            long bytes=(long)nodes*60+((long)faces+markers)*6*Float.BYTES+(long)starts*Integer.BYTES,peak=bytes+(long)count*4+(count==0?0:4);
+            for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=WorldMesh.batchCount(mesh.markers().size()); }
+            var usage=scene.usage();if(scene.sections().size()!=usage.sections()||count!=usage.drawableSections()||faces!=usage.faceBatches()||markers!=usage.markerBatches())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Picking source sections/ranges differ from the complete scene receipt");
+            int nodes=count==0?0:count*2-1;
+            long bytes=indexBytes(scene.sections().size(),count,faces,markers),peak=preparationBytes(scene.sections().size(),count,faces,markers);
             if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking hierarchy/range arrays or combined CPU payload budget exceeded");
             if(reserved>=0) {
                 if(memory!=null&&!admission.tracked()||admission.tracked()&&!admission.belongsTo(memory))throw new IllegalArgumentException("Admitted picking preparation requires its exact memory coordinator");

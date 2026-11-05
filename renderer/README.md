@@ -269,3 +269,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared material counts
 
 [Verified section/scene material totals](MATERIAL-COUNTS.md) now carry surviving tint-required and translucent face counts from CPU count/emission into GPU validation and camera-sort admission. Sorting reserves actual primitive scratch within the existing ceilings; depth/key ordering and native identity remain intact. No face-sized arrays are added. All 129 CPU/OpenGL sources compile; runtime/native/GPU comparisons and editor integration remain deferred, with unsupported previews disabled.
+
+## Prepared picking sizes
+
+[Verified drawable/range counts](PICKING-SIZES.md) now size picking-index worker arrays in constant time during submission. Scene construction and index preparation independently recheck counts; mesh publication also verifies drawable bounds and primitive collection coverage. Valid jobs reserve actual source/index/build payload within existing ceilings, preserving complete queries and native identity. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.

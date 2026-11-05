@@ -24,7 +24,7 @@ Cancellation checks run at each range and through existing primitive loops. No e
 
 ## Admission and lifetime
 
-Preparation counts every drawable section and both range families before array allocation. The existing 16 MiB index and 512 MiB scene-plus-index preparation ceilings include:
+Preparation counts every drawable section and both range families before array allocation. [Prepared complete-scene totals](PICKING-SIZES.md) now size background-worker admission without a synchronous count scan; actual preparation recounts and validates them before allocating. Valid requests reserve actual retained/build primitive demand rather than the full configured index ceiling. The existing 16 MiB index and 512 MiB scene-plus-index preparation ceilings include:
 
 | Payload | Primitive bytes |
 | --- | --- |

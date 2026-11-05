@@ -8,7 +8,8 @@ import java.util.*;
 public final class WorldMesh {
     public static final int TRANSLUCENT_BYTES_PER_FACE=Integer.BYTES+3*Double.BYTES;
     public static final int BATCH_FACES=128;
-    static long batchBytes(int faces) { return ((faces+(long)BATCH_FACES-1)/BATCH_FACES)*6*Float.BYTES; }
+    static int batchCount(int primitives) { return (int)((primitives+(long)BATCH_FACES-1)/BATCH_FACES); }
+    static long batchBytes(int faces) { return (long)batchCount(faces)*6*Float.BYTES; }
     public record Cell(int sourceCell,int visualEntry,int firstFace,int faceCount,int marker) {
         public Cell { if(sourceCell<0||visualEntry<0||firstFace<0||faceCount<0||marker< -1||marker>=0&&faceCount!=0)throw new IllegalArgumentException("Invalid world cell span"); }
     }
@@ -36,8 +37,9 @@ public final class WorldMesh {
         this.cells=List.copyOf(cells);this.faces=List.copyOf(faces);this.markers=List.copyOf(markers);this.ranges=List.copyOf(ranges);this.bounds=bounds;this.usage=usage;this.problems=List.copyOf(problems);
         if(translucentCenters.length!=(long)translucentFaces.length*3)throw new IllegalArgumentException("Invalid translucent center coverage");
         if(faceBatchBytes()!=batchBytes(faces.size()))throw new IllegalArgumentException("Invalid world face-batch coverage");
+        if(bounds.isPresent()!=(!faces.isEmpty()||!markers.isEmpty()))throw new IllegalArgumentException("World mesh drawable bounds differ from its primitives");
         if(!problems.isEmpty()&&(vertices.length!=0||indices.length!=0||translucentFaces.length!=0||!cells.isEmpty()||!faces.isEmpty()||!markers.isEmpty()||!ranges.isEmpty()||bounds.isPresent()||usage.isPresent()))throw new IllegalArgumentException("Partial section mesh escaped failure");
-        if(usage.isPresent()&&(usage.orElseThrow().translucentFaces()!=translucentFaces.length||usage.orElseThrow().outputBytes()!=packedBytes()+translucentBytes()+faceBatchBytes()))throw new IllegalArgumentException("World mesh payload differs from admitted output");
+        if(usage.isPresent()&&(usage.orElseThrow().faces()!=faces.size()||usage.orElseThrow().markers()!=markers.size()||usage.orElseThrow().nonEmptyCells()!=cells.size()||usage.orElseThrow().translucentFaces()!=translucentFaces.length||usage.orElseThrow().outputBytes()!=packedBytes()+translucentBytes()+faceBatchBytes()))throw new IllegalArgumentException("World mesh payload differs from admitted output");
     }
     static WorldMesh success(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,float[] vertices,int[] indices,int[] translucentFaces,double[] translucentCenters,float[] faceBatches,List<Cell> cells,List<Face> faces,List<Marker> markers,List<AtlasMesh.DrawRange> ranges,Optional<BlockMesh.Bounds> bounds,Usage usage) { return new WorldMesh(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,faceBatches,cells,faces,markers,ranges,bounds,Optional.of(usage),List.of()); }
     static WorldMesh placeholder(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,List<WorldProblem> problems) { if(problems.isEmpty())throw new IllegalArgumentException("Placeholder requires a problem");return new WorldMesh(models,visibility,extent,new float[0],new int[0],new int[0],new double[0],new float[0],List.of(),List.of(),List.of(),List.of(),Optional.empty(),Optional.empty(),problems); }

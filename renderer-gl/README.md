@@ -184,3 +184,7 @@ World upload validation now consumes [prepared material counts](../renderer/MATE
 ## Clipped camera fitting
 
 [World/scalar fit helpers](CAMERA-FIT.md) now support explicit `fitClipped` navigation using current geometric clipping, alongside full-source fitting. Section/surface-bound intersections keep exact anchors, existing camera limits and empty-source fallbacks; non-intersecting scopes fail before view mutation. No native samples, geometry or clip settings are changed. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
+
+## Picking preparation admission
+
+Completed-frame background index requests now inherit [prepared picking-size receipts](../renderer/PICKING-SIZES.md), reserving their actual source/index/build primitive demand without synchronous section/face scans during handoff. The same complete CPU source, ray/clip/animated-atlas contracts and independent frame/index ownership remain in place. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU validation remains deferred and unsupported previews stay disabled.

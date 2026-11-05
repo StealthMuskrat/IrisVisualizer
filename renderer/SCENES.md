@@ -10,6 +10,8 @@ Renderer implementation, 2026-11-03. All 57 CPU renderer sources compile with Ja
 
 [Prepared material counts](MATERIAL-COUNTS.md) also retain surviving translucent and tint-required totals per section and complete scene. Section emission and complete scene construction independently verify these counts before publication; GPU validation and camera-sort admission can then consume metadata without scanning every source face.
 
+[Picking size receipts](PICKING-SIZES.md) additionally record drawable sections and face/marker range groups. Complete scene construction rechecks them against actual mesh bounds and stored/grouped primitives, enabling constant-time background-index admission while preserving full section coverage.
+
 Every successful plan covers exactly `snapshot.extent().cells()`, including the complete configured height. It does not reduce area, sample resolution, vertical extent, model detail or selected generation features to fit. An over-budget scene fails explicitly. Section size is an assembly parameter; the specified 128 × 128 preview default and source volume are unchanged.
 
 The section count/emit passes now omit redundant cell-span records for fully hidden meshes. Cells emitting faces or explicit placeholder markers retain picking spans. All original cells, states and biomes remain in the native snapshot, including hidden and explicitly empty cells. This reduces cache metadata without dropping generated data, visible geometry or unsupported-content markers.
