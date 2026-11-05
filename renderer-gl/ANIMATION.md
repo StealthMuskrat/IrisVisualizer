@@ -59,3 +59,9 @@ The [connected world animation path](WORLD-ANIMATION.md) now schedules CPU patch
 ## Same-scene replacement preflight
 
 [Atlas recovery](ATLAS-RECOVERY.md) now validates displayed scene and exact successful CPU plan baseline before accepting a newer frame token. Rejected preflight preserves previous queued/READY work; explicit upstream invalidation and newer-scene obsolescence keep their existing behavior. `retry(expectedScene, expectedFrame)` reopens only a current FAILED pair after cleanup, then requires ordinary complete-plan resubmission. Follow-up compilation in the restored workspace covers these changes; runtime/GPU checks remain pending.
+
+## Atlas capture cleanup
+
+`GlAtlasFrame.capture` now attempts every temporary page-owner release after capture succeeds or fails. It preserves the setup error when cleanup also fails, or reports the first cleanup error with later distinct errors suppressed. If a frame was already created but temporary cleanup prevents its return, capture attempts to close that frame before propagating the error. Its ordinary page/journal cleanup still aggregates failures and device journals preserve unfinished or retired/quarantined ownership. Capture, partial-create unwind and frame close use the same indexed page-release path, without cleanup iterator allocation.
+
+This does not add page copies, change page references on successful capture, retire the caller's scene, alter frame tokens or bypass device accounting. On real Windows GL at renderer completion, inject setup failure plus multiple page-release errors, release error after successful frame creation, and subsequent frame/journal close failure. Check primary/suppressed identity, every remaining page attempt, no returned partial frame, original-scene usability and actual retained/dependency/retirement charges through device cleanup. Runtime/failure injection remains deferred; compilation and source inspection only.

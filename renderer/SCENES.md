@@ -34,6 +34,16 @@ The returned `WorldScene.Result` is an `AutoCloseable` owner of all section tick
 
 Failed or cancelled builds release every acquired ticket and publish no partial scene. Valid completed sections from an interrupted build may remain as unleased, bounded cache entries. They are reusable only under the same epoch/key. Structured failures preserve the source generation receipt; memory recovery is best effort and does not guarantee survival under process-wide exhaustion.
 
+## Complete cleanup attempts
+
+Final shared-result release and failed/cancelled scene assembly now visit every ticket in the owned bundle even when an earlier close throws RuntimeException or Error. The first release error stays primary; later distinct errors are suppressed. Indexed cleanup avoids allocating an iterator during unwind. If recording a newly acquired ticket fails, that ticket is still closed, with cleanup failure suppressed onto the original recording error. Try-with-resources keeps an existing build/cancellation failure primary when bundle cleanup also fails.
+
+This preserves existing consumption semantics: a closed `Result` cannot be read, retained or adopted again, its reference count drops once, and a consumed ticket is not replayed. This is best-effort release of the whole bundle, not rollback of a partially failed cache/account update or a promise that every failing ticket was successfully released. Cache/shared charges follow actual release; no blanket uncharge, source substitution or memory-ceiling change is introduced. Internal cache/account failure recovery still requires deferred validation.
+
+The existing cache-ownership group now also prepares cancellation, RuntimeException and Error after a completed section and a second incomplete reservation are both leased. It checks original-error identity, zero remaining leases/reservations, one reusable complete section, a subsequent full four-section build and final source/account/byte release. These cases compile without executing; the suite remains 21 world groups and 64 groups overall.
+
+At renderer completion, additionally inject ticket-release failures at the first, middle and last positions for final shared-owner close and partial-build unwind. Verify every later ticket is attempted, primary/suppressed ordering and identity, independent retained owners, exactly-once reference drops, closed-result guards, and conservative charges after a failed cache update. Combine ticket-recording allocation failure with cleanup failure and original build failure with multiple release failures. These cleanup-failure paths are source-inspected only, not covered by executed assertions.
+
 ## One worker and one pending request
 
 `WorldSceneWorker` owns one CPU worker executor and its supplied/default section cache. It starts no UI or GPU work. `submit(Request)` returns a monotonically increasing request revision, cancels the active job cooperatively, replaces the one pending job, and closes any previously owned untaken result. It never starts overlapping scene assembly jobs. Inputs are immutable snapshots supplied by the caller; generation itself is not implemented or scheduled by this worker.

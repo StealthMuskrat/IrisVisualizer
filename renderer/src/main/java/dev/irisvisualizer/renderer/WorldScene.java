@@ -9,7 +9,7 @@ public final class WorldScene {
         private static final class Shared {
             final WorldScene scene;final List<WorldSectionCache.Ticket> tickets;int references=1;
             Shared(WorldScene scene,List<WorldSectionCache.Ticket> tickets) { this.scene=scene;this.tickets=List.copyOf(tickets); }
-            void release() { boolean last;synchronized(this) { if(references<1)throw new IllegalStateException("Invalid shared scene lease");last=--references==0; }if(last)for(var ticket:tickets)ticket.close(); }
+            void release() { boolean last;synchronized(this) { if(references<1)throw new IllegalStateException("Invalid shared scene lease");last=--references==0; }if(last)releaseTickets(tickets); }
         }
         private final WorldSnapshot.Source source;private final List<WorldProblem> problems;
         private Shared shared;private boolean closed;
@@ -33,8 +33,18 @@ public final class WorldScene {
     private static final class Work implements AutoCloseable {
         final List<WorldSectionCache.Ticket> tickets;final List<WorldMesh> sections;boolean transferred;
         Work(int size) { tickets=new ArrayList<>(size);sections=new ArrayList<>(size); }
-        void own(WorldSectionCache.Ticket ticket) { try { tickets.add(ticket); }catch(RuntimeException|Error failure) { ticket.close();throw failure; } }
-        @Override public void close() { if(!transferred)for(var ticket:tickets)ticket.close(); }
+        void own(WorldSectionCache.Ticket ticket) {
+            try { tickets.add(ticket); }
+            catch(RuntimeException|Error failure) { try { ticket.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
+        }
+        @Override public void close() { if(!transferred)releaseTickets(tickets); }
+    }
+    /** Visit the whole owned bundle even if one ticket release fails; allocate no cleanup iterator. */
+    private static void releaseTickets(List<WorldSectionCache.Ticket> tickets) {
+        Throwable failure=null;
+        for(int i=0;i<tickets.size();i++)try { tickets.get(i).close(); }
+        catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     private final WorldScenePlan plan;private final AtlasRaster raster;private final List<WorldMesh> sections;
     private WorldScene(WorldScenePlan plan,AtlasRaster raster,List<WorldMesh> sections) { this.plan=plan;this.raster=raster;this.sections=List.copyOf(sections); }

@@ -20,7 +20,15 @@ public final class GlAtlasFrame implements AutoCloseable {
     public static GlAtlasFrame capture(GlScene scene) {
         Objects.requireNonNull(scene);scene.device.live(scene.allocation);var raster=scene.cpuScene().raster();var pages=new ArrayList<Page>(raster.pages().size());
         for(int i=0;i<raster.pages().size();i++)pages.add(new Page(scene.allocation,i,raster.pages().get(i),false));
-        try { return create(scene,raster,pages); }finally { for(var page:pages)page.release(scene.device); }
+        GlAtlasFrame frame=null;Throwable failure=null;
+        try { frame=create(scene,raster,pages); }catch(RuntimeException|Error error) { failure=error; }
+        failure=releasePages(scene.device,pages,pages.size(),failure);
+        if(failure!=null) {
+            // A completed frame cannot escape when temporary-owner cleanup rejects its return.
+            if(frame!=null)try { frame.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
+        return frame;
     }
     static GlAtlasFrame create(GlScene scene,AtlasRaster raster,List<Page> pages) {
         var device=scene.device;device.live(scene.allocation);
@@ -31,9 +39,15 @@ public final class GlAtlasFrame implements AutoCloseable {
             for(int i=0;i<pages.size();i++) { var page=pages.get(i);if(page.pixels!=raster.pages().get(i))throw new GlFailure(GlFailure.Code.STATE,"Atlas page CPU/GPU ownership disagrees");page.retain(device);retained++;if(page.owned)device.depend(journal,page.allocation); }
             var frame=new GlAtlasFrame(scene,raster,pages,journal);journal.retained=raster;return frame;
         }catch(RuntimeException|Error failure) {
-            for(int i=0;i<retained;i++)try { pages.get(i).release(device); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            releasePages(device,pages,retained,failure);
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
+    }
+    /** Preserve an earlier setup error while visiting every retained or temporary page owner. */
+    private static Throwable releasePages(GlDevice device,List<Page> pages,int count,Throwable failure) {
+        for(int i=0;i<count;i++)try { pages.get(i).release(device); }
+        catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        return failure;
     }
     void requireScene(GlScene expected) {
         if(closed)throw new GlFailure(GlFailure.Code.STATE,"Atlas frame is closed");device.live(journal);device.live(scene.allocation);
@@ -50,7 +64,7 @@ public final class GlAtlasFrame implements AutoCloseable {
     int[] textures(GlScene expected) { requireScene(expected);return textures; }
     @Override public void close() {
         if(closed)return;if(!journal.released)device.current();closed=true;var release=pages;var allocation=journal;pages=List.of();raster=null;scene=null;journal=null;Throwable failure=null;
-        for(var page:release)try { page.release(device); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        failure=releasePages(device,release,release.size(),failure);
         try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }

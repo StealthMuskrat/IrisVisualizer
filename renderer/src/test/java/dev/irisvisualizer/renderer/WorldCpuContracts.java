@@ -123,7 +123,24 @@ public final class WorldCpuContracts {
         var foreign=WorldVisibility.keepAll(snapshot(2),f.layout());var mismatch=WorldScenePlan.plan(f.models(),foreign,LIVE);check(mismatch.requiresPlaceholder()&&mismatch.sections().isEmpty(),"exact visibility snapshot required");
         throwsType(CancellationException.class,()->WorldScenePlan.plan(f.models(),f.visibility(),()->true),"scene planning cancellation separate");
     }
+    private static void interruptedSceneBundles() {
+        var f=fixture(4,255,false);
+        for(Throwable injected:new Throwable[]{new CancellationException("scene bundle cancellation"),new IllegalStateException("scene bundle failure"),new AssertionError("scene bundle error")}) {
+            try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,memory.open("interrupted scene cache"))) {
+                BooleanSupplier interrupted=()->{
+                    if(cache.stats().leases()>=2) { if(injected instanceof RuntimeException runtime)throw runtime;throw (Error)injected; }
+                    return false;
+                };
+                try { var unexpected=WorldScene.build(f.plan(),f.raster(),cache,interrupted);unexpected.close();throw new AssertionError("interrupted build returned a result"); }
+                catch(RuntimeException|Error failure) { check(failure==injected,"original build interruption remains primary"); }
+                equal(0L,cache.stats().leases(),"complete and incomplete tickets both released");equal(0,cache.stats().reservations(),"interrupted reservation removed");equal(1,cache.stats().sections(),"only first completed section stays reusable");
+                try(var owner=build(f,cache)) { equal(4L,cache.stats().leases(),"complete rebuild owns exactly four tickets");equal(4,owner.scene().orElseThrow().sections().size(),"rebuild publishes full source coverage"); }
+                equal(0L,cache.stats().leases(),"rebuild owner releases complete bundle");cache.close();equal(0L,cache.stats().knownPayloadBytes(),"closed cache clears interrupted source references");equal(0L,memory.stats().chargedBytes(),"final cache release clears shared charge");equal(0,memory.stats().accounts(),"no interrupted cache account leak");
+            }
+        }
+    }
     private static void cacheOwners() {
+        interruptedSceneBundles();
         var f=fixture(2,255,false);try(var cache=new WorldSectionCache()) {
             var first=build(f,cache);var retained=first.retain();var second=build(f,cache);var scene=first.scene().orElseThrow();check(scene.sections().getFirst()==second.scene().orElseThrow().sections().getFirst(),"same epoch shares cached mesh");equal(4L,cache.stats().leases(),"two builds own four section tickets");
             first.close();equal(4L,cache.stats().leases(),"retained scene shares existing ticket owner");second.close();equal(2L,cache.stats().leases(),"second build releases its tickets");check(!cache.clear(),"pinned clear rejected");retained.close();equal(0L,cache.stats().leases(),"last scene releases tickets");check(cache.clear(),"unleased cache clear");equal(0L,cache.stats().knownPayloadBytes(),"clear releases source/mesh demand");

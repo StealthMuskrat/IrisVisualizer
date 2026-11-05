@@ -16,7 +16,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Visual assignments | Wrong native state and foreign-snapshot offsets fail atomically; caller assignment mutation cannot alter captured choices |
 | Native visibility | KEEP_ALL retains interior faces; only supplied shared-face masks remove them; copied flags and undefined-bit rejection |
 | Mesh metadata | Complete original section/cell/face coverage, material totals, range counts and per-face native identities |
-| Cache ownership | Matching epochs share meshes; independent scene wrappers preserve shared tickets until last close |
+| Cache ownership | Matching meshes and independent shared wrappers; cancellation/runtime/error with completed plus incomplete tickets, full rebuild, final charge/account release |
 | Complete limits | A one-face deficit publishes no partial scene; foreign visibility and cancellation remain explicit |
 | Pinned replacement | A replacement cannot evict pinned old data or change cache stats on rejection; releasing old owners admits replacement |
 | Geometry picking | Analytic unit-cube plane distance and exact source identities, batch/exhaustive agreement, clipping, budget failure and alpha/geometry modes |

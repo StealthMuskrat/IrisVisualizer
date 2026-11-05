@@ -256,3 +256,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Animation worker admission preflight
 
 [Standalone animation construction](../renderer/ANIMATION-OWNERS.md#worker-validation-before-atlas-capture) now rejects closed/exhausted workers and tracked coordinator mismatches before retaining GPU atlas ownership. Validation preserves pending/READY CPU work and tokens; tracked matching and untracked compatibility remain available. The retained-completion contract now prepares these ownership cases without adding a group. All production/harness sources compile; all 64 groups and GPU/runtime validation remain unexecuted.
+
+## Complete resource-bundle cleanup
+
+[Scene ticket release](../renderer/SCENES.md#complete-cleanup-attempts) and [atlas capture cleanup](ANIMATION.md#atlas-capture-cleanup) now attempt every remaining owned resource after a release error while preserving the first failure. Capture also attempts to close an already-created frame if temporary-owner cleanup prevents its return. Existing cache/device accounting and consumed-owner semantics remain intact. Full and dependency-free compilation passed; the expanded cache-ownership cases remain within 64 prepared, unexecuted groups.
