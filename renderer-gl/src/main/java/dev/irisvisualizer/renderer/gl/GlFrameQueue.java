@@ -30,7 +30,8 @@ public final class GlFrameQueue implements AutoCloseable {
     }
     /** The obsolete supplier must be side-effect free; it can observe an externally advanced edit/view token. */
     public boolean render(long next,Request request,BooleanSupplier obsolete) {
-        Objects.requireNonNull(request);Objects.requireNonNull(obsolete);current();if(next<1)throw new IllegalArgumentException("Invalid frame revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;if(next>revision)invalidate(next);
+        Objects.requireNonNull(request);Objects.requireNonNull(obsolete);current();if(next<1)throw new IllegalArgumentException("Invalid frame revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+        GlFrame.validate(renderer,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height());if(next>revision)invalidate(next);
         rendering=true;GlFrame result=null;
         try {
             status=new Status(revision,Phase.RENDERING,Optional.of(request.scene().cpuScene().snapshot().source()),Optional.empty(),Optional.empty(),"");

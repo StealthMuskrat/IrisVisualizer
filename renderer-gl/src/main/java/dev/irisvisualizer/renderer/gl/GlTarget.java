@@ -8,9 +8,13 @@ public final class GlTarget implements AutoCloseable {
     final GlDevice device;final GlDevice.Allocation allocation;private final int width,height;
     boolean complete=true;
     private GlTarget(GlDevice device,GlDevice.Allocation allocation,int width,int height) { this.device=device;this.allocation=allocation;this.width=width;this.height=height; }
-    public static GlTarget create(GlDevice device,int width,int height) {
+    /** Dimension/context preflight only; no target journal or GL storage is allocated. */
+    static void validate(GlDevice device,int width,int height) {
         Objects.requireNonNull(device);device.current();
         if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>device.maximumTextureSize()||height>device.maximumTextureSize()||width>device.maximumRenderbufferSize()||height>device.maximumRenderbufferSize()||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Offscreen target exceeds configured or hardware dimensions");
+    }
+    public static GlTarget create(GlDevice device,int width,int height) {
+        validate(device,width,height);
         var allocation=device.reserve((long)width*height*8,0,0,1,0,1,1,0,0,null);
         try(var state=new GlState(device)) {
             GlTransferState.unpack();glActiveTexture(GL_TEXTURE0);allocation.textures[0]=glGenTextures();glBindTexture(GL_TEXTURE_2D,allocation.textures[0]);

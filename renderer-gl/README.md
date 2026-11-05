@@ -232,3 +232,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## World replacement preflight
 
 [World scene/material guards](WORLD-PREFLIGHT.md) now validate complete source and exact tint/lighting identity before queue/view invalidation. Missing required tint is rejected using prepared counts before journal admission; automatic native tint reuses captured metadata. Fresh-wrapper consumption and already-device-owned protection remain intact. All 129 CPU/OpenGL sources plus four harnesses compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.
+
+## Completed-frame replacement preflight
+
+[Frame metadata/target guards](FRAME-PREFLIGHT.md) now preserve earlier untaken world images when source/order/atlas identity, camera pose or target limits reject a replacement. Direct frame rendering and target creation share the checks; accepted drawing/cancellation retains its existing path. All 129 CPU/OpenGL sources plus four harnesses compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.

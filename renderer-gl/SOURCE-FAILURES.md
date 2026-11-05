@@ -44,3 +44,7 @@ Check worker admission rejection before mutation, successful replacement after f
 ## Rejection before source acceptance
 
 [World preflight](WORLD-PREFLIGHT.md) now distinguishes invalid prepared scene/material submission from a failure after accepted replacement. Invalid candidates preserve the prior world/view revisions, adoption flag, upstream diagnostics and still-owned ordering/animation/images. Fresh candidate wrappers are consumed; independent old owners remain live. Explicit upstream invalidation and accepted-source failure/retry retain their existing semantics. No runtime/GPU checks have been executed.
+
+## Rejection before frame acceptance
+
+[Frame queue preflight](FRAME-PREFLIGHT.md) now preserves earlier untaken world images when a newer render request fails scene/order/atlas, camera or target checks. It accepts no new token and invokes no obsolete callback. Explicit view invalidation and failures after accepted render retain their existing lifecycle; already-transferred images remain independent. No runtime/GPU checks have been executed.

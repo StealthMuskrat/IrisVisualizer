@@ -26,14 +26,20 @@ public final class GlFrame implements AutoCloseable {
     private final Info info;private Shared shared;
     private GlFrame(Shared shared) { this.shared=shared;info=shared.info; }
     private static void current(BooleanSupplier obsolete) { if(obsolete.getAsBoolean())throw new CancellationException("Completed frame request is obsolete"); }
+    /** Borrowed metadata preflight; creates no target, journal or independent source owner. */
+    static AtlasRaster validate(GlRenderer renderer,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height) {
+        Objects.requireNonNull(renderer);Objects.requireNonNull(scene);Objects.requireNonNull(camera);var device=renderer.device;
+        device.live(renderer.allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame inputs must share one renderer device");device.live(scene.allocation);
+        if(scene.translucentFaces>0&&order==null)throw new GlFailure(GlFailure.Code.MATERIAL,"A complete camera-bound translucent order is required");
+        if(order!=null) { if(order.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame order belongs to another device");order.order(scene,camera); }
+        var raster=scene.cpuScene().raster();if(atlas!=null) { atlas.textures(scene);raster=atlas.raster(); }camera.matrix((double)width/height);GlTarget.validate(device,width,height);return raster;
+    }
     /** Inputs are borrowed for this call. The returned frame owns a fresh target and retained CPU scene. */
     public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,BooleanSupplier obsolete) { return render(renderer,revision,scene,atlas,order,camera,width,height,WorldClip.NONE,obsolete); }
     public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,BooleanSupplier obsolete) {
         Objects.requireNonNull(clip);Objects.requireNonNull(renderer);Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid frame revision or dimensions");
         var device=renderer.device;device.live(renderer.allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame inputs must share one renderer device");device.live(scene.allocation);current(obsolete);
-        if(scene.translucentFaces>0&&order==null)throw new GlFailure(GlFailure.Code.MATERIAL,"A complete camera-bound translucent order is required");
-        if(order!=null) { if(order.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame order belongs to another device");order.order(scene,camera); }
-        var cpu=scene.cpuScene();AtlasRaster raster=cpu.raster();if(atlas!=null) { atlas.textures(scene);raster=atlas.raster(); }camera.matrix((double)width/height);
+        var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();
         long extraCpu=0;for(int page=0;page<raster.pages().size();page++)if(raster.pages().get(page)!=cpu.raster().pages().get(page))extraCpu+=raster.pages().get(page).bytes();
         WorldScene.Result owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
         try {

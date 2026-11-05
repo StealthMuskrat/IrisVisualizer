@@ -317,3 +317,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## World source and material preflight
 
 [World upload/view preflight](../renderer-gl/WORLD-PREFLIGHT.md) now preserves earlier owned output when a new CPU scene or its tint/lighting inputs are invalid. Verified tint-required counts avoid synchronous geometry scans, while fresh rejected scene wrappers are still consumed. All 129 CPU/OpenGL sources plus four harnesses compile; the 55 prepared groups remain unexecuted and unsupported previews stay disabled.
+
+## Completed-frame queue preservation
+
+[World image preflight](../renderer-gl/FRAME-PREFLIGHT.md) now rejects invalid borrowed scene/order/atlas/camera/target metadata before replacing earlier queue-owned output. It adds no geometry scan or source copy. All 129 CPU/OpenGL sources plus four harnesses compile; the 55 prepared groups remain unexecuted and unsupported previews stay disabled.
