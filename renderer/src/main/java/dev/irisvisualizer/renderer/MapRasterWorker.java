@@ -86,7 +86,7 @@ public final class MapRasterWorker implements AutoCloseable {
             synchronized(lock) {
                 if(!closed&&job.revision==revision&&!job.cancelled.get()) {
                     if(!result.requiresPlaceholder()) { if(result.payloadBytes()>job.request.reservation())throw new IllegalStateException("Map output exceeds its admitted peak");var ready=new Status(revision,Phase.READY,Optional.of(result.samples().context()),List.of());var hold=job.admission.retain();Completion value;
-                        try { value=new Completion(revision,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
+                        try { value=new Completion(revision,result,hold); }catch(RuntimeException|Error failure) { try { hold.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
                         job.retainedBytes=result.payloadBytes();completed=value;status=ready; }
                     else status=new Status(revision,Phase.FAILED,Optional.of(result.samples().context()),result.problems());
                 }

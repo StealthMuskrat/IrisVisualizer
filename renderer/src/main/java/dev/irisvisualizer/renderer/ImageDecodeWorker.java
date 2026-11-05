@@ -76,7 +76,7 @@ public final class ImageDecodeWorker implements AutoCloseable {
             synchronized(lock) {
                 if(!closed&&job.revision==revision&&!job.cancelled.get()) {
                     if(!result.requiresPlaceholder()) { var ready=new Status(revision,Phase.READY,Optional.of(result.identity()),List.of());var hold=job.admission.retain();Completion value;
-                        try { value=new Completion(revision,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
+                        try { value=new Completion(revision,result,hold); }catch(RuntimeException|Error failure) { try { hold.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
                         job.retainedBytes=result.payloadBytes();completed=value;status=ready; }
                     else status=new Status(revision,Phase.FAILED,Optional.of(result.identity()),result.problems());
                 }

@@ -145,7 +145,7 @@ public final class WorldOrderWorker implements AutoCloseable {
                 synchronized(lock) {
                     if(!closed&&revision==job.revision&&!job.cancelled.get()) {
                         if(result!=null&&!result.requiresPlaceholder()) { var ready=status(job,Phase.READY,List.of());long bytes=job.owner.scene().orElseThrow().usage().knownPayloadBytes()+result.bytes();var hold=job.admission.retain();Completion value;
-                            try { value=new Completion(job.revision,job.owner,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
+                            try { value=new Completion(job.revision,job.owner,result,hold); }catch(RuntimeException|Error failure) { try { hold.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
                             job.retainedBytes=bytes;completed=value;completedReservation=bytes;retained=true;status=ready; }
                         else { if(problems.isEmpty())problems=List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Sorting ended without a complete face order"));status=status(job,Phase.FAILED,problems); }
                     }

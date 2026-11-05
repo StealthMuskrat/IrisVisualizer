@@ -123,7 +123,7 @@ public final class WorldVisualWorker implements AutoCloseable {
                     long bytes=result.usage().orElseThrow().knownWorkingBytes();
                     if(bytes>job.request.limits().workingBytes())throw new IllegalStateException("Visual output exceeds its admitted working ceiling");
                     var ready=status(revision,Phase.READY,job.request,List.of(),List.of());var hold=job.admission.retain();Completion value;
-                    try { value=new Completion(revision,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
+                    try { value=new Completion(revision,result,hold); }catch(RuntimeException|Error failure) { try { hold.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
                     job.retainedBytes=bytes;completed=value;status=ready;
                 }else status=status(revision,Phase.FAILED,job.request,result.problems(),result.assetProblems());
             }

@@ -34,7 +34,7 @@ public final class ClientAssetWorker implements AutoCloseable {
         public Completion { Objects.requireNonNull(input);if(revision<1)throw new IllegalArgumentException("Invalid completed asset revision"); }
         public ClientAssetSnapshot assets() { return input.value(); }
         public Completion retain() {
-            var owned=input.retain();try { return new Completion(revision,owned); }catch(RuntimeException|OutOfMemoryError failure) { owned.close();throw failure; }
+            var owned=input.retain();try { return new Completion(revision,owned); }catch(RuntimeException|Error failure) { try { owned.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
         }
         @Override public void close() { input.close(); }
     }

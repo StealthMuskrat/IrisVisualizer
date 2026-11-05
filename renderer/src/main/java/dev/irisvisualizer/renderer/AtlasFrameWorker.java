@@ -119,7 +119,7 @@ public final class AtlasFrameWorker implements AutoCloseable {
                     else {
                         if(plan.extraCpuBytes()!=request.extraCpuBytes())throw new IllegalStateException("Atlas plan payload differs from metadata preflight");
                         var ready=state(job,Phase.READY,List.of());var hold=job.admission.retain();Completion result;
-                        try { result=new Completion(job.revision,plan,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
+                        try { result=new Completion(job.revision,plan,hold); }catch(RuntimeException|Error failure) { try { hold.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
                         job.retainedBytes=request.reservation();completed=result;completedReservation=request.reservation();status=ready;
                     }
                 }
