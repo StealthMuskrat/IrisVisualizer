@@ -58,7 +58,7 @@ The [animation frame layer](ANIMATION.md) now supports immutable GPU atlas snaps
 
 Closing a scene, target or renderer marks its allocation retired and inserts a fence after previously submitted work. `device.collect()` polls fences with zero wait time, deletes eligible objects only after completion, then releases their GPU charge and CPU scene lease. Call it periodically even after a failed upload; retirement does not require another successful draw. Shader/cube dependencies prevent parent resources from being deleted while a scene still references them. A parent may require a later collection pass after its children retire.
 
-Every allocation already has a journal entry before GL objects are created. Fence/cleanup failure therefore cannot lose its ownership record. An allocation without a usable retirement fence remains quarantined and charged. `device.close()` explicitly finishes GPU work, deletes children before dependencies, releases CPU owners and frees native staging. This final teardown may block and must happen while the original context is current. Context/driver/process-wide failure recovery is not guaranteed; failed deletion does not falsely release a budget charge.
+Every allocation already has a journal entry before GL objects are created. Fence/cleanup failure therefore cannot lose its ownership record. An allocation without a usable retirement fence remains quarantined and charged. [Device shutdown](DEVICE-TEARDOWN.md) closes the work gate, explicitly finishes GPU work, attempts independent dependency branches after cleanup errors and permits close retry on the original context. Failed children keep parents pinned; statistics remain available while closing. Only complete teardown releases final staging/account ownership. This may block; context/driver/process-wide recovery is not guaranteed and failed deletion does not falsely release a budget charge.
 
 Close methods are idempotent after release. Previously returned Java/native identifiers are borrowed and cannot extend a closed object's legal lifetime. Escaping CPU scene references after owner release is also outside the ownership contract.
 
@@ -268,3 +268,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Transfer error preservation
 
 [All six incremental transfer paths](HOST-STATE.md#transfer-failures-remain-primary) now preserve original transfer/cancellation errors through host-state restoration and disposal failure. Atlas copy also preserves its original error through source detachment; world-upload setup aggregates source/journal cleanup errors. Restoration-only failure still prevents publication. Full and dependency-free compilation passed; all 64 prepared groups and runtime/GPU validation remain unexecuted.
+
+## Retryable device shutdown
+
+[Device teardown](DEVICE-TEARDOWN.md) now preserves its first error while visiting independent eligible allocations, keeps failed dependencies charged and blocks new GPU work after shutdown starts. Close retry and context-affine statistics remain available; a failed allocation is visited once per attempt. Retirement/collection also quarantine Errors and retirement rejects a zero fence explicitly. Full and dependency-free compilation passed; all 64 prepared groups and Windows GPU/runtime validation remain unexecuted.

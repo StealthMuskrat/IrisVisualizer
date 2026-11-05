@@ -29,7 +29,7 @@ public final class GlDevice implements AutoCloseable {
     }
     private final Thread thread=Thread.currentThread();private final long context;private final GLCapabilities capabilities;private final Limits limits;private final RenderMemory memory;private final RenderMemory.Account admission;
     private final int maximumTexture,maximumRenderbuffer;private final List<Allocation> allocations=new ArrayList<>();private ByteBuffer staging;
-    private long gpuBytes,cpuBytes;private int names;private boolean closed;
+    private long gpuBytes,cpuBytes;private int names;private boolean closing,closed;
     public GlDevice() { this(Limits.DEFAULT); }
     public GlDevice(Limits limits) { this(limits,null); }
     public GlDevice(Limits limits,RenderMemory memory) {
@@ -79,6 +79,10 @@ public final class GlDevice implements AutoCloseable {
         }
     }
     void current() {
+        context();if(closing)throw new GlFailure(GlFailure.Code.STATE,"GPU device teardown is incomplete; retry close");
+    }
+    /** Teardown and diagnostic inspection may revisit the original context after the work gate closes. */
+    private void context() {
         if(closed)throw new GlFailure(GlFailure.Code.STATE,"GPU device is closed");
         if(Thread.currentThread()!=thread||glfwGetCurrentContext()!=context)throw new GlFailure(GlFailure.Code.CONTEXT,"GPU work must use its original thread and GLFW context");
         GLCapabilities current;try { current=GL.getCapabilities(); }catch(IllegalStateException missing) { throw new GlFailure(GlFailure.Code.CONTEXT,"The original LWJGL capabilities are no longer current"); }
@@ -123,12 +127,12 @@ public final class GlDevice implements AutoCloseable {
     }
     void retire(Allocation allocation) {
         if(allocation.released)return;current();if(allocation.retired)return;
-        if(allocation.names==0&&allocation.gpu==0&&allocation.dependents==0) { release(allocation);allocations.remove(allocation);return; }
-        allocation.retired=true;
-        // Every allocation already has a journal slot, including failed uploads. A failed fence
-        // leaves it quarantined and charged until successful explicit device teardown.
-        try { allocation.fence=glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE,0);check("resource retirement fence");glFlush();check("resource retirement flush"); }
-        catch(RuntimeException failure) { allocation.quarantined=true;throw failure; }
+        // Every allocation has a journal, including CPU-only preflight and failed uploads.
+        // Failed release/fencing stays quarantined until explicit synchronized device teardown.
+        try {
+            if(allocation.names==0&&allocation.gpu==0&&allocation.dependents==0) { release(allocation);allocations.remove(allocation);return; }
+            allocation.retired=true;allocation.fence=glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE,0);check("resource retirement fence");if(allocation.fence==0)throw new GlFailure(GlFailure.Code.GL_ERROR,"Could not create resource retirement fence");glFlush();check("resource retirement flush");
+        }catch(RuntimeException|Error failure) { allocation.retired=true;allocation.quarantined=true;throw failure; }
     }
     public void collect() {
         current();var iterator=allocations.iterator();
@@ -138,7 +142,7 @@ public final class GlDevice implements AutoCloseable {
                 int status=glClientWaitSync(allocation.fence,GL_SYNC_FLUSH_COMMANDS_BIT,0);check("nonblocking resource retirement");
                 if(status==GL_TIMEOUT_EXPIRED)continue;if(status!=GL_ALREADY_SIGNALED&&status!=GL_CONDITION_SATISFIED)throw new GlFailure(GlFailure.Code.GL_ERROR,"GPU retirement fence could not be observed");
                 delete(allocation);glDeleteSync(allocation.fence);check("retirement fence deletion");allocation.fence=0;release(allocation);iterator.remove();
-            }catch(RuntimeException failure) { allocation.quarantined=true;throw failure; }
+            }catch(RuntimeException|Error failure) { allocation.quarantined=true;throw failure; }
         }
     }
     private void delete(Allocation allocation) {
@@ -155,15 +159,36 @@ public final class GlDevice implements AutoCloseable {
         if(allocation.owner!=null) { allocation.owner.close();allocation.owner=null; }
         allocation.retained=null;for(var parent:allocation.dependencies)parent.dependents--;allocation.dependencies.clear();allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;admit(gpuBytes+cpuBytes+limits.stagingBytes());
     }
-    public Stats stats() { current();int retired=0,quarantined=0;for(var allocation:allocations)if(allocation.retired) { retired++;if(allocation.fence==0||allocation.quarantined)quarantined++; }return new Stats(gpuBytes,cpuBytes,limits.stagingBytes(),allocations.size(),names,retired,quarantined); }
+    public Stats stats() { context();int retired=0,quarantined=0;for(var allocation:allocations)if(allocation.retired) { retired++;if(allocation.fence==0||allocation.quarantined)quarantined++; }return new Stats(gpuBytes,cpuBytes,limits.stagingBytes(),allocations.size(),names,retired,quarantined); }
     /** Explicit teardown may wait for the GPU. Call before destroying the original current context. */
     @Override public void close() {
-        if(closed)return;current();glFinish();check("GPU device teardown synchronization");
+        if(closed)return;context();
+        // Bounded bookkeeping is allocated before closing the work gate or mutating resources.
+        var failed=new IdentityHashMap<Allocation,Boolean>(allocations.size());closing=true;
+        glFinish();check("GPU device teardown synchronization");Throwable failure=null;
         while(!allocations.isEmpty()) {
-            boolean progress=false;var iterator=allocations.iterator();
-            while(iterator.hasNext()) { var allocation=iterator.next();if(allocation.dependents!=0)continue;delete(allocation);if(allocation.fence!=0) { glDeleteSync(allocation.fence);check("teardown fence deletion");allocation.fence=0; }release(allocation);iterator.remove();progress=true; }
-            if(!progress)throw new GlFailure(GlFailure.Code.STATE,"GPU dependency teardown cannot progress");
+            boolean progress=false;
+            for(int i=0;i<allocations.size();) {
+                var allocation=allocations.get(i);
+                // Release may have committed before shared-admission publication reported a failure.
+                if(allocation.released) { allocations.remove(i);progress=true;continue; }
+                if(allocation.dependents!=0||failed.containsKey(allocation)) { i++;continue; }
+                try {
+                    delete(allocation);if(allocation.fence!=0) { glDeleteSync(allocation.fence);check("teardown fence deletion");allocation.fence=0; }
+                    release(allocation);allocations.remove(i);progress=true;
+                }catch(RuntimeException|Error error) {
+                    if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error);
+                    if(allocation.released) { allocations.remove(i);progress=true; }
+                    else { allocation.retired=true;allocation.quarantined=true;failed.put(allocation,Boolean.TRUE);i++; }
+                }
+            }
+            if(!progress) {
+                if(failure==null)failure=new GlFailure(GlFailure.Code.STATE,"GPU dependency teardown cannot progress");
+                break;
+            }
         }
-        MemoryUtil.memFree(staging);staging=null;if(admission!=null) { admission.retained(0);admission.close(); }closed=true;
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+        if(staging!=null) { MemoryUtil.memFree(staging);staging=null; }
+        if(admission!=null) { admission.retained(0);admission.close(); }closed=true;
     }
 }

@@ -100,3 +100,7 @@ Check worker admission rejection before mutation, successful replacement after f
 ## Rejection before frame acceptance
 
 [Frame queue preflight](FRAME-PREFLIGHT.md) now preserves earlier untaken world images when a newer render request fails scene/order/atlas, camera or target checks. It accepts no new token and invokes no obsolete callback. Explicit view invalidation and failures after accepted render retain their existing lifecycle; already-transferred images remain independent. No runtime/GPU checks have been executed.
+
+## Device teardown after owner shutdown
+
+[Device shutdown and retry](DEVICE-TEARDOWN.md) now close the device work gate before synchronization/deletion. A failed close cannot leave partly deleted resources usable for drawing, upload or adoption. After successful synchronization, independent dependency branches continue after a cleanup error; failed children and their parents remain charged, and explicit close retry plus original-context statistics stay available. Close views/queues/workers before their borrowed device. Full and dependency-free compilation passed; device/runtime failure injection and all 64 prepared groups remain unexecuted.
