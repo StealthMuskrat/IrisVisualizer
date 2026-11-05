@@ -629,7 +629,64 @@ public final class WorldCpuContracts {
             }
         }
     }
+    /** Faults one ticket lookup during final scene release; remaining tickets must still be visited. */
+    private static final class TicketFault implements AutoCloseable {
+        final Object shared;final java.lang.reflect.Field field;final List<WorldSectionCache.Ticket> original;final Error failure;int visits;boolean fired;
+        @SuppressWarnings("unchecked") TicketFault(WorldScene.Result owner,Error failure) {
+            this.failure=failure;
+            try {
+                var lease=WorldScene.Result.class.getDeclaredField("shared");lease.setAccessible(true);shared=lease.get(owner);check(shared!=null,"fault fixture owns a live scene");
+                field=shared.getClass().getDeclaredField("tickets");field.setAccessible(true);original=(List<WorldSectionCache.Ticket>)field.get(shared);
+                field.set(shared,new AbstractList<WorldSectionCache.Ticket>() {
+                    @Override public int size() { return original.size(); }
+                    @Override public WorldSectionCache.Ticket get(int index) { visits++;if(!fired&&index==0) { fired=true;throw TicketFault.this.failure; }return original.get(index); }
+                });
+            }catch(ReflectiveOperationException error) { throw new AssertionError("controlled scene release fault unavailable",error); }
+        }
+        @Override public void close() {
+            try { field.set(shared,original); }catch(ReflectiveOperationException error) { throw new AssertionError("scene release fault restore failed",error); }
+            for(var ticket:original)ticket.close();
+        }
+        void allVisited() { check(fired,"scene release fault was reached");equal(original.size(),visits,"source release visits every ticket despite first failure"); }
+    }
+    private static Throwable caughtFailure(Runnable action) {
+        try { action.run(); }catch(RuntimeException|Error failure) { return failure; }throw new AssertionError("expected cleanup failure missing");
+    }
+    private static void ownedCleanupFailures() {
+        var f=fixture(2,128,false);
+        for(boolean indexing:new boolean[]{false,true})for(boolean ready:new boolean[]{false,true}) {
+            try(var cache=new WorldSectionCache();var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor()) {
+                var source=build(f,cache);var cleanup=new AssertionError("injected worker source release error");
+                if(indexing)try(var worker=new WorldPickIndexWorker(4*1024*1024,memory,()->executor)) {
+                    long revision=worker.submit(source);if(ready)executor.runNext();check(memory.stats().chargedBytes()>0,"index worker owns admitted source before cleanup");
+                    try(var fault=new TicketFault(source,cleanup)) { check(caughtFailure(worker::invalidate)==cleanup,"index invalidation preserves exact cleanup error");fault.allVisited();check(source.closed(),"index invalidation consumes its source wrapper");equal(0L,worker.reservedBytes(),"failed index cleanup clears completed/pending reservation");equal(0L,memory.stats().chargedBytes(),"index cleanup still releases shared hold");check(worker.take(revision).isEmpty(),"closed index completion cannot escape after invalidation failure"); }
+                    equal(0L,cache.stats().leases(),"test restores and releases deliberately faulted source ticket");var retry=build(f,cache);equal(revision+1,worker.submit(retry),"index cleanup failure does not spend an invalidation revision");worker.close();check(retry.closed(),"index retry source closes");noWorkerCharge(memory);
+                }else try(var worker=new WorldOrderWorker(4*1024*1024,memory,()->executor)) {
+                    long revision=worker.submit(source,orderView(f));if(ready)executor.runNext();check(memory.stats().chargedBytes()>0,"sort worker owns admitted source before cleanup");
+                    try(var fault=new TicketFault(source,cleanup)) { check(caughtFailure(worker::invalidate)==cleanup,"sort invalidation preserves exact cleanup error");fault.allVisited();check(source.closed(),"sort invalidation consumes its source wrapper");equal(0L,worker.reservedBytes(),"failed sort cleanup clears completed/pending reservation");equal(0L,memory.stats().chargedBytes(),"sort cleanup still releases shared hold");check(worker.take(revision).isEmpty(),"closed sort completion cannot escape after invalidation failure"); }
+                    equal(0L,cache.stats().leases(),"test restores and releases deliberately faulted sort ticket");var retry=build(f,cache);equal(revision+1,worker.submit(retry,orderView(f)),"sort cleanup failure does not spend an invalidation revision");worker.close();check(retry.closed(),"sort retry source closes");noWorkerCharge(memory);
+                }
+            }
+        }
+        for(boolean indexing:new boolean[]{false,true})try(var cache=new WorldSectionCache();var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var source=build(f,cache);var fault=new TicketFault(source,new AssertionError("injected rejected scene release"))) {
+            Throwable actual;
+            if(indexing)try(var worker=new WorldPickIndexWorker(4*1024*1024,memory,()->executor)) { actual=caughtFailure(()->worker.submit(source,null));equal(0L,worker.status().revision(),"index preflight rejection does not spend revision"); }
+            else try(var worker=new WorldOrderWorker(4*1024*1024,memory,()->executor)) { actual=caughtFailure(()->worker.submit(source,null));equal(0L,worker.status().revision(),"sort preflight rejection does not spend revision"); }
+            check(actual instanceof NullPointerException,"preflight error remains primary through source cleanup");check(Arrays.stream(actual.getSuppressed()).anyMatch(value->value==fault.failure),"rejected source cleanup is suppressed onto original validation error");fault.allVisited();check(source.closed(),"rejected fresh source consumed");noWorkerCharge(memory);
+        }
+        try(var cache=new WorldSectionCache();var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var source=build(f,cache);var fault=new TicketFault(source,new AssertionError("injected prepare source release"))) {
+            var primary=new AssertionError("injected admitted index preparation error");int[] checks={0};
+            var actual=caughtFailure(()->WorldPickIndex.prepare(source,WorldPickIndex.Limits.DEFAULT,memory,()->{ if(++checks[0]==4)throw primary;return false; }));
+            check(actual==primary,"admitted index preparation retains exact primary error");check(Arrays.stream(primary.getSuppressed()).anyMatch(value->value==fault.failure),"prepare source-release error suppressed");fault.allVisited();check(source.closed(),"failed preparation consumes source wrapper");noWorkerCharge(memory);
+        }
+        try(var cache=new WorldSectionCache();var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var source=build(f,cache);var index=WorldPickIndex.prepare(source,WorldPickIndex.Limits.DEFAULT,memory,LIVE);var fault=new TicketFault(source,new AssertionError("injected deferred index source release"))) {
+            var primary=new AssertionError("injected active query error");int[] checks={0};
+            var actual=caughtFailure(()->index.query(ray(f.snapshot()),()->{ if(++checks[0]==2) { index.close();throw primary; }return false; }));
+            check(actual==primary,"query error remains primary through deferred close");check(Arrays.stream(primary.getSuppressed()).anyMatch(value->value==fault.failure),"deferred source-release error suppressed");fault.allVisited();check(index.closed()&&index.released()&&source.closed(),"last query detaches closed index storage and source despite release error");equal(0L,index.retainedBytes(),"closed index arrays released");noWorkerCharge(memory);index.close();
+        }
+    }
     private static void indexOwnership() {
+        ownedCleanupFailures();
         var f=fixture(2,255,false);try(var memory=new RenderMemory(new RenderMemory.Limits(4*1024*1024,4));var cache=new WorldSectionCache();var owner=build(f,cache)) {
             var input=owner.retain();var index=WorldPickIndex.prepare(input,WorldPickIndex.Limits.DEFAULT,memory,LIVE);check(!index.requiresPlaceholder()&&!input.closed(),"index owns consumed fresh scene wrapper");equal(owner.scene().orElseThrow().usage().knownPayloadBytes()+index.retainedBytes(),memory.stats().chargedBytes(),"index exact source plus retained arrays");
             cache.close();check(cache.stats().leases()>0,"cache close preserves scene pins");index.close();check(input.closed()&&index.released(),"index releases transferred source");equal(0L,memory.stats().chargedBytes(),"index admission released");owner.close();equal(0L,cache.stats().knownPayloadBytes(),"final cached source release");

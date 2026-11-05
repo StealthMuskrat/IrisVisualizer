@@ -25,7 +25,7 @@ public final class WorldPickIndexWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final RenderMemory memory;private final long workingBytes;
-    private long revision;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;private WorldScene.Result completedOwner;
+    private long revision,completedBytes;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;private WorldScene.Result completedOwner;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public WorldPickIndexWorker() { this(1024L*1024*1024,null); }
     public WorldPickIndexWorker(RenderMemory memory) { this(1024L*1024*1024,memory); }
@@ -46,16 +46,26 @@ public final class WorldPickIndexWorker implements AutoCloseable {
     private static Status failed(Job job,Throwable failure) {
         return state(job,Phase.FAILED,List.of(new WorldProblem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,Optional.empty(),"Picking index preparation failed: "+failure.getClass().getSimpleName())));
     }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedOwner=null; }
+    private void dropCompleted() {
+        if(completed==null) { completedOwner=null;completedBytes=0;return; }
+        try { completed.close();completed=null; }
+        catch(RuntimeException|Error cleanup) { if(completed.index().released())completed=null;throw cleanup; }
+        finally { if(completed==null) { completedOwner=null;completedBytes=0; } }
+    }
     private void cancelOwned() {
-        if(active!=null)active.cancelled.set(true);
-        if(pending!=null) { var old=pending;pending=null;old.cancelled.set(true);try { old.owner.close(); }finally { old.admission.close(); } }
-        dropCompleted();
+        if(active!=null)active.cancelled.set(true);Throwable failure=null;
+        if(pending!=null) {
+            var old=pending;pending=null;old.cancelled.set(true);
+            try { old.owner.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; }
+            try { old.admission.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        }
+        try { dropCompleted(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     public long submit(WorldScene.Result owner) { return submit(owner,WorldPickIndex.Limits.DEFAULT); }
     /** Rejecting a reused worker-owned wrapper never closes it. All other outcomes consume the fresh wrapper. */
     public long submit(WorldScene.Result owner,WorldPickIndex.Limits limits) {
-        Objects.requireNonNull(owner);boolean consumed=false;RenderMemory.Hold fresh=RenderMemory.Hold.none();
+        Objects.requireNonNull(owner);boolean consumed=false;Throwable rejection=null;RenderMemory.Hold fresh=RenderMemory.Hold.none();
         try {
             synchronized(lock) {
                 if(active!=null&&active.owner==owner||pending!=null&&pending.owner==owner||completedOwner==owner) { consumed=true;throw new IllegalArgumentException("Picking worker already owns this scene wrapper; retain a fresh owner"); }
@@ -73,7 +83,13 @@ public final class WorldPickIndexWorker implements AutoCloseable {
                 }
                 return next;
             }
-        }finally { if(!consumed)try { owner.close(); }finally { fresh.close(); } }
+        }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        finally { if(!consumed) {
+            Throwable failure=rejection;
+            try { owner.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(rejection==null) { if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error; }
+        } }
     }
     public long invalidate() {
         synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; }
@@ -82,14 +98,14 @@ public final class WorldPickIndexWorker implements AutoCloseable {
     public long reservedBytes() {
         synchronized(lock) {
             return (active==null?0:active.reservation)+(pending==null?0:pending.reservation)+
-                    (completed==null||active!=null&&active.revision==completed.revision()?0:completed.index().queryPayloadBytes(null));
+                    (completed==null||active!=null&&active.revision==completed.revision()?0:completedBytes);
         }
     }
     public Optional<Completion> take(long expectedRevision) {
         synchronized(lock) {
-            if(closed||expectedRevision!=revision||completed==null)return Optional.empty();
+            if(closed||expectedRevision!=revision||completed==null||completed.index().closed())return Optional.empty();
             var result=Optional.of(completed);var delivered=new Status(revision,Phase.DELIVERED,status.snapshotId(),List.of());
-            completed=null;completedOwner=null;status=delivered;return result;
+            completed=null;completedOwner=null;completedBytes=0;status=delivered;return result;
         }
     }
     private void execute(Job job) {
@@ -105,7 +121,7 @@ public final class WorldPickIndexWorker implements AutoCloseable {
                         else {
                             long retained=index.queryPayloadBytes(null);if(retained>job.reservation)throw new IllegalStateException("Prepared picking output exceeded admitted peak");
                             var value=new Completion(job.revision,job.snapshotId,index);var ready=state(job,Phase.READY,List.of());
-                            job.retainedBytes=retained;job.published=true;completed=value;completedOwner=job.owner;status=ready;index=null;
+                            job.retainedBytes=retained;job.published=true;completedBytes=retained;completed=value;completedOwner=job.owner;status=ready;index=null;
                         }
                     }
                 }

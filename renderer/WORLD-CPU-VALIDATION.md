@@ -24,7 +24,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Translucent ordering | An independent vertex-centroid reference sort checks complete global back-to-front keys and stable ties; scratch deficit withholds the entire order |
 | Translucent view preflight | Tiny/subnormal directions preserve pending/READY status, tokens and admission; fresh rejected wrappers are consumed, existing owners protected, and the exact minimum direction keeps the ordinary axial order |
 | Empty/diagnostic visuals | Empty scenes use no dummy texture/geometry; unsupported markers preserve original state and diagnostic without fabricated block faces |
-| Index ownership | Exact source-plus-index shared admission, cache shutdown with live scenes, consumed-owner release on close/failure/cancellation and independent original owner survival |
+| Index ownership | Exact source-plus-index admission and independent owners; pending/READY source-release failures still close worker holds and block stale take; original preflight/prepare/query errors survive source cleanup, last-query index storage detaches and later worker requests retry |
 | Pending sort admission | Insufficient overlap preserves the exact source/status; admitted replacement releases old ownership; duplicate wrappers stay protected and close clears local/shared bytes |
 | READY sort admission | Known twelve-face scratch shrinks to source plus final keys; old output survives rejection and exact old-output plus new-peak capacity permits replacement |
 | Transferred sort admission | Taken completion and independently retained holds stay charged through rejected submissions; final close permits retry without skipped revisions |

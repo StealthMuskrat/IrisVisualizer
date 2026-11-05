@@ -76,11 +76,11 @@ public final class WorldSceneWorker implements AutoCloseable {
     public long submit(WorldVisualWorker.Completion prepared,WorldVisibility visibility) { return submit(prepared,visibility,WorldScenePlan.Limits.DEFAULT,WorldMesher.Limits.DEFAULT); }
     public long submit(WorldVisualWorker.Completion prepared,WorldVisibility visibility,WorldScenePlan.Limits sceneLimits,WorldMesher.Limits sectionLimits) {
         Objects.requireNonNull(prepared);
-        try(var sourceAdmission=prepared.admission().retain()) {
+        try(prepared;var sourceAdmission=prepared.admission().retain()) {
             if(prepared.admission().tracked()&&(admission==null||!prepared.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked visual handoff requires the same managed scene coordinator");
             var result=prepared.result();if(result.requiresPlaceholder())throw new IllegalArgumentException("A successful visual result is required for scene handoff");
             return submit(new Request(result.models().orElseThrow(),visibility,result.raster().orElseThrow(),sceneLimits,sectionLimits));
-        }finally { prepared.close(); }
+        }
     }
     public long invalidate() { synchronized(lock) { long next=next();var waiting=new Status(next,Phase.IDLE,Optional.empty(),List.of());cancelOwned();refreshAdmission();revision=next;status=waiting;return next; } }
     public Status status() { synchronized(lock) { return status; } }

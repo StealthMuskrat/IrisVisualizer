@@ -59,28 +59,35 @@ public final class WorldPickIndex implements AutoCloseable {
         return prepare(owner,limits,memory,Objects.requireNonNull(admission),reserved,cancelled);
     }
     private static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,RenderMemory memory,RenderMemory.Hold admission,long reserved,BooleanSupplier cancelled) {
-        Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;var source=owner.source();
+        Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;Throwable escapingFailure=null;var source=owner.source();
         try {
-            WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0;
-            for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=WorldMesh.batchCount(mesh.markers().size()); }
-            var usage=scene.usage();if(scene.sections().size()!=usage.sections()||count!=usage.drawableSections()||faces!=usage.faceBatches()||markers!=usage.markerBatches())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Picking source sections/ranges differ from the complete scene receipt");
-            int nodes=count==0?0:count*2-1;
-            long bytes=indexBytes(scene.sections().size(),count,faces,markers),peak=preparationBytes(scene.sections().size(),count,faces,markers);
-            if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking hierarchy/range arrays or combined CPU payload budget exceeded");
-            if(reserved>=0) {
-                if(memory!=null&&!admission.tracked()||admission.tracked()&&!admission.belongsTo(memory))throw new IllegalArgumentException("Admitted picking preparation requires its exact memory coordinator");
-                if(scene.usage().knownPayloadBytes()+peak>reserved||admission.tracked()&&scene.usage().knownPayloadBytes()+peak>admission.bytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking preparation exceeds its previously admitted source/index peak");
-            }else if(memory!=null)try { admission=memory.hold("World picking index",scene.usage().knownPayloadBytes()+peak); }
-            catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
-            var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());int[] admitted=new int[count];int at=0;
-            for(int i=0;i<scene.sections().size();i++) { WorldProblem.check(cancelled);if(scene.sections().get(i).bounds().isPresent())admitted[at++]=i; }
-            var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],faces==0?Ranges.EMPTY:new Ranges(faces,scene.sections().size()),markers==0?Ranges.EMPTY:new Ranges(markers,scene.sections().size()),List.of(),memory,admission);Arrays.fill(result.section,-1);
-            if(count>0)result.build(admitted,0,count,new int[1],cancelled);result.buildRanges(cancelled);WorldProblem.check(cancelled);admitted=null;
-            if(reserved<0)admission.shrinkTo(scene.usage().knownPayloadBytes()+bytes);transferred=true;return result;
-        }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(source,List.of(failure.problem)); }
-        catch(ArithmeticException overflow) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Picking index anchor subtraction exceeds exact coordinate bounds"))); }
-        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to index the complete scene; no partial picking index was published"))); }
-        finally { if(!transferred) { owner.close();admission.close(); } }
+            try {
+                WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0;
+                for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=WorldMesh.batchCount(mesh.markers().size()); }
+                var usage=scene.usage();if(scene.sections().size()!=usage.sections()||count!=usage.drawableSections()||faces!=usage.faceBatches()||markers!=usage.markerBatches())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Picking source sections/ranges differ from the complete scene receipt");
+                int nodes=count==0?0:count*2-1;
+                long bytes=indexBytes(scene.sections().size(),count,faces,markers),peak=preparationBytes(scene.sections().size(),count,faces,markers);
+                if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking hierarchy/range arrays or combined CPU payload budget exceeded");
+                if(reserved>=0) {
+                    if(memory!=null&&!admission.tracked()||admission.tracked()&&!admission.belongsTo(memory))throw new IllegalArgumentException("Admitted picking preparation requires its exact memory coordinator");
+                    if(scene.usage().knownPayloadBytes()+peak>reserved||admission.tracked()&&scene.usage().knownPayloadBytes()+peak>admission.bytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking preparation exceeds its previously admitted source/index peak");
+                }else if(memory!=null)try { admission=memory.hold("World picking index",scene.usage().knownPayloadBytes()+peak); }
+                catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
+                var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());int[] admitted=new int[count];int at=0;
+                for(int i=0;i<scene.sections().size();i++) { WorldProblem.check(cancelled);if(scene.sections().get(i).bounds().isPresent())admitted[at++]=i; }
+                var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],faces==0?Ranges.EMPTY:new Ranges(faces,scene.sections().size()),markers==0?Ranges.EMPTY:new Ranges(markers,scene.sections().size()),List.of(),memory,admission);Arrays.fill(result.section,-1);
+                if(count>0)result.build(admitted,0,count,new int[1],cancelled);result.buildRanges(cancelled);WorldProblem.check(cancelled);admitted=null;
+                if(reserved<0)admission.shrinkTo(scene.usage().knownPayloadBytes()+bytes);transferred=true;return result;
+            }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(source,List.of(failure.problem)); }
+            catch(ArithmeticException overflow) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Picking index anchor subtraction exceeds exact coordinate bounds"))); }
+            catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(source,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to index the complete scene; no partial picking index was published"))); }
+        }catch(RuntimeException|Error failure) { escapingFailure=failure;throw failure; }
+        finally { if(!transferred) {
+            Throwable failure=escapingFailure;
+            try { owner.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { admission.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(escapingFailure==null) { if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error; }
+        } }
     }
     private static WorldPickIndex failed(WorldSnapshot.Source source,List<WorldProblem> problems) { return new WorldPickIndex(source,new WorldSnapshot.Position(0,0,0),null,null,EMPTY_BOUNDS,EMPTY_NODES,EMPTY_NODES,EMPTY_NODES,Ranges.EMPTY,Ranges.EMPTY,problems,null,RenderMemory.Hold.none()); }
     private static double relative(long value,long origin) { long difference=Math.subtractExact(value,origin);if(Math.abs((double)difference)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Picking coordinates exceed the relative precision bound");return difference; }
@@ -150,21 +157,36 @@ public final class WorldPickIndex implements AutoCloseable {
     public WorldPick query(WorldRay ray,Options options,AtlasRaster displayed,BooleanSupplier cancelled) {
         Objects.requireNonNull(ray);Objects.requireNonNull(options);Objects.requireNonNull(cancelled);if(cancelled.getAsBoolean())throw new CancellationException("Scene picking cancelled");
         synchronized(this) { if(closed)throw new IllegalStateException("Picking index is closed");if(requiresPlaceholder())return new WorldPick(id,source,ray,Optional.empty(),new WorldPick.Stats(0,0,0,0,0),problems,options.clip());if(queries>=64)throw new IllegalStateException("Concurrent picking query limit reached");queries++; }
-        Query work=null;RenderMemory.Hold displayAdmission=RenderMemory.Hold.none();
+        Query work=null;Throwable escapingFailure=null;RenderMemory.Hold displayAdmission=RenderMemory.Hold.none();
         try {
-            if(memory!=null) {
-                long extra=displayedBytes(displayed);
-                if(extra>0)try { displayAdmission=memory.hold("Picking displayed atlas",extra); }
-                catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
-            }
-            work=new Query(ray,options,displayed,cancelled);return work.execute(); }
-        catch(WorldProblem.Failure failure) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(failure.problem),options.clip()); }
-        catch(ArithmeticException overflow) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Ray and picking index anchors exceed exact coordinate bounds")),options.clip()); }
-        catch(OutOfMemoryError exhausted) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to complete picking; no partial hit was published")),options.clip()); }
-        finally { try { synchronized(this) { queries--;releaseIfIdle(); } }finally { displayAdmission.close(); } }
+            try {
+                if(memory!=null) {
+                    long extra=displayedBytes(displayed);
+                    if(extra>0)try { displayAdmission=memory.hold("Picking displayed atlas",extra); }
+                    catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
+                }
+                work=new Query(ray,options,displayed,cancelled);return work.execute(); }
+            catch(WorldProblem.Failure failure) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(failure.problem),options.clip()); }
+            catch(ArithmeticException overflow) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"Ray and picking index anchors exceed exact coordinate bounds")),options.clip()); }
+            catch(OutOfMemoryError exhausted) { checkQuery(cancelled);return new WorldPick(id,source,ray,Optional.empty(),work==null?new WorldPick.Stats(0,0,0,0,0):work.stats(),List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to complete picking; no partial hit was published")),options.clip()); }
+        }catch(RuntimeException|Error failure) { escapingFailure=failure;throw failure; }
+        finally {
+            work=null;Throwable failure=escapingFailure;
+            try { synchronized(this) { queries--;releaseIfIdle(); } }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { displayAdmission.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(escapingFailure==null) { if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error; }
+        }
     }
     private void checkQuery(BooleanSupplier cancelled) { if(closed||cancelled.getAsBoolean())throw new CancellationException("Scene picking cancelled"); }
-    private void releaseIfIdle() { if(closed&&queries==0&&!released) { owner.close();owner=null;scene=null;bounds=EMPTY_BOUNDS;left=EMPTY_NODES;right=EMPTY_NODES;section=EMPTY_NODES;faceRanges=Ranges.EMPTY;markerRanges=Ranges.EMPTY;released=true;admission.close(); } }
+    private void releaseIfIdle() {
+        if(closed&&queries==0&&!released) {
+            var sourceOwner=owner;owner=null;scene=null;bounds=EMPTY_BOUNDS;left=EMPTY_NODES;right=EMPTY_NODES;section=EMPTY_NODES;faceRanges=Ranges.EMPTY;markerRanges=Ranges.EMPTY;released=true;
+            Throwable failure=null;
+            try { sourceOwner.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; }
+            try { admission.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+        }
+    }
     @Override public synchronized void close() { closed=true;releaseIfIdle(); }
     private final class Query {
         final WorldRay ray;final Options options;final WorldClip.Bounds clip;final AtlasRaster raster;final BooleanSupplier cancelled;final double ox,oy,oz;double nearest,hitU,hitV,normalX,normalY,normalZ,hitX,hitY,hitZ;int hitSection=-1,hitFace=-1,hitMarker=-1;int nodes,sections,faces,markers,alphaRejected,batches,culledBatches;

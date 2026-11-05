@@ -8,7 +8,7 @@ Picking indices/queries and the standalone visual/scene workers now have optiona
 
 The peak includes the source scene, 60 bytes per hierarchy node, four bytes per admitted section and the four-byte build cursor when the hierarchy is nonempty. The build cursor is now included in the existing local index/working bounds too. After building, temporary index lists/cursor have unwound and the successful hold shrinks to source-scene bytes plus final hierarchy arrays. Original limits remain 16 MiB for index/build primitives and 512 MiB for scene plus index work.
 
-`retainedBytes()` retains its hierarchy-array meaning. `admittedBytes()` reports the tracked source/index charge and remains nonzero while index closure waits for in-flight queries. Index close requests cancellation, prevents new queries and defers array/source release until the last active query leaves. Source-owner release precedes clearing arrays and closing the shared hold; failed source cleanup does not claim successful release. Failed/cancelled builds publish no partial index or native graph.
+`retainedBytes()` retains its hierarchy-array meaning. `admittedBytes()` reports the tracked source/index charge and remains nonzero while index closure waits for in-flight queries. Index close requests cancellation, prevents new queries and defers array/source release until the last active query leaves. At final query unwind, the index detaches its own scene/array references and attempts both source-wrapper and shared-hold close, preserving the first cleanup error. A failed external cache-ticket release still propagates and does not establish successful external cache cleanup. Failed/cancelled builds publish no partial index or native graph.
 
 ## Displayed atlas and pointer requests
 
@@ -63,3 +63,11 @@ Exercise standalone visual setup/preparation/publication failures, take/close be
 ## Actual index-worker demand
 
 [Prepared picking-size counts](PICKING-SIZES.md) now provide exact drawable-section/range/offset/build demand for valid index-worker submissions. Source plus actual arrays replaces source plus full configured index slack, with the same index/combined/local/shared ceilings and rejection-before-mutation contract. Actual preparation independently rechecks the scene receipt and admitted peak before allocating; cancellation/unwind, retained source/index charge and query/close ownership remain intact.
+
+## Primary errors through preparation and deferred close
+
+Raw index preparation now preserves an escaping validation/cancellation/error through both fresh-scene and admission cleanup. Synchronous queries similarly preserve an escaping query error through last-query source/index cleanup and displayed-page hold release. If there was no prior escaping error, the first cleanup failure is primary. Distinct later cleanup failures are suppressed, and every owned cleanup step is attempted.
+
+`releaseIfIdle` still waits for zero active queries. It then drops the source/array graph and marks index storage released before visiting source-wrapper and admission cleanup. The last query drops its temporary query/raster graph before this deferred release. `released()` describes detached index storage; it does not certify that a failing cache or coordinator cleanup freed every external charge. Errors remain observable, external cache ownership remains separate, and repeated close cannot replay source/index release. Detached hit/problem receipts, exact native identity, clipping, work budgets and independent owners retain their existing contracts.
+
+Prepared source-release cases now check original error identity and suppression during admitted preparation and a query that closes its own index before failing. They verify closed/released storage, source-wrapper consumption, remaining cleanup attempts and no index-owned charge in the controlled fixtures. The fixtures restore and close the deliberately faulted external ticket themselves. Full and dependency-free compilation passed; no assertion or native/GPU operation has run.

@@ -15,7 +15,11 @@ public final class WorldOrderWorker implements AutoCloseable {
     public record Completion(long revision,WorldScene.Result owner,WorldDrawOrder order,RenderMemory.Hold admission) implements AutoCloseable {
         public Completion { Objects.requireNonNull(owner);Objects.requireNonNull(order);Objects.requireNonNull(admission); }
         public Completion(long revision,WorldScene.Result owner,WorldDrawOrder order) { this(revision,owner,order,RenderMemory.Hold.none()); }
-        @Override public void close() { owner.close();admission.close(); }
+        @Override public void close() {
+            Throwable failure=null;try { owner.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; }
+            try { admission.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+        }
     }
     private static final class Job {
         final long revision,reservation;RenderMemory.Hold admission=RenderMemory.Hold.none();long retainedBytes;boolean releaseAdmission;final WorldScene.Result owner;final WorldDrawOrder.View view;final WorldDrawOrder.Limits limits;final UUID snapshotId;final AtomicBoolean cancelled=new AtomicBoolean();
@@ -36,7 +40,7 @@ public final class WorldOrderWorker implements AutoCloseable {
     public long submit(WorldScene.Result owner,WorldDrawOrder.View view) { return submit(owner,view,WorldDrawOrder.Limits.DEFAULT); }
     /** Already-owned wrappers are rejected without closing their current owner; use retain() for new jobs. */
     public long submit(WorldScene.Result owner,WorldDrawOrder.View view,WorldDrawOrder.Limits limits) {
-        Objects.requireNonNull(owner);boolean consumed=false;RenderMemory.Hold freshAdmission=RenderMemory.Hold.none();
+        Objects.requireNonNull(owner);boolean consumed=false;Throwable rejection=null;RenderMemory.Hold freshAdmission=RenderMemory.Hold.none();
         try {
             synchronized(lock) {
                 if(active!=null&&active.owner==owner||pending!=null&&pending.owner==owner||completed!=null&&completed.owner()==owner) { consumed=true;throw new IllegalArgumentException("Draw-order worker already owns this scene wrapper"); }
@@ -54,10 +58,26 @@ public final class WorldOrderWorker implements AutoCloseable {
                 }
                 return next;
             }
-        }finally { if(!consumed) { owner.close();freshAdmission.close(); } }
+        }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        finally { if(!consumed) {
+            Throwable failure=rejection;
+            try { owner.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { freshAdmission.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(rejection==null) { if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error; }
+        } }
     }
     private long nextRevision() { if(closed)throw new IllegalStateException("Draw-order worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Draw-order revision counter exhausted");return revision+1; }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.owner.close();pending.admission.close();pending=null; }if(completed!=null) { completed.close();completed=null; }completedReservation=0; }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);Throwable failure=null;
+        if(pending!=null) {
+            var old=pending;pending=null;old.cancelled.set(true);
+            try { old.owner.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; }
+            try { old.admission.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        }
+        var old=completed;completed=null;completedReservation=0;
+        try { if(old!=null)old.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     public long invalidate() { synchronized(lock) { long next=nextRevision();var waiting=new Status(next,Phase.IDLE,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; } }
     public Status status() { synchronized(lock) { return status; } }
     /** Active scratch remains charged through unwind; untaken completed output is counted once. */
