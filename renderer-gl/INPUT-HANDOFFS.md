@@ -1,4 +1,4 @@
-# Consuming GPU input handoffs
+# Consuming renderer input handoffs
 
 Renderer implementation, 2026-11-05. Owned-input upload factories now keep a newly created job locally owned until CPU input cleanup finishes. World lighting/scene submission also preserves original rejection errors through fresh-owner cleanup. All 129 production sources and four harnesses compile with Java 25/LWJGL 3.4.1, and the dependency-free set compiles. All 64 prepared groups and runtime/GPU/failure-injection validation remain unexecuted. Unsupported previews remain disabled.
 
@@ -26,6 +26,28 @@ A direct factory retains the just-created upload until all input scopes close, s
 
 Raw scene submission through `GlUploadQueue` and `GlWorldView` now remembers a validation/context/admission error before attempting fresh-owner close. Distinct close errors are suppressed onto that original error. If submission simply returns false for a stale/duplicate token and fresh-owner close fails, that cleanup error is reported as primary because there was no earlier exception. Fresh owners are still consumed, and wrappers already recognized as device-owned retain the existing protection. No new revision, upload acceptance or source mutation is added by the error aggregator.
 
+## Scoped worker, view and queue inputs
+
+The remaining 17 consuming `RenderInput` overloads now declare the supplied input before its temporary retain in one resource scope. Cleanup visits the temporary wrapper first and the supplied input second. If retention, coordinator/context validation or destination admission throws, that original error remains primary and distinct cleanup errors are suppressed onto it. If the temporary retain cannot be created, the already-scoped supplied input is still consumed. An unconditional `finally` close previously could replace the primary rejection with its own error.
+
+| Destination | Consuming overloads |
+| --- | --- |
+| `MapRasterWorker` | Native map submission and raster recoloring |
+| `NoiseSurfaceWorker` | Scalar volume submission and surface recoloring |
+| `NoisePickWorker` | Owned pointer-query submission |
+| `ImageDecodeWorker` | Owned decode submission |
+| `WorldRenderWorker` | Raw and model input submission |
+| `GlMapView` | Submission, recoloring and upload retry |
+| `GlNoiseView` | Submission, recoloring and upload retry |
+| `GlImageView` | Submission and upload retry |
+| `GlAtlasQueue` | Atlas-plan submission |
+
+These paths return revision/acceptance metadata, while accepted work is already reachable from the destination worker/view/queue. A cleanup error after acceptance therefore leaves that work owned by the destination under its existing recovery and close rules; it does not promise rollback. Source consumption, independent retained handles, admission overlap, validation order and prior-work preservation on preflight rejection retain their existing contracts. No allocation-failure test hooks or additional worker/GPU work are introduced.
+
+## CPU input wrapper construction
+
+`RenderInput.own` now keeps a newly created wrapper locally owned until the supplied memory-hold handle closes successfully. If that final cleanup fails, it attempts to close the unreturned wrapper before propagating the error. Retain/construction failures preserve their primary error while attempting both fresh-handle and supplied-handle cleanup. `retain()` likewise preserves a wrapper-allocation error through fresh-handle release, including `Error` as well as runtime failures. Nonnull checks still precede consumption; normal successful ownership and shared byte/account charges are unchanged.
+
 ## Deferred verification
 
 On real Windows GL at renderer completion, cover all three factories with successful admission followed by temporary/supplied input-close failure, then combine it with job-close RuntimeException or Error. Verify the job is not returned, close is attempted, the original input error stays primary and all remaining ownership stays charged in reachable device journals until release. Include ordinary successful return, failure before creation, closed/foreign input, matching tracked and untracked admission, exact atlas baseline and lighting/source mismatch, pressure rejection and independently retained CPU inputs.
@@ -33,3 +55,5 @@ On real Windows GL at renderer completion, cover all three factories with succes
 For both lighting/scene routes, combine validation/coordinator/context errors, input close failure and fresh-scene release failure. Check every required owner is visited, original/suppressed errors retain identity, recognized already-device-owned wrappers stay intact and delegated ownership is not released twice. For raw queue/view submission, combine preflight rejection with scene cleanup failure and cover false stale return plus cleanup-only error. Verify prior status/tokens/current images survive preflight rejection and already accepted work remains reachable if a later input release fails. Check final leases, device dependency pins, retired/quarantined charges and independent input lifetime through device teardown.
 
 Compilation and source inspection are the current evidence. No harness, mock/real GL context, worker/native comparison or workflow ran for this batch.
+
+For the scoped worker/view/queue routes, deferred failure checks must combine retain or preflight rejection with temporary/supplied-input release failure and verify primary/suppressed error identity. Cover stale/false acceptance, successful admission followed by release failure, independently retained sources and final worker/device/account ownership. For `RenderInput.own` and `retain`, cover fresh-wrapper allocation failure and supplied-hold cleanup failure after successful creation, confirming no wrapper is returned and every locally owned handle is visited. Existing ownership contracts compile, but these failure paths have not been executed.

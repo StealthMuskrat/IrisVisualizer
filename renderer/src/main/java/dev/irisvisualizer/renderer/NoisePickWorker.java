@@ -109,11 +109,11 @@ public final class NoisePickWorker implements AutoCloseable {
     /** Consume owned CPU input after destination admission, on success and rejection alike. */
     public long submit(RenderInput<Request> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))
                 throw new IllegalArgumentException("Scalar picking input requires the same shared coordinator");
             return submit(source.value());
-        }finally { input.close(); }
+        }
     }
     /** Use when the pointer leaves, or the displayed image changes before a replacement query is available. */
     public long invalidate() {

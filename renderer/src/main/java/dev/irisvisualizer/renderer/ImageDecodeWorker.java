@@ -53,10 +53,10 @@ public final class ImageDecodeWorker implements AutoCloseable {
     /** Consumes a detached image input after destination admission or rejection. */
     public long submit(RenderInput<Request> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked image input requires the same image coordinator");
             return submit(source.value());
-        }finally { input.close(); }
+        }
     }
     private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }

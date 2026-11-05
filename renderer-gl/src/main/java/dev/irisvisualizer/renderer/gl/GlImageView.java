@@ -49,11 +49,11 @@ public final class GlImageView implements AutoCloseable {
     /** Consumes an admitted image input; CPU admission precedes releasing its source hold. */
     public long submit(RenderInput<ImageDecodeWorker.Request> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             current();var memory=device.memory().orElse(null);
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked image input requires the same device coordinator");
             return submit(source.value());
-        }finally { input.close(); }
+        }
     }
     public long submit(SourceImage.Encoded source) { return submit(new ImageDecodeWorker.Request(source)); }
     private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
@@ -89,10 +89,10 @@ public final class GlImageView implements AutoCloseable {
     /** Consumes the supplied decoded CPU owner through admission, including rejection/failure. */
     public boolean retryUpload(long expectedImageRevision,RenderInput<SourceImage> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked image retry requires the same device coordinator");
             return retryUpload(expectedImageRevision,source.value());
-        }finally { input.close(); }
+        }
     }
     /** Decoding is off-thread; upload is bounded and one complete frame draw is synchronous. */
     public Status advance(GlUploadBudget budget,long expectedImageRevision) {

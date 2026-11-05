@@ -47,10 +47,10 @@ public final class GlNoiseView implements AutoCloseable {
     /** Consumes detached native samples after destination admission; retain another input for retries/style changes. */
     public long submit(RenderInput<NoiseVolume> input,NoiseSurface.Style style,NoiseSurface.Limits limits) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar view requires the same tracked input coordinator");
             return submit(new NoiseSurfaceWorker.Request(source.value(),style,limits));
-        }finally { input.close(); }
+        }
     }
     public long recolor(MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
         current();if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"Complete current scalar geometry is required for recoloring");return recolor(scene.surface(),colors,limits);
@@ -64,8 +64,7 @@ public final class GlNoiseView implements AutoCloseable {
     /** Consumes an independently retained CPU surface after destination admission or rejection. */
     public long recolor(RenderInput<NoiseSurface> input,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) { tracked(source);return recolor(source.value(),colors,limits); }
-        finally { input.close(); }
+        try(input;var source=input.retain()) { tracked(source);return recolor(source.value(),colors,limits); }
     }
     private void tracked(RenderInput<NoiseSurface> input) {
         current();var memory=device.memory().orElse(null);
@@ -110,8 +109,7 @@ public final class GlNoiseView implements AutoCloseable {
     /** Consumes retained CPU ownership through retry admission, including stale-token and failure outcomes. */
     public boolean retryUpload(long expectedDataRevision,RenderInput<NoiseSurface> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) { tracked(source);return retryUpload(expectedDataRevision,source.value()); }
-        finally { input.close(); }
+        try(input;var source=input.retain()) { tracked(source);return retryUpload(expectedDataRevision,source.value()); }
     }
     /** One bounded upload step; an admitted complete-frame draw remains synchronous. */
     public Status advance(GlUploadBudget budget,long expectedDataRevision) {

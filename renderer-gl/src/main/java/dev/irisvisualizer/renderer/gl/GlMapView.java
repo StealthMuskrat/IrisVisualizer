@@ -49,11 +49,11 @@ public final class GlMapView implements AutoCloseable {
     /** Consumes an admitted native map input; CPU admission precedes releasing its source hold. */
     public long submit(RenderInput<MapRasterWorker.Request> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             current();var memory=device.memory().orElse(null);
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked native map input requires the same device coordinator");
             return submit(source.value());
-        }finally { input.close(); }
+        }
     }
     public long submit(MapSamples samples,MapRaster.Style style) { return submit(new MapRasterWorker.Request(samples,style)); }
     public long recolor(MapRaster.Style style) { return recolor(style,MapRaster.Limits.DEFAULT); }
@@ -68,10 +68,10 @@ public final class GlMapView implements AutoCloseable {
     /** Consumes independently owned CPU raster data after destination admission or rejection. */
     public long recolor(RenderInput<MapRaster> input,MapRaster.Style style,MapRaster.Limits limits) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked map recoloring requires the same device coordinator");
             return recolor(source.value(),style,limits);
-        }finally { input.close(); }
+        }
     }
     private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
     /** Display-only framing; the source grid, sampling scale and native values are never changed. */
@@ -107,10 +107,10 @@ public final class GlMapView implements AutoCloseable {
     /** Consumes the supplied CPU owner through destination admission, including rejection/failure. */
     public boolean retryUpload(long expectedMapRevision,RenderInput<MapRaster> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked map retry requires the same device coordinator");
             return retryUpload(expectedMapRevision,source.value());
-        }finally { input.close(); }
+        }
     }
     /** Colorization is off-thread; upload is bounded and one complete frame draw is synchronous. */
     public Status advance(GlUploadBudget budget,long expectedMapRevision) {

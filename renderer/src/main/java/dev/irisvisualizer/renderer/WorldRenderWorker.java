@@ -80,13 +80,11 @@ public final class WorldRenderWorker implements AutoCloseable {
     /** Consumes detached native input on every outcome; source admission survives destination preflight. */
     public long submit(RenderInput<Request> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) { requireCoordinator(source.admission());return submit(source.value()); }
-        finally { input.close(); }
+        try(input;var source=input.retain()) { requireCoordinator(source.admission());return submit(source.value()); }
     }
     public long submitModel(RenderInput<ModelRequest> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) { requireCoordinator(source.admission());return submit(source.value()); }
-        finally { input.close(); }
+        try(input;var source=input.retain()) { requireCoordinator(source.admission());return submit(source.value()); }
     }
     private void requireCoordinator(RenderMemory.Hold source) {
         if(source.tracked()&&(admission==null||!source.belongsTo(memory)))throw new IllegalArgumentException("Tracked native input requires the same managed world coordinator");

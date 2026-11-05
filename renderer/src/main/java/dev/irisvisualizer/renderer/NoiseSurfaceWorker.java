@@ -66,18 +66,18 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
     /** Consumes a captured scalar owner after destination admission, including all rejection/failure outcomes. */
     public long submit(RenderInput<NoiseVolume> input,NoiseSurface.Style style,NoiseSurface.Limits limits) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar input requires the same managed coordinator");
             return submit(new Request(source.value(),style,limits));
-        }finally { input.close(); }
+        }
     }
     /** Consumes complete surface ownership only after destination admission, including rejected submissions. */
     public long recolor(RenderInput<NoiseSurface> input,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar recoloring requires the same managed coordinator");
             return submit(Request.recolor(source.value(),colors,limits));
-        }finally { input.close(); }
+        }
     }
     public long invalidate() { synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; } }
     public Status status() { synchronized(lock) { return status; } }

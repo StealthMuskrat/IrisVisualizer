@@ -55,18 +55,18 @@ public final class MapRasterWorker implements AutoCloseable {
     /** Consumes a detached native map input after destination admission or rejection. */
     public long submit(RenderInput<Request> input) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked native map input requires the same map coordinator");
             return submit(source.value());
-        }finally { input.close(); }
+        }
     }
     /** Consumes a retained raster owner after recolor admission or rejection. */
     public long recolor(RenderInput<MapRaster> input,MapRaster.Style style,MapRaster.Limits limits) {
         Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        try(input;var source=input.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked map recoloring requires the same map coordinator");
             return submit(Request.recolor(source.value(),style,limits));
-        }finally { input.close(); }
+        }
     }
     private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
