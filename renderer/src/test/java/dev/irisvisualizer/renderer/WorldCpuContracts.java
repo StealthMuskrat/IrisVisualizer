@@ -149,7 +149,44 @@ public final class WorldCpuContracts {
             first.close();equal(4L,cache.stats().leases(),"retained scene shares existing ticket owner");second.close();equal(2L,cache.stats().leases(),"second build releases its tickets");check(!cache.clear(),"pinned clear rejected");retained.close();equal(0L,cache.stats().leases(),"last scene releases tickets");check(cache.clear(),"unleased cache clear");equal(0L,cache.stats().knownPayloadBytes(),"clear releases source/mesh demand");
         }
     }
+    /** Journaling fault commits insertion/removal before throwing; the real cache counters must remain unchanged. */
+    private static final class CacheInsertionFault implements AutoCloseable {
+        final WorldSectionCache cache;final java.lang.reflect.Field field;final LinkedHashMap<Object,Object> original;final Throwable primary,rollback;
+        @SuppressWarnings("unchecked") CacheInsertionFault(WorldSectionCache cache,Throwable primary,Throwable rollback) {
+            this.cache=cache;this.primary=primary;this.rollback=rollback;
+            try {
+                field=WorldSectionCache.class.getDeclaredField("entries");field.setAccessible(true);original=(LinkedHashMap<Object,Object>)field.get(cache);
+                field.set(cache,new LinkedHashMap<Object,Object>() {
+                    @Override public Object get(Object key) { return original.get(key); }
+                    @Override public int size() { return original.size(); }
+                    @Override public Collection<Object> values() { return original.values(); }
+                    @Override public Object put(Object key,Object value) { original.put(key,value);if(CacheInsertionFault.this.primary instanceof Error error)throw error;throw (RuntimeException)CacheInsertionFault.this.primary; }
+                    @Override public Object remove(Object key) { var removed=original.remove(key);if(CacheInsertionFault.this.rollback instanceof Error error)throw error;if(CacheInsertionFault.this.rollback instanceof RuntimeException failure)throw failure;return removed; }
+                });
+            }catch(ReflectiveOperationException failure) { throw new AssertionError("controlled cache insertion fault unavailable",failure); }
+        }
+        @Override public void close() {
+            try { field.set(cache,original); }catch(ReflectiveOperationException failure) { throw new AssertionError("cache insertion fault restore failed",failure); }
+        }
+    }
+    private static void cacheReservationFailures() {
+        var f=fixture(2,255,false);
+        for(int kind=0;kind<3;kind++)for(boolean cleanupError:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var account=memory.open("cache insertion fixture");var cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,account)) {
+            cache.prepare(f.plan(),LIVE);var firstPlan=f.plan().sections().getFirst();var nextPlan=f.plan().sections().get(1);
+            try(var first=cache.reserve(firstPlan,f.plan().limits().workingBytes())) {
+                first.complete(WorldMesher.assemble(firstPlan,LIVE));var pinned=first.mesh();var before=cache.stats();var admitted=memory.stats();
+                Throwable primary=switch(kind) { case 0->new IllegalStateException("injected cache journal rejection");case 1->new OutOfMemoryError("injected cache journal OOM");default->new AssertionError("injected cache journal error"); };Throwable rollback=cleanupError?new AssertionError("injected post-remove cache rollback error"):null;
+                try(var fault=new CacheInsertionFault(cache,primary,rollback)) {
+                    var actual=caughtFailure(()->cache.reserve(nextPlan,f.plan().limits().workingBytes()));check(actual==primary,"cache journal preserves exact insertion failure");equal(cleanupError?1:0,primary.getSuppressed().length,"cache rollback suppression count");if(cleanupError)check(primary.getSuppressed()[0]==rollback,"cache rollback error suppressed onto insertion failure");equal(before,cache.stats(),"failed insertion creates no orphan slot or committed lease/payload counters");equal(admitted,memory.stats(),"failed insertion preserves complete shared cache admission");check(first.cached()&&first.mesh()==pinned,"failed insertion preserves pinned cached output");
+                }
+                try(var retry=cache.reserve(nextPlan,f.plan().limits().workingBytes())) { check(!retry.cached(),"failed journal leaves no incomplete reservation blocking retry");retry.complete(WorldMesher.assemble(nextPlan,LIVE));equal(f.snapshot().extent().position(1),retry.mesh().positionForFace(0),"retry retains exact original native position");equal(state(407),retry.mesh().stateForFace(0),"retry retains original native state");equal(2L,cache.stats().leases(),"successful retry commits exactly one new lease"); }
+                equal(1L,cache.stats().leases(),"retry close preserves independent pinned first ticket");
+            }
+            cache.close();noWorkerCharge(memory);
+        }
+    }
     private static void pinnedReplacement() {
+        cacheReservationFailures();
         var first=fixture(2,255,false);var next=fixture(2,255,false);var limits=new WorldSectionCache.Limits(2,1024,64,64,1024*1024,4*1024*1024);
         try(var cache=new WorldSectionCache(limits);var owner=build(first,cache)) {
             var before=cache.stats();var rejected=WorldScene.build(next.plan(),next.raster(),cache,LIVE);check(rejected.requiresPlaceholder(),"pinned replacement refuses incomplete fit");equal(WorldProblem.Code.CACHE_BUSY,rejected.problems().getFirst().code(),"pinned cache diagnostic");equal(before,cache.stats(),"rejection preserves cache and old leases");rejected.close();
@@ -652,7 +689,44 @@ public final class WorldCpuContracts {
     private static Throwable caughtFailure(Runnable action) {
         try { action.run(); }catch(RuntimeException|Error failure) { return failure; }throw new AssertionError("expected cleanup failure missing");
     }
+    /** Source-capture hold release can fail after removing its account; source errors must remain primary. */
+    private static final class CaptureCloseFault implements AutoCloseable {
+        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Error failure;
+        @SuppressWarnings("unchecked") CaptureCloseFault(RenderMemory memory,Error failure) {
+            this.memory=memory;this.failure=failure;
+            try {
+                field=RenderMemory.class.getDeclaredField("owners");field.setAccessible(true);original=(Set<RenderMemory.Account>)field.get(memory);
+                field.set(memory,new AbstractSet<RenderMemory.Account>() {
+                    @Override public int size() { return original.size(); }
+                    @Override public Iterator<RenderMemory.Account> iterator() { return original.iterator(); }
+                    @Override public boolean add(RenderMemory.Account value) { return original.add(value); }
+                    @Override public boolean remove(Object value) { original.remove(value);throw CaptureCloseFault.this.failure; }
+                });
+            }catch(ReflectiveOperationException error) { throw new AssertionError("controlled capture-close fault unavailable",error); }
+        }
+        @Override public void close() { try { field.set(memory,original); }catch(ReflectiveOperationException error) { throw new AssertionError("capture-close fault restore failed",error); } }
+    }
+    private static void captureCleanupFailures() {
+        var f=fixture(2,255,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+            for(boolean lighting:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var fault=new CaptureCloseFault(memory,new AssertionError("injected capture hold release error"))) {
+                var primary=new AssertionError("injected capture producer error");Throwable actual;
+                if(lighting) {
+                    var scene=owner.scene().orElseThrow();var reader=new WorldLighting.Reader() {
+                        @Override public void begin() { throw primary; }
+                        @Override public int sections() { return scene.sections().size(); }
+                        @Override public int components(int section) { return scene.sections().get(section).faces().size()*12; }
+                        @Override public float component(int section,int face,int vertex,int channel) { return 1; }
+                    };
+                    actual=caughtFailure(()->WorldLighting.readOwned(scene,"synthetic capture error",reader,WorldLighting.Limits.DEFAULT,memory,LIVE));
+                }else {
+                    int[] checks={0};actual=caughtFailure(()->ClientColormaps.readOwned(f.assets(),ClientColormaps.Limits.DEFAULT,memory,()->{ if(++checks[0]==2)throw primary;return false; }));
+                }
+                check(actual==primary,"owned capture preserves exact source error through hold cleanup");check(primary.getSuppressed().length==1&&primary.getSuppressed()[0]==fault.failure,"capture release error suppressed onto source error");noWorkerCharge(memory);check(!owner.closed()&&owner.scene().orElseThrow().snapshot()==f.snapshot(),"capture failure preserves independently owned native scene");
+            }
+        }
+    }
     private static void ownedCleanupFailures() {
+        captureCleanupFailures();
         var f=fixture(2,128,false);
         for(boolean indexing:new boolean[]{false,true})for(boolean ready:new boolean[]{false,true}) {
             try(var cache=new WorldSectionCache();var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor()) {

@@ -47,8 +47,7 @@ public final class ClientColormaps {
         long peak=workingBytes(assets,limits);
         if(peak>limits.workingBytes())return RenderInput.own(failed(assets,problem(ModelPlan.Code.LIMIT,Kind.GRASS,"Colormap source/decode peak exceeds its working allowance")),RenderMemory.Hold.none());
         var hold=memory==null?RenderMemory.Hold.none():memory.hold("Vanilla colormaps",peak);
-        try { var result=read(assets,limits,cancelled);hold.shrinkTo(result.bytes());return RenderInput.own(result,hold); }
-        finally { hold.close(); }
+        try(hold) { var result=read(assets,limits,cancelled);hold.shrinkTo(result.bytes());return RenderInput.own(result,hold); }
     }
     private static ModelPlan.Problem problem(ModelPlan.Code code,Kind kind,String reason) { return new ModelPlan.Problem(code,ClientAssetSnapshot.Kind.TEXTURE,kind.id(),"",reason); }
     private static ClientColormaps failed(ClientAssetSnapshot assets,ModelPlan.Problem problem) { return new ClientColormaps(assets.receipt(),new int[0][],List.of(),List.of(problem)); }

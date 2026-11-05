@@ -50,11 +50,11 @@ public final class WorldLighting {
         long peak=scene.usage().knownPayloadBytes()+(long)scene.usage().faces()*48;
         if(peak>limits.workingBytes()||(long)scene.usage().faces()*48>limits.sampleBytes())throw new WorldCapture.ReadFailure(new WorldProblem(WorldProblem.Code.LIMIT,Optional.empty(),"Owned lighting capture exceeds scene/sample working bounds"));
         var hold=memory==null?RenderMemory.Hold.none():memory.hold("Lighting capture",peak);
-        try {
+        try(hold) {
             var result=read(scene,policy,reader,limits,cancelled);if(result.requiresPlaceholder())throw new WorldCapture.ReadFailure(result.problems().getFirst());WorldProblem.check(cancelled);
             // execute/read have unwound their producer stack before sealing an immutable owner.
             hold.shrinkTo(scene.usage().knownPayloadBytes()+result.bytes());return RenderInput.own(result,hold);
-        }finally { hold.close(); }
+        }
     }
     private static void shapes(WorldScene scene,Reader reader,BooleanSupplier cancelled) {
         if(reader.sections()!=scene.sections().size())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Supply one lighting section for every scene section");

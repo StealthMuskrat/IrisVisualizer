@@ -98,7 +98,7 @@ public final class WorldSectionCache implements AutoCloseable {
         }
         trim(usage,working,null);var slot=new Slot(key,plan);var ticket=new Ticket(this,slot);
         try { entries.put(key,slot); }
-        catch(OutOfMemoryError exhausted) { entries.remove(key);throw exhausted; }
+        catch(RuntimeException|Error failure) { try { entries.remove(key); }catch(RuntimeException|Error rollback) { if(rollback!=failure)failure.addSuppressed(rollback); }throw failure; }
         prepared.slots++;preparedBytes-=usage.outputBytes();meshBytes+=usage.outputBytes();faces+=usage.faces();cellRecords+=usage.nonEmptyCells();markers+=usage.markers();leases++;updateAdmission();return ticket;
     }
     private boolean futureFits(int sections,long bytes,int faces,int cells,int markers,long working) { return epochs.size()<=MAX_EPOCHS&&entries.size()+sections<=limits.sections()&&meshBytes+bytes<=limits.meshBytes()&&this.faces+faces<=limits.faces()&&cellRecords+cells<=limits.cellRecords()&&this.markers+markers<=limits.markers()&&sourceBytes+meshBytes+bytes<=working; }

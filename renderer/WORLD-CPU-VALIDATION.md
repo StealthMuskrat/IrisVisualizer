@@ -18,13 +18,13 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Mesh metadata | Complete original section/cell/face coverage, material totals, range counts and per-face native identities |
 | Cache ownership | Matching meshes and independent shared wrappers; cancellation/runtime/error with completed plus incomplete tickets, full rebuild, final charge/account release |
 | Complete limits | A one-face deficit publishes no partial scene; foreign visibility and cancellation remain explicit |
-| Pinned replacement | A replacement cannot evict pinned old data or change cache stats on rejection; releasing old owners admits replacement |
+| Pinned replacement | Pinned data survives pressure rejection and tentative cache-entry insertion failure; exact counters/admission, suppressed rollback errors, one-lease retry and original native metadata remain intact |
 | Geometry picking | Analytic unit-cube plane distance and exact source identities, batch/exhaustive agreement, clipping, budget failure and alpha/geometry modes |
 | Conservative picking hierarchy | Analytic edge/corner hits survive node/range rejection; six exact source planes and tiny translated planes retain detached coordinates; section-local tiny inside/outside points, six marker entry planes, inside-box near distances, closed clip/ray endpoints, strict exclusions, shifted anchors, lower-section ties, atomic budget failure and unexpanded actual marker boxes |
 | Translucent ordering | An independent vertex-centroid reference sort checks complete global back-to-front keys and stable ties; scratch deficit withholds the entire order |
 | Translucent view preflight | Tiny/subnormal directions preserve pending/READY status, tokens and admission; fresh rejected wrappers are consumed, existing owners protected, and the exact minimum direction keeps the ordinary axial order |
 | Empty/diagnostic visuals | Empty scenes use no dummy texture/geometry; unsupported markers preserve original state and diagnostic without fabricated block faces |
-| Index ownership | Exact source-plus-index admission and independent owners; pending/READY source-release failures still close worker holds and block stale take; original preflight/prepare/query errors survive source cleanup, last-query index storage detaches and later worker requests retry |
+| Index/capture ownership | Exact source-plus-index admission and independent owners; worker close failures block stale take, original preflight/prepare/query errors survive source cleanup, and owned lighting/colormap producer errors survive capture-hold release |
 | Pending sort admission | Insufficient overlap preserves the exact source/status; admitted replacement releases old ownership; duplicate wrappers stay protected and close clears local/shared bytes |
 | READY sort admission | Known twelve-face scratch shrinks to source plus final keys; old output survives rejection and exact old-output plus new-peak capacity permits replacement |
 | Transferred sort admission | Taken completion and independently retained holds stay charged through rejected submissions; final close permits retry without skipped revisions |
