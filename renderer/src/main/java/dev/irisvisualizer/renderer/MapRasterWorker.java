@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active colorization and one latest pending request; never samples or regenerates a world. */
 public final class MapRasterWorker implements AutoCloseable {
@@ -27,13 +28,15 @@ public final class MapRasterWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;private final RenderMemory memory;
-    private long revision;private boolean closed,scheduled;private Job active,pending;private Completion completed;private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
+    private long revision;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public MapRasterWorker() { this(128L*1024*1024); }
     public MapRasterWorker(long workingBytes) { this(workingBytes,null); }
-    public MapRasterWorker(long workingBytes,RenderMemory memory) {
+    public MapRasterWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,MapRasterWorker::executor); }
+    MapRasterWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>128L*1024*1024)throw new IllegalArgumentException("Map worker budget exceeds its bound");this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-map-raster");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-map-raster");thread.setDaemon(true);return thread;}); }
     private long next() { if(closed)throw new IllegalStateException("Map worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Map revision counter exhausted");return revision+1; }
     /** Invalidate as soon as native inputs become obsolete, even before replacement sampling finishes. */
     public long invalidate() {
@@ -99,5 +102,14 @@ public final class MapRasterWorker implements AutoCloseable {
         }
     }
     /** Cancels without waiting for native/JVM work from a UI thread. No GL context is accessed. */
-    @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }
+    @Override public void close() {
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

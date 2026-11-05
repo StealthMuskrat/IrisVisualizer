@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active PNG/JPEG decode and one latest pending request; immutable original pixels only. */
 public final class ImageDecodeWorker implements AutoCloseable {
@@ -25,13 +26,15 @@ public final class ImageDecodeWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;private final RenderMemory memory;
-    private long revision;private boolean closed,scheduled;private Job active,pending;private Completion completed;private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
+    private long revision;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public ImageDecodeWorker() { this(256L*1024*1024); }
     public ImageDecodeWorker(long workingBytes) { this(workingBytes,null); }
-    public ImageDecodeWorker(long workingBytes,RenderMemory memory) {
+    public ImageDecodeWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,ImageDecodeWorker::executor); }
+    ImageDecodeWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>256L*1024*1024)throw new IllegalArgumentException("Image worker budget exceeds its bound");this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-image-decode");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-image-decode");thread.setDaemon(true);return thread;}); }
     private long next() { if(closed)throw new IllegalStateException("Image worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Image revision counter exhausted");return revision+1; }
     /** Invalidate as soon as image inputs become obsolete, before replacement bytes arrive. */
     public long invalidate() {
@@ -89,5 +92,14 @@ public final class ImageDecodeWorker implements AutoCloseable {
         }
     }
     /** Cancels without waiting for decoder/JVM work from a UI thread. No GL context is accessed. */
-    @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }
+    @Override public void close() {
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

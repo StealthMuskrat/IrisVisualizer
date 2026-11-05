@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active and one latest pending scalar display mesh, without native sampling on this executor. */
 public final class NoiseSurfaceWorker implements AutoCloseable {
@@ -37,13 +38,15 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final RenderMemory memory;private final long workingBytes;
-    private long revision,completedBytes;private boolean closed,scheduled;private Job active,pending;private Completion completed;
+    private long revision,completedBytes;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public NoiseSurfaceWorker() { this(1024L*1024*1024,null); }
-    public NoiseSurfaceWorker(long workingBytes,RenderMemory memory) {
+    public NoiseSurfaceWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,NoiseSurfaceWorker::executor); }
+    NoiseSurfaceWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Scalar mesh worker exceeds its combined allowance");this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-noise-surfaces");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-noise-surfaces");thread.setDaemon(true);return thread;}); }
     private long next() { if(closed)throw new IllegalStateException("Scalar mesh worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Scalar mesh revision exhausted");return revision+1; }
     private boolean current(Job job) { return !closed&&job.revision==revision&&!job.cancelled.get(); }
     private static Status state(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.request.volume().id()),problems); }
@@ -107,5 +110,14 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
             try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;job=null;hold.shrinkTo(retained);hold.close(); } }
         }
     }
-    @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }
+    @Override public void close() {
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

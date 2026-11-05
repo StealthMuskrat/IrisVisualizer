@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** Latest-selection, read-only asset capture. No native/GL access, download or readiness authority. */
 public final class ClientAssetWorker implements AutoCloseable {
@@ -44,14 +45,16 @@ public final class ClientAssetWorker implements AutoCloseable {
         void check() { if(cancelled())throw new CancellationException("Client asset selection is obsolete"); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final RenderMemory memory;private final long workingBytes;
-    private long revision,completedBytes;private boolean closed,scheduled;private Job active,pending;private Completion completed;
+    private long revision,completedBytes;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),List.of());
     public ClientAssetWorker() { this(1024L*1024*1024,null); }
     public ClientAssetWorker(RenderMemory memory) { this(1024L*1024*1024,memory); }
-    public ClientAssetWorker(long workingBytes,RenderMemory memory) {
+    public ClientAssetWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,ClientAssetWorker::executor); }
+    ClientAssetWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Asset worker exceeds its working allowance");this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-client-assets");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-client-assets");thread.setDaemon(true);return thread;}); }
     private long next() { if(closed)throw new IllegalStateException("Client asset worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Asset selection revision exhausted");return revision+1; }
     private boolean current(Job job) { return !closed&&job.revision==revision&&!job.cancelled.get(); }
     private static Status state(Job job,Phase phase,Optional<ClientAssetSnapshot.Receipt> assets,List<Problem> problems) { return new Status(job.revision,phase,Optional.of(job.request.selected()),assets,problems); }
@@ -118,7 +121,13 @@ public final class ClientAssetWorker implements AutoCloseable {
     }
     /** Cancels without waiting for file I/O or private capture cleanup; active memory remains charged until unwind. */
     @Override public void close() {
-        synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of());closed=true;cancelOwned();status=done; }
-        executor.shutdownNow();
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

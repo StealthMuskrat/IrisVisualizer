@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active query and one latest pending pointer request; results contain no retained scene graph. */
 public final class WorldPickWorker implements AutoCloseable {
@@ -28,14 +29,16 @@ public final class WorldPickWorker implements AutoCloseable {
         Job(long revision,long reservation,Request request) { this.revision=revision;this.reservation=reservation;this.request=request; }
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
-    private final Object lock=new Object();private final ExecutorService executor;private final RenderMemory memory;private final long workingBytes;private long revision;private boolean closed,scheduled;private Job active,pending;private Completion completed;
+    private final Object lock=new Object();private final ExecutorService executor;private final RenderMemory memory;private final long workingBytes;private long revision;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public WorldPickWorker() { this(1024L*1024*1024,null); }
     public WorldPickWorker(RenderMemory memory) { this(1024L*1024*1024,memory); }
-    public WorldPickWorker(long workingBytes,RenderMemory memory) {
+    public WorldPickWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldPickWorker::executor); }
+    WorldPickWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Pointer query worker exceeds 1 GiB");
-        this.workingBytes=workingBytes;this.memory=memory;executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-pick");thread.setDaemon(true);return thread;});
+        this.workingBytes=workingBytes;this.memory=memory;executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-pick");thread.setDaemon(true);return thread;}); }
     public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
     private static Status state(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.request.index().id()),problems,job.request.frame()); }
     private long next() { if(closed)throw new IllegalStateException("Picking worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Picking revision counter exhausted");return revision+1; }
@@ -79,8 +82,17 @@ public final class WorldPickWorker implements AutoCloseable {
         catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get()) { completed=null;status=failed(job,failure); } } }
     }
     private void drain() {
-        while(true) { Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }try { execute(job); }finally { synchronized(lock) { active=null;job.admission.close();job=null; } } }
+        while(true) { Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;job=null;hold.close(); } } }
     }
     /** Caller-owned indices and atlas frames are never closed by the worker. */
-    @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }
+    @Override public void close() {
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

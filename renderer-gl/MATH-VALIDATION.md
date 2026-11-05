@@ -1,6 +1,6 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04. `GlMathContracts` adds 13 deterministic groups for projection, pointer rays, navigation, clipping and conservative culling. Together with 18 initial CPU groups and 13 world-pipeline groups, 44 groups were prepared initially. [Animation contracts](../renderer/ANIMATION-OWNERS.md) add 11 and subsequent sorting/shutdown/picking-boundary preparation adds seven world groups; a map/image boundary group brings the total to 63. All four harnesses compile; none has been executed. This does not establish renderer-stage completion, native parity or GPU correctness. Unsupported previews remain disabled.
+Prepared 2026-11-04. `GlMathContracts` adds 13 deterministic groups for projection, pointer rays, navigation, clipping and conservative culling. Together with 18 initial CPU groups and 13 world-pipeline groups, 44 groups were prepared initially. [Animation contracts](../renderer/ANIMATION-OWNERS.md) add 11 and subsequent sorting/shutdown/picking-boundary preparation adds eight world groups; a map/image boundary group brings the total to 64. All four harnesses compile; none has been executed. This does not establish renderer-stage completion, native parity or GPU correctness. Unsupported previews remain disabled.
 
 ## No context or driver required
 

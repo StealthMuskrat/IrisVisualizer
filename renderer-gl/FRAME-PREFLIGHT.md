@@ -1,6 +1,6 @@
 # Completed-frame replacement preflight
 
-Renderer implementation, 2026-11-05. World completed-frame rendering checks borrowed source/order/atlas metadata, camera pose and target dimensions before queue replacement. Direct map, original-image and scalar rendering now also checks target bounds before source retention or frame-journal admission; all four connected views share the same target checks. All 129 CPU/OpenGL production sources plus four prepared harnesses compile with Java 25 and LWJGL 3.4.1 (133 total). No renderer contract, native adapter, GL context, GPU draw/readback or workflow test ran. The 63 prepared groups remain unexecuted and unsupported previews stay disabled.
+Renderer implementation, 2026-11-05. World completed-frame rendering checks borrowed source/order/atlas metadata, camera pose and target dimensions before queue replacement. Direct map, original-image and scalar rendering now also checks target bounds before source retention or frame-journal admission; all four connected views share the same target checks. All 129 CPU/OpenGL production sources plus four prepared harnesses compile with Java 25 and LWJGL 3.4.1 (133 total). No renderer contract, native adapter, GL context, GPU draw/readback or workflow test ran. The 64 prepared groups remain unexecuted and unsupported previews stay disabled.
 
 ## Preserve an earlier completed image on invalid input
 

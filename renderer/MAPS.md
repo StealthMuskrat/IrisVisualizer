@@ -40,7 +40,7 @@ For example, with an image origin of -1 and unit sample spacing, the largest dou
 
 The correction uses a fixed number of scalar operations with no sample scan or new per-query scratch. It runs when spacing is at least twice the largest endpoint ULP. For coarser screen precision, where adjacent edges may collapse, the existing inverse-index policy remains, with valid-index clamping after the unchanged outer containment check. The source grid, presence flags, native coordinates/values, colors and zoom limits are unchanged. `MapPick.at` and original-image inspection share this lookup.
 
-A prepared CPU contract covers tiny offsets below/above internal edges, upper interior corners, min/max zoom, fractional displayed edges, distant coarse screen coordinates, original present zero versus absence, native map coordinates and transparent source RGBA. All 63 prepared groups compile but remain unexecuted; real GPU/DPI/pointer comparison stays deferred until renderer-stage validation.
+A prepared CPU contract covers tiny offsets below/above internal edges, upper interior corners, min/max zoom, fractional displayed edges, distant coarse screen coordinates, original present zero versus absence, native map coordinates and transparent source RGBA. All 64 prepared groups compile but remain unexecuted; real GPU/DPI/pointer comparison stays deferred until renderer-stage validation.
 
 ## Latest-request worker
 

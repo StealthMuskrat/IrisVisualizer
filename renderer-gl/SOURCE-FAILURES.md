@@ -51,7 +51,7 @@ World scene release also catches fallback animation-worker invalidation failure 
 
 A standalone `GlWorldAnimation` still borrows its exclusive worker. If invalidation fails, for example at revision exhaustion, shutdown retains the first error but continues closing atlas owners. It clears pending CPU adoption metadata only after invalidation succeeds or the borrowed worker is already CLOSED. The host may close that worker and repeat animation close to finish the incomplete cancellation step. This does not turn a borrowed worker into an owned one.
 
-The four [scene-owning CPU workers](../renderer/WORKER-MEMORY.md) now also retry incomplete shutdown independently of their closed input gate, continue executor/cache cleanup after earlier errors and preserve transferred-scene charges. A controlled failure-injection group is compiled but unexecuted.
+All twelve [CPU workers](../renderer/WORKER-MEMORY.md) now retry incomplete shutdown independently of their closed input gate, continue executor/cache cleanup as applicable after earlier errors and preserve caller-owned source/output charges. Controlled failure-injection groups compile but remain unexecuted.
 
 Each view/animation marks disposal complete only after the close attempt, including status publication, succeeds. An unsuccessful attempt stays eligible for another close; unfinished GL resources remain reachable under their prior cleanup contracts. Context/thread validation still occurs before any teardown. Cancellation remains nonblocking and active worker inputs retain their admission until unwind. No memory ceiling, source identity, preview gate or GPU retirement rule changes.
 

@@ -292,7 +292,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 
 ## Prepared world pipeline contracts
 
-[The world CPU harness](WORLD-CPU-VALIDATION.md) adds 20 synthetic groups for cube model/atlas geometry, native assignments/visibility, complete scene metadata, cache lifetimes, exact picking and independent translucent ordering. The compile-only runner now includes both suites (31 prepared groups). All 129 production sources plus both harnesses compile; no tests ran and unsupported previews stay disabled.
+[The world CPU harness](WORLD-CPU-VALIDATION.md) adds 21 synthetic groups for cube model/atlas geometry, native assignments/visibility, complete scene metadata, cache lifetimes, exact picking and independent translucent ordering. The compile-only runner now includes both suites (31 prepared groups). All 129 production sources plus both harnesses compile; no tests ran and unsupported previews stay disabled.
 
 ## Prepared display math contracts
 
@@ -304,11 +304,11 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 
 ## Owned atlas plans and prepared animation checks
 
-[Independent atlas plan inputs](ANIMATION-OWNERS.md) now preserve shared admission beyond completion closure and feed consuming GPU upload/queue paths with coordinator checks. The connected animation controller uses this handoff. Eleven prepared schedule/interpolation/page-sharing/limit groups bring the total to 63. All 129 production sources plus four harnesses compile; no tests ran and unsupported previews stay disabled.
+[Independent atlas plan inputs](ANIMATION-OWNERS.md) now preserve shared admission beyond completion closure and feed consuming GPU upload/queue paths with coordinator checks. The connected animation controller uses this handoff. Eleven prepared schedule/interpolation/page-sharing/limit groups bring the total to 64. All 129 production sources plus four harnesses compile; no tests ran and unsupported previews stay disabled.
 
 ## Atlas replacement guards
 
-[Atlas GPU queue preflight/recovery](../renderer-gl/ATLAS-RECOVERY.md) now checks exact displayed scene/raster identity before replacing same-scene work, with explicit current-failure cleanup/retry. CPU plan ownership and existing scene/frame adoption contracts remain intact. Follow-up compilation in the restored workspace now covers these changes. The 63 prepared groups remain unexecuted and unsupported previews stay disabled.
+[Atlas GPU queue preflight/recovery](../renderer-gl/ATLAS-RECOVERY.md) now checks exact displayed scene/raster identity before replacing same-scene work, with explicit current-failure cleanup/retry. CPU plan ownership and existing scene/frame adoption contracts remain intact. Follow-up compilation in the restored workspace now covers these changes. The 64 prepared groups remain unexecuted and unsupported previews stay disabled.
 
 ## Map and image queue preservation
 
@@ -316,28 +316,32 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 
 ## World source and material preflight
 
-[World upload/view preflight](../renderer-gl/WORLD-PREFLIGHT.md) now preserves earlier owned output when a new CPU scene or its tint/lighting inputs are invalid. Verified tint-required counts avoid synchronous geometry scans, while fresh rejected scene wrappers are still consumed. All 129 CPU/OpenGL sources plus four harnesses compile; the 63 prepared groups remain unexecuted and unsupported previews stay disabled.
+[World upload/view preflight](../renderer-gl/WORLD-PREFLIGHT.md) now preserves earlier owned output when a new CPU scene or its tint/lighting inputs are invalid. Verified tint-required counts avoid synchronous geometry scans, while fresh rejected scene wrappers are still consumed. All 129 CPU/OpenGL sources plus four harnesses compile; the 64 prepared groups remain unexecuted and unsupported previews stay disabled.
 
 ## Completed-frame queue preservation
 
-[World image preflight](../renderer-gl/FRAME-PREFLIGHT.md) now rejects invalid borrowed scene/order/atlas/camera/target metadata before replacing earlier queue-owned output. It adds no geometry scan or source copy. All 129 CPU/OpenGL sources plus four harnesses compile; the 63 prepared groups remain unexecuted and unsupported previews stay disabled.
+[World image preflight](../renderer-gl/FRAME-PREFLIGHT.md) now rejects invalid borrowed scene/order/atlas/camera/target metadata before replacing earlier queue-owned output. It adds no geometry scan or source copy. All 129 CPU/OpenGL sources plus four harnesses compile; the 64 prepared groups remain unexecuted and unsupported previews stay disabled.
 
 ## Camera-order reservation visibility
 
-[Sorting-worker accounting](WORKER-MEMORY.md) now exposes active/pending/READY lifecycle totals through `reservedBytes()` and the world-view forwarding accessor. Source-cleanup overlap and caller-owned charges remain enforced. Sorting, shutdown-recovery and picking-boundary groups bring the four-suite total to 63; all compile and remain unexecuted.
+[Sorting-worker accounting](WORKER-MEMORY.md) now exposes active/pending/READY lifecycle totals through `reservedBytes()` and the world-view forwarding accessor. Source-cleanup overlap and caller-owned charges remain enforced. Sorting, shutdown-recovery and picking-boundary groups bring the four-suite total to 64; all compile and remain unexecuted.
 
 ## Retrying worker shutdown
 
-[Scene-owning worker shutdown](WORKER-MEMORY.md) now retries unfinished close attempts after executor/cleanup errors, continues owned-cache retirement and preserves caller-transferred scene charges. Public construction keeps the existing daemon scheduling. All 129 production sources and four harnesses compile; 63 groups are prepared and remain unexecuted.
+[Scene-owning worker shutdown](WORKER-MEMORY.md) now retries unfinished close attempts after executor/cleanup errors, continues owned-cache retirement and preserves caller-transferred scene charges. Public construction keeps the existing daemon scheduling. All 129 production sources and four harnesses compile; 64 groups are prepared and remain unexecuted.
 
 ## Conservative world picking boundaries
 
-[Picking hierarchy and range bounds](PICKING-RANGES.md) now share conservative padding and outward slab rounding, so hierarchy rejection cannot discard the existing triangle edge allowance. Actual triangle/marker, geometric clipping, ray-distance and stable tie rules remain unchanged. A prepared analytic edge/corner group brings the total to 63 unexecuted groups; all sources compile.
+[Picking hierarchy and range bounds](PICKING-RANGES.md) now share conservative padding and outward slab rounding, so hierarchy rejection cannot discard the existing triangle edge allowance. Actual triangle/marker, geometric clipping, ray-distance and stable tie rules remain unchanged. A prepared analytic edge/corner group brings the total to 64 unexecuted groups; all sources compile.
 
 ## Map and image inspection boundaries
 
-[Display boundary precision](MAPS.md) now keeps contained upper-edge pixels inspectable and corrects adjacent-sample selection after cancellation-prone pan/zoom. It preserves half-open bounds, exact displayed internal edges and the existing coarse-screen inverse policy with constant-time scalar work. Native map samples and original image RGBA stay unchanged; the new prepared group brings the total to 63 unexecuted groups.
+[Display boundary precision](MAPS.md) now keeps contained upper-edge pixels inspectable and corrects adjacent-sample selection after cancellation-prone pan/zoom. It preserves half-open bounds, exact displayed internal edges and the existing coarse-screen inverse policy with constant-time scalar work. Native map samples and original image RGBA stay unchanged; the new prepared group brings the total to 64 unexecuted groups.
 
 ## Sorting view preflight
 
-[Translucent direction guards](TRANSLUCENT-CENTERS.md) now preserve pending/READY worker output when a supplied direction is too small, while consuming only fresh rejected source wrappers. Direct sorting reports the existing coordinate problem before scratch allocation and uses the same stable length calculation as camera math. The new prepared contract brings the total to 63 unexecuted groups; all production and harness sources compile.
+[Translucent direction guards](TRANSLUCENT-CENTERS.md) now preserve pending/READY worker output when a supplied direction is too small, while consuming only fresh rejected source wrappers. Direct sorting reports the existing coordinate problem before scratch allocation and uses the same stable length calculation as camera math. The new prepared contract brings the total to 64 unexecuted groups; all production and harness sources compile.
+
+## Consistent CPU worker shutdown
+
+[All twelve CPU workers](WORKER-MEMORY.md) now retry unsuccessful shutdown attempts while keeping input gates closed, active reservations charged through unwind and caller-owned sources/completions independent. Pointer workers drop their request graph before releasing admission. Controlled checks for the remaining eight worker families bring the total to 64 prepared, unexecuted groups; all sources compile.

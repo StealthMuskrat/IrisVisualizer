@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active atlas preparation and one replaceable pending clock; never accesses a native or GL context. */
 public final class AtlasFrameWorker implements AutoCloseable {
@@ -52,14 +53,16 @@ public final class AtlasFrameWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;private final RenderMemory memory;
-    private long revision,completedReservation;private boolean closed,scheduled;private Job active,pending;private Completion completed;
+    private long revision,completedReservation;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),0,0,List.of());
     public AtlasFrameWorker() { this(1024L*1024*1024); }
     public AtlasFrameWorker(long workingBytes) { this(workingBytes,null); }
-    public AtlasFrameWorker(long workingBytes,RenderMemory memory) {
+    public AtlasFrameWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,AtlasFrameWorker::executor); }
+    AtlasFrameWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Atlas worker exceeds its aggregate working bound");this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-atlas-frames");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-atlas-frames");thread.setDaemon(true);return thread;}); }
     private long next() { if(closed)throw new IllegalStateException("Atlas worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Atlas revision counter exhausted");return revision+1; }
     private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedReservation=0; }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
@@ -120,5 +123,14 @@ public final class AtlasFrameWorker implements AutoCloseable {
         }
     }
     /** Nonblocking cancellation; active immutable inputs remain reserved until unwinding completes. */
-    @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),0,0,List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }
+    @Override public void close() {
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),0,0,List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

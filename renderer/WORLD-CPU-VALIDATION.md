@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 20 synthetic contract groups alongside 19 map/scalar/image/ownership groups: 39 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 63 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 21 synthetic contract groups alongside 19 map/scalar/image/ownership groups: 40 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 64 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -30,6 +30,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Transferred sort admission | Taken completion and independently retained holds stay charged through rejected submissions; final close permits retry without skipped revisions |
 | Active sort cancellation | A controlled active source read preserves local/shared peak through rejection and nonblocking close; final unwind releases only the worker source and its account |
 | Scene-worker shutdown recovery | Controlled executor shutdown RuntimeException/Error leaves source/cache cleanup and CLOSED guards intact; second close retries, successful close is idempotent, transferred scenes stay charged and executor setup failure leaks no cache account |
+| Remaining worker shutdown recovery | Eight preparation/pointer families preserve primary RuntimeException/Error, retry failed executor shutdown, release queued admission, retain borrowed sources and keep transferred map output charged |
 
 The winding, hit-distance and order expectations come from simple geometry and ordinary reference sorting rather than the prepared centroid/range metadata being checked. The batch/exhaustive query comparison supplements the analytic hit check. These fixtures exercise a narrow known model and are not a substitute for broader native/client-asset coverage.
 

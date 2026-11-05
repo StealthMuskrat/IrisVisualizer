@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active visual assembly plus one replaceable pending frozen request; no native/UI/GL calls. */
 public final class WorldVisualWorker implements AutoCloseable {
@@ -21,15 +22,17 @@ public final class WorldVisualWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;private final RenderMemory memory;
-    private boolean closed,scheduled;private long revision;private Job active,pending;private Completion completed;
+    private boolean closed,scheduled,disposed;private long revision;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());
     public WorldVisualWorker() { this(1024L*1024*1024); }
     /** Reserves each job's full declared CPU working ceiling, including a cancelled active request. */
     public WorldVisualWorker(long workingBytes) { this(workingBytes,null); }
-    public WorldVisualWorker(long workingBytes,RenderMemory memory) {
+    public WorldVisualWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldVisualWorker::executor); }
+    WorldVisualWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Visual worker admission exceeds its 1 GiB ceiling");this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-visuals");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-visuals");thread.setDaemon(true);return thread;}); }
     public long submit(WorldVisuals.Request request) {
         Objects.requireNonNull(request);synchronized(lock) {
             requireOpen();long reservation=request.limits().workingBytes()+(active==null?0:active.request.limits().workingBytes());
@@ -98,7 +101,13 @@ public final class WorldVisualWorker implements AutoCloseable {
     }
     /** Nonblocking cooperative cancellation and release of worker-owned CPU references. */
     @Override public void close() {
-        synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of(),List.of());closed=true;cancelOwned();status=done; }
-        executor.shutdownNow();
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

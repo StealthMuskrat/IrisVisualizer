@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active scalar query and one latest pending pointer. Completions retain no surface or GL owner. */
 public final class NoisePickWorker implements AutoCloseable {
@@ -46,21 +47,23 @@ public final class NoisePickWorker implements AutoCloseable {
     private final RenderMemory memory;
     private final long workingBytes;
     private long revision;
-    private boolean closed,scheduled;
+    private boolean closed,scheduled,disposed;
     private Job active,pending;
     private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),List.of());
 
     public NoisePickWorker() { this(1024L*1024*1024,null); }
     public NoisePickWorker(RenderMemory memory) { this(1024L*1024*1024,memory); }
-    public NoisePickWorker(long workingBytes,RenderMemory memory) {
+    public NoisePickWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,NoisePickWorker::executor); }
+    NoisePickWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)
             throw new IllegalArgumentException("Scalar query worker exceeds its combined allowance");
         this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{
-            var thread=new Thread(task,"iris-noise-pick");thread.setDaemon(true);return thread;
-        });
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{
+            var thread=new Thread(task,"iris-noise-pick");thread.setDaemon(true);return thread;
+        }); }
     public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
     private long next() {
         if(closed)throw new IllegalStateException("Scalar picking worker is closed");
@@ -165,16 +168,18 @@ public final class NoisePickWorker implements AutoCloseable {
                 job=pending;pending=null;active=job;
             }
             try { execute(job); }
-            finally { synchronized(lock) { active=null;job.admission.close();job=null; } }
+            finally { synchronized(lock) { active=null;var hold=job.admission;job=null;hold.close(); } }
         }
     }
     /** Nonblocking cancellation. Active input stays charged until its CPU query has unwound. */
     @Override public void close() {
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         synchronized(lock) {
-            if(closed)return;
-            var done=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of());
-            closed=true;cancelOwned();status=done;
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
         }
-        executor.shutdownNow();
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

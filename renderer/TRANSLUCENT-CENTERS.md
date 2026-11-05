@@ -22,7 +22,7 @@ Repeated poses therefore avoid opaque/cutout face scans and vertex-buffer reads 
 
 Direct `WorldDrawOrder.prepare` keeps its structured COORDINATE problem and empty failed order, but now checks direction before allocating the key/depth scratch arrays. Existing face-count/sort/combined-limit checks still precede that direct pose check, preserving their diagnostic precedence. Direction length uses nested `Math.hypot`, matching `GlCamera.basis`, with the existing inclusive 1e-8 minimum. The requested vector, source entries, merge algorithm, section/face tie rule and memory ceilings are unchanged; no face scan or source-sized scratch is added by worker preflight.
 
-A prepared world contract covers tiny, just-below-minimum and subnormal directions, fresh-wrapper consumption, already-owned protection, pending/READY preservation, corrected revision progression, exact-threshold acceptance, axial-order equivalence and final account release. It compiles but remains unexecuted. All 63 prepared groups and wider native/GPU/order comparisons remain deferred until renderer-stage validation.
+A prepared world contract covers tiny, just-below-minimum and subnormal directions, fresh-wrapper consumption, already-owned protection, pending/READY preservation, corrected revision progression, exact-threshold acceptance, axial-order equivalence and final account release. It compiles but remains unexecuted. All 64 prepared groups and wider native/GPU/order comparisons remain deferred until renderer-stage validation.
 
 ## CPU and GPU accounting
 
