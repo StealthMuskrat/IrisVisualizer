@@ -41,7 +41,7 @@ public final class GlUploadQueue implements AutoCloseable {
     }
     public boolean submit(long next,WorldScene.Result owner,WorldTint tint) { return submit(next,owner,tint,null); }
     public boolean submit(long next,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {
-        Objects.requireNonNull(owner);boolean handedOff=false;
+        Objects.requireNonNull(owner);boolean handedOff=false;Throwable rejection=null;
         try {
             current();
             if(device.ownsCpu(owner)) { handedOff=true;return false; }
@@ -53,7 +53,11 @@ public final class GlUploadQueue implements AutoCloseable {
             handedOff=true;
             try { active=GlUpload.begin(renderer,owner,tint,lighting);status=new Status(revision,Phase.UPLOADING,Optional.of(owner.source()),Optional.of(active.progress()),Optional.empty(),"");return true; }
             catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error retirement) { if(retirement!=failure)failure.addSuppressed(retirement); }failed(failure);throw failure; }
-        }finally { if(!handedOff)owner.close(); }
+        }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        finally {
+            if(!handedOff)try { owner.close(); }
+            catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); }
+        }
     }
     /** The caller supplies its current CPU/edit revision each frame; obsolete work is never advanced. */
     public Status advance(GlUploadBudget budget,long latestRevision) {

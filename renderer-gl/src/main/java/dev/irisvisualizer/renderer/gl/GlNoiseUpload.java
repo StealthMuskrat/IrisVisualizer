@@ -31,11 +31,15 @@ public final class GlNoiseUpload implements AutoCloseable {
     }
     /** Source admission remains live until the destination device journal is admitted; consumes every outcome. */
     public static GlNoiseUpload begin(GlDevice device,RenderInput<NoiseSurface> input) {
-        Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        Objects.requireNonNull(input);GlNoiseUpload result=null;
+        try(input;var source=input.retain()) {
             Objects.requireNonNull(device);var memory=device.memory().orElse(null);
-            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar upload requires the same shared coordinator");return begin(device,source.value());
-        }finally { input.close(); }
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar upload requires the same shared coordinator");result=begin(device,source.value());
+        }catch(RuntimeException|Error failure) {
+            if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+        return result;
     }
     public Progress progress() { return new Progress(phase,face,count,(long)face*INSTANCE_BYTES,(long)count*INSTANCE_BYTES); }
     public boolean ready() { return phase==Phase.READY; }

@@ -37,12 +37,16 @@ public final class GlAtlasUpload implements AutoCloseable {
     }
     /** Consumes independent CPU plan ownership through destination admission or rejection. */
     public static GlAtlasUpload begin(GlAtlasFrame current,RenderInput<AtlasFramePlan> input) {
-        Objects.requireNonNull(input);
-        try(var source=input.retain()) {
+        Objects.requireNonNull(input);GlAtlasUpload result=null;
+        try(input;var source=input.retain()) {
             Objects.requireNonNull(current);var memory=current.scene().device.memory().orElse(null);
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked atlas plan requires the same device coordinator");
-            return begin(current,source.value());
-        }finally { input.close(); }
+            result=begin(current,source.value());
+        }catch(RuntimeException|Error failure) {
+            if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+        return result;
     }
     public Progress progress() { return new Progress(phase,pageCursor,changedCount,copied,totalCopy,uploaded,totalUpload); }
     public boolean ready() { return phase==Phase.READY; }

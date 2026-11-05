@@ -64,18 +64,21 @@ public final class GlWorldView implements AutoCloseable {
     /** Consumes a fresh CPU scene and admitted lighting input, preserving source charge through upload admission. */
     public boolean submitLit(long revision,WorldScene.Result owner,WorldTint tint,RenderInput<WorldLighting> input) {
         Objects.requireNonNull(owner);Objects.requireNonNull(input);boolean handedOff=false;
-        try {
+        try(input) {
             current();if(device.ownsCpu(owner)) { handedOff=true;return false; }
             try(var source=input.retain()) {
                 var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Lighting requires the same managed world-view coordinator");
                 var lighting=source.value();if(lighting.requiresPlaceholder()||lighting.scene()!=owner.scene().orElseThrow())throw new GlFailure(GlFailure.Code.STALE,"Lighting belongs to another successful exact CPU scene");
                 handedOff=true;return submit(revision,owner,tint,lighting);
             }
-        }finally { input.close();if(!handedOff)owner.close(); }
+        }catch(RuntimeException|Error failure) {
+            if(!handedOff)try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            throw failure;
+        }
     }
     /** Consumes fresh CPU scene owners on every outcome; optional native colors belong to this exact scene. */
     public boolean submit(long revision,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {
-        Objects.requireNonNull(owner);boolean handedOff=false;
+        Objects.requireNonNull(owner);boolean handedOff=false;Throwable rejection=null;
         try {
             current();if(device.ownsCpu(owner)) { handedOff=true;return false; }
             if(revision<1)throw new IllegalArgumentException("Invalid world revision");if(revision<worldRevision||revision==worldRevision&&status.phase()!=Phase.WAITING_CPU)return false;
@@ -85,8 +88,11 @@ public final class GlWorldView implements AutoCloseable {
             handedOff=true;
             try { boolean accepted=uploads.submit(revision,owner,tint,lighting);if(!accepted)throw new GlFailure(GlFailure.Code.STATE,"World upload did not accept its current CPU scene");return true; }
             catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        finally {
+            if(!handedOff)try { owner.close(); }
+            catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); }
         }
-        finally { if(!handedOff)owner.close(); }
     }
     public WorldClip clip() { current();return clip; }
     /** Geometric display clipping preserves source meshes and the existing complete transparent order. */

@@ -56,3 +56,7 @@ The context-free runner set compiles without external dependencies: 88 CPU produ
 ## Queue replacement and failed-request recovery
 
 [Atlas queue preflight](../renderer-gl/ATLAS-RECOVERY.md) now preserves earlier same-scene work when the new displayed/plan baseline is invalid. Owned submission still consumes the supplied wrapper while independent owners remain live. Exact current FAILED tokens can reopen after cleanup, with no implicit plan retention or retry loop. Follow-up compilation in the restored workspace now covers these queue changes; runtime/GPU validation remains pending.
+
+## Owned upload creation and input release
+
+[Direct GPU factory handoff](../renderer-gl/INPUT-HANDOFFS.md) now keeps a created atlas uploader locally owned until supplied/temporary CPU wrappers finish closing. If that release prevents return, the uploader is closed on the failure path and a distinct close error is suppressed onto the original input error. The displayed atlas and independently retained CPU plans keep their existing ownership; unfinished GPU cleanup remains device-journal-owned and charged. Full and dependency-free compilation passed. All 64 prepared groups and Windows GL/failure-injection checks remain unexecuted.

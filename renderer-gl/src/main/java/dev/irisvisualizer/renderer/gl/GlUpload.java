@@ -31,14 +31,19 @@ public final class GlUpload implements AutoCloseable {
     public static GlUpload begin(GlRenderer renderer,WorldScene.Result owner,WorldTint tint) { return begin(renderer,owner,tint,null); }
     /** Consumes fresh scene/input owners; lighting admission persists through device-journal admission. */
     public static GlUpload beginLit(GlRenderer renderer,WorldScene.Result owner,WorldTint tint,RenderInput<WorldLighting> input) {
-        Objects.requireNonNull(renderer);Objects.requireNonNull(owner);Objects.requireNonNull(input);boolean handedOff=false,alreadyOwned=false;
-        try {
+        Objects.requireNonNull(renderer);Objects.requireNonNull(owner);Objects.requireNonNull(input);boolean handedOff=false,alreadyOwned=false;GlUpload result=null;
+        try(input) {
             var device=renderer.device;alreadyOwned=device.ownsCpu(owner);if(alreadyOwned)throw new GlFailure(GlFailure.Code.STATE,"This scene lease was already transferred to the device");
             try(var source=input.retain()) {
                 var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Lighting requires the same managed device coordinator");
-                handedOff=true;return begin(renderer,owner,tint,source.value());
+                var lighting=source.value();handedOff=true;result=begin(renderer,owner,tint,lighting);
             }
-        }finally { input.close();if(!handedOff&&!alreadyOwned)owner.close(); }
+        }catch(RuntimeException|Error failure) {
+            if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(!handedOff&&!alreadyOwned)try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+        return result;
     }
     /** Borrowed constant-time preflight. Returns resolved tint without consuming or admitting the source. */
     static WorldTint validate(GlRenderer renderer,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {

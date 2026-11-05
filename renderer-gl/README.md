@@ -276,3 +276,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Device and resource setup rollback
 
 [Setup rollback](DEVICE-TEARDOWN.md#setup-rollback-before-ownership-escapes) now catches Errors after device-account creation, frees temporary staging when possible and preserves conservative charges if native release fails. Staging exhaustion keeps its MEMORY code and now retains its original cause. Journal insertion, world-renderer/target retirement and temporary texture-unit capture preserve original setup errors through rollback failures. All production/harness sources and the dependency-free set compile; all 64 prepared groups and runtime/GPU failure-injection checks remain unexecuted.
+
+## Consuming input cleanup
+
+[Owned GPU handoffs](INPUT-HANDOFFS.md) now retain newly created atlas/scalar/lit-world upload jobs until supplied CPU input cleanup succeeds. A cleanup failure attempts to close the unreturned job while preserving the first error. Paired lighting/scene and raw world submission also attempt fresh-owner cleanup without masking the original rejection. Full and dependency-free compilation passed; all 64 prepared groups and runtime/GPU failure injection remain unexecuted.
