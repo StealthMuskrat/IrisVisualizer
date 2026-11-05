@@ -203,7 +203,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 
 ## CPU validation preparation
 
-[Initial dependency-free CPU contracts](../renderer/CPU-VALIDATION.md) now compile alongside the renderer, preparing 18 deterministic groups before stage execution. They cover supplied map/scalar/image data and ownership, including independent exposure/light expectations; no GL context, driver, native parity or retry behavior is certified. All 129 production sources plus the harness compile; runtime tests remain deferred and unsupported previews stay disabled.
+[Initial dependency-free CPU contracts](../renderer/CPU-VALIDATION.md) now compile alongside the renderer, preparing 19 deterministic groups before stage execution. They cover supplied map/scalar/image data and ownership, including independent exposure/light expectations; no GL context, driver, native parity or retry behavior is certified. All 129 production sources plus the harness compile; runtime tests remain deferred and unsupported previews stay disabled.
 
 ## World CPU validation preparation
 
@@ -243,8 +243,8 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 
 ## Camera-order reservation visibility
 
-`GlWorldView.orderReservedBytes()` now exposes [sorting-worker lifecycle totals](../renderer/WORKER-MEMORY.md), including cancelled active scratch until unwind. Conservative source-cleanup overlap and caller-owned result charges remain enforced. Prepared sorting and shutdown-recovery groups compile, bringing the total to 61 unexecuted groups; runtime/GPU validation remains deferred.
+`GlWorldView.orderReservedBytes()` now exposes [sorting-worker lifecycle totals](../renderer/WORKER-MEMORY.md), including cancelled active scratch until unwind. Conservative source-cleanup overlap and caller-owned result charges remain enforced. Prepared sorting and shutdown-recovery groups compile, bringing the total to 62 unexecuted groups; runtime/GPU validation remains deferred.
 
 ## Shutdown after CPU worker errors
 
-[View and animation shutdown](SOURCE-FAILURES.md) now attempts remaining GPU cleanup after worker close/invalidation failure and aggregates terminal-status errors without masking the first failure. World shutdown closes both owned workers before GPU owners; standalone animation keeps its borrowed-worker contract. All 129 production sources plus four harnesses compile; the 61 prepared groups and native/GPU failure paths remain unexecuted.
+[View and animation shutdown](SOURCE-FAILURES.md) now attempts remaining GPU cleanup after worker close/invalidation failure and aggregates terminal-status errors without masking the first failure. World shutdown closes both owned workers before GPU owners; standalone animation keeps its borrowed-worker contract. All 129 production sources plus four harnesses compile; the 62 prepared groups and native/GPU failure paths remain unexecuted.

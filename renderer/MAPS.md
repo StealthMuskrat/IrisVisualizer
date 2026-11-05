@@ -32,6 +32,16 @@ Absent samples produce transparent black; an all-empty successful map is valid. 
 
 `MapView` supplies fit-to-viewport, pointer-delta panning, anchor-preserving zoom and half-open pixel hit testing. Left/top are the displayed image origin; positive pan deltas move the image with the pointer. Display zoom does not change `blocksPerSample` or regenerate anything. Hits outside the image, including its right/bottom borders, return empty. Nonfinite or precision-collapsed transforms are refused. After a hit, use its pixel index on the matching raster's samples, check presence, and inspect the original terrain height, noise double or native biome. `grid.worldX/worldZ` provide the corresponding sample coordinates. The application must use a view whose dimensions belong to that displayed raster.
 
+## Display boundary precision
+
+`MapView.pixelAt` now clamps a contained point to valid source indices and checks the adjacent displayed sample edges when screen precision distinguishes them. This corrects subtraction/division rounding after pan or zoom: a pointer immediately below an internal edge stays in the preceding sample, and a pointer immediately inside right/bottom remains inspectable. Exact internal boundaries select the following sample; left/top stay included and right/bottom stay excluded.
+
+For example, with an image origin of -1 and unit sample spacing, the largest double below screen X=1 remains inside the image even when inverse subtraction rounds up to 2. At spacing 2, that same point belongs to the first sample just below the internal edge at X=1. A fractional zoom uses its displayed `origin + index * pixelsPerSample` boundaries, preserving the following-sample rule at those exact screen positions.
+
+The correction uses a fixed number of scalar operations with no sample scan or new per-query scratch. It runs when spacing is at least twice the largest endpoint ULP. For coarser screen precision, where adjacent edges may collapse, the existing inverse-index policy remains, with valid-index clamping after the unchanged outer containment check. The source grid, presence flags, native coordinates/values, colors and zoom limits are unchanged. `MapPick.at` and original-image inspection share this lookup.
+
+A prepared CPU contract covers tiny offsets below/above internal edges, upper interior corners, min/max zoom, fractional displayed edges, distant coarse screen coordinates, original present zero versus absence, native map coordinates and transparent source RGBA. All 62 prepared groups compile but remain unexecuted; real GPU/DPI/pointer comparison stays deferred until renderer-stage validation.
+
 ## Latest-request worker
 
 `MapRasterWorker` runs colorization on one daemon worker with one active and one replaceable pending request. Native generation/sampling remains a separate engine operation. `submit` returns a monotonic renderer revision. Replacing work cancels obsolete active colorization cooperatively, drops the old pending request and untaken output, and never adopts a stale result. `invalidate()` advances the token immediately when upstream native inputs become obsolete, even before replacement samples exist.

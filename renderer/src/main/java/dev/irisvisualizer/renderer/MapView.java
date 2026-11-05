@@ -26,7 +26,19 @@ public record MapView(int width,int height,double left,double top,double pixelsP
         return new MapView(width,height,screenX-(screenX-left)*factor,screenY-(screenY-top)*factor,pixelsPerSample*factor);
     }
     public Optional<Pixel> pixelAt(double screenX,double screenY) {
-        if(!Double.isFinite(screenX)||!Double.isFinite(screenY)||screenX<left||screenX>=right()||screenY<top||screenY>=bottom())return Optional.empty();double x=Math.floor((screenX-left)/pixelsPerSample),z=Math.floor((screenY-top)/pixelsPerSample);
-        if(x<0||x>=width||z<0||z>=height)return Optional.empty();return Optional.of(new Pixel((int)x,(int)z,(int)z*width+(int)x));
+        if(!Double.isFinite(screenX)||!Double.isFinite(screenY)||screenX<left||screenX>=right()||screenY<top||screenY>=bottom())return Optional.empty();
+        int x=sampleAt(screenX,left,width),z=sampleAt(screenY,top,height);return Optional.of(new Pixel(x,z,z*width+x));
+    }
+    /** Correct a rounded inverse against the displayed edges; no pixel scan or per-query scratch is needed. */
+    private int sampleAt(double coordinate,double origin,int count) {
+        int sample=Math.clamp((int)Math.floor((coordinate-origin)/pixelsPerSample),0,count-1);
+        double end=origin+count*pixelsPerSample;
+        // When adjacent edges are distinguishable, inverse rounding can cross at most one boundary.
+        // Coarser screen coordinates retain their existing inverse lookup rather than selecting a collapsed edge.
+        if(pixelsPerSample>=2*Math.ulp(Math.max(Math.abs(origin),Math.abs(end)))) {
+            if(sample>0&&coordinate<origin+sample*pixelsPerSample)sample--;
+            else if(sample+1<count&&coordinate>=origin+(sample+1)*pixelsPerSample)sample++;
+        }
+        return sample;
     }
 }

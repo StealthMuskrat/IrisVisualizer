@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 19 synthetic contract groups alongside the initial 18 map/scalar/image/ownership groups: 37 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 61 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 19 synthetic contract groups alongside 19 map/scalar/image/ownership groups: 38 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 62 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 

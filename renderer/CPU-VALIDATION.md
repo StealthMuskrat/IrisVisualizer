@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-05. The `RendererCpuContracts` harness has 18 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 19 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 61 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-05. The `RendererCpuContracts` harness has 19 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 19 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 62 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -20,7 +20,7 @@ Once renderer implementation is complete and stage testing begins:
 
 Execution is explicit rather than a CI trigger or default script side effect. Assertions use ordinary checks that throw `AssertionError`, so they do not depend on JVM `-ea`. Each suite runs in a separate JVM; the runner stops at the first failing group or process and exits unsuccessfully; only executed successful groups print PASS. A final count describes this synthetic CPU suite, never native or GPU parity. The runner is newly prepared and has not itself been run or validated on PowerShell/Windows.
 
-## Initial contract scope
+## CPU contract scope
 
 | Contract group | Independent expectation |
 | --- | --- |
@@ -33,6 +33,7 @@ Execution is explicit rather than a CI trigger or default script side effect. As
 | Native biome identity and alpha | Palette order preserves original numeric IDs, transparent present values remain inspectable and missing palette colors fail |
 | Terrain relief | A plane with known slopes and upward light has independently calculated diffuse shading; edges/missing stencils stay flat |
 | Map navigation and hits | Letterbox/half-open bounds, fit/pan/zoom anchor invariance and absent versus real-zero inspection |
+| Map/image boundary precision | Analytic half-open edge ownership after cancellation-prone pan/zoom, positive internal edges, upper interior corners, coarse screen coordinates and unchanged map/transparent-image samples |
 | Full-height scalar capture | X-Z-Y ordering, fractional native coordinates, copied data and rejection instead of height truncation |
 | Exposed-face coverage | A separate voxel-neighbor enumerator compared with expanded CELLS/GREEDY rectangles over 18 fixed-seed fixtures, plus a uniform cuboid |
 | Scalar recoloring | Source-only equal-color admission, exact native volume, unchanged geometry, prepared colors and atomic insufficient-peak failure |
