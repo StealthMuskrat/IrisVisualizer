@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** Background section/range indexing. Every submission consumes one fresh CPU scene owner. */
 public final class WorldPickIndexWorker implements AutoCloseable {
@@ -24,15 +25,17 @@ public final class WorldPickIndexWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final RenderMemory memory;private final long workingBytes;
-    private long revision;private boolean closed,scheduled;private Job active,pending;private Completion completed;private WorldScene.Result completedOwner;
+    private long revision;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;private WorldScene.Result completedOwner;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public WorldPickIndexWorker() { this(1024L*1024*1024,null); }
     public WorldPickIndexWorker(RenderMemory memory) { this(1024L*1024*1024,memory); }
-    public WorldPickIndexWorker(long workingBytes,RenderMemory memory) {
+    public WorldPickIndexWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldPickIndexWorker::executor); }
+    WorldPickIndexWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Picking preparation worker exceeds 1 GiB");
         this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-pick-index");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-pick-index");thread.setDaemon(true);return thread;}); }
     public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
     private long next() {
         if(closed)throw new IllegalStateException("Picking preparation worker is closed");
@@ -119,7 +122,13 @@ public final class WorldPickIndexWorker implements AutoCloseable {
         }
     }
     @Override public void close() {
-        synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }
-        executor.shutdownNow();
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 17 synthetic contract groups alongside the initial 18 map/scalar/image/ownership groups: 35 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 59 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 18 synthetic contract groups alongside the initial 18 map/scalar/image/ownership groups: 36 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 60 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -27,6 +27,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | READY sort admission | Known twelve-face scratch shrinks to source plus final keys; old output survives rejection and exact old-output plus new-peak capacity permits replacement |
 | Transferred sort admission | Taken completion and independently retained holds stay charged through rejected submissions; final close permits retry without skipped revisions |
 | Active sort cancellation | A controlled active source read preserves local/shared peak through rejection and nonblocking close; final unwind releases only the worker source and its account |
+| Scene-worker shutdown recovery | Controlled executor shutdown RuntimeException/Error leaves source/cache cleanup and CLOSED guards intact; second close retries, successful close is idempotent, transferred scenes stay charged and executor setup failure leaks no cache account |
 
 The winding, hit-distance and order expectations come from simple geometry and ordinary reference sorting rather than the prepared centroid/range metadata being checked. The batch/exhaustive query comparison supplements the analytic hit check. These fixtures exercise a narrow known model and are not a substitute for broader native/client-asset coverage.
 
@@ -36,4 +37,4 @@ The winding, hit-distance and order expectations come from simple geometry and o
 
 All 129 CPU/OpenGL production sources plus four harness sources compile with Java 25 and LWJGL 3.4.1 (133 total). The default source set, including four display helpers and four harnesses, compiles without external dependencies (96 total). The Windows PowerShell runner was inspected only; no contract, native adapter, GL context, worker race, GPU upload/readback or workflow ran.
 
-The [initial CPU validation scope](CPU-VALIDATION.md) remains explicit. Broader worker concurrency/failure injection beyond the four prepared controlled sort groups, weighted/multipart/transformed models, complex native geometry and fluids, tint/lighting, animation, broad codecs, camera/state math and all real Windows GPU/native comparisons still need stage validation. Full source/client assets, combined application memory and final editor integration remain pending.
+The [initial CPU validation scope](CPU-VALIDATION.md) remains explicit. Broader worker concurrency/failure injection beyond the prepared controlled sort and worker-shutdown groups, weighted/multipart/transformed models, complex native geometry and fluids, tint/lighting, animation, broad codecs, camera/state math and all real Windows GPU/native comparisons still need stage validation. Full source/client assets, combined application memory and final editor integration remain pending.

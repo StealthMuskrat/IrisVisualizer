@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** Latest camera-bound translucent sorting. Every submitted fresh CPU owner is consumed. */
 public final class WorldOrderWorker implements AutoCloseable {
@@ -22,14 +23,16 @@ public final class WorldOrderWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;private final RenderMemory memory;
-    private long revision,completedReservation;private boolean closed,scheduled;private Job active,pending;private Completion completed;
+    private long revision,completedReservation;private boolean closed,scheduled,disposed;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public WorldOrderWorker() { this(1024L*1024*1024); }
     public WorldOrderWorker(long workingBytes) { this(workingBytes,null); }
-    public WorldOrderWorker(long workingBytes,RenderMemory memory) {
+    public WorldOrderWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldOrderWorker::executor); }
+    WorldOrderWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Draw-order worker limit exceeds 1 GiB");this.workingBytes=workingBytes;this.memory=memory;
-        executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-order");thread.setDaemon(true);return thread;});
+        executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-order");thread.setDaemon(true);return thread;}); }
     public long submit(WorldScene.Result owner,WorldDrawOrder.View view) { return submit(owner,view,WorldDrawOrder.Limits.DEFAULT); }
     /** Already-owned wrappers are rejected without closing their current owner; use retain() for new jobs. */
     public long submit(WorldScene.Result owner,WorldDrawOrder.View view,WorldDrawOrder.Limits limits) {
@@ -86,5 +89,14 @@ public final class WorldOrderWorker implements AutoCloseable {
             synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,Phase.FAILED,List.of(problem(failure,"Translucent order publication failed"))); }
         }finally { if(!retained)job.owner.close();job.releaseAdmission=true; }
     }
-    @Override public void close() { synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();status=done; }executor.shutdownNow(); }
+    @Override public void close() {
+        Throwable failure=null;
+        synchronized(lock) { if(disposed)return;closed=true;try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; } }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

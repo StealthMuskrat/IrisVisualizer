@@ -9,6 +9,8 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BooleanSupplier;
 import java.util.zip.*;
 
@@ -245,6 +247,69 @@ public final class WorldCpuContracts {
             }
         }
     }
+    /** Queues jobs without starting them and fails its first shutdown request with an exact supplied error. */
+    private static final class ShutdownExecutor extends AbstractExecutorService {
+        private final List<Runnable> queued=new ArrayList<>();private final Throwable failure;private boolean shutdown;private int attempts;
+        ShutdownExecutor(boolean error) { failure=error?new AssertionError("injected shutdown error"):new IllegalStateException("injected shutdown failure"); }
+        @Override public void execute(Runnable command) { if(shutdown)throw new RejectedExecutionException("test executor is closed");queued.add(Objects.requireNonNull(command)); }
+        @Override public void shutdown() { shutdown=true; }
+        @Override public List<Runnable> shutdownNow() {
+            if(++attempts==1) { if(failure instanceof Error error)throw error;throw (RuntimeException)failure; }
+            shutdown=true;var result=List.copyOf(queued);queued.clear();return result;
+        }
+        @Override public boolean isShutdown() { return shutdown; }
+        @Override public boolean isTerminated() { return shutdown&&queued.isEmpty(); }
+        @Override public boolean awaitTermination(long timeout,TimeUnit unit) { return isTerminated(); }
+        @Override public void close() { shutdown=true;queued.clear(); }
+        void runAll() { while(!queued.isEmpty())queued.remove(0).run(); }
+    }
+    private static void firstShutdownFails(AutoCloseable worker,ShutdownExecutor executor) {
+        try { worker.close(); }catch(Throwable failure) { check(failure==executor.failure,"exact shutdown failure remains primary");equal(1,executor.attempts,"first shutdown attempted once");return; }
+        throw new AssertionError("injected shutdown failure was not reported");
+    }
+    private static void retryShutdown(AutoCloseable worker,ShutdownExecutor executor) {
+        try { worker.close();equal(2,executor.attempts,"failed shutdown is retried despite closed input gate");check(executor.isTerminated(),"retry disposes queued executor work");worker.close();equal(2,executor.attempts,"successful shutdown is idempotent"); }
+        catch(Exception failure) { throw new AssertionError("shutdown recovery failed",failure); }
+    }
+    private static void workerShutdownRecovery() {
+        var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+            for(boolean error:new boolean[]{false,true}) {
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new ShutdownExecutor(error);var worker=new WorldOrderWorker(4*1024*1024,memory,()->executor)) {
+                    var input=owner.retain();long revision=worker.submit(input,orderView(f));check(worker.reservedBytes()>0&&memory.stats().chargedBytes()>0,"pending sort is admitted");firstShutdownFails(worker,executor);
+                    check(input.closed()&&!owner.closed(),"failed executor shutdown still releases pending sort source");equal(0L,worker.reservedBytes(),"sort local reservation cleared");equal(0L,memory.stats().chargedBytes(),"sort shared reservation cleared");equal(0,memory.stats().accounts(),"sort account released");equal(WorldOrderWorker.Phase.CLOSED,worker.status().phase(),"sort terminal status published");equal(revision,worker.status().revision(),"sort shutdown preserves revision");check(worker.take(revision).isEmpty(),"closed sort transfers no output");throwsType(IllegalStateException.class,worker::invalidate,"closed sort rejects new invalidation");retryShutdown(worker,executor);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new ShutdownExecutor(error);var worker=new WorldPickIndexWorker(4*1024*1024,memory,()->executor)) {
+                    var input=owner.retain();long revision=worker.submit(input);check(worker.reservedBytes()>0&&memory.stats().chargedBytes()>0,"pending index preparation is admitted");firstShutdownFails(worker,executor);
+                    check(input.closed()&&!owner.closed(),"failed executor shutdown still releases pending index source");equal(0L,worker.reservedBytes(),"index local reservation cleared");equal(0L,memory.stats().chargedBytes(),"index shared reservation cleared");equal(0,memory.stats().accounts(),"index account released");equal(WorldPickIndexWorker.Phase.CLOSED,worker.status().phase(),"index terminal status published");equal(revision,worker.status().revision(),"index shutdown preserves revision");check(worker.take(revision).isEmpty(),"closed index worker transfers no output");throwsType(IllegalStateException.class,worker::invalidate,"closed index worker rejects new invalidation");retryShutdown(worker,executor);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new ShutdownExecutor(error);var worker=new WorldSceneWorker(4*1024*1024,memory,()->executor)) {
+                    long revision=worker.submit(new WorldSceneWorker.Request(f.models(),f.visibility(),f.raster(),f.plan().limits(),WorldMesher.Limits.DEFAULT));check(memory.stats().chargedBytes()>0,"pending standalone scene is admitted");firstShutdownFails(worker,executor);
+                    check(worker.cacheStats().closed(),"scene cache closes after executor failure");equal(0L,memory.stats().chargedBytes(),"scene reservation cleared");equal(0,memory.stats().accounts(),"scene cache account released despite executor failure");equal(WorldSceneWorker.Phase.CLOSED,worker.status().phase(),"scene terminal status published");equal(revision,worker.status().revision(),"scene shutdown preserves revision");check(worker.take(revision).isEmpty(),"closed scene worker transfers no output");throwsType(IllegalStateException.class,worker::invalidate,"closed scene worker rejects new invalidation");retryShutdown(worker,executor);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new ShutdownExecutor(error);var worker=new WorldRenderWorker(4*1024*1024,memory,()->executor)) {
+                    equal(1,memory.stats().accounts(),"integrated preparation owns a cache account before work");firstShutdownFails(worker,executor);
+                    check(worker.cacheStats().closed(),"integrated cache closes after executor failure");equal(0L,memory.stats().chargedBytes(),"integrated idle reservation remains zero");equal(0,memory.stats().accounts(),"integrated cache account released despite executor failure");equal(WorldRenderWorker.Phase.CLOSED,worker.status().phase(),"integrated terminal status published");equal(0L,worker.status().revision(),"idle integrated shutdown preserves revision");throwsType(IllegalStateException.class,worker::invalidate,"closed integrated worker rejects new invalidation");retryShutdown(worker,executor);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new ShutdownExecutor(error);var worker=new WorldSceneWorker(4*1024*1024,memory,()->executor)) {
+                    long revision=worker.submit(new WorldSceneWorker.Request(f.models(),f.visibility(),f.raster(),f.plan().limits(),WorldMesher.Limits.DEFAULT));executor.runAll();equal(WorldSceneWorker.Phase.READY,worker.status().phase(),"controlled scene preparation publishes complete output");
+                    try(var transferred=worker.take(revision).orElseThrow().result()) {
+                        long retained=memory.stats().chargedBytes();check(retained>0,"transferred scene retains its cache account");firstShutdownFails(worker,executor);
+                        check(worker.cacheStats().closed()&&worker.cacheStats().leases()>0&&!transferred.closed(),"failed shutdown retires cache without closing transferred scene");equal(retained,memory.stats().chargedBytes(),"external scene keeps exact charge after failed shutdown");retryShutdown(worker,executor);check(transferred.scene().isPresent(),"transferred scene survives shutdown retry");equal(retained,memory.stats().chargedBytes(),"successful shutdown retry keeps external lease charged");
+                    }
+                    equal(0L,memory.stats().chargedBytes(),"last transferred scene release clears retired cache charge");equal(0,memory.stats().accounts(),"last transferred scene release clears cache account");check(!owner.closed(),"independent fixture source remains live");
+                }
+            }
+            try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4))) {
+                for(Throwable failure:List.of(new IllegalStateException("executor construction failed"),new AssertionError("executor construction error"))) {
+                    java.util.function.Supplier<ExecutorService> factory=()->{ if(failure instanceof Error error)throw error;throw (RuntimeException)failure; };
+                    for(Runnable action:List.<Runnable>of(()->new WorldSceneWorker(4*1024*1024,memory,factory),()->new WorldRenderWorker(4*1024*1024,memory,factory))) {
+                        try { action.run();throw new AssertionError("executor construction failure missing"); }catch(Throwable actual) { check(actual==failure,"original executor construction error propagated"); }equal(0,memory.stats().accounts(),"failed executor setup leaves no cache account");
+                    }
+                }
+                throwsType(NullPointerException.class,()->new WorldSceneWorker(4*1024*1024,memory,()->null),"null scene executor rejected");throwsType(NullPointerException.class,()->new WorldRenderWorker(4*1024*1024,memory,()->null),"null integrated executor rejected");equal(0,memory.stats().accounts(),"null executor setup leaves no cache account");
+            }
+        }
+    }
     private static void emptyAndMarkers() {
         var snapshot=snapshot(1);var assets=assets(255);var layout=AtlasBuilder.empty(assets,BLOCK,LIVE);var raster=AtlasImages.capture(layout,0,0,LIVE);equal(0,raster.pages().size(),"empty atlas needs no dummy texture");
         var diagnostic=new ModelPlan.Problem(ModelPlan.Code.BUILTIN_MODEL,ClientAssetSnapshot.Kind.MODEL,MODEL,"","synthetic unsupported native visual");
@@ -282,6 +347,7 @@ public final class WorldCpuContracts {
         group("ready sort replacement admission",WorldCpuContracts::readyOrderAdmission);
         group("transferred sort ownership and admission",WorldCpuContracts::transferredOrderAdmission);
         group("active sort cancellation and admission",WorldCpuContracts::activeOrderAdmission);
+        group("scene-worker shutdown recovery",WorldCpuContracts::workerShutdownRecovery);
         group("explicit empty and unsupported markers",WorldCpuContracts::emptyAndMarkers);
         group("picking-index admission and source release",WorldCpuContracts::indexOwnership);
         System.out.println("PASS "+groups+" synthetic world contract groups; native/GPU parity is outside this harness.");

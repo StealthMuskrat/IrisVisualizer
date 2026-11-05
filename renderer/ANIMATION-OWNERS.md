@@ -21,7 +21,7 @@ The atlas worker drops its active request reference before shrinking/releasing t
 
 ## Prepared animation suite
 
-`AnimationCpuContracts` adds 11 groups to the three earlier harnesses. With the subsequent four world sort-admission groups, 59 groups are now prepared in total. Its sources compile; no assertion has been executed or claimed to pass. The default Windows validation runner compiles only and now includes four suite classes. At renderer-stage validation, explicit `-Execute` launches each suite in its own JVM and stops on failure. The runner remains inspected only on this host.
+`AnimationCpuContracts` adds 11 groups to the three earlier harnesses. With the subsequent world sorting and shutdown-recovery groups, 60 groups are now prepared in total. Its sources compile; no assertion has been executed or claimed to pass. The default Windows validation runner compiles only and now includes four suite classes. At renderer-stage validation, explicit `-Execute` launches each suite in its own JVM and stops on failure. The runner remains inspected only on this host.
 
 | Group | Prepared expectation |
 | --- | --- |

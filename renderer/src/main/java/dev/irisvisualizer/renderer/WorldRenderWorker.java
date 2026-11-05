@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** Single CPU path from frozen native visual decisions to a complete leased world scene. */
 public final class WorldRenderWorker implements AutoCloseable {
@@ -51,19 +52,21 @@ public final class WorldRenderWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final WorldSectionCache cache;private final RenderMemory.Account admission;private final RenderMemory memory;private final ExecutorService executor;private final long workingBytes;
-    private long revision;private boolean closed,scheduled;private Job active,pending;private WorldScene.Result completed;private WorldTint completedTint;
+    private long revision;private boolean closed,scheduled,disposed;private Job active,pending;private WorldScene.Result completed;private WorldTint completedTint;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());
     public WorldRenderWorker() { this(1024L*1024*1024); }
     /** Aggregate admission includes active/cache CPU payload and one frozen pending input. */
     public WorldRenderWorker(long workingBytes) { this(workingBytes,null); }
-    public WorldRenderWorker(long workingBytes,RenderMemory memory) {
+    public WorldRenderWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldRenderWorker::executor); }
+    WorldRenderWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Render worker working limit exceeds 1 GiB");this.workingBytes=workingBytes;this.memory=memory;
         admission=memory==null?null:memory.open("World preparation and scene cache");
         try {
             cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);
-            executor=Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-render");thread.setDaemon(true);return thread;});
-        }catch(RuntimeException|OutOfMemoryError failure) { if(admission!=null)admission.close();throw failure; }
+            executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
+        }catch(RuntimeException|Error failure) { if(admission!=null)admission.close();throw failure; }
     }
+    private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-render");thread.setDaemon(true);return thread;}); }
     private void reserve(long bytes) { if(admission!=null)admission.reserve(bytes); }
     /** Retained cache payload is covered by the current job ceiling rather than charged a second time. */
     private void refreshAdmission() {
@@ -170,7 +173,18 @@ public final class WorldRenderWorker implements AutoCloseable {
         }finally { if(!retained&&result!=null)result.close(); }
     }
     @Override public void close() {
-        synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of(),List.of());closed=true;if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();refreshAdmission();status=done; }
-        executor.shutdownNow();cache.close();
+        Throwable failure=null;
+        synchronized(lock) {
+            if(disposed)return;closed=true;if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;
+            try { dropCompleted(); }catch(RuntimeException|Error error) { failure=error; }
+            try { refreshAdmission(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        try { cache.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),List.of(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

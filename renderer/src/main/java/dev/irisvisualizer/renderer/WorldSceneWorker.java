@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /** One active CPU scene job and one replaceable pending request. No UI or GPU thread is called. */
 public final class WorldSceneWorker implements AutoCloseable {
@@ -30,7 +31,7 @@ public final class WorldSceneWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final WorldSectionCache cache;private final ExecutorService executor;private final RenderMemory.Account admission;private final RenderMemory memory;private final long workingBytes;
-    private long revision;private boolean closed,scheduled;private Job pending,active;private WorldScene.Result completed;
+    private long revision;private boolean closed,scheduled,disposed;private Job pending,active;private WorldScene.Result completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public WorldSceneWorker() { this(new WorldSectionCache()); }
     /** Existing externally configured caches retain their own admission policy. */
@@ -38,11 +39,12 @@ public final class WorldSceneWorker implements AutoCloseable {
         this.cache=Objects.requireNonNull(cache);admission=null;memory=null;workingBytes=1024L*1024*1024;executor=executor();
     }
     /** Owns one shared cache/job account, including externally retained scene tickets after close. */
-    public WorldSceneWorker(long workingBytes,RenderMemory memory) {
+    public WorldSceneWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldSceneWorker::executor); }
+    WorldSceneWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Standalone scene worker limit exceeds 1 GiB");this.workingBytes=workingBytes;this.memory=memory;
         admission=memory==null?null:memory.open("Standalone scene preparation and cache");
-        try { cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);executor=executor(); }
-        catch(RuntimeException|OutOfMemoryError failure) { if(admission!=null)admission.close();throw failure; }
+        try { cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);executor=Objects.requireNonNull(Objects.requireNonNull(executors).get()); }
+        catch(RuntimeException|Error failure) { if(admission!=null)admission.close();throw failure; }
     }
     private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-scene");thread.setDaemon(true);return thread;}); }
     private long next() { if(closed)throw new IllegalStateException("Scene worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Scene revision counter exhausted");return revision+1; }
@@ -126,7 +128,18 @@ public final class WorldSceneWorker implements AutoCloseable {
     }
     /** Cancels cooperatively; external scene leases keep the cache admission until their last release. */
     @Override public void close() {
-        synchronized(lock) { if(closed)return;var done=new Status(revision,Phase.CLOSED,Optional.empty(),List.of());closed=true;cancelOwned();refreshAdmission();status=done; }
-        executor.shutdownNow();cache.close();
+        Throwable failure=null;
+        synchronized(lock) {
+            if(disposed)return;closed=true;
+            try { cancelOwned(); }catch(RuntimeException|Error error) { failure=error; }
+            try { refreshAdmission(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        }
+        try { executor.shutdownNow(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        try { cache.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        synchronized(lock) {
+            try { status=new Status(revision,Phase.CLOSED,Optional.empty(),List.of()); }
+            catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }
