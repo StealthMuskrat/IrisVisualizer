@@ -240,3 +240,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Upload recovery capability guards
 
 [Map/image recovery](RASTER-RECOVERY.md) and [scalar recovery](SCALAR-RECOVERY.md) now validate upload capabilities before recovery token changes, worker invalidation or retained-owner cleanup. Map dimensions and scalar grid precision are also checked before connected background preparation, preserving earlier work/output on unsupported submissions. Direct upload and retry share the guards; all 129 production sources plus four harnesses compile. Runtime/native/GPU checks remain deferred.
+
+## Camera-order reservation visibility
+
+`GlWorldView.orderReservedBytes()` now exposes [sorting-worker lifecycle totals](../renderer/WORKER-MEMORY.md), including cancelled active scratch until unwind. Conservative source-cleanup overlap and caller-owned result charges remain enforced. Four prepared sort-admission groups compile, bringing the total to 59 unexecuted groups; runtime/GPU validation remains deferred.

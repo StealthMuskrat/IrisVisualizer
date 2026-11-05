@@ -25,7 +25,7 @@ Keep a tracked completion open while using or handing off its output. Close it a
 
 `RenderMemory.hold(label, bytes)` creates a full reservation before starting work. `Hold.retain()` creates an independently closable handle without increasing the byte charge. After temporary work has unwound, `shrinkTo(retainedBytes)` can lower the shared reservation to retained output; it cannot grow. Last-handle close releases the account's byte charge and its account slot. Closing the coordinator still preserves all live holds and permits these decreases/releases.
 
-Worker `reservedBytes()` reports worker-owned active/pending/ready payload according to its existing contract. Caller-transferred completions are absent from that local value, but remain visible in the coordinator's totals until their last hold closes. `WorldOrderWorker` retains its existing source lease ownership and has no new local `reservedBytes` API.
+Worker `reservedBytes()` reports worker-owned active/pending/ready payload according to its existing contract. Caller-transferred completions are absent from that local value, but remain visible in the coordinator's totals until their last hold closes. `WorldOrderWorker.reservedBytes()` now reports its active/pending/untaken order payload too; `GlWorldView.orderReservedBytes()` forwards that synchronized snapshot without GL work. Source-lease ownership and conservative replacement admission are unchanged.
 
 ## Atomic idle replacement
 
@@ -38,6 +38,14 @@ The sorting worker also catches completion-publication failures, preserving late
 Only idle payload whose ownership can be dropped without external cleanup belongs in this replacement operation. The ordering worker admits its new job before closing prior scene owners and deliberately uses conservative overlap rather than idle replacement credit. A budget failure therefore does not require destroying an old scene to make the replacement concrete.
 
 All replacement metadata, iterator and account/hold objects are allocated before old handles are consumed. Failed account insertion removes the empty account. No callback, resource deletion or native/GL work runs under the coordinator lock. Replacement is bounded to 256 supplied handles and respects the existing account-count ceiling.
+
+## Camera-order reservation visibility
+
+`WorldOrderWorker.reservedBytes()` counts full source/scratch reservations for active and pending jobs. Once a published job unwinds, it reports only the untaken source scene plus final order keys. READY before unwind counts that job once at its full active reservation. Taking a completion removes it from worker-owned totals; its hold remains visible in coordinator totals. Close/invalidation drop idle work immediately, while cancelled active stacks remain visible until unwind. Invalidation also prepares its next status before cancelling owned work, so status-allocation failure cannot first destroy the old result.
+
+The source-cleanup overlap described above remains intentional: replacement first admits its full new reservation and account before disposing prior pending/ready scene owners. A single-account or insufficient-byte limit rejects without changing the old token/status/owner. With sufficient overlap, successful cleanup leaves only the new pending reservation. Active sorts remain subject to the local active-plus-new-request bound. Caller-transferred completions and independently retained holds supply no early release credit. No sort algorithm, camera identity, scene geometry, byte ceiling or source-lease rule changes.
+
+Four additional synthetic groups prepare checks for pending/READY overlap rejection and exact-bound accepted replacement, already-owned wrapper protection, source-plus-key shrink, stale take, transferred completion/independent hold pressure, active local admission and cancelled-active charge through nonblocking close. Tests gate the private daemon executor through read-only reflection without patching worker state; the active case holds a source monitor until SORTING is observed. FIFO barriers separate publication from unwind. Expected twelve-face scratch/key sizes use explicit primitive widths, not the sorting implementation. These groups compile but have not run. All 129 production sources and four harnesses compile; 59 groups are now prepared. Broader publication races, cleanup/status allocation failures, native/GPU behavior and final application integration remain deferred.
 
 ## Connected GPU handoffs
 

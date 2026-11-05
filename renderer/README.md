@@ -292,7 +292,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 
 ## Prepared world pipeline contracts
 
-[The world CPU harness](WORLD-CPU-VALIDATION.md) adds 13 synthetic groups for cube model/atlas geometry, native assignments/visibility, complete scene metadata, cache lifetimes, exact picking and independent translucent ordering. The compile-only runner now includes both suites (31 prepared groups). All 129 production sources plus both harnesses compile; no tests ran and unsupported previews stay disabled.
+[The world CPU harness](WORLD-CPU-VALIDATION.md) adds 17 synthetic groups for cube model/atlas geometry, native assignments/visibility, complete scene metadata, cache lifetimes, exact picking and independent translucent ordering. The compile-only runner now includes both suites (31 prepared groups). All 129 production sources plus both harnesses compile; no tests ran and unsupported previews stay disabled.
 
 ## Prepared display math contracts
 
@@ -304,11 +304,11 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 
 ## Owned atlas plans and prepared animation checks
 
-[Independent atlas plan inputs](ANIMATION-OWNERS.md) now preserve shared admission beyond completion closure and feed consuming GPU upload/queue paths with coordinator checks. The connected animation controller uses this handoff. Eleven prepared schedule/interpolation/page-sharing/limit groups bring the total to 55. All 129 production sources plus four harnesses compile; no tests ran and unsupported previews stay disabled.
+[Independent atlas plan inputs](ANIMATION-OWNERS.md) now preserve shared admission beyond completion closure and feed consuming GPU upload/queue paths with coordinator checks. The connected animation controller uses this handoff. Eleven prepared schedule/interpolation/page-sharing/limit groups bring the total to 59. All 129 production sources plus four harnesses compile; no tests ran and unsupported previews stay disabled.
 
 ## Atlas replacement guards
 
-[Atlas GPU queue preflight/recovery](../renderer-gl/ATLAS-RECOVERY.md) now checks exact displayed scene/raster identity before replacing same-scene work, with explicit current-failure cleanup/retry. CPU plan ownership and existing scene/frame adoption contracts remain intact. Follow-up compilation in the restored workspace now covers these changes. The 55 prepared groups remain unexecuted and unsupported previews stay disabled.
+[Atlas GPU queue preflight/recovery](../renderer-gl/ATLAS-RECOVERY.md) now checks exact displayed scene/raster identity before replacing same-scene work, with explicit current-failure cleanup/retry. CPU plan ownership and existing scene/frame adoption contracts remain intact. Follow-up compilation in the restored workspace now covers these changes. The 59 prepared groups remain unexecuted and unsupported previews stay disabled.
 
 ## Map and image queue preservation
 
@@ -316,8 +316,12 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 
 ## World source and material preflight
 
-[World upload/view preflight](../renderer-gl/WORLD-PREFLIGHT.md) now preserves earlier owned output when a new CPU scene or its tint/lighting inputs are invalid. Verified tint-required counts avoid synchronous geometry scans, while fresh rejected scene wrappers are still consumed. All 129 CPU/OpenGL sources plus four harnesses compile; the 55 prepared groups remain unexecuted and unsupported previews stay disabled.
+[World upload/view preflight](../renderer-gl/WORLD-PREFLIGHT.md) now preserves earlier owned output when a new CPU scene or its tint/lighting inputs are invalid. Verified tint-required counts avoid synchronous geometry scans, while fresh rejected scene wrappers are still consumed. All 129 CPU/OpenGL sources plus four harnesses compile; the 59 prepared groups remain unexecuted and unsupported previews stay disabled.
 
 ## Completed-frame queue preservation
 
-[World image preflight](../renderer-gl/FRAME-PREFLIGHT.md) now rejects invalid borrowed scene/order/atlas/camera/target metadata before replacing earlier queue-owned output. It adds no geometry scan or source copy. All 129 CPU/OpenGL sources plus four harnesses compile; the 55 prepared groups remain unexecuted and unsupported previews stay disabled.
+[World image preflight](../renderer-gl/FRAME-PREFLIGHT.md) now rejects invalid borrowed scene/order/atlas/camera/target metadata before replacing earlier queue-owned output. It adds no geometry scan or source copy. All 129 CPU/OpenGL sources plus four harnesses compile; the 59 prepared groups remain unexecuted and unsupported previews stay disabled.
+
+## Camera-order reservation visibility
+
+[Sorting-worker accounting](WORKER-MEMORY.md) now exposes active/pending/READY lifecycle totals through `reservedBytes()` and the world-view forwarding accessor. Source-cleanup overlap and caller-owned charges remain enforced. Four controlled source/admission contract groups are prepared, bringing the four-suite total to 59; all compile and remain unexecuted.

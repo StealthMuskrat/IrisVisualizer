@@ -23,6 +23,7 @@ public final class GlWorldView implements AutoCloseable {
     public Status status() { return status; }
     public GlUploadQueue.Status uploadStatus() { return uploads.status(); }
     public WorldOrderWorker.Status orderStatus() { return ordering.status(); }
+    public long orderReservedBytes() { return ordering.reservedBytes(); }
     public AtlasFrameWorker.Status animationWorkerStatus() { return animationWorker.status(); }
     public long animationReservedBytes() { return animationWorker.reservedBytes(); }
     public Optional<GlWorldAnimation.Status> animationStatus() { return Optional.ofNullable(animation).map(GlWorldAnimation::status); }

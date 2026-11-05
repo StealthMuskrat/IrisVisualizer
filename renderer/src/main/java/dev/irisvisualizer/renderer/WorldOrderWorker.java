@@ -22,7 +22,7 @@ public final class WorldOrderWorker implements AutoCloseable {
         boolean cancelled() { return cancelled.get()||Thread.currentThread().isInterrupted(); }
     }
     private final Object lock=new Object();private final ExecutorService executor;private final long workingBytes;private final RenderMemory memory;
-    private long revision;private boolean closed,scheduled;private Job active,pending;private Completion completed;
+    private long revision,completedReservation;private boolean closed,scheduled;private Job active,pending;private Completion completed;
     private Status status=new Status(0,Phase.IDLE,Optional.empty(),List.of());
     public WorldOrderWorker() { this(1024L*1024*1024); }
     public WorldOrderWorker(long workingBytes) { this(workingBytes,null); }
@@ -53,10 +53,12 @@ public final class WorldOrderWorker implements AutoCloseable {
         }finally { if(!consumed) { owner.close();freshAdmission.close(); } }
     }
     private long nextRevision() { if(closed)throw new IllegalStateException("Draw-order worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Draw-order revision counter exhausted");return revision+1; }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.owner.close();pending.admission.close();pending=null; }if(completed!=null) { completed.close();completed=null; } }
-    public long invalidate() { synchronized(lock) { long next=nextRevision();cancelOwned();revision=next;status=new Status(next,Phase.IDLE,Optional.empty(),List.of());return next; } }
+    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.owner.close();pending.admission.close();pending=null; }if(completed!=null) { completed.close();completed=null; }completedReservation=0; }
+    public long invalidate() { synchronized(lock) { long next=nextRevision();var waiting=new Status(next,Phase.IDLE,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; } }
     public Status status() { synchronized(lock) { return status; } }
-    public Optional<Completion> take(long expectedRevision) { synchronized(lock) { if(closed||revision!=expectedRevision||completed==null)return Optional.empty();var result=Optional.of(completed);var delivered=new Status(revision,Phase.DELIVERED,status.snapshotId(),List.of());completed=null;status=delivered;return result; } }
+    /** Active scratch remains charged through unwind; untaken completed output is counted once. */
+    public long reservedBytes() { synchronized(lock) { return (active==null?0:active.reservation)+(pending==null?0:pending.reservation)+(completed==null||active!=null&&active.revision==completed.revision()?0:completedReservation); } }
+    public Optional<Completion> take(long expectedRevision) { synchronized(lock) { if(closed||revision!=expectedRevision||completed==null)return Optional.empty();var result=Optional.of(completed);var delivered=new Status(revision,Phase.DELIVERED,status.snapshotId(),List.of());completed=null;completedReservation=0;status=delivered;return result; } }
     private static Status status(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.snapshotId),problems); }
     private static WorldProblem problem(Throwable error,String reason) { return new WorldProblem(error instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,Optional.empty(),reason+": "+error.getClass().getSimpleName()); }
     private void drain() {
@@ -76,7 +78,7 @@ public final class WorldOrderWorker implements AutoCloseable {
                 if(!closed&&revision==job.revision&&!job.cancelled.get()) {
                     if(result!=null&&!result.requiresPlaceholder()) { var ready=status(job,Phase.READY,List.of());long bytes=job.owner.scene().orElseThrow().usage().knownPayloadBytes()+result.bytes();var hold=job.admission.retain();Completion value;
                         try { value=new Completion(job.revision,job.owner,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
-                        job.retainedBytes=bytes;completed=value;retained=true;status=ready; }
+                        job.retainedBytes=bytes;completed=value;completedReservation=bytes;retained=true;status=ready; }
                     else { if(problems.isEmpty())problems=List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Sorting ended without a complete face order"));status=status(job,Phase.FAILED,problems); }
                 }
             }
