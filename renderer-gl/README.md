@@ -236,3 +236,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Completed-frame replacement preflight
 
 [Frame metadata/target guards](FRAME-PREFLIGHT.md) now preserve earlier untaken world images when source/order/atlas identity, camera pose or target limits reject a replacement. All four direct frame types and connected viewports share target-limit checks before source retention/journal admission or display mutation. Direct readback also validates its borrowed target and budgets before retaining any of the four frame types; accepted drawing/cancellation and admission cleanup retain their existing paths. All 129 CPU/OpenGL sources plus four harnesses compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.
+
+## Upload recovery capability guards
+
+[Map/image recovery](RASTER-RECOVERY.md) and [scalar recovery](SCALAR-RECOVERY.md) now validate upload capabilities before recovery token changes, worker invalidation or retained-owner cleanup. Map dimensions and scalar grid precision are also checked before connected background preparation, preserving earlier work/output on unsupported submissions. Direct upload and retry share the guards; all 129 production sources plus four harnesses compile. Runtime/native/GPU checks remain deferred.

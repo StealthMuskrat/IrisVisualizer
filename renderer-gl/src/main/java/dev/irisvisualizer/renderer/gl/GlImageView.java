@@ -75,6 +75,7 @@ public final class GlImageView implements AutoCloseable {
         Objects.requireNonNull(source);current();if(expectedImageRevision<1)throw new IllegalArgumentException("Invalid image revision");
         if(expectedImageRevision!=imageRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
         if(source.requiresPlaceholder()||latestReceipt==null||!source.receipt().orElseThrow().equals(latestReceipt))throw new GlFailure(GlFailure.Code.STALE,"Retry requires the exact latest successful decoded image receipt");
+        GlImageUpload.validate(device,source);
         long next=nextView();var queued=new Status(imageRevision,next,Phase.UPLOADING,status.source(),List.of(),Optional.empty(),"");
         worker.invalidate();cpuRevision=0;viewRevision=next;dirty=false;
         try {

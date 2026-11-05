@@ -36,9 +36,9 @@ public final class GlNoiseView implements AutoCloseable {
         current();long next=nextData(),view=nextView();var waiting=new Status(next,view,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");worker.invalidate();dataRevision=next;viewRevision=view;cpuRevision=0;sourceReady=false;dirty=false;latestVolume=null;latestStyle=null;latestLimits=null;status=waiting;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
-    /** CPU admission precedes token changes and disposal of the previous view-owned output. */
+    /** Grid precision preflight and CPU admission precede token changes and disposal of prior output. */
     public long submit(NoiseSurfaceWorker.Request request) {
-        Objects.requireNonNull(request);current();long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
+        Objects.requireNonNull(request);current();GlNoiseUpload.precision(request.volume().grid());long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
         long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;sourceReady=false;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();latestLimits=request.limits();status=queued;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -99,6 +99,7 @@ public final class GlNoiseView implements AutoCloseable {
         if(expectedDataRevision!=dataRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
         if(source.requiresPlaceholder()||latestStyle==null||!source.volume().id().equals(latestVolume)||!source.style().equals(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Retry requires the exact latest scalar volume and complete display style");
         if(source.size()>latestLimits.faces()||source.payloadBytes()>latestLimits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Retry surface exceeds the latest scalar preparation allowance");
+        GlNoiseUpload.validate(device,source);
         long next=nextView();var queued=new Status(dataRevision,next,Phase.UPLOADING,status.context(),List.of(),Optional.empty(),"");
         worker.invalidate();cpuRevision=0;viewRevision=next;dirty=false;
         try { releaseDisplay();upload=GlNoiseUpload.begin(device,source);status=queued;return true; }

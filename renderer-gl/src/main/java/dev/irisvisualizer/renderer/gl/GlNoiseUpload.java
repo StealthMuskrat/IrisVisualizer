@@ -14,12 +14,17 @@ public final class GlNoiseUpload implements AutoCloseable {
     public record Step(Progress progress,int transferBytes,long storageBytes,int actions,int workUnits,long elapsedNanoseconds) {}
     private final GlDevice device;private final int count;private GlDevice.Allocation allocation;private GlNoiseScene completed;private Phase phase=Phase.STORAGE;private int face;
     private GlNoiseUpload(GlDevice device,GlDevice.Allocation allocation,int count) { this.device=device;this.allocation=allocation;this.count=count; }
-    static void precision(NoiseSurface surface) {
-        var g=surface.volume().grid();float scale=(float)g.horizontal().blocksPerSample();
+    /** Grid-only precision bounds, available before scalar meshing or recoloring. */
+    static void precision(NoiseVolume.Grid g) {
+        Objects.requireNonNull(g);float scale=(float)g.horizontal().blocksPerSample();
         if(!Float.isFinite(scale)||scale<Float.MIN_NORMAL||Math.max((double)g.width()*scale,(double)g.depth()*scale)>1048576)throw new GlFailure(GlFailure.Code.LIMIT,"Scalar bins exceed supported float scale/relative-span bounds; data was not reduced");
     }
+    /** Borrowed completeness/context/precision checks; no journal or source owner is admitted. */
+    static void validate(GlDevice device,NoiseSurface surface) {
+        Objects.requireNonNull(device);Objects.requireNonNull(surface);device.current();if(surface.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"A complete scalar boundary surface is required");precision(surface.volume().grid());
+    }
     public static GlNoiseUpload begin(GlDevice device,NoiseSurface surface) {
-        Objects.requireNonNull(device);Objects.requireNonNull(surface);device.current();if(surface.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"A complete scalar boundary surface is required");precision(surface);
+        validate(device,surface);
         GlDevice.Allocation allocation=null;
         try { allocation=device.reserve(0,surface.payloadBytes(),0,0,0,0,0,0,0,null);allocation.retained=surface;return new GlNoiseUpload(device,allocation,surface.size()); }
         catch(RuntimeException|Error failure) { if(allocation!=null)try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }

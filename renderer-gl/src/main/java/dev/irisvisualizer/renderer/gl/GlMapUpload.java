@@ -17,7 +17,12 @@ public final class GlMapUpload implements AutoCloseable {
     /** Source/context/capability preflight; no upload journal, texture or staging payload is allocated. */
     static void validate(GlDevice device,MapRaster raster) {
         Objects.requireNonNull(device);Objects.requireNonNull(raster);device.current();if(raster.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"A complete CPU map raster is required");var image=raster.image().orElseThrow();
-        if(image.width()>device.maximumTextureSize()||image.height()>device.maximumTextureSize()||image.width()*4>device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.CAPABILITY,"Map exceeds hardware texture or bounded row-staging dimensions");
+        dimensions(device,image.width(),image.height());
+    }
+    /** Original sample-grid bounds, also known before colorization; no pixel or sample scan. */
+    static void dimensions(GlDevice device,int width,int height) {
+        Objects.requireNonNull(device);device.current();
+        if(width<1||height<1||width>device.maximumTextureSize()||height>device.maximumTextureSize()||(long)width*4>device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.CAPABILITY,"Map exceeds hardware texture or bounded row-staging dimensions");
     }
     public static GlMapUpload begin(GlDevice device,MapRaster raster) {
         validate(device,raster);

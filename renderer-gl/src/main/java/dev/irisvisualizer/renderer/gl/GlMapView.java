@@ -37,9 +37,9 @@ public final class GlMapView implements AutoCloseable {
         worker.invalidate();mapRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;latestSamples=null;latestStyle=null;latestLimits=null;status=waiting;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
-    /** Worker admission occurs first; a budget rejection leaves the current view, tokens and work intact. */
+    /** Capability preflight and worker admission precede changes to the current view, tokens and work. */
     public long submit(MapRasterWorker.Request request) {
-        Objects.requireNonNull(request);current();long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,request.source().isPresent()?Phase.RECOLORING:Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
+        Objects.requireNonNull(request);current();var requestedGrid=request.samples().grid();GlMapUpload.dimensions(device,requestedGrid.width(),requestedGrid.height());long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,request.source().isPresent()?Phase.RECOLORING:Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
         long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;latestSamples=request.samples().id();latestStyle=request.style();latestLimits=request.limits();status=queued;grid=request.samples().grid();
         if(view!=null&&(view.width()!=grid.width()||view.height()!=grid.height()))view=null;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
@@ -93,6 +93,7 @@ public final class GlMapView implements AutoCloseable {
         if(expectedMapRevision!=mapRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
         if(source.requiresPlaceholder()||!source.samples().id().equals(latestSamples)||!source.style().equals(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Retry requires the latest complete map capture and display style");
         if(source.image().orElseThrow().bytes()>latestLimits.imageBytes()||source.payloadBytes()>latestLimits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Retry raster exceeds the latest map output allowance");
+        GlMapUpload.validate(device,source);
         long next=nextView();var queued=new Status(mapRevision,next,Phase.UPLOADING,status.context(),List.of(),Optional.empty(),"");
         worker.invalidate();cpuRevision=0;viewRevision=next;dirty=false;
         try {
