@@ -28,8 +28,10 @@ public final class GlImageView implements AutoCloseable {
         return new Status(imageRevision,next,sourceReady?Phase.WAITING_VIEW:status.phase(),status.source(),sourceFailure?status.problems():List.of(),sourceFailure?status.code():Optional.empty(),sourceFailure?status.reason():"");
     }
     private void failed(Throwable error) {
-        String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
-        status=new Status(imageRevision,viewRevision,Phase.FAILED,status.source(),List.of(),Optional.of(error instanceof GlFailure gpu?gpu.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE),reason);
+        try {
+            String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
+            status=new Status(imageRevision,viewRevision,Phase.FAILED,status.source(),List.of(),Optional.of(error instanceof GlFailure gpu?gpu.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE),reason);
+        }catch(RuntimeException|Error publication) { if(publication!=error)error.addSuppressed(publication); }
     }
     /** Invalidate immediately when resource inputs change, before replacement bytes arrive. */
     public long invalidate() {

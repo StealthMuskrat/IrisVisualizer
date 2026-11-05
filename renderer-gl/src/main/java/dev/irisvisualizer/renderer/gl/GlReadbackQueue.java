@@ -25,8 +25,10 @@ public final class GlReadbackQueue implements AutoCloseable {
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"Readback queue is closed"); }
     private Status state(Phase phase,GlFailure.Code code,String reason) { return new Status(revision,phase,active==null?Optional.empty():Optional.of(active.progress()),Optional.ofNullable(code),reason); }
     private void failed(Throwable error) {
-        String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
-        status=state(Phase.FAILED,error instanceof GlFailure gpu?gpu.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE,reason);
+        try {
+            String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
+            status=state(Phase.FAILED,error instanceof GlFailure gpu?gpu.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE,reason);
+        }catch(RuntimeException|Error publication) { if(publication!=error)error.addSuppressed(publication); }
     }
     private void releaseOwned() { if(active!=null)try { active.close();active=null; }catch(RuntimeException|Error error) { if(!active.ownsResources())active=null;throw error; } }
     public boolean invalidate(long next) {

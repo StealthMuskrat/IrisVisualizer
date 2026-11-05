@@ -27,8 +27,10 @@ public final class GlWorldAnimation implements AutoCloseable {
         status=new Status(sceneRevision,revision,phase,tick,partialTick,displayedTick,displayedPartial,problems,Optional.ofNullable(code),reason);
     }
     private void failed(Throwable failure) {
-        String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
-        state(Phase.FAILED,List.of(),failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE,reason);
+        try {
+            String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
+            state(Phase.FAILED,List.of(),failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE,reason);
+        }catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
     }
     /** External clock, including seeks. A repeated failed clock explicitly retries; no internal timer runs. */
     public void clock(long tick,double partialTick) {

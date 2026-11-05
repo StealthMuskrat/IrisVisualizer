@@ -23,7 +23,11 @@ public final class GlFrameQueue implements AutoCloseable {
     public Status status() { return status; }
     private void current() { device.current();if(closed||rendering)throw new GlFailure(GlFailure.Code.STATE,"Frame queue is closed or already rendering"); }
     private void releaseOwned() { if(completed==null)return;try { completed.close();completed=null; }catch(RuntimeException|Error failure) { if(completed.closed())completed=null;throw failure; } }
-    private void failed(Throwable failure) { String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);var code=failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;status=new Status(revision,failure instanceof CancellationException?Phase.CANCELLED:Phase.FAILED,status.source(),Optional.empty(),Optional.of(code),reason); }
+    private void failed(Throwable failure) {
+        try {
+            String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);var code=failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;status=new Status(revision,failure instanceof CancellationException?Phase.CANCELLED:Phase.FAILED,status.source(),Optional.empty(),Optional.of(code),reason);
+        }catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
+    }
     public boolean invalidate(long next) {
         current();if(next<1)throw new IllegalArgumentException("Invalid frame revision");if(next<=revision)return false;var waiting=new Status(next,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");revision=next;status=waiting;
         try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }return true;

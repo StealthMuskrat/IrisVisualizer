@@ -23,13 +23,22 @@ public final class GlAtlasQueue implements AutoCloseable {
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"Atlas queue is closed"); }
     private Status state(Phase phase,GlFailure.Code code,String reason) { return new Status(sceneRevision,frameRevision,phase,active==null?Optional.empty():Optional.of(active.progress()),Optional.ofNullable(code),reason); }
     private void failure(Throwable failure) {
-        var code=failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;String reason=failure.getMessage();if(reason==null)reason=failure.getClass().getSimpleName();if(reason.length()>8192)reason=reason.substring(0,8192);status=state(Phase.FAILED,code,reason);
+        try {
+            var code=failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;String reason=failure.getMessage();if(reason==null)reason=failure.getClass().getSimpleName();if(reason.length()>8192)reason=reason.substring(0,8192);status=state(Phase.FAILED,code,reason);
+        }catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
     }
     private void releaseOwned() { if(active==null)return;try { active.close();active=null; }catch(RuntimeException|Error error) { if(!active.ownsResources())active=null;throw error; } }
     private boolean observe(long latestScene,long latestFrame) {
         if(latestScene<1||latestFrame<1)throw new IllegalArgumentException("Invalid atlas revision");
         if(latestScene<sceneRevision)return false;
-        if(latestScene>sceneRevision) { obsolete=true;try { releaseOwned(); }finally { status=state(Phase.STALE,GlFailure.Code.STALE,"The GPU scene revision changed"); }return false; }
+        if(latestScene>sceneRevision) {
+            obsolete=true;Throwable failure=null;
+            try { releaseOwned(); }catch(RuntimeException|Error cleanup) { failure=cleanup; }
+            try { status=new Status(sceneRevision,frameRevision,Phase.STALE,Optional.empty(),Optional.of(GlFailure.Code.STALE),"The GPU scene revision changed"); }
+            catch(RuntimeException|Error publication) { if(failure==null)throw publication;if(publication!=failure)failure.addSuppressed(publication); }
+            if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+            return false;
+        }
         if(obsolete)return false;
         if(latestFrame>frameRevision) { frameRevision=latestFrame;status=state(Phase.WAITING,null,"");try { releaseOwned(); }catch(RuntimeException|Error error) { failure(error);throw error; }status=state(Phase.WAITING,null,""); }
         return latestFrame==frameRevision;

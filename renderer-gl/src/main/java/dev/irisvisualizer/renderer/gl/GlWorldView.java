@@ -47,9 +47,11 @@ public final class GlWorldView implements AutoCloseable {
         return new Status(worldRevision,next,sourceReady?Phase.WAITING_VIEW:status.phase(),status.source(),sourceFailure?status.problems():List.of(),sourceFailure?status.code():Optional.empty(),sourceFailure?status.reason():"");
     }
     private void failed(Throwable error) {
-        String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
-        var code=error instanceof GlFailure failure?failure.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;
-        status=new Status(worldRevision,viewRevision,Phase.FAILED,status.source(),List.of(),Optional.of(code),reason);
+        try {
+            String reason=Objects.toString(error.getMessage(),error.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
+            var code=error instanceof GlFailure failure?failure.code():error instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;
+            status=new Status(worldRevision,viewRevision,Phase.FAILED,status.source(),List.of(),Optional.of(code),reason);
+        }catch(RuntimeException|Error publication) { if(publication!=error)error.addSuppressed(publication); }
     }
     /** Notify immediately when native input changes, before the replacement CPU scene exists. */
     public boolean invalidate(long nextWorldRevision) {

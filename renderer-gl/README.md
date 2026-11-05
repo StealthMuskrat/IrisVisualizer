@@ -280,3 +280,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Consuming input cleanup
 
 [Owned GPU handoffs](INPUT-HANDOFFS.md) now retain newly created atlas/scalar/lit-world upload jobs until supplied CPU input cleanup succeeds. A cleanup failure attempts to close the unreturned job while preserving the first error. Paired lighting/scene and raw world submission also attempt fresh-owner cleanup without masking the original rejection. Full and dependency-free compilation passed; all 64 prepared groups and runtime/GPU failure injection remain unexecuted.
+
+## Failure diagnostic preservation
+
+[All eleven queue/view/animation publishers](SOURCE-FAILURES.md#best-effort-failure-diagnostics) now preserve the original error if diagnostic message, metadata or status construction also fails. Atlas invalidation likewise preserves cleanup errors through STALE publication failure and keeps its obsolete gate authoritative. Successful status formats, source ownership and memory limits retain their existing contracts. Full and dependency-free compilation passed; all 64 prepared groups and runtime/GPU validation remain unexecuted.

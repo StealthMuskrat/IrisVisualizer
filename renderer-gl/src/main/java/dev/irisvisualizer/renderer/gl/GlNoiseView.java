@@ -28,8 +28,10 @@ public final class GlNoiseView implements AutoCloseable {
         return new Status(dataRevision,next,sourceReady?Phase.WAITING_VIEW:status.phase(),status.context(),sourceFailure?status.problems():List.of(),sourceFailure?status.code():Optional.empty(),sourceFailure?status.reason():"");
     }
     private void failed(Throwable failure) {
-        String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
-        status=new Status(dataRevision,viewRevision,Phase.FAILED,status.context(),List.of(),Optional.of(failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE),reason);
+        try {
+            String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
+            status=new Status(dataRevision,viewRevision,Phase.FAILED,status.context(),List.of(),Optional.of(failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE),reason);
+        }catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
     }
     /** Call when native inputs become obsolete, before replacement samples are ready. */
     public long invalidate() {

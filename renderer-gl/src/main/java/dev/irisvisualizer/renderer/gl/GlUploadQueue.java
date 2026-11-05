@@ -78,9 +78,11 @@ public final class GlUploadQueue implements AutoCloseable {
         if(latestRevision!=revision||status.phase()!=Phase.READY||completed==null)return Optional.empty();var value=Optional.of(new Completion(revision,completed));var delivered=new Status(revision,Phase.DELIVERED,status.source(),status.progress(),Optional.empty(),"");completed=null;status=delivered;return value;
     }
     private void failed(Throwable failure) {
-        var code=failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;
-        String reason=failure.getMessage();if(reason==null)reason=failure.getClass().getSimpleName();if(reason.length()>8192)reason=reason.substring(0,8192);
-        status=new Status(revision,Phase.FAILED,status.source(),status.progress(),Optional.of(code),reason);
+        try {
+            var code=failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE;
+            String reason=failure.getMessage();if(reason==null)reason=failure.getClass().getSimpleName();if(reason.length()>8192)reason=reason.substring(0,8192);
+            status=new Status(revision,Phase.FAILED,status.source(),status.progress(),Optional.of(code),reason);
+        }catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
     }
     private void releaseOwned() {
         Throwable failure=null;
