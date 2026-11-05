@@ -284,3 +284,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Failure diagnostic preservation
 
 [All eleven queue/view/animation publishers](SOURCE-FAILURES.md#best-effort-failure-diagnostics) now preserve the original error if diagnostic message, metadata or status construction also fails. Atlas invalidation likewise preserves cleanup errors through STALE publication failure and keeps its obsolete gate authoritative. Successful status formats, source ownership and memory limits retain their existing contracts. Full and dependency-free compilation passed; all 64 prepared groups and runtime/GPU validation remain unexecuted.
+
+## Precise scalar focus receipts
+
+[Scalar focus](CAMERA-FIT.md#fractional-scalar-focus-at-distant-origins) now reconstructs sample positions from immutable hit-grid metadata before subtracting distant anchors, preserving decimal spacing near world-coordinate limits. Produced hits supply the receipt automatically; legacy hit construction/focus remains available. Expanded navigation and picking contracts compile within 64 prepared, unexecuted groups. Full and dependency-free compilation passed; runtime/native/GPU validation remains deferred.

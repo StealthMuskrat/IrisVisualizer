@@ -6,7 +6,17 @@ import java.util.function.BooleanSupplier;
 /** Bounded front-face inspection of opaque scalar bins. No Minecraft block/biome identity is fabricated. */
 public final class NoisePick {
     private NoisePick() {}
-    public record Hit(int face,NoiseSurface.Face sample,double distance,double localX,double localY,double localZ) {}
+    /** Grid metadata contains no sample arrays and preserves fractional coordinates before absolute-double rounding. */
+    public record Hit(int face,NoiseSurface.Face sample,double distance,double localX,double localY,double localZ,Optional<NoiseVolume.Grid> grid) {
+        public Hit(int face,NoiseSurface.Face sample,double distance,double localX,double localY,double localZ) { this(face,sample,distance,localX,localY,localZ,Optional.empty()); }
+        public Hit {
+            Objects.requireNonNull(grid);
+            if(grid.isPresent()) {
+                var source=grid.orElseThrow();
+                if(sample==null||sample.sample()<0||sample.sample()>=source.count()||!source.point(sample.sample()).equals(sample.point()))throw new IllegalArgumentException("Scalar hit sample does not match its grid metadata");
+            }
+        }
+    }
     public record Options(int maximumFaces,WorldClip clip) {
         public Options(int maximumFaces) { this(maximumFaces,WorldClip.NONE); }
         public Options { Objects.requireNonNull(clip);if(maximumFaces<0||maximumFaces>1048576)throw new IllegalArgumentException("Invalid scalar query face allowance"); }
@@ -60,7 +70,7 @@ public final class NoisePick {
             }
         }
         WorldProblem.check(cancelled);Optional<Hit> hit=Optional.empty();
-        if(found>=0) { int cell=foundCell;double minX=(cell%g.width())*scale,minY=cell/((long)g.width()*g.depth()),minZ=(cell/g.width()%g.depth())*scale;hit=Optional.of(new Hit(found,surface.face(found,foundU,foundV),nearest,hitX-minX,hitY-minY,hitZ-minZ)); }
+        if(found>=0) { int cell=foundCell;double minX=(cell%g.width())*scale,minY=cell/((long)g.width()*g.depth()),minZ=(cell/g.width()%g.depth())*scale;hit=Optional.of(new Hit(found,surface.face(found,foundU,foundV),nearest,hitX-minX,hitY-minY,hitZ-minZ,Optional.of(g))); }
         return new Result(volume.id(),ray,hit,visited,visitedBatches,culledBatches,List.of(),options.clip());
     }
     /** Expand slabs and interval rounding so a batch cannot hide an edge/corner tie. */

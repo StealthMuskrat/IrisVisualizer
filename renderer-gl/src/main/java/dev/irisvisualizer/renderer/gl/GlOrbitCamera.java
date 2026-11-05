@@ -34,8 +34,17 @@ public record GlOrbitCamera(WorldSnapshot.Position anchor,double centerX,double 
     }
     /** Caller checks the current scalar image/volume receipt before adopting a detached hit. */
     public GlOrbitCamera focus(NoisePick.Hit hit) {
-        Objects.requireNonNull(hit);var p=hit.sample().point();long x=(long)Math.floor(p.x()),z=(long)Math.floor(p.z());
+        Objects.requireNonNull(hit);
+        if(hit.grid().isPresent()) {
+            var grid=hit.grid().orElseThrow();int cell=hit.sample().sample(),x=cell%grid.width(),z=cell/grid.width()%grid.depth();long y=cell/((long)grid.width()*grid.depth());double scale=grid.horizontal().blocksPerSample();
+            return new GlOrbitCamera(anchor,relativeSample(grid.horizontal().originX(),x*scale,anchor.x(),hit.localX()),((long)grid.vertical().minY()+y-anchor.y())+hit.localY(),relativeSample(grid.horizontal().originZ(),z*scale,anchor.z(),hit.localZ()),distance,yaw,pitch,fieldOfView,near,far);
+        }
+        var p=hit.sample().point();long x=(long)Math.floor(p.x()),z=(long)Math.floor(p.z());
         return new GlOrbitCamera(anchor,Math.subtractExact(x,anchor.x())+(p.x()-x)+hit.localX(),((long)p.y()-anchor.y())+hit.localY(),Math.subtractExact(z,anchor.z())+(p.z()-z)+hit.localZ(),distance,yaw,pitch,fieldOfView,near,far);
+    }
+    private static double relativeSample(int origin,double offset,long anchor,double local) {
+        long whole=(long)Math.floor(offset);
+        return Math.subtractExact(Math.addExact((long)origin,whole),anchor)+(offset-whole)+local;
     }
     /** Fit actual emitted geometry/marker bounds. Empty scenes use their complete configured extent. */
     public static GlOrbitCamera fit(WorldScene scene,double aspect) {
