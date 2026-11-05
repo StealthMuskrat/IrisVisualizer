@@ -289,3 +289,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared CPU stage contracts
 
 [The initial CPU validation harness](CPU-VALIDATION.md) now prepares 18 deterministic groups for map capture/color/relief/navigation, original PNG pixels, scalar exposure/recolor/picking and shared ownership. Independent face/light expectations supplement atomic failure and memory-boundary cases. The Windows runner compiles by default and requires explicit execution at renderer-stage validation. All 129 production sources plus the harness compile; no contracts ran and unsupported previews stay disabled.
+
+## Prepared world pipeline contracts
+
+[The world CPU harness](WORLD-CPU-VALIDATION.md) adds 13 synthetic groups for cube model/atlas geometry, native assignments/visibility, complete scene metadata, cache lifetimes, exact picking and independent translucent ordering. The compile-only runner now includes both suites (31 prepared groups). All 129 production sources plus both harnesses compile; no tests ran and unsupported previews stay disabled.

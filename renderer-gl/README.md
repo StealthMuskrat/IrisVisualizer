@@ -204,3 +204,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## CPU validation preparation
 
 [Initial dependency-free CPU contracts](../renderer/CPU-VALIDATION.md) now compile alongside the renderer, preparing 18 deterministic groups before stage execution. They cover supplied map/scalar/image data and ownership, including independent exposure/light expectations; no GL context, driver, native parity or retry behavior is certified. All 129 production sources plus the harness compile; runtime tests remain deferred and unsupported previews stay disabled.
+
+## World CPU validation preparation
+
+[Prepared world contracts](../renderer/WORLD-CPU-VALIDATION.md) now supplement the map/scalar/image suite with model-to-atlas geometry, scene/cache ownership, picking and translucent order checks. Both harnesses compile alongside all 129 production sources; the runner remains compile-only by default. No contract, native or GPU execution occurred and unsupported previews stay disabled.

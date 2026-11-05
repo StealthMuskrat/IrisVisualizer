@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04. The new `RendererCpuContracts` harness has 18 deterministic contract groups. Its source compiles; it has **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04. The `RendererCpuContracts` harness has 18 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add another 13 groups in a separate harness, for 31 prepared groups total. Its source compiles; it has **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -10,7 +10,7 @@ On the supported Windows x64 environment with a Java 25 JDK:
 ./scripts/Validate-RendererCpu.ps1
 ```
 
-The default compiles CPU production sources and the contract harness into `build/renderer-cpu-validation/classes`. It uses an explicit UTF-8 source argument file, including quoted paths for repository locations with spaces. It executes no contract, imports no native adapter or OpenGL source and does not require LWJGL, pinned native checkouts, a client asset JAR, a pack or a display server.
+The default compiles CPU production sources and the contract harness into `build/renderer-cpu-validation/classes`. It uses an explicit UTF-8 source argument file, including quoted paths for repository locations with spaces. It executes no contract, compiles both CPU harnesses, imports no native adapter or OpenGL source and does not require LWJGL, pinned native checkouts, a client asset JAR, a pack or a display server.
 
 Once renderer implementation is complete and stage testing begins:
 
@@ -18,7 +18,7 @@ Once renderer implementation is complete and stage testing begins:
 ./scripts/Validate-RendererCpu.ps1 -Execute
 ```
 
-Execution is explicit rather than a CI trigger or default script side effect. Assertions use ordinary checks that throw `AssertionError`, so they do not depend on JVM `-ea`. The process stops at the first failing group and exits unsuccessfully; only executed successful groups print PASS. A final count describes this synthetic CPU suite, never native or GPU parity. The runner is newly prepared and has not itself been run or validated on PowerShell/Windows.
+Execution is explicit rather than a CI trigger or default script side effect. Assertions use ordinary checks that throw `AssertionError`, so they do not depend on JVM `-ea`. Each suite runs in a separate JVM; the runner stops at the first failing group or process and exits unsuccessfully; only executed successful groups print PASS. A final count describes this synthetic CPU suite, never native or GPU parity. The runner is newly prepared and has not itself been run or validated on PowerShell/Windows.
 
 ## Initial contract scope
 
@@ -47,6 +47,6 @@ The exposure oracle enumerates occupied original cells and their six neighbors; 
 
 ## Current verification evidence and remaining work
 
-Compilation succeeded for all 129 CPU/OpenGL production sources plus this contract source (130 total) with Java 25 and LWJGL 3.4.1. The 88 CPU production sources plus the harness also compile independently without external dependencies. No contracts, worker/concurrency checks, native query, GL context, GPU upload/readback or workflow ran. The Windows PowerShell runner was inspected only.
+Compilation succeeded for all 129 CPU/OpenGL production sources plus both contract sources (131 total) with Java 25 and LWJGL 3.4.1. The 88 CPU production sources plus both harnesses also compile independently without external dependencies (90 total). No contracts, worker/concurrency checks, native query, GL context, GPU upload/readback or workflow ran. The Windows PowerShell runner was inspected only.
 
-This is an initial suite, not renderer-stage completion. World block/model/fluid/material/atlas pipelines, cache and picking-index construction, worker races/failure injection, full PNG/JPEG matrices, camera math, GPU state/upload/draw/retirement, real pixel comparisons and native source parity still require their planned verification. Sixteen native adapters still require genuine pinned Windows compilation/execution. Final UI integration and combined application memory/GPU QA remain pending. Do not infer readiness or enable supported previews from successful compilation or from a future synthetic CPU suite result alone.
+This is an initial suite, not renderer-stage completion. Broader world block/model/fluid/material/atlas coverage beyond the prepared synthetic world suite, worker races/failure injection, full PNG/JPEG matrices, camera math, GPU state/upload/draw/retirement, real pixel comparisons and native source parity still require their planned verification. Sixteen native adapters still require genuine pinned Windows compilation/execution. Final UI integration and combined application memory/GPU QA remain pending. Do not infer readiness or enable supported previews from successful compilation or from a future synthetic CPU suite result alone.

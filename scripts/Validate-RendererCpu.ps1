@@ -18,7 +18,9 @@ Invoke-Checked -Program $javac -Arguments @('--release','25','-encoding','UTF-8'
 Write-Host "Compiled $($paths.Count) CPU production/contract sources. No native adapter or OpenGL dependency was used."
 if ($Execute) {
     # Execute only after renderer implementation is complete, as required by AGENTS.md.
-    Invoke-Checked -Program $java -Arguments @('-cp',$classes,'dev.irisvisualizer.renderer.RendererCpuContracts')
+    foreach ($suite in @('RendererCpuContracts','WorldCpuContracts')) {
+        Invoke-Checked -Program $java -Arguments @('-cp',$classes,"dev.irisvisualizer.renderer.$suite")
+    }
 } else {
     Write-Host 'Compilation only; no renderer contract was executed. Use -Execute at renderer-stage validation.'
 }
