@@ -252,3 +252,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Retryable queue disposal
 
 [All six GPU queues](SOURCE-FAILURES.md#queue-shutdown-and-terminal-publication) now retain shutdown retry eligibility until cleanup and CLOSED publication both succeed. Cleanup errors remain primary when terminal metadata also fails, and the closed gate blocks further adoption throughout recovery. Original-context validation precedes teardown, atlas CLOSED publication reads no failed-upload progress, and independently transferred outputs retain their ownership. Close queues before their device. Full and dependency-free compilation passed; all 64 prepared groups and GPU/runtime validation remain unexecuted.
+
+## Animation worker admission preflight
+
+[Standalone animation construction](../renderer/ANIMATION-OWNERS.md#worker-validation-before-atlas-capture) now rejects closed/exhausted workers and tracked coordinator mismatches before retaining GPU atlas ownership. Validation preserves pending/READY CPU work and tokens; tracked matching and untracked compatibility remain available. The retained-completion contract now prepares these ownership cases without adding a group. All production/harness sources compile; all 64 groups and GPU/runtime validation remain unexecuted.

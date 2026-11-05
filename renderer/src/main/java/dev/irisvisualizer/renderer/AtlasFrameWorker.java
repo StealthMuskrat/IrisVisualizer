@@ -63,6 +63,17 @@ public final class AtlasFrameWorker implements AutoCloseable {
         executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
     }
     private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-atlas-frames");thread.setDaemon(true);return thread;}); }
+    /**
+     * Checks the next-submit gate and tracked destination identity without reserving, cancelling or advancing work.
+     * A null destination denotes external admission; untracked workers remain compatible with any destination.
+     * This is a snapshot, not an exclusive claim: the host must keep this borrowed worker exclusive through use.
+     */
+    public void validateDestination(RenderMemory destination) {
+        synchronized(lock) {
+            next();
+            if(memory!=null&&memory!=destination)throw new IllegalArgumentException("Tracked atlas worker requires the same destination coordinator");
+        }
+    }
     private long next() { if(closed)throw new IllegalStateException("Atlas worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Atlas revision counter exhausted");return revision+1; }
     private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedReservation=0; }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }

@@ -75,7 +75,7 @@ One additional prepared contract supplies queued work to all eight families and 
 
 The GPU journal is admitted **before** the CPU completion hold closes. This conservative overlap avoids an uncharged handoff gap. The shared allowance may reject a handoff even if a future deduplicating transfer could fit. A rejected handoff does not silently close a displayed caller-owned image or lower resolution; existing failure/retry contracts apply. Admitted CPU/GPU journals continue to retain their payload through fences, dependencies and quarantine. No additional context/thread or internal timer is created.
 
-A directly constructed `GlWorldAnimation` still borrows the worker supplied by its caller; that caller must choose the matching coordinator. Lower-level raster/plan/order APIs remain usable independently, and callers using them must scope their completion holds through the actual destination admission or disposal.
+A directly constructed `GlWorldAnimation` still borrows the worker supplied by its caller. [Worker destination preflight](ANIMATION-OWNERS.md#worker-validation-before-atlas-capture) now rejects a closed/exhausted worker or tracked coordinator mismatch before initial atlas capture, preserving queued/ready work and creating no GPU ownership. Untracked workers retain explicit external-admission compatibility. Lower-level raster/plan/order APIs remain usable independently, and callers using them must scope their completion holds through the actual destination admission or disposal.
 
 ## Detached readback ownership
 

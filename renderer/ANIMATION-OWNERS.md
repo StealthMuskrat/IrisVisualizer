@@ -19,6 +19,18 @@ Tracked GPU inputs must belong to the same coordinator as their destination devi
 
 The atlas worker drops its active request reference before shrinking/releasing the job hold after unwind. A failed/cancelled request therefore no longer remains strongly referenced by that job variable after its admission is released. Successful plans retain their ordinary full output charge through independent completion/input owners. No memory ceiling or source/atlas identity changes.
 
+## Worker validation before atlas capture
+
+`AtlasFrameWorker.validateDestination(destination)` checks the actual closed gate, next-revision availability and tracked coordinator identity under the worker lock. A tracked worker requires its exact coordinator; untracked workers retain explicit external-admission compatibility with either a tracked or untracked destination. Validation creates no account, submits no task, consumes no revision and never cancels or takes pending/ready work. It does not reserve future bytes or claim exclusive ownership. A closed coordinator or later memory pressure still fails through ordinary job admission.
+
+`GlWorldAnimation` validates the live scene/context, positive scene revision and borrowed worker before constructing its atlas queue or capturing the initial GPU atlas. Closed, exhausted and foreign tracked workers therefore fail before any atlas journal, page reference or scene dependency is acquired. A tracked worker cannot target an untracked device; an untracked worker remains permitted with externally scoped CPU admission. The connected world view already creates workers with its device coordinator and keeps that policy.
+
+The worker need not be idle: an exclusive worker can still be unwinding cancelled work from a previous world. The host must not submit unrelated jobs or close it concurrently with controller use. Validation is a snapshot; later worker closure, revision changes, coordinator closure and admission failures retain the existing explicit failure/adoption guards. Construction rejection leaves borrowed workers and scenes caller-owned and performs no invalidation or shutdown.
+
+The existing retained-completion contract group now also prepares deterministic destination checks in idle, queued, READY, transferred, closed and exhausted states. It verifies status identity, next token, task queue, reservations and account/byte snapshots after rejection, successful execution/take of the preserved plan, independent transferred lifetime and untracked compatibility. The controlled executor starts no thread; its jobs run only when the deferred harness is explicitly executed. Group count remains 11 for animation and 64 overall. No assertions ran.
+
+At renderer completion, additionally reject closed/exhausted workers, tracked foreign workers and tracked workers with untracked devices on a real current GL context. Check unchanged scene ownership, device journals/dependencies, worker status/charge and queued/READY output after constructor rejection, including under account pressure. Confirm matching and untracked compatibility, cancelled-active reuse, later close/admission failure and ordinary clock/plan/atlas adoption. No fake GL device is used as a runtime substitute.
+
 ## Prepared animation suite
 
 `AnimationCpuContracts` adds 11 groups to the three earlier harnesses. With the subsequent sorting, shutdown-recovery and world/map/image boundary groups, 64 groups are now prepared in total. Its sources compile; no assertion has been executed or claimed to pass. The default Windows validation runner compiles only and now includes four suite classes. At renderer-stage validation, explicit `-Execute` launches each suite in its own JVM and stops on failure. The runner remains inspected only on this host.
@@ -35,7 +47,7 @@ The atlas worker drops its active request reference before shrinking/releasing t
 | Copy-on-write pages | Only the animated page changes, static page sharing, grouped patches, old pixels and exact source/patch/copy accounting |
 | Stale baselines | A matching-looking different raster cannot accept an update; no partial raster/plan escapes |
 | Working limits/cancellation | Exact peak acceptance, one-byte copy/patch deficits, worker metadata rejection and cancellation without source mutation |
-| Retained completion | Completion/input/coordinator closure preserves independent exact-plan lifetime and final charge/account release |
+| Retained completion and destination preflight | Independent exact-plan lifetime and final release; idle/queued/READY/transferred rejection preservation, closed/exhausted guards and untracked compatibility |
 
 The tiny fixture resolves a two-face JSON model and prepares two standard-library-generated PNG sprites through the production texture/atlas pipeline. A four-pixel page limit places animated/static slots on separate pages, making page sharing observable. One-pixel frame gutters and a half blend have direct known byte expectations. Synthetic catalog/source receipts identify a fixture, never a verified client archive or native engine result.
 

@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.*;
 import java.util.*;
-import java.util.concurrent.CancellationException;
+import java.util.concurrent.*;
 import java.util.zip.*;
 
 /** Synthetic animation/atlas contracts; compile during implementation, execute only at stage validation. */
@@ -97,7 +97,43 @@ public final class AnimationCpuContracts {
         var small=baseline(layout(4096,35));var rejected=AtlasImages.updates(small,1,0,()->false);check(rejected.requiresPlaceholder()&&rejected.patches().isEmpty()&&rejected.bytes()==0,"patch budget failure atomic");
         throwsType(CancellationException.class,()->AtlasImages.capture(base.layout(),0,0,()->true),"raster cancellation");throwsType(CancellationException.class,()->AtlasImages.updates(base,1,0,()->true),"patch cancellation");throwsType(CancellationException.class,()->AtlasFramePlan.prepare(base,AtlasImages.updates(base,1,0,()->false),()->true),"plan cancellation");equal(0xff000080,content(base,ANIMATED),"cancelled preparation leaves baseline unchanged");
     }
+    /** Deferred deterministic worker scheduling; no thread or native/GL context is created. */
+    private static final class QueuedExecutor extends AbstractExecutorService {
+        private final List<Runnable> queued=new ArrayList<>();private boolean shutdown;
+        @Override public void execute(Runnable command) { if(shutdown)throw new RejectedExecutionException();queued.add(Objects.requireNonNull(command)); }
+        @Override public void shutdown() { shutdown=true; }
+        @Override public List<Runnable> shutdownNow() { shutdown=true;var result=List.copyOf(queued);queued.clear();return result; }
+        @Override public boolean isShutdown() { return shutdown; }
+        @Override public boolean isTerminated() { return shutdown&&queued.isEmpty(); }
+        @Override public boolean awaitTermination(long timeout,TimeUnit unit) { return isTerminated(); }
+        void runAll() { while(!queued.isEmpty())queued.removeFirst().run(); }
+    }
+    private static void destinationPreflight() {
+        var source=baseline(layout(4096,512));var request=AtlasFrameWorker.Request.capture(source,1,0);
+        try(var memory=new RenderMemory(new RenderMemory.Limits(8192,4));var foreign=new RenderMemory(new RenderMemory.Limits(8192,4));var executor=new QueuedExecutor();var worker=new AtlasFrameWorker(8192,memory,()->executor)) {
+            var idle=worker.status();worker.validateDestination(memory);check(worker.status()==idle,"valid preflight leaves idle status unchanged");equal(0,memory.stats().accounts(),"preflight creates no admission");
+            long token=worker.submit(request);equal(1L,token,"preflight consumes no worker token");var queued=worker.status();var charged=memory.stats();long reserved=worker.reservedBytes();
+            for(RenderMemory destination:new RenderMemory[]{null,foreign}) {
+                throwsType(IllegalArgumentException.class,()->worker.validateDestination(destination),"tracked destination mismatch");
+                check(worker.status()==queued,"rejection preserves queued status identity");equal(charged,memory.stats(),"rejection preserves complete charge/account snapshot");equal(reserved,worker.reservedBytes(),"rejection preserves queued reservation");equal(1,executor.queued.size(),"rejection leaves queued execution intact");
+            }
+            worker.validateDestination(memory);executor.runAll();var ready=worker.status();equal(AtlasFrameWorker.Phase.READY,ready.phase(),"queued plan remains executable");var readyCharge=memory.stats();
+            throwsType(IllegalArgumentException.class,()->worker.validateDestination(foreign),"READY destination mismatch");check(worker.status()==ready,"rejection preserves READY status identity");equal(readyCharge,memory.stats(),"READY admission unchanged");
+            try(var completion=worker.take(token).orElseThrow();var input=completion.retainInput()) {
+                check(completion.plan().expected()==source,"exact source baseline survives preflight");equal(0L,worker.reservedBytes(),"transferred output is external");long bytes=memory.stats().chargedBytes();check(bytes>0,"taken plan remains charged");
+                worker.validateDestination(memory);worker.close();throwsType(IllegalStateException.class,()->worker.validateDestination(memory),"closed worker rejected before binding");equal(bytes,memory.stats().chargedBytes(),"validation and worker close preserve transferred input");check(input.value()==completion.plan(),"independent plan remains usable");
+            }
+            equal(0L,memory.stats().chargedBytes(),"last transferred owner releases charge");equal(0,memory.stats().accounts(),"no leaked preflight/worker account");equal(0,foreign.stats().accounts(),"foreign destination untouched");
+        }
+        try(var memory=new RenderMemory();var executor=new QueuedExecutor();var worker=new AtlasFrameWorker(8192,null,()->executor)) {
+            var idle=worker.status();worker.validateDestination(null);worker.validateDestination(memory);check(worker.status()==idle,"untracked external-admission compatibility");equal(0,memory.stats().accounts(),"untracked preflight creates no destination account");
+            try { var counter=AtlasFrameWorker.class.getDeclaredField("revision");counter.setAccessible(true);counter.setLong(worker,Long.MAX_VALUE); }
+            catch(ReflectiveOperationException failure) { throw new AssertionError("controlled exhausted-worker fixture",failure); }
+            throwsType(IllegalStateException.class,()->worker.validateDestination(null),"exhausted worker rejected before binding");check(worker.status()==idle,"exhaustion rejection publishes no status");equal(0,executor.queued.size(),"preflight schedules no work");
+        }
+    }
     private static void retainedCompletion() {
+        destinationPreflight();
         var source=baseline(layout(4096,512));var plan=AtlasFramePlan.prepare(source,AtlasImages.updates(source,1,0,()->false),()->false);long bytes=source.layout().usage().orElseThrow().knownPayloadBytes()+plan.extraCpuBytes();
         try(var memory=new RenderMemory(new RenderMemory.Limits(8192,4))) { var completion=new AtlasFrameWorker.Completion(1,plan,memory.hold("prepared atlas",bytes));var input=completion.retainInput();var independent=input.retain();completion.close();input.close();check(independent.value()==plan,"independent exact CPU plan");equal(bytes,memory.stats().chargedBytes(),"retained plan remains fully charged");memory.close();equal(bytes,memory.stats().chargedBytes(),"coordinator close preserves plan charge");independent.close();equal(0L,memory.stats().chargedBytes(),"last plan input releases charge");equal(0,memory.stats().accounts(),"no leaked plan account"); }
     }

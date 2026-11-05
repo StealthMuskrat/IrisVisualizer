@@ -60,3 +60,7 @@ On Windows GL, compare incremental textures and completed images to CPU rasters 
 ## Independently owned CPU plans
 
 [Owned plan handoff](../renderer/ANIMATION-OWNERS.md) now retains an independent completion input through GPU queue admission. Tracked worker output must share the device coordinator; supplied wrappers are consumed on every outcome, while other retained owners remain live. Ordinary exact-baseline/token validation and externally clocked scheduling are unchanged. Eleven synthetic animation groups are compiled but unexecuted; runtime/GPU checks remain deferred.
+
+## Worker preflight before construction
+
+[Destination validation](../renderer/ANIMATION-OWNERS.md#worker-validation-before-atlas-capture) now checks the borrowed worker before the initial atlas capture. Closed/exhausted workers and tracked coordinator mismatches fail without new atlas journals, page references or scene dependencies, and without cancelling queued/ready CPU work. Matching tracked and explicit untracked admission remain supported; cancelled active work may continue unwinding during world replacement. This snapshot does not claim worker exclusivity or reserve later job memory. Full and dependency-free compilation passed; the expanded retained-completion contract remains one of 11 animation groups (64 overall), all unexecuted.
