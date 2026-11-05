@@ -60,11 +60,12 @@ public final class WorldRenderWorker implements AutoCloseable {
     public WorldRenderWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldRenderWorker::executor); }
     WorldRenderWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Render worker working limit exceeds 1 GiB");this.workingBytes=workingBytes;this.memory=memory;
+        Objects.requireNonNull(executors);
         admission=memory==null?null:memory.open("World preparation and scene cache");
         try {
             cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);
-            executor=Objects.requireNonNull(Objects.requireNonNull(executors).get());
-        }catch(RuntimeException|Error failure) { if(admission!=null)admission.close();throw failure; }
+            executor=Objects.requireNonNull(executors.get());
+        }catch(RuntimeException|Error failure) { if(admission!=null)try { admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-render");thread.setDaemon(true);return thread;}); }
     private void reserve(long bytes) { if(admission!=null)admission.reserve(bytes); }

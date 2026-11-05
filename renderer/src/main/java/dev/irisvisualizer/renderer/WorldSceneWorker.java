@@ -42,9 +42,10 @@ public final class WorldSceneWorker implements AutoCloseable {
     public WorldSceneWorker(long workingBytes,RenderMemory memory) { this(workingBytes,memory,WorldSceneWorker::executor); }
     WorldSceneWorker(long workingBytes,RenderMemory memory,Supplier<ExecutorService> executors) {
         if(workingBytes<0||workingBytes>1024L*1024*1024)throw new IllegalArgumentException("Standalone scene worker limit exceeds 1 GiB");this.workingBytes=workingBytes;this.memory=memory;
+        Objects.requireNonNull(executors);
         admission=memory==null?null:memory.open("Standalone scene preparation and cache");
-        try { cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);executor=Objects.requireNonNull(Objects.requireNonNull(executors).get()); }
-        catch(RuntimeException|Error failure) { if(admission!=null)admission.close();throw failure; }
+        try { cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,admission);executor=Objects.requireNonNull(executors.get()); }
+        catch(RuntimeException|Error failure) { if(admission!=null)try { admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     private static ExecutorService executor() { return Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"iris-world-scene");thread.setDaemon(true);return thread;}); }
     private long next() { if(closed)throw new IllegalStateException("Scene worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Scene revision counter exhausted");return revision+1; }

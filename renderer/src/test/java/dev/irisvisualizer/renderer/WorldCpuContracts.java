@@ -443,6 +443,7 @@ public final class WorldCpuContracts {
         catch(Exception failure) { throw new AssertionError("shutdown recovery failed",failure); }
     }
     private static void workerShutdownRecovery() {
+        workerConstructionFailures();
         var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
             for(boolean error:new boolean[]{false,true}) {
                 try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new ShutdownExecutor(error);var worker=new WorldOrderWorker(4*1024*1024,memory,()->executor)) {
@@ -469,15 +470,6 @@ public final class WorldCpuContracts {
                     }
                     equal(0L,memory.stats().chargedBytes(),"last transferred scene release clears retired cache charge");equal(0,memory.stats().accounts(),"last transferred scene release clears cache account");check(!owner.closed(),"independent fixture source remains live");
                 }
-            }
-            try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4))) {
-                for(Throwable failure:List.of(new IllegalStateException("executor construction failed"),new AssertionError("executor construction error"))) {
-                    java.util.function.Supplier<ExecutorService> factory=()->{ if(failure instanceof Error error)throw error;throw (RuntimeException)failure; };
-                    for(Runnable action:List.<Runnable>of(()->new WorldSceneWorker(4*1024*1024,memory,factory),()->new WorldRenderWorker(4*1024*1024,memory,factory))) {
-                        try { action.run();throw new AssertionError("executor construction failure missing"); }catch(Throwable actual) { check(actual==failure,"original executor construction error propagated"); }equal(0,memory.stats().accounts(),"failed executor setup leaves no cache account");
-                    }
-                }
-                throwsType(NullPointerException.class,()->new WorldSceneWorker(4*1024*1024,memory,()->null),"null scene executor rejected");throwsType(NullPointerException.class,()->new WorldRenderWorker(4*1024*1024,memory,()->null),"null integrated executor rejected");equal(0,memory.stats().accounts(),"null executor setup leaves no cache account");
             }
         }
     }
@@ -689,9 +681,9 @@ public final class WorldCpuContracts {
     private static Throwable caughtFailure(Runnable action) {
         try { action.run(); }catch(RuntimeException|Error failure) { return failure; }throw new AssertionError("expected cleanup failure missing");
     }
-    /** Source-capture hold release can fail after removing its account; source errors must remain primary. */
+    /** Account release can fail after removal; producer/construction errors must remain primary. */
     private static final class CaptureCloseFault implements AutoCloseable {
-        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Error failure;
+        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Error failure;int removals;
         @SuppressWarnings("unchecked") CaptureCloseFault(RenderMemory memory,Error failure) {
             this.memory=memory;this.failure=failure;
             try {
@@ -700,11 +692,43 @@ public final class WorldCpuContracts {
                     @Override public int size() { return original.size(); }
                     @Override public Iterator<RenderMemory.Account> iterator() { return original.iterator(); }
                     @Override public boolean add(RenderMemory.Account value) { return original.add(value); }
-                    @Override public boolean remove(Object value) { original.remove(value);throw CaptureCloseFault.this.failure; }
+                    @Override public boolean remove(Object value) { removals++;original.remove(value);throw CaptureCloseFault.this.failure; }
                 });
             }catch(ReflectiveOperationException error) { throw new AssertionError("controlled capture-close fault unavailable",error); }
         }
         @Override public void close() { try { field.set(memory,original); }catch(ReflectiveOperationException error) { throw new AssertionError("capture-close fault restore failed",error); } }
+    }
+    private static void workerConstructionFailures() {
+        for(boolean integrated:new boolean[]{false,true})for(boolean tracked:new boolean[]{false,true})for(int kind=0;kind<5;kind++)for(int cleanup=0;cleanup<3;cleanup++) {
+            if(!tracked&&cleanup!=0||cleanup==2&&(kind!=1&&kind!=2))continue;
+            try(var memory=new RenderMemory(new RenderMemory.Limits(100,2));var unrelated=memory.hold("unrelated",40)) {
+                var before=memory.stats();var owners=memory.owners();int[] calls={0};RenderMemory destination=tracked?memory:null;
+                Throwable primary=switch(kind) { case 0->new IllegalStateException("injected executor factory failure");case 1->new OutOfMemoryError("injected executor factory OOM");case 2->new AssertionError("injected executor factory error");default->null; };
+                java.util.function.Supplier<ExecutorService> factory=kind==4?null:()->{
+                    calls[0]++;equal(tracked?2:1,memory.stats().accounts(),"factory sees its cache admission and unrelated owner");
+                    if(primary instanceof Error error)throw error;if(primary instanceof RuntimeException runtime)throw runtime;return null;
+                };
+                Runnable construct=()->{ if(integrated)new WorldRenderWorker(100,destination,factory);else new WorldSceneWorker(100,destination,factory); };
+                Error release=cleanup==2?(Error)primary:new AssertionError("injected constructor account close error");Throwable actual;
+                if(cleanup==0)actual=caughtFailure(construct);
+                else try(var fault=new CaptureCloseFault(memory,release)) {
+                    actual=caughtFailure(construct);equal(kind==4?0:1,fault.removals,"constructor attempts only its own admitted account release");
+                }
+                if(primary!=null)check(actual==primary,"constructor preserves exact executor factory failure");else check(actual instanceof NullPointerException,"null factory/executor rejected");
+                int suppressed=cleanup==1&&kind!=4?1:0;equal(suppressed,actual.getSuppressed().length,"distinct constructor cleanup failure suppressed once; identical errors never self-suppress");if(suppressed!=0)check(actual.getSuppressed()[0]==release,"constructor release failure attached to original setup error");
+                equal(kind==4?0:1,calls[0],"null supplier rejected before admission or executor invocation");equal(before,memory.stats(),"failed constructor preserves exact unrelated admission");equal(owners,memory.owners(),"failed constructor leaves no retired/empty owner");equal(40L,unrelated.bytes(),"unrelated hold remains usable");
+                try(var executor=new DrainExecutor()) {
+                    AutoCloseable retry=integrated?new WorldRenderWorker(100,destination,()->executor):new WorldSceneWorker(100,destination,()->executor);
+                    equal(tracked?2:1,memory.stats().accounts(),"retry reuses failed constructor account slot");equal(0,executor.attempts,"construction schedules no native or scene work");
+                    try { retry.close(); }catch(Exception failure) { throw new AssertionError("constructor retry close failed",failure); }
+                    check(executor.isShutdown(),"retry owns and shuts down its supplied executor");equal(before,memory.stats(),"retry releases only its own empty cache account");
+                }
+            }
+        }
+        // With no account slots available, a null supplier still fails metadata validation first.
+        try(var memory=new RenderMemory(new RenderMemory.Limits(100,1));var occupied=memory.hold("occupied",40)) {
+            throwsType(NullPointerException.class,()->new WorldSceneWorker(100,memory,null),"null scene factory precedes account-limit admission");throwsType(NullPointerException.class,()->new WorldRenderWorker(100,memory,null),"null integrated factory precedes account-limit admission");equal(40L,occupied.bytes(),"invalid factory preserves full coordinator");equal(1,memory.stats().accounts(),"invalid factory never registers an account");
+        }
     }
     private static void captureCleanupFailures() {
         var f=fixture(2,255,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
