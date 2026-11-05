@@ -164,5 +164,5 @@ public final class GlUpload implements AutoCloseable {
         try { if(allocation!=null)device.retire(allocation); }
         finally { if(allocation==null||allocation.retired||allocation.released) { allocation=null;scene=null;tint=null;lighting=null;completed=null;sections.clear(); }phase=terminal; }
     }
-    @Override public void close() { if(phase==Phase.TAKEN||phase==Phase.CLOSED)return;dispose(Phase.CLOSED); }
+    @Override public void close() { if(phase==Phase.TAKEN||phase==Phase.CLOSED&&allocation==null)return;dispose(Phase.CLOSED); }
 }

@@ -104,6 +104,19 @@ public final class GlWorldView implements AutoCloseable {
         try { frames.invalidate(viewRevision);if(order==null)resetOrder();return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
+    /** Reopen a failed current source upload; then submit a fresh retained CPU owner at the same world token. */
+    public boolean retryUpload(long expectedWorldRevision) {
+        current();if(expectedWorldRevision<1)throw new IllegalArgumentException("Invalid world revision");
+        if(expectedWorldRevision!=worldRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
+        long next=nextView();var waiting=new Status(worldRevision,next,Phase.WAITING_CPU,status.source(),List.of(),Optional.empty(),"");
+        viewRevision=next;dirty=false;sortRevision=0;
+        try {
+            ordering.invalidate();frames.invalidate(viewRevision);releaseScene();
+            if(uploads.status().revision()<worldRevision)uploads.invalidate(worldRevision);
+            if(!uploads.restart(worldRevision))throw new GlFailure(GlFailure.Code.STALE,"World upload queue no longer matches the retry revision");
+            status=waiting;return true;
+        }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
     private void resetOrder() { ordering.invalidate();sortRevision=0;if(order!=null) { order.close();order=null; } }
     /** Upload steps are bounded; drawing a completed frame remains one synchronous context operation. */
     public Status advance(GlUploadBudget budget,long latestWorldRevision) {

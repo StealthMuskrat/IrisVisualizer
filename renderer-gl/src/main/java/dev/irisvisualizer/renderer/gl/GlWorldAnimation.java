@@ -10,7 +10,7 @@ public final class GlWorldAnimation implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlScene scene;private final GlDevice device;private final AtlasFrameWorker worker;private final GlAtlasQueue queue;private final long sceneRevision;
-    private GlAtlasFrame frame;private AtlasFrameWorker.Request request;private long revision,cpuRevision,tick;private double partialTick;
+    private GlAtlasFrame frame,retiring;private AtlasFrameWorker.Request request;private long revision,cpuRevision,tick;private double partialTick;
     private boolean clockDirty,closed,disposed,invalidated;private volatile Status status;
     public GlWorldAnimation(GlScene scene,long sceneRevision,AtlasFrameWorker worker) {
         this.scene=Objects.requireNonNull(scene);device=scene.device;this.worker=Objects.requireNonNull(worker);this.sceneRevision=sceneRevision;queue=new GlAtlasQueue(scene,sceneRevision);
@@ -35,6 +35,10 @@ public final class GlWorldAnimation implements AutoCloseable {
         this.tick=tick;this.partialTick=partialTick;clockDirty=true;state(status.phase(),status.problems(),status.code().orElse(null),status.reason());
     }
     private long next() { if(revision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"World animation revision counter exhausted");return revision+1; }
+    private void releaseRetiring() {
+        if(retiring!=null)try { retiring.close();retiring=null; }
+        catch(RuntimeException|Error failure) { if(retiring.closedOrReleased())retiring=null;throw failure; }
+    }
     private void observeClock() {
         var candidate=AtlasFrameWorker.Request.capture(frame.raster(),tick,partialTick);
         if(status.phase()!=Phase.FAILED&&candidate.samePixels(request)) { clockDirty=false;return; }
@@ -49,7 +53,7 @@ public final class GlWorldAnimation implements AutoCloseable {
     public boolean advance(GlUploadBudget budget) {
         Objects.requireNonNull(budget);current();
         try {
-            if(clockDirty)observeClock();if(status.phase()==Phase.FAILED||request==null)return false;
+            releaseRetiring();if(clockDirty)observeClock();if(status.phase()==Phase.FAILED||request==null)return false;
             if(cpuRevision!=0) {
                 var completion=worker.take(cpuRevision);
                 if(completion.isPresent())try(var prepared=completion.orElseThrow()) {
@@ -65,8 +69,8 @@ public final class GlWorldAnimation implements AutoCloseable {
             }
             queue.advance(budget,sceneRevision,revision);var completion=queue.take(sceneRevision,revision,frame);
             if(completion.isEmpty())return false;
-            var old=frame;frame=completion.orElseThrow().frame();request=null;cpuRevision=0;clockDirty=true;
-            state(Phase.CURRENT,List.of(),null,"");old.close();return true;
+            retiring=frame;frame=completion.orElseThrow().frame();request=null;cpuRevision=0;clockDirty=true;
+            releaseRetiring();state(Phase.CURRENT,List.of(),null,"");return true;
         }catch(RuntimeException|Error failure) { clockDirty=false;failed(failure);throw failure; }
     }
     /** Borrowed only for synchronous rendering on the owning context; never close this frame externally. */
@@ -76,6 +80,7 @@ public final class GlWorldAnimation implements AutoCloseable {
         if(disposed)return;device.current();closed=true;Throwable failure=null;
         if(!invalidated) { if(worker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)worker.invalidate();invalidated=true;request=null;cpuRevision=0; }
         try { queue.close(); }catch(RuntimeException|Error error) { failure=error; }
+        try { releaseRetiring(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(frame!=null)try { frame.close();frame=null; }catch(RuntimeException|Error error) { if(frame.closedOrReleased())frame=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         // A failed frame close may already have cleared its context-affine state.
         status=new Status(sceneRevision,revision,Phase.CLOSED,tick,partialTick,status.displayedTick(),status.displayedPartialTick(),List.of(),Optional.empty(),"");disposed=failure==null;

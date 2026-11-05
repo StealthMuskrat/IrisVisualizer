@@ -20,6 +20,12 @@ public final class GlImageQueue implements AutoCloseable {
         var waiting=new Status(next,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");revision=next;status=waiting;
         try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }return true;
     }
+    /** Reopen the current failed upload for a retained decoded image, without decoding it again. */
+    public boolean retry(long expectedRevision) {
+        current();if(expectedRevision<1)throw new IllegalArgumentException("Invalid image revision");if(expectedRevision!=revision||status.phase()!=Phase.FAILED)return false;
+        var waiting=new Status(revision,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");
+        try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
     /** Immutable decoded images are borrowed; no native generation owner is involved. */
     public boolean submit(long next,SourceImage raster) {
         Objects.requireNonNull(raster);current();if(next<1)throw new IllegalArgumentException("Invalid image revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;if(next>revision)invalidate(next);

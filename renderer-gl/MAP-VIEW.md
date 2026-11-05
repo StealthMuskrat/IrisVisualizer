@@ -69,3 +69,5 @@ On Windows GL, compare source RGBA, uploaded maps and output canvas pixels at na
 ## Current source and failure recovery
 
 Map navigation now preserves upstream failure problems/codes/reasons. Redraw, draw and frame transfer require a complete current upload, even if a previous map remains held after cleanup failure. Grid framing during pending work, admission rejection and caller-held frames keep their existing contracts. See [current-source adoption guards](SOURCE-FAILURES.md) for lifecycle and deferred verification. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
+
+The lower-level `GlMapQueue` now supports [explicit current-failure retry](UPLOAD-RETRY.md) using a retained map raster at the same queue token after cleanup. Connected-view resubmission keeps its existing revision flow. Source values/pixels and caller-held completed images retain their existing ownership.

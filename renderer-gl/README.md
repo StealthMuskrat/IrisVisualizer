@@ -172,3 +172,7 @@ World camera sorting now consumes [prepared translucent face indices and centers
 ## Material metadata validation
 
 World upload validation now consumes [prepared material counts](../renderer/MATERIAL-COUNTS.md) per section, preserving missing-tint, exact-raster/material identity and aggregate coverage checks before GPU storage. Face progress advances by validated section coverage; actual transfers keep their existing work/byte/action limits and layouts. Camera sorting uses the scene's verified translucent total for bounded scratch admission. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
+
+## Explicit upload recovery
+
+[Current-revision upload retries](UPLOAD-RETRY.md) now reopen failed world/map/image queues after cleanup, and the world view can accept retained complete CPU data at the same world token. Retry preserves display configuration and requires fresh source adoption. Atlas replacement also retains one previous owner through retirement and status failures. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); failure injection, runtime/native/GPU validation and editor integration remain deferred, with unsupported previews disabled.

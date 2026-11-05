@@ -24,6 +24,17 @@ public final class GlUploadQueue implements AutoCloseable {
         var waiting=new Status(next,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");revision=next;status=waiting;
         try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }return true;
     }
+    /** Reopen only the current failed upload for a fresh CPU owner; successful/transferred work is unchanged. */
+    public boolean retry(long expectedRevision) {
+        current();if(expectedRevision<1)throw new IllegalArgumentException("Invalid request revision");
+        if(expectedRevision!=revision||status.phase()!=Phase.FAILED)return false;return restart(expectedRevision);
+    }
+    /** The owning world view may abandon partial work after its own source-adoption failure. */
+    boolean restart(long expectedRevision) {
+        current();if(expectedRevision<1)throw new IllegalArgumentException("Invalid request revision");if(expectedRevision!=revision)return false;
+        var waiting=new Status(revision,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");
+        try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
     /** Fresh nonnull leases are consumed; an already-device-owned lease is ignored without closing it. */
     public boolean submit(long next,WorldScene.Result owner) {
         return submit(next,owner,null);
@@ -69,7 +80,7 @@ public final class GlUploadQueue implements AutoCloseable {
     private void releaseOwned() {
         Throwable failure=null;
         if(active!=null)try { active.close();active=null; }catch(RuntimeException|Error error) { if(!active.ownsResources())active=null;failure=error; }
-        if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.allocation.retired||completed.allocation.released)completed=null;if(failure==null)failure=error;else failure.addSuppressed(error); }
+        if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.allocation.retired||completed.allocation.released)completed=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     /** Caller-transferred completions stay caller-owned; only queue-owned uploads/scenes are retired. */

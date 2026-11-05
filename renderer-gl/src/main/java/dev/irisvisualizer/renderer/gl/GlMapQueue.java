@@ -20,6 +20,12 @@ public final class GlMapQueue implements AutoCloseable {
         var waiting=new Status(next,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");revision=next;status=waiting;
         try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }return true;
     }
+    /** Reuse retained native raster data after current failed-upload cleanup, without changing its token. */
+    public boolean retry(long expectedRevision) {
+        current();if(expectedRevision<1)throw new IllegalArgumentException("Invalid map revision");if(expectedRevision!=revision||status.phase()!=Phase.FAILED)return false;
+        var waiting=new Status(revision,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");
+        try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
     /** Immutable rasters are borrowed/retained, not consuming native generation leases. */
     public boolean submit(long next,MapRaster raster) {
         Objects.requireNonNull(raster);current();if(next<1)throw new IllegalArgumentException("Invalid map revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;if(next>revision)invalidate(next);

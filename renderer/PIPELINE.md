@@ -53,6 +53,7 @@ Create `GlWorldView(renderer)` on the renderer's current owning context. It borr
 | `take(worldRevision, viewRevision)` | Transfers the matching completed image exactly once |
 | `clock(tick, partialTick)` | Requests externally clocked atlas animation without regeneration or re-sorting geometry |
 | `redraw()` | Explicitly retries/redraws the current view without regenerating native output |
+| `retryUpload(expectedWorldRevision)` | Reopens failed current source upload/adoption for a fresh retained CPU scene, preserving the native-world token |
 | `close()` | Cancels CPU sorting and retires view-owned resources; leaves the renderer/device and transferred frames caller-owned |
 
 The host should invalidate both CPU and GPU endpoints immediately when native input changes, before generation/visual preparation completes. Poll the CPU worker with the matching current token and submit its fresh completed owner to the view. Configure a camera/viewport, call `advance` from the context thread, then adopt only a `take` matching both current world and view revisions. Repeated `advance` calls for an unchanged completed view perform no redundant upload, sort or draw.
@@ -92,3 +93,5 @@ Opt into [RenderMemory](SHARED-MEMORY.md) with `WorldRenderWorker(workerBytes, m
 ## Current-source adoption after failures
 
 [GPU view adoption guards](../renderer-gl/SOURCE-FAILURES.md) now require a complete upload for the current source revision before drawing, transferring frames or advancing world animation. A prior scene retained after failed cleanup remains charged and retryable for disposal; camera, viewport and clip changes cannot make it the new source or erase upstream failure diagnostics. World redraw requires the complete current scene/camera, while pre-upload camera configuration remains available. The same distinction applies to map, scalar and original-image views without changing native readiness or preview gates.
+
+[Explicit upload recovery](../renderer-gl/UPLOAD-RETRY.md) now permits cleanup and resubmission of retained complete CPU scenes at the same world revision. The display revision advances and current-source adoption stays false until the new upload completes. Keep an independent CPU owner before a consuming submission if retries are needed; no native generation is started or retained implicitly.
