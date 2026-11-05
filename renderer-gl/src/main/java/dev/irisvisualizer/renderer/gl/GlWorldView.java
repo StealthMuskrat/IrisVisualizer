@@ -33,6 +33,9 @@ public final class GlWorldView implements AutoCloseable {
         atlasTick=tick;atlasPartialTick=partialTick;atlasClockSet=true;if(sourceReady&&animation!=null)animation.clock(tick,partialTick);
     }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"World view is closed"); }
+    private void dimensions(int width,int height) {
+        if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||(long)width*height>device.limits().targetPixels()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize()))throw new GlFailure(GlFailure.Code.LIMIT,"Requested world view exceeds device target bounds");
+    }
     private long nextView() { if(viewRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"View revision counter exhausted");return viewRevision+1; }
     private void state(Phase phase) { status=new Status(worldRevision,viewRevision,phase,status.source(),List.of(),Optional.empty(),""); }
     /** A retained cleanup owner is not proof that this revision completed upload. */
@@ -92,11 +95,19 @@ public final class GlWorldView implements AutoCloseable {
     /** Display-only camera/size changes never regenerate or rebake the native world. */
     public long view(GlCamera camera,int width,int height) {
         Objects.requireNonNull(camera);current();
-        if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||(long)width*height>device.limits().targetPixels()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize()))throw new GlFailure(GlFailure.Code.LIMIT,"Requested world view exceeds device target bounds");
+        dimensions(width,height);
         camera.matrix((double)width/height);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
         long next=nextView();var changed=displayStatus(next);boolean poseChanged=this.camera==null||!camera.drawView().equals(this.camera.drawView());this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
         try { frames.invalidate(viewRevision);if(poseChanged)resetOrder();return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
+    /** Fit complete emitted world/marker bounds; geometric clipping remains independently configured. */
+    public long fit(int width,int height) { return fit(width,height,WorldClip.NONE); }
+    /** Fit the conservative intersection of current source bounds and the current geometric clip. */
+    public long fitClipped(int width,int height) { return fit(width,height,clip); }
+    private long fit(int width,int height,WorldClip scope) {
+        current();dimensions(width,height);if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current world upload is required before camera fitting");
+        return view(GlOrbitCamera.fit(scene.cpuScene(),(double)width/height,scope).camera(),width,height);
     }
     /** Explicit redraw/retry after a view failure; keeps the same complete world and native data. */
     public long redraw() {

@@ -180,3 +180,7 @@ World upload validation now consumes [prepared material counts](../renderer/MATE
 ## Owned readback pixels
 
 [CPU readback owners](READBACK-OWNERS.md) now preserve managed output admission after direct or revision-checked queue transfer, without copying pixels or retaining GL sources. Independent inputs can outlive device shutdown and release their shared charge on final close; handoff admission/setup rejection preserves READY output for retry. Raw transfers remain available with external accounting. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU validation and editor integration remain deferred, with unsupported previews disabled.
+
+## Clipped camera fitting
+
+[World/scalar fit helpers](CAMERA-FIT.md) now support explicit `fitClipped` navigation using current geometric clipping, alongside full-source fitting. Section/surface-bound intersections keep exact anchors, existing camera limits and empty-source fallbacks; non-intersecting scopes fail before view mutation. No native samples, geometry or clip settings are changed. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.

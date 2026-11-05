@@ -81,3 +81,7 @@ On genuine Windows GL, compile/link shaders and compare camera/fit/navigation, d
 ## Current source and failure recovery
 
 Scalar navigation/clipping now preserves upstream failure diagnostics even if an old scene remains held for cleanup. Redraw, camera fitting and convenience recoloring require the current complete upload. Explicit caller-held source recoloring retains its volume/geometry/admission checks for rapid replacements, and caller-owned frames keep their original pixels and receipts. See [current-source adoption guards](SOURCE-FAILURES.md) for lifecycle and deferred verification. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
+
+## Clipped display fitting
+
+`fitClipped(width, height)` now uses the current clip and prepared scalar bounds; `fit(width, height)` preserves full-source behavior. Both require the complete adopted current upload. Empty surfaces use their full display-bin extent as the fitting source, then apply the selected scope. Non-intersecting/invalid fits leave the existing view untouched during preflight. See [camera fitting](CAMERA-FIT.md) for conservative bounds, exact anchors and deferred verification.

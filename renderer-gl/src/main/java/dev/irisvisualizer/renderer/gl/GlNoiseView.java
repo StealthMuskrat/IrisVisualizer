@@ -74,7 +74,12 @@ public final class GlNoiseView implements AutoCloseable {
         this.clip=clip;viewRevision=next;dirty=true;status=changed;
         try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
-    public long fit(int width,int height) { current();dimensions(width,height);if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current scalar upload is required before camera fitting");return view(GlOrbitCamera.fit(scene.surface(),(double)width/height).camera(),width,height); }
+    public long fit(int width,int height) { return fit(width,height,WorldClip.NONE); }
+    /** Display-only fit within the current clip; source samples and clipping stay unchanged. */
+    public long fitClipped(int width,int height) { return fit(width,height,clip); }
+    private long fit(int width,int height,WorldClip scope) {
+        current();dimensions(width,height);if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current scalar upload is required before camera fitting");return view(GlOrbitCamera.fit(scene.surface(),(double)width/height,scope).camera(),width,height);
+    }
     /** Display-only retry; source/CPU/upload failures require resubmission. */
     public long redraw() {
         current();if(!sourceReady||scene==null||camera==null)throw new GlFailure(GlFailure.Code.STATE,"Complete current scalar scene/camera required to redraw");long next=nextView();var waiting=displayStatus(next);viewRevision=next;dirty=true;status=waiting;

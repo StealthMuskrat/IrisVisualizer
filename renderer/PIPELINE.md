@@ -49,6 +49,7 @@ Create `GlWorldView(renderer)` on the renderer's current owning context. It borr
 | `invalidate(worldRevision)` | Immediately rejects older CPU/GPU/frame work and retires view-owned prior work |
 | `submit(worldRevision, owner, tint, lighting)` | Consumes a complete fresh CPU scene lease and starts bounded GPU upload |
 | `view(camera, width, height)` | Validates camera/target bounds and advances the display revision when the view changes |
+| `fit(width, height)` / `fitClipped(width, height)` | Fits complete current source bounds or their current-clip intersections without rebaking or generation |
 | `advance(uploadBudget, latestWorldRevision)` | Advances current uploads, polls current sorting and renders a complete requested image when ready |
 | `take(worldRevision, viewRevision)` | Transfers the matching completed image exactly once |
 | `clock(tick, partialTick)` | Requests externally clocked atlas animation without regeneration or re-sorting geometry |
@@ -95,3 +96,5 @@ Opt into [RenderMemory](SHARED-MEMORY.md) with `WorldRenderWorker(workerBytes, m
 [GPU view adoption guards](../renderer-gl/SOURCE-FAILURES.md) now require a complete upload for the current source revision before drawing, transferring frames or advancing world animation. A prior scene retained after failed cleanup remains charged and retryable for disposal; camera, viewport and clip changes cannot make it the new source or erase upstream failure diagnostics. World redraw requires the complete current scene/camera, while pre-upload camera configuration remains available. The same distinction applies to map, scalar and original-image views without changing native readiness or preview gates.
 
 [Explicit upload recovery](../renderer-gl/UPLOAD-RETRY.md) now permits cleanup and resubmission of retained complete CPU scenes at the same world revision. The display revision advances and current-source adoption stays false until the new upload completes. Keep an independent CPU owner before a consuming submission if retries are needed; no native generation is started or retained implicitly.
+
+[Camera fitting](../renderer-gl/CAMERA-FIT.md) now offers full-source and explicit clipped fitting for complete current world/scalar uploads. Fitting keeps camera/clip/source identity separate and uses conservative prepared bounds. A non-intersecting scope reports a preflight error while leaving the existing view and untaken image intact; existing display updates and retirement rules apply once a valid camera is admitted.

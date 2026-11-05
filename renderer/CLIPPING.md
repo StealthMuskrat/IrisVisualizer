@@ -49,3 +49,7 @@ At renderer completion, cover no clipping, one-block slices, every inclusive bou
 Check near-clipped/far-eligible triangle hits, clipped node/marker boxes, rays starting inside/outside/on planes, parallel rays, alpha tests, budgets and detached clip receipts. Exercise rapid clip/camera/clock/world changes, pending sorting, stale frame tokens, same-value no-ops, constructor compatibility, retained old frames and readback receipts. Compare real Windows shader/picking/readback pixels at float boundary cases before enabling any supported preview. Native fidelity, complete renderer-stage testing and final editor integration remain pending.
 
 [Scalar clipping](SCALAR-CLIPPING.md) now applies the same world-coordinate display-box contract to 3D noise views, carrying its exact scope through shader/range rejection, view/frame/readback receipts and original-value picking. Earlier scalar APIs retain `NONE` defaults. Full captured volumes and instance buffers remain unchanged.
+
+## Camera fitting within the clip
+
+[Explicit clipped camera fitting](../renderer-gl/CAMERA-FIT.md) now frames the intersection of prepared world/scalar bounds and the current clip through `fitClipped`. Full-source `fit` remains available and does not change clip settings. Empty sources retain their configured-extent fallback, while a non-intersecting scope reports STATE before connected-view mutation. Conservative AABB fitting performs no voxel/triangle filtering, native generation or cap construction; existing camera precision and current-upload guards remain in force.

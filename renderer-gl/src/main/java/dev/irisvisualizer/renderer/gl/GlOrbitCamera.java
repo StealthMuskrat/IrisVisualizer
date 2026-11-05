@@ -39,19 +39,39 @@ public record GlOrbitCamera(WorldSnapshot.Position anchor,double centerX,double 
     }
     /** Fit actual emitted geometry/marker bounds. Empty scenes use their complete configured extent. */
     public static GlOrbitCamera fit(WorldScene scene,double aspect) {
-        Objects.requireNonNull(scene);if(!Double.isFinite(aspect)||aspect<=0)throw new IllegalArgumentException("Invalid fit aspect");var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());double minX=Double.POSITIVE_INFINITY,minY=minX,minZ=minX,maxX=Double.NEGATIVE_INFINITY,maxY=maxX,maxZ=maxX;
+        return fit(scene,aspect,WorldClip.NONE);
+    }
+    /** Fit conservative section bounds within a geometric display scope, without changing source data. */
+    public static GlOrbitCamera fit(WorldScene scene,double aspect,WorldClip clip) {
+        Objects.requireNonNull(scene);Objects.requireNonNull(clip);if(!Double.isFinite(aspect)||aspect<=0)throw new IllegalArgumentException("Invalid fit aspect");var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());var scope=clip.relative(anchor);var fit=new FitBounds();boolean drawable=false;
         for(var mesh:scene.sections()) {
-            if(mesh.bounds().isEmpty())continue;var bounds=mesh.bounds().orElseThrow();long exactX=Math.subtractExact(mesh.origin().x(),anchor.x()),exactY=(long)mesh.origin().y()-anchor.y(),exactZ=Math.subtractExact(mesh.origin().z(),anchor.z());double x=exactX,y=exactY,z=exactZ;
+            if(mesh.bounds().isEmpty())continue;drawable=true;var bounds=mesh.bounds().orElseThrow();long exactX=Math.subtractExact(mesh.origin().x(),anchor.x()),exactY=(long)mesh.origin().y()-anchor.y(),exactZ=Math.subtractExact(mesh.origin().z(),anchor.z());double x=exactX,y=exactY,z=exactZ;
             if(Math.max(Math.max(Math.abs(x),Math.abs(y)),Math.abs(z))>1048576)throw new GlFailure(GlFailure.Code.LIMIT,"Scene fit exceeds relative camera precision");
-            minX=Math.min(minX,x+bounds.min().x());minY=Math.min(minY,y+bounds.min().y());minZ=Math.min(minZ,z+bounds.min().z());maxX=Math.max(maxX,x+bounds.max().x());maxY=Math.max(maxY,y+bounds.max().y());maxZ=Math.max(maxZ,z+bounds.max().z());
+            fit.include(x+bounds.min().x(),y+bounds.min().y(),z+bounds.min().z(),x+bounds.max().x(),y+bounds.max().y(),z+bounds.max().z(),scope);
         }
-        if(!Double.isFinite(minX)) { minX=0;minY=0;minZ=0;maxX=extent.width();maxY=extent.height();maxZ=extent.depth(); }
-        return fitBounds(anchor,minX,minY,minZ,maxX,maxY,maxZ,aspect);
+        if(!drawable)fit.include(0,0,0,extent.width(),extent.height(),extent.depth(),scope);
+        return fit.camera(anchor,aspect);
     }
     public static GlOrbitCamera fit(NoiseSurface surface,double aspect) {
-        Objects.requireNonNull(surface);if(surface.requiresPlaceholder()||!Double.isFinite(aspect)||aspect<=0)throw new IllegalArgumentException("Complete scalar surface and positive aspect required");
+        return fit(surface,aspect,WorldClip.NONE);
+    }
+    /** Empty scalar surfaces use their complete display-bin extent, intersected with the supplied scope. */
+    public static GlOrbitCamera fit(NoiseSurface surface,double aspect,WorldClip clip) {
+        Objects.requireNonNull(surface);Objects.requireNonNull(clip);if(surface.requiresPlaceholder()||!Double.isFinite(aspect)||aspect<=0)throw new IllegalArgumentException("Complete scalar surface and positive aspect required");
         var grid=surface.volume().grid();var anchor=new WorldSnapshot.Position(grid.horizontal().originX(),grid.vertical().minY(),grid.horizontal().originZ());double scale=grid.horizontal().blocksPerSample();
-        var b=surface.bounds().orElseGet(()->new NoiseSurface.Bounds(0,0,0,grid.width()*scale,grid.height(),grid.depth()*scale));return fitBounds(anchor,b.minX(),b.minY(),b.minZ(),b.maxX(),b.maxY(),b.maxZ(),aspect);
+        var b=surface.bounds().orElseGet(()->new NoiseSurface.Bounds(0,0,0,grid.width()*scale,grid.height(),grid.depth()*scale));var fit=new FitBounds();fit.include(b.minX(),b.minY(),b.minZ(),b.maxX(),b.maxY(),b.maxZ(),clip.relative(anchor));return fit.camera(anchor,aspect);
+    }
+    private static final class FitBounds {
+        double minX=Double.POSITIVE_INFINITY,minY=minX,minZ=minX,maxX=Double.NEGATIVE_INFINITY,maxY=maxX,maxZ=maxX;
+        void include(double lowX,double lowY,double lowZ,double highX,double highY,double highZ,WorldClip.Bounds clip) {
+            lowX=Math.max(lowX,clip.minX());lowY=Math.max(lowY,clip.minY());lowZ=Math.max(lowZ,clip.minZ());highX=Math.min(highX,clip.maxX());highY=Math.min(highY,clip.maxY());highZ=Math.min(highZ,clip.maxZ());
+            if(lowX>highX||lowY>highY||lowZ>highZ)return;
+            minX=Math.min(minX,lowX);minY=Math.min(minY,lowY);minZ=Math.min(minZ,lowZ);maxX=Math.max(maxX,highX);maxY=Math.max(maxY,highY);maxZ=Math.max(maxZ,highZ);
+        }
+        GlOrbitCamera camera(WorldSnapshot.Position anchor,double aspect) {
+            if(!Double.isFinite(minX))throw new GlFailure(GlFailure.Code.STATE,"Display scope does not intersect the source bounds");
+            return fitBounds(anchor,minX,minY,minZ,maxX,maxY,maxZ,aspect);
+        }
     }
     private static GlOrbitCamera fitBounds(WorldSnapshot.Position anchor,double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double aspect) {
         double radius=Math.max(0.5,Math.hypot(Math.hypot((maxX-minX)/2,(maxY-minY)/2),(maxZ-minZ)/2)),angle=Math.min(Math.PI/6,Math.atan(Math.tan(Math.PI/6)*aspect)),distance=radius/Math.sin(angle)*1.05,far=Math.max(64,distance+radius*2);
