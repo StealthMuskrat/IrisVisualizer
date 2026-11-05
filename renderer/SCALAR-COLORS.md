@@ -41,3 +41,7 @@ At renderer completion, compare prepared words with an independent evaluation of
 Verify immutable old/new colors, geometry/sample/range reuse, equal-style reuse, empty/all-absent sources, unchanged unit/selected counts and failure without partial output. Check exact/one-over color/output/coexistence/worker/shared bounds, lowered limits, cancellation through color preparation and job-reference release before shrinking admission. Exercise consuming tracked inputs, foreign/closed coordinators, latest-only replacement, take/close before unwind and independently retained old GPU frames.
 
 For connected views, cover recoloring during pending work/upload, the current-scene convenience guard, explicit retained-frame reuse, source/threshold/meshing mismatch, invalidation, retry, camera/clip retention and stale frame/query/readback tokens. Compare final Windows GPU colors, upload bytes and retirement lifetimes before claiming runtime or performance improvements. Native validation and final editor routing remain pending.
+
+## Gradient value equality
+
+`MapRamp` now compares immutable ordered stops by value, with matching hash codes. Separately constructed equal scalar color styles therefore use the existing scalar recolor source-only reservation and CPU no-op. Interpolation, thresholds and geometry identity remain unchanged. See [map recoloring](MAP-RECOLOR.md) for the corresponding captured-map path and deferred checks.

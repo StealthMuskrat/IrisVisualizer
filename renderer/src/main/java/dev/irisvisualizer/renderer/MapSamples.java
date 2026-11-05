@@ -5,6 +5,7 @@ import java.util.function.BooleanSupplier;
 
 /** Detached native map output, X fastest then positive Z. Sampling remains an engine operation. */
 public final class MapSamples {
+    private final UUID id=UUID.randomUUID();
     public enum Kind { TERRAIN, BIOME, NOISE }
     public record Context(WorldSnapshot.Source world,String resourceType,String resourceKey,String samplingPolicy) {
         public Context { Objects.requireNonNull(world);for(String text:List.of(resourceType,resourceKey,samplingPolicy))if(text.isBlank()||text.length()>1024)throw new IllegalArgumentException("Map context requires bounded exact resource and sampling identities"); }
@@ -66,6 +67,7 @@ public final class MapSamples {
     }
     static MapSamples failed(Context context,Grid grid,Kind kind,Optional<Vertical> vertical,WorldProblem problem) { return new MapSamples(context,grid,kind,vertical,List.of(),new int[0],new double[0],new byte[0],List.of(problem)); }
     private void sample(int at) { if(requiresPlaceholder())throw new IllegalStateException("Map capture failed");if(at<0||at>=present.length)throw new IndexOutOfBoundsException("Sample outside map");if(present[at]==0)throw new IllegalStateException("Native sample is absent"); }
+    public UUID id() { return id; }
     public Context context() { return context; }
     public Grid grid() { return grid; }
     public Kind kind() { return kind; }

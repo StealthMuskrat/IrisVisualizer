@@ -188,3 +188,7 @@ World upload validation now consumes [prepared material counts](../renderer/MATE
 ## Picking preparation admission
 
 Completed-frame background index requests now inherit [prepared picking-size receipts](../renderer/PICKING-SIZES.md), reserving their actual source/index/build primitive demand without synchronous section/face scans during handoff. The same complete CPU source, ray/clip/animated-atlas contracts and independent frame/index ownership remain in place. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
+
+## Captured map recoloring
+
+`GlMapView` now supports [recoloring exact native map captures](../renderer/MAP-RECOLOR.md), including current-upload and retained-raster/owned-input forms. A capture UUID rejects obsolete sources during rapid replacements; ordinary revision/upload ownership and matching-grid pan/zoom remain in place. CPU work reserves both old/new image payloads and reuses equal value styles. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation remains deferred and unsupported previews stay disabled.

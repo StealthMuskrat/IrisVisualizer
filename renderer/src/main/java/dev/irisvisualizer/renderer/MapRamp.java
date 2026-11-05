@@ -13,6 +13,8 @@ public final class MapRamp {
         if(this.stops.getFirst().position()!=0||this.stops.getLast().position()!=1)throw new IllegalArgumentException("Gradient endpoints must be zero and one");
     }
     public List<Stop> stops() { return stops; }
+    @Override public boolean equals(Object other) { return other instanceof MapRamp ramp&&stops.equals(ramp.stops); }
+    @Override public int hashCode() { return stops.hashCode(); }
     public int rgba(double position) {
         if(!Double.isFinite(position))throw new IllegalArgumentException("Nonfinite gradient lookup");if(position<=0)return stops.getFirst().rgba();if(position>=1)return stops.getLast().rgba();
         for(int i=1;i<stops.size();i++) { var right=stops.get(i);if(position>right.position())continue;var left=stops.get(i-1);double fraction=(position-left.position())/(right.position()-left.position());int result=0;

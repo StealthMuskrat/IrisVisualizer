@@ -41,6 +41,22 @@ public final class MapRaster {
     public static ScalarStyle terrainStyle(MapSamples samples) { if(samples.kind()!=MapSamples.Kind.TERRAIN||samples.requiresPlaceholder())throw new IllegalArgumentException("Complete terrain samples required");var range=samples.vertical().orElseThrow();return new ScalarStyle(range.minY(),range.maxY()-1,MapRamp.GRAYSCALE); }
     /** Explicit opt-in; the existing terrainStyle helper remains a flat full-height gradient. */
     public static TerrainStyle terrainReliefStyle(MapSamples samples) { return new TerrainStyle(terrainStyle(samples),Relief.DEFAULT); }
+    /** Complete old raster plus prospective replacement RGBA; equal value styles reuse the original image. */
+    public static long recolorReservation(MapRaster source,Style style) {
+        Objects.requireNonNull(source);Objects.requireNonNull(style);if(source.requiresPlaceholder())throw new IllegalArgumentException("Complete map raster required for recoloring");
+        return source.payloadBytes()+(source.style.equals(style)?0:source.samples.grid().count()*4);
+    }
+    /** Reuses exact native samples. No native callback or generator is consulted for display-style changes. */
+    public static MapRaster recolor(MapRaster source,Style style,Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(source);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);
+        if(source.requiresPlaceholder())return new MapRaster(source.samples,style,Optional.empty(),Optional.empty(),source.problems);
+        try {
+            if(source.image.orElseThrow().bytes()>limits.imageBytes()||recolorReservation(source,style)>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Complete map source and replacement colors exceed their working allowance");
+            if(source.style.equals(style)) { WorldProblem.check(cancelled);return source; }
+            return execute(source.samples,style,limits,cancelled);
+        }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return new MapRaster(source.samples,style,Optional.empty(),Optional.empty(),List.of(failure.problem)); }
+        catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return new MapRaster(source.samples,style,Optional.empty(),Optional.empty(),List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to recolor map samples; no partial image was published"))); }
+    }
     public static MapRaster render(MapSamples samples,Style style,BooleanSupplier cancelled) { return render(samples,style,Limits.DEFAULT,cancelled); }
     public static MapRaster render(MapSamples samples,Style style,Limits limits,BooleanSupplier cancelled) {
         Objects.requireNonNull(samples);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);

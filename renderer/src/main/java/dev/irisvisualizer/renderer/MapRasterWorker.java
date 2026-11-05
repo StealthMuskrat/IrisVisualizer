@@ -6,16 +6,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** One active colorization and one latest pending request; never samples or regenerates a world. */
 public final class MapRasterWorker implements AutoCloseable {
-    public record Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits) {
-        public Request { Objects.requireNonNull(samples);Objects.requireNonNull(style);Objects.requireNonNull(limits); }
+    public record Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits,Optional<MapRaster> source) {
+        public Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits) { this(samples,style,limits,Optional.empty()); }
+        public Request { Objects.requireNonNull(samples);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(source);if(source.isPresent()&&(source.orElseThrow().requiresPlaceholder()||source.orElseThrow().samples()!=samples))throw new IllegalArgumentException("Map recoloring requires a complete raster with the exact native samples"); }
         public Request(MapSamples samples,MapRaster.Style style) { this(samples,style,MapRaster.Limits.DEFAULT); }
-        long reservation() { return samples.requiresPlaceholder()?0:samples.payloadBytes()+samples.grid().count()*4; }
+        public static Request recolor(MapRaster source,MapRaster.Style style,MapRaster.Limits limits) { Objects.requireNonNull(source);return new Request(source.samples(),style,limits,Optional.of(source)); }
+        long reservation() { return source.isPresent()?MapRaster.recolorReservation(source.orElseThrow(),style):samples.requiresPlaceholder()?0:samples.payloadBytes()+samples.grid().count()*4; }
     }
-    public enum Phase { IDLE, WAITING, QUEUED, RENDERING, READY, DELIVERED, FAILED, CLOSED }
+    public enum Phase { IDLE, WAITING, QUEUED, RENDERING, RECOLORING, READY, DELIVERED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<MapSamples.Context> context,List<WorldProblem> problems) { public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems); } }
     public record Completion(long revision,MapRaster raster,RenderMemory.Hold admission) implements AutoCloseable {
         public Completion { Objects.requireNonNull(raster);Objects.requireNonNull(admission); }
         public Completion(long revision,MapRaster raster) { this(revision,raster,RenderMemory.Hold.none()); }
+        public RenderInput<MapRaster> retainInput() { return RenderInput.own(raster,admission.retain()); }
         @Override public void close() { admission.close(); }
     }
     private static final class Job {
@@ -54,6 +57,14 @@ public final class MapRasterWorker implements AutoCloseable {
             return submit(source.value());
         }finally { input.close(); }
     }
+    /** Consumes a retained raster owner after recolor admission or rejection. */
+    public long recolor(RenderInput<MapRaster> input,MapRaster.Style style,MapRaster.Limits limits) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked map recoloring requires the same map coordinator");
+            return submit(Request.recolor(source.value(),style,limits));
+        }finally { input.close(); }
+    }
     private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
     public Status status() { synchronized(lock) { return status; } }
@@ -67,11 +78,11 @@ public final class MapRasterWorker implements AutoCloseable {
     private static Status failed(long revision,MapSamples.Context context,Throwable failure) { return new Status(revision,Phase.FAILED,Optional.of(context),List.of(new WorldProblem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,Optional.empty(),"Map colorization failed: "+failure.getClass().getSimpleName()))); }
     private void execute(Job job) {
         try {
-            synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get())status=new Status(job.revision,Phase.RENDERING,Optional.of(job.request.samples().context()),List.of()); }
-            var request=job.request;var result=MapRaster.render(request.samples(),request.style(),request.limits(),job::cancelled);
+            synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get())status=new Status(job.revision,job.request.source().isPresent()?Phase.RECOLORING:Phase.RENDERING,Optional.of(job.request.samples().context()),List.of()); }
+            var request=job.request;var result=request.source().isPresent()?MapRaster.recolor(request.source().orElseThrow(),request.style(),request.limits(),job::cancelled):MapRaster.render(request.samples(),request.style(),request.limits(),job::cancelled);
             synchronized(lock) {
                 if(!closed&&job.revision==revision&&!job.cancelled.get()) {
-                    if(!result.requiresPlaceholder()) { var ready=new Status(revision,Phase.READY,Optional.of(result.samples().context()),List.of());var hold=job.admission.retain();Completion value;
+                    if(!result.requiresPlaceholder()) { if(result.payloadBytes()>job.request.reservation())throw new IllegalStateException("Map output exceeds its admitted peak");var ready=new Status(revision,Phase.READY,Optional.of(result.samples().context()),List.of());var hold=job.admission.retain();Completion value;
                         try { value=new Completion(revision,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
                         job.retainedBytes=result.payloadBytes();completed=value;status=ready; }
                     else status=new Status(revision,Phase.FAILED,Optional.of(result.samples().context()),result.problems());
@@ -84,7 +95,7 @@ public final class MapRasterWorker implements AutoCloseable {
         while(true) {
             Job job;
             synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
-            try { execute(job); }finally { synchronized(lock) { active=null;job.admission.shrinkTo(job.retainedBytes);job.admission.close();job=null; } }
+            try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;job=null;hold.shrinkTo(retained);hold.close(); } }
         }
     }
     /** Cancels without waiting for native/JVM work from a UI thread. No GL context is accessed. */

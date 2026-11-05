@@ -10,7 +10,8 @@ Every admitted job owns a `RenderMemory.Hold`. Successful publication retains an
 
 | Worker | Admitted peak | Retained completion charge after unwinding |
 | --- | --- | --- |
-| Map colorization | Native samples plus complete RGBA output | Samples plus complete raster |
+| Map initial colorization | Native samples plus complete RGBA output | Samples plus complete raster |
+| Map recoloring | Complete source raster plus replacement RGBA; source only for equal styles | Samples plus final raster |
 | Atlas preparation | Original layout payload plus padded patches and copied pages | Same conservative source/plan payload |
 | Camera sorting | Source scene plus 32 bytes per verified translucent face, capped by existing sort/working limits | Source scene plus final order array |
 
@@ -57,3 +58,7 @@ These additions automatically cover the connected map, atlas and sorting prepara
 All 101 independent renderer/OpenGL sources compile with Java 25 and LWJGL 3.4.1 (72 CPU, 29 GL). Eleven native adapters remain syntax-parsed/source-manifest checked only, pending genuine Windows API compilation/execution. No renderer tests, reservation/worker execution, native query, GL context, GPU upload or workflow ran for this batch.
 
 At renderer completion, exercise shared account/byte/owner-count limits; no empty account after failed hold setup/insertion; exact-map and atlas reservations; sort scratch-to-output shrink; cancellation and executor failure; READY before unwind; take/close before unwind; replacement of pending/ready outputs; duplicate/shared/foreign replacement handles; no credit for active or transferred owners; stale tokens and repeated close. Verify every publication allocation-failure path, coordinator close with live holds, source-owner release failure without false budget release, worker shutdown with external completions and exact final zero charges. On real Windows GPU contexts, check shared-pressure handoff rejection, map/atlas/sort adoption, baseline mismatch, old images surviving failure, device/source overlap and delayed retirement. Compare actual native/GPU output before enabling supported previews. Renderer tests remain deferred until implementation is complete.
+
+## Captured map style replacement
+
+[Map recoloring](MAP-RECOLOR.md) now retains the complete old raster through preparation, charging its old RGBA alongside replacement pixels. Equal value styles reuse the CPU raster and reserve only that source. The job graph is dropped before the hold shrinks to final native samples plus RGBA. `MapRasterWorker.Completion.retainInput()` creates independent CPU ownership; consuming worker/view recolor inputs retain it through destination admission or rejection, with matching-coordinator checks. Runtime and reservation checks remain deferred.

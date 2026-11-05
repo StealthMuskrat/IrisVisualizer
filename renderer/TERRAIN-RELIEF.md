@@ -44,3 +44,7 @@ Lighting creates one small job-local normalized-light object and reads the exist
 At renderer completion, compare flat/planar/rising/falling X/Z slopes against independent central-difference and diffuse-light calculations. Include signed extreme heights, full configured ranges, fractional/tiny sampling scales, large/subnormal light vectors, zero vectors/nonfinite/range rejection, ambient/amount endpoints and round-to-byte boundaries. Check one/two-row grids, every edge, missing neighbors, absent centers and transparent RGB/alpha.
 
 Verify amount-zero equality with the scalar style, native extrema/source identity preservation, eligible-stencil counts independent of changed pixels and rejection on noise/biome maps. Exercise rapid recoloring, cancellation, stale worker/view tokens, memory limits, immutable old frames and original-value picking. Confirm style/summary metadata and legacy constructors across completed maps/readback, source-versus-viewport dimensions and invalid receipt combinations. Real Windows pixel/display QA, native source verification and final editor integration remain pending; no renderer tests ran for this batch.
+
+## Retained-sample style changes
+
+[Explicit map recoloring](MAP-RECOLOR.md) now changes lighting or base gradients from a complete retained raster, with old/new image admission and latest-capture checks in the connected view. Equal value styles reuse the exact CPU image and summary after limit/cancellation checks; changed relief settings run the same stencil and original-height path. No native samples are requested.

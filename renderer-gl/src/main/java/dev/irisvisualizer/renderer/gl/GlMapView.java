@@ -5,12 +5,12 @@ import java.util.*;
 
 /** One native-map colorization/upload pipeline and independently owned display frames. */
 public final class GlMapView implements AutoCloseable {
-    public enum Phase { IDLE, WAITING_CPU, COLORIZING, UPLOADING, WAITING_VIEW, FRAME_READY, DELIVERED, FAILED, CLOSED }
+    public enum Phase { IDLE, WAITING_CPU, COLORIZING, RECOLORING, UPLOADING, WAITING_VIEW, FRAME_READY, DELIVERED, FAILED, CLOSED }
     public record Status(long mapRevision,long viewRevision,Phase phase,Optional<MapSamples.Context> context,List<WorldProblem> problems,Optional<GlFailure.Code> code,String reason) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlMapRenderer renderer;private final GlDevice device;private final MapRasterWorker worker;private final GlMapQueue uploads;
-    private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private UUID latestSamples;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlMapView(GlMapRenderer renderer) { this(renderer,128L*1024*1024); }
     public GlMapView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new MapRasterWorker(workerBytes,device.memory().orElse(null));uploads=new GlMapQueue(device); }
@@ -34,13 +34,13 @@ public final class GlMapView implements AutoCloseable {
     /** Invalidate immediately when native/resource inputs change, before replacement samples arrive. */
     public long invalidate() {
         current();long next=nextMap(),nextView=nextView();var waiting=new Status(next,nextView,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");
-        worker.invalidate();mapRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;status=waiting;
+        worker.invalidate();mapRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;latestSamples=null;status=waiting;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Worker admission occurs first; a budget rejection leaves the current view, tokens and work intact. */
     public long submit(MapRasterWorker.Request request) {
-        Objects.requireNonNull(request);current();long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;status=queued;grid=request.samples().grid();
+        Objects.requireNonNull(request);current();long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,request.source().isPresent()?Phase.RECOLORING:Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
+        long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;latestSamples=request.samples().id();status=queued;grid=request.samples().grid();
         if(view!=null&&(view.width()!=grid.width()||view.height()!=grid.height()))view=null;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -54,6 +54,23 @@ public final class GlMapView implements AutoCloseable {
         }finally { input.close(); }
     }
     public long submit(MapSamples samples,MapRaster.Style style) { return submit(new MapRasterWorker.Request(samples,style)); }
+    public long recolor(MapRaster.Style style) { return recolor(style,MapRaster.Limits.DEFAULT); }
+    public long recolor(MapRaster.Style style,MapRaster.Limits limits) {
+        current();if(!sourceReady||map==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current map upload is required for recoloring");return recolor(map.raster(),style,limits);
+    }
+    /** A caller-held raster can support rapid replacements; keep its owner live through CPU admission. */
+    public long recolor(MapRaster source,MapRaster.Style style,MapRaster.Limits limits) {
+        Objects.requireNonNull(source);current();if(!source.samples().id().equals(latestSamples))throw new GlFailure(GlFailure.Code.STALE,"Recolor source differs from the latest native map samples");
+        return submit(MapRasterWorker.Request.recolor(source,style,limits));
+    }
+    /** Consumes independently owned CPU raster data after destination admission or rejection. */
+    public long recolor(RenderInput<MapRaster> input,MapRaster.Style style,MapRaster.Limits limits) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked map recoloring requires the same device coordinator");
+            return recolor(source.value(),style,limits);
+        }finally { input.close(); }
+    }
     private void dimensions(int width,int height) {
         if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Map viewport exceeds device target bounds");
     }
@@ -105,7 +122,7 @@ public final class GlMapView implements AutoCloseable {
     }
     /** Leaves the borrowed renderer/device and caller-transferred frames owned by their callers. */
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;sourceReady=false;worker.close();Throwable failure=null;
+        if(disposed)return;device.current();closed=true;sourceReady=false;latestSamples=null;worker.close();Throwable failure=null;
         try { uploads.close(); }catch(RuntimeException|Error error) { failure=error; }
         try { releaseDisplay(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         status=new Status(mapRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");disposed=failure==null;

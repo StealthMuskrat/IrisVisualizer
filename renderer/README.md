@@ -273,3 +273,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared picking sizes
 
 [Verified drawable/range counts](PICKING-SIZES.md) now size picking-index worker arrays in constant time during submission. Scene construction and index preparation independently recheck counts; mesh publication also verifies drawable bounds and primitive collection coverage. Valid jobs reserve actual source/index/build payload within existing ceilings, preserving complete queries and native identity. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
+
+## Captured map recoloring
+
+[Explicit map recoloring](MAP-RECOLOR.md) now reuses exact native captures for scalar gradients, biome palettes and terrain relief. Equal value styles reuse the CPU raster; changed styles reserve old and new images, with owned handoffs and latest-capture guards in the connected view. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
