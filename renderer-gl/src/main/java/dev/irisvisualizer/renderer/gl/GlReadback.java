@@ -1,6 +1,8 @@
 package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.RgbaImage;
+import dev.irisvisualizer.renderer.RenderInput;
+import dev.irisvisualizer.renderer.RenderMemory;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
@@ -140,6 +142,18 @@ public final class GlReadback implements AutoCloseable {
         return new Step(progress(),readNow,copiedNow,storage,actions,units,System.nanoTime()-start);
     }
     Pixels readyPixels() { device.current();if(!ready()||completed==null)throw new GlFailure(GlFailure.Code.STATE,"No complete readback is available");return completed; }
+    /** Admit detached output before consuming the device journal; rejection leaves READY pixels untouched. */
+    RenderInput<Pixels> retainReadyInput() {
+        var result=readyPixels();var memory=device.memory().orElse(null);
+        try { return RenderInput.own(result,memory==null?RenderMemory.Hold.none():memory.hold("Completed image pixels",bytes)); }
+        catch(RenderMemory.LimitException failure) { throw new GlFailure(GlFailure.Code.LIMIT,failure.getMessage()); }
+        catch(IllegalStateException failure) { throw new GlFailure(GlFailure.Code.STATE,failure.getMessage()); }
+    }
+    /** Owned CPU-only handoff. A managed device's shared charge survives device close until final owner close. */
+    public RenderInput<Pixels> takeInput() {
+        var result=retainReadyInput();
+        try { take();return result; }catch(RuntimeException|Error failure) { result.close();throw failure; }
+    }
     /** Transfers immutable CPU data once. Its memory is caller-owned after this operation. */
     public Pixels take() {
         var result=readyPixels();device.retire(output);output=null;completed=null;phase=Phase.TAKEN;return result;

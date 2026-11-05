@@ -176,3 +176,7 @@ World upload validation now consumes [prepared material counts](../renderer/MATE
 ## Explicit upload recovery
 
 [Current-revision upload retries](UPLOAD-RETRY.md) now reopen failed world/map/image queues after cleanup, and the world view can accept retained complete CPU data at the same world token. Retry preserves display configuration and requires fresh source adoption. Atlas replacement also retains one previous owner through retirement and status failures. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); failure injection, runtime/native/GPU validation and editor integration remain deferred, with unsupported previews disabled.
+
+## Owned readback pixels
+
+[CPU readback owners](READBACK-OWNERS.md) now preserve managed output admission after direct or revision-checked queue transfer, without copying pixels or retaining GL sources. Independent inputs can outlive device shutdown and release their shared charge on final close; handoff admission/setup rejection preserves READY output for retry. Raw transfers remain available with external accounting. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU validation and editor integration remain deferred, with unsupported previews disabled.

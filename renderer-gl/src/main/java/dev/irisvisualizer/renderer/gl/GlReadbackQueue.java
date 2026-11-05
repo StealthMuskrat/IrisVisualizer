@@ -1,5 +1,6 @@
 package dev.irisvisualizer.renderer.gl;
 
+import dev.irisvisualizer.renderer.RenderInput;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -10,6 +11,12 @@ public final class GlReadbackQueue implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(progress);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     public record Completion(long revision,GlReadback.Pixels pixels) { public Completion { if(revision<1)throw new IllegalArgumentException("Invalid readback revision");Objects.requireNonNull(pixels); } }
+    /** The packet is borrowed from input; retain the input before sharing it with another owner. */
+    public record OwnedCompletion(long revision,RenderInput<GlReadback.Pixels> input) implements AutoCloseable {
+        public OwnedCompletion { if(revision<1)throw new IllegalArgumentException("Invalid readback revision");Objects.requireNonNull(input); }
+        public GlReadback.Pixels pixels() { return input.value(); }
+        @Override public void close() { input.close(); }
+    }
     private final GlDevice device;private final GlReadback.Limits limits;private long revision;private GlReadback active;private boolean closed;
     private volatile Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),"");
     public GlReadbackQueue(GlDevice device) { this(device,GlReadback.Limits.DEFAULT); }
@@ -48,6 +55,19 @@ public final class GlReadbackQueue implements AutoCloseable {
         try {
             var result=Optional.of(new Completion(revision,active.readyPixels()));var delivered=new Status(revision,Phase.DELIVERED,status.progress(),Optional.empty(),"");active.take();active.close();active=null;status=delivered;return result;
         }catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failed(error);throw error; }
+    }
+    /** Admission/setup rejection preserves READY output; successful transfer leaves no queue-owned CPU pixels. */
+    public Optional<OwnedCompletion> takeInput(long latestRevision) {
+        current();if(latestRevision<1)throw new IllegalArgumentException("Invalid readback revision");if(latestRevision>revision) { invalidate(latestRevision);return Optional.empty(); }if(latestRevision!=revision||status.phase()!=Phase.READY||active==null||!active.ready())return Optional.empty();
+        var input=active.retainReadyInput();boolean transferring=false;
+        try {
+            var result=Optional.of(new OwnedCompletion(revision,input));var delivered=new Status(revision,Phase.DELIVERED,status.progress(),Optional.empty(),"");
+            transferring=true;active.take();active.close();active=null;status=delivered;return result;
+        }catch(RuntimeException|Error error) {
+            input.close();
+            if(transferring) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failed(error); }
+            throw error;
+        }
     }
     @Override public void close() { if(closed&&active==null)return;closed=true;try { releaseOwned(); }finally { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),""); } }
 }

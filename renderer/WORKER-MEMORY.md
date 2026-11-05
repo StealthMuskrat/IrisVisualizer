@@ -46,6 +46,10 @@ The GPU journal is admitted **before** the CPU completion hold closes. This cons
 
 A directly constructed `GlWorldAnimation` still borrows the worker supplied by its caller; that caller must choose the matching coordinator. Lower-level raster/plan/order APIs remain usable independently, and callers using them must scope their completion holds through the actual destination admission or disposal.
 
+## Detached readback ownership
+
+The GPU readback path now offers [owned CPU handoff](../renderer-gl/READBACK-OWNERS.md) through direct and revision-checked `takeInput` methods. A device coordinator admits the full output before its device journal releases it; the independent input remains charged through device close until its final CPU owner closes. Setup/admission rejection preserves READY output. This adds no second image copy and retains existing conservative handoff overlap and raw-transfer external accounting.
+
 ## Remaining scope and validation
 
 These additions automatically cover the connected map, atlas and sorting preparation paths when the device participates. [Picking and standalone visual/scene preparation](PICKING-MEMORY.md) now also provide optional shared admission. Native generation/sampling and producer scratch, caller-retained input catalogs/maps/plans, custom caches and escaped arrays still require separate host admission or further wiring. Java object/collection overhead, parser/decoder scratch, native caches and driver storage overhead are not measured by primitive reservations. Whole-application memory profiling and final editor integration remain pending.
