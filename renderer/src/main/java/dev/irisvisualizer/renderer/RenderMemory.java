@@ -83,17 +83,25 @@ public final class RenderMemory implements AutoCloseable {
             if(hold.holding.memory!=this)throw new IllegalArgumentException("Cannot replace a hold from another renderer coordinator");
             if(!hold.closed&&handles.add(hold))references.merge(hold.holding,1,Integer::sum);
         }
-        long credit=0;int released=0;
-        for(var entry:references.entrySet())if(entry.getValue()==entry.getKey().references) {
-            var account=entry.getKey().account;credit+=Math.max(account.retained,account.reserved);released++;
+        Holding[] groups=references.keySet().toArray(Holding[]::new);int[] counts=new int[groups.length];long credit=0;int released=0;
+        for(int i=0;i<groups.length;i++) {
+            var group=groups[i];counts[i]=references.get(group);
+            if(counts[i]==group.references) { var account=group.account;credit+=Math.max(account.retained,account.reserved);released++; }
         }
         if(bytes-credit>limits.bytes()-charged||owners.size()+1-released>limits.accounts())throw new LimitException("Replacement renderer hold exceeds shared bytes or account allowance");
-        var account=new Account(label);var result=new Hold(new Holding(this,account));var iterator=handles.iterator();
-        try { owners.add(account); }catch(RuntimeException|Error failure) { try { owners.remove(account); }catch(RuntimeException|Error rollback) { if(rollback!=failure)failure.addSuppressed(rollback); }throw failure; }
-        // All allocations and rejection checks precede consuming the idle handles.
-        while(iterator.hasNext())iterator.next().close();account.reserved=bytes;charged+=bytes;return result;
+        Hold[] consumed=handles.toArray(Hold[]::new);var account=new Account(label);var result=new Hold(new Holding(this,account));
+        Set<Account> nextOwners=Collections.newSetFromMap(new IdentityHashMap<>(owners.size()+1));nextOwners.addAll(owners);
+        for(int i=0;i<groups.length;i++)if(counts[i]==groups[i].references&&!nextOwners.remove(groups[i].account))throw new IllegalStateException("Replaced renderer account is absent");
+        nextOwners.add(account);
+        // Registry construction can fail without touching live owners. The locked commit below allocates nothing.
+        for(int i=0;i<consumed.length;i++)consumed[i].closed=true;
+        for(int i=0;i<groups.length;i++) {
+            var group=groups[i];group.references-=counts[i];
+            if(group.references==0) { var old=group.account;old.retained=0;old.reserved=0;old.retiring=true;old.released=true; }
+        }
+        account.reserved=bytes;owners=nextOwners;charged+=bytes-credit;return result;
     }
-    private final Limits limits;private final Set<Account> owners=Collections.newSetFromMap(new IdentityHashMap<>());private long charged;private boolean closed;
+    private final Limits limits;private Set<Account> owners=Collections.newSetFromMap(new IdentityHashMap<>());private long charged;private boolean closed;
     public RenderMemory() { this(Limits.DEFAULT); }
     public RenderMemory(Limits limits) { this.limits=Objects.requireNonNull(limits); }
     public Limits limits() { return limits; }
