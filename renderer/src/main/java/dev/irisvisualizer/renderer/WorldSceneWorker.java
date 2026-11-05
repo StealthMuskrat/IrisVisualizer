@@ -55,8 +55,15 @@ public final class WorldSceneWorker implements AutoCloseable {
         if(active==null&&pending!=null)running=cache.stats().knownPayloadBytes();
         reserve(Math.max(running+input,pending==null?0:pending.request.sceneLimits().workingBytes()));
     }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted(); }
+    private void dropCompleted() { var old=completed;completed=null;if(old!=null)old.close(); }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;
+        try { dropCompleted(); }
+        catch(RuntimeException|Error failure) {
+            // No replacement was installed. Drop its reservation while keeping actual cache/active bytes covered.
+            try { refreshAdmission(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+        }
+    }
     /** Admission precedes cancellation, revision changes or closing worker-owned output. */
     public long submit(Request request) {
         Objects.requireNonNull(request);synchronized(lock) {

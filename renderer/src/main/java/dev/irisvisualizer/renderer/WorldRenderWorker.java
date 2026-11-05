@@ -97,7 +97,7 @@ public final class WorldRenderWorker implements AutoCloseable {
             long next=nextRevision();var job=new Job(next,request);var queued=status(job,Phase.QUEUED,List.of(),List.of());
             // Reject shared admission before changing revisions, cancelling jobs or dropping old output.
             reserve(Math.max(request.workingBytes(),(active==null?running:active.admissionBytes)+request.inputBytes()));
-            if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);dropCompleted();pending=job;revision=next;status=queued;
+            cancelOwned();pending=job;revision=next;status=queued;
             if(!scheduled) {
                 scheduled=true;try { executor.execute(this::drain); }
                 catch(RuntimeException|Error failure) { startFailed(job,failure); }
@@ -106,7 +106,7 @@ public final class WorldRenderWorker implements AutoCloseable {
         }
     }
     public long invalidate() {
-        synchronized(lock) { requireOpen();long next=nextRevision();var waiting=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();refreshAdmission();revision=next;status=waiting;return next; }
+        synchronized(lock) { requireOpen();long next=nextRevision();var waiting=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());cancelOwned();refreshAdmission();revision=next;status=waiting;return next; }
     }
     public Status status() { synchronized(lock) { return status; } }
     public WorldSectionCache.Stats cacheStats() { return cache.stats(); }
@@ -115,7 +115,15 @@ public final class WorldRenderWorker implements AutoCloseable {
     }
     private void requireOpen() { if(closed)throw new IllegalStateException("Render worker is closed"); }
     private long nextRevision() { if(revision==Long.MAX_VALUE)throw new IllegalStateException("Render revision counter exhausted");return revision+1; }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null;completedTint=null; } }
+    private void dropCompleted() { var old=completed;completed=null;completedTint=null;if(old!=null)old.close(); }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;
+        try { dropCompleted(); }
+        catch(RuntimeException|Error failure) {
+            // No replacement was installed. Drop its reservation while keeping actual cache/active bytes covered.
+            try { refreshAdmission(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+        }
+    }
     private static WorldProblem problem(WorldProblem.Code code,String reason) { return new WorldProblem(code,Optional.empty(),reason); }
     private static Status status(Job job,Phase phase,List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Status(job.revision,phase,Optional.of(job.request.snapshot().source()),Optional.of(job.request.snapshot().id()),problems,assets); }
     private void phase(Job job,Phase phase) { synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,phase,List.of(),List.of()); } }

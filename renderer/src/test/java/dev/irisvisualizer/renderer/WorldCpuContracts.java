@@ -660,15 +660,15 @@ public final class WorldCpuContracts {
     }
     /** Faults one ticket lookup during final scene release; remaining tickets must still be visited. */
     private static final class TicketFault implements AutoCloseable {
-        final Object shared;final java.lang.reflect.Field field;final List<WorldSectionCache.Ticket> original;final Error failure;int visits;boolean fired;
-        @SuppressWarnings("unchecked") TicketFault(WorldScene.Result owner,Error failure) {
+        final Object shared;final java.lang.reflect.Field field;final List<WorldSectionCache.Ticket> original;final Throwable failure;int visits;boolean fired;
+        @SuppressWarnings("unchecked") TicketFault(WorldScene.Result owner,Throwable failure) {
             this.failure=failure;
             try {
                 var lease=WorldScene.Result.class.getDeclaredField("shared");lease.setAccessible(true);shared=lease.get(owner);check(shared!=null,"fault fixture owns a live scene");
                 field=shared.getClass().getDeclaredField("tickets");field.setAccessible(true);original=(List<WorldSectionCache.Ticket>)field.get(shared);
                 field.set(shared,new AbstractList<WorldSectionCache.Ticket>() {
                     @Override public int size() { return original.size(); }
-                    @Override public WorldSectionCache.Ticket get(int index) { visits++;if(!fired&&index==0) { fired=true;throw TicketFault.this.failure; }return original.get(index); }
+                    @Override public WorldSectionCache.Ticket get(int index) { visits++;if(!fired&&index==0) { fired=true;if(TicketFault.this.failure instanceof RuntimeException runtime)throw runtime;throw (Error)TicketFault.this.failure; }return original.get(index); }
                 });
             }catch(ReflectiveOperationException error) { throw new AssertionError("controlled scene release fault unavailable",error); }
         }
@@ -680,6 +680,49 @@ public final class WorldCpuContracts {
     }
     private static Throwable caughtFailure(Runnable action) {
         try { action.run(); }catch(RuntimeException|Error failure) { return failure; }throw new AssertionError("expected cleanup failure missing");
+    }
+    /** Read the worker-owned READY result without transferring it; fault injection remains in the shared ticket list. */
+    private static Object workerField(Object worker,String name) {
+        try { var field=worker.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(worker); }
+        catch(ReflectiveOperationException failure) { throw new AssertionError("controlled worker ownership inspection unavailable",failure); }
+    }
+    private static void sceneCompletionCleanupFailures() {
+        var f=fixture(2,128,false);var sceneRequest=new WorldSceneWorker.Request(f.models(),f.visibility(),f.raster(),f.plan().limits(),f.plan().sectionLimits());
+        var visualLimits=new WorldVisuals.Limits(4,4,4,16,16,1024*1024,4*1024*1024);
+        var visuals=WorldVisuals.Request.capture(f.assets(),f.snapshot(),List.of(new WorldVisuals.ModelChoice(0,List.of(0))),new int[2],0,0,visualLimits,LIVE);
+        var renderRequest=new WorldRenderWorker.Request(visuals,WorldVisibility.Input.keepAll(f.snapshot()),f.plan().limits(),f.plan().sectionLimits(),4*1024*1024);
+        for(boolean integrated:new boolean[]{false,true})for(int action=0;action<3;action++)for(int kind=0;kind<3;kind++) {
+            try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();
+                var scene=integrated?null:new WorldSceneWorker(4*1024*1024,memory,()->executor);
+                var render=integrated?new WorldRenderWorker(4*1024*1024,memory,()->executor):null) {
+                Object worker=integrated?render:scene;
+                LongSupplier submit=integrated?()->render.submit(renderRequest):()->scene.submit(sceneRequest);
+                LongSupplier invalidate=integrated?render::invalidate:scene::invalidate;
+                LongSupplier revision=integrated?()->render.status().revision():()->scene.status().revision();
+                Supplier<String> phase=integrated?()->render.status().phase().name():()->scene.status().phase().name();
+                Supplier<WorldSectionCache.Stats> cache=integrated?render::cacheStats:scene::cacheStats;
+                Supplier<RenderMemory.Owner> usage=integrated?()->render.memoryUsage().orElseThrow():()->scene.memoryUsage().orElseThrow();
+                java.util.function.LongFunction<Optional<WorldScene.Result>> take=integrated?token->render.take(token).map(WorldRenderWorker.Completion::owner):token->scene.take(token).map(WorldSceneWorker.Completion::result);
+                Runnable close=integrated?render::close:scene::close;
+                equal(1L,submit.getAsLong(),"initial scene request accepted");executor.runNext();equal("READY",phase.get(),"scene completion ready before release fault");
+                var old=(WorldScene.Result)workerField(worker,"completed");check(old!=null&&!old.closed(),"worker owns live untaken scene");long retained=memory.stats().chargedBytes();check(retained>0&&retained<4*1024*1024,"READY cache is smaller than new working reservation");equal(0L,usage.get().reservedBytes(),"READY worker has no job reservation after unwind");
+                Throwable primary=switch(kind) { case 0->new IllegalStateException("injected READY source release failure");case 1->new OutOfMemoryError("injected READY source release OOM");default->new AssertionError("injected READY source release error"); };
+                try(var fault=new TicketFault(old,primary)) {
+                    Throwable actual=action==0?caughtFailure(()->invalidate.getAsLong()):action==1?caughtFailure(()->submit.getAsLong()):caughtFailure(close);
+                    check(actual==primary,"scene disposal preserves exact source release failure");fault.allVisited();check(old.closed(),"failed scene release consumes its wrapper");check(workerField(worker,"completed")==null,"dropped scene is detached before release");if(integrated)check(workerField(worker,"completedTint")==null,"dropped scene tint is detached with its owner");
+                    check(take.apply(1).isEmpty(),"failed disposal exposes no closed scene completion");equal(1L,revision.getAsLong(),"failed disposal does not spend a replacement revision");equal(0L,usage.get().reservedBytes(),"failed disposal removes any uninstalled replacement reservation");check(executor.queued.isEmpty(),"failed replacement dispatches no new task");
+                    check(cache.get().leases()>0,"deliberately skipped external ticket remains charged");if(action!=2) { equal(retained,memory.stats().chargedBytes(),"failed cancellation keeps actual cache charge without new peak");equal("READY",phase.get(),"failed cancellation leaves prior metadata snapshot"); }
+                    else { check(cache.get().closed(),"shutdown still retires cache after source release failure");equal("CLOSED",phase.get(),"shutdown still publishes terminal metadata"); }
+                }
+                equal(0L,cache.get().leases(),"fixture restores and closes deliberately skipped ticket");
+                if(action==2) { close.run();noWorkerCharge(memory);continue; }
+                equal(cache.get().knownPayloadBytes(),memory.stats().chargedBytes(),"only actual resident cache payload remains charged");equal(2L,submit.getAsLong(),"fresh request retries without skipped revision");equal(1,executor.queued.size(),"retry schedules exactly one drain");executor.runNext();equal("READY",phase.get(),"retry publishes complete scene");
+                try(var result=take.apply(2).orElseThrow()) {
+                    var ready=result.scene().orElseThrow();check(ready.snapshot()==f.snapshot(),"retry preserves exact native snapshot");equal(12,ready.usage().faces(),"retry retains all original model faces");equal(state(407),ready.snapshot().states().getFirst(),"retry preserves original native state");equal(BIOME,ready.snapshot().biomes().getFirst(),"retry preserves original native biome");
+                }
+                close.run();noWorkerCharge(memory);
+            }
+        }
     }
     /** Account release can fail after removal; producer/construction errors must remain primary. */
     private static final class CaptureCloseFault implements AutoCloseable {
@@ -750,6 +793,7 @@ public final class WorldCpuContracts {
         }
     }
     private static void ownedCleanupFailures() {
+        sceneCompletionCleanupFailures();
         captureCleanupFailures();
         var f=fixture(2,128,false);
         for(boolean indexing:new boolean[]{false,true})for(boolean ready:new boolean[]{false,true}) {
