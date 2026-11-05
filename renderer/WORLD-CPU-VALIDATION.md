@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 18 synthetic contract groups alongside the initial 18 map/scalar/image/ownership groups: 36 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 60 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-05. `WorldCpuContracts` has 19 synthetic contract groups alongside the initial 18 map/scalar/image/ownership groups: 37 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 61 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -20,6 +20,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Complete limits | A one-face deficit publishes no partial scene; foreign visibility and cancellation remain explicit |
 | Pinned replacement | A replacement cannot evict pinned old data or change cache stats on rejection; releasing old owners admits replacement |
 | Geometry picking | Analytic unit-cube plane distance and exact source identities, batch/exhaustive agreement, clipping, budget failure and alpha/geometry modes |
+| Conservative picking hierarchy | Analytic edge/corner front-plane hits survive node/range rejection; exact clip/ray limits, shifted anchors, lower-section ties, atomic budget failure and unexpanded diagnostic marker boxes |
 | Translucent ordering | An independent vertex-centroid reference sort checks complete global back-to-front keys and stable ties; scratch deficit withholds the entire order |
 | Empty/diagnostic visuals | Empty scenes use no dummy texture/geometry; unsupported markers preserve original state and diagnostic without fabricated block faces |
 | Index ownership | Exact source-plus-index shared admission, cache shutdown with live scenes, consumed-owner release on close/failure/cancellation and independent original owner survival |

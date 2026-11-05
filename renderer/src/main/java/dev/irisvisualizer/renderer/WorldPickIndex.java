@@ -177,15 +177,25 @@ public final class WorldPickIndex implements AutoCloseable {
         WorldPick.Stats stats() { return new WorldPick.Stats(nodes,sections,faces,markers,alphaRejected,batches,culledBatches); }
         WorldPick execute() { check();if(section.length>0)visit(0,nodeEntry(0));check();return new WorldPick(id,source,ray,Optional.ofNullable(hit()),stats(),List.of(),options.clip()); }
         double box(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z) {
+            return box(minX,minY,minZ,maxX,maxY,maxZ,x,y,z,false);
+        }
+        /** Traversal only: include triangle edge tolerance and round slab intervals outward. */
+        double candidate(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z) {
+            double magnitude=Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z)));
+            magnitude=Math.max(magnitude,Math.max(Math.abs(minX),Math.abs(maxX)));magnitude=Math.max(magnitude,Math.max(Math.abs(minY),Math.abs(maxY)));magnitude=Math.max(magnitude,Math.max(Math.abs(minZ),Math.abs(maxZ)));
+            double margin=1e-6+8*Math.ulp(magnitude+128);
+            return box(Math.nextDown(minX-margin),Math.nextDown(minY-margin),Math.nextDown(minZ-margin),Math.nextUp(maxX+margin),Math.nextUp(maxY+margin),Math.nextUp(maxZ+margin),x,y,z,true);
+        }
+        double box(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,double x,double y,double z,boolean outward) {
             minX=Math.max(minX,clip.minX());minY=Math.max(minY,clip.minY());minZ=Math.max(minZ,clip.minZ());maxX=Math.min(maxX,clip.maxX());maxY=Math.min(maxY,clip.maxY());maxZ=Math.min(maxZ,clip.maxZ());
             if(minX>maxX||minY>maxY||minZ>maxZ)return Double.POSITIVE_INFINITY;
             double low=ray.minimum(),high=nearest;
-            if(ray.dx()==0) { if(x<minX||x>maxX)return Double.POSITIVE_INFINITY; }else { double a=(minX-x)/ray.dx(),b=(maxX-x)/ray.dx();low=Math.max(low,Math.min(a,b));high=Math.min(high,Math.max(a,b)); }
-            if(ray.dy()==0) { if(y<minY||y>maxY)return Double.POSITIVE_INFINITY; }else { double a=(minY-y)/ray.dy(),b=(maxY-y)/ray.dy();low=Math.max(low,Math.min(a,b));high=Math.min(high,Math.max(a,b)); }
-            if(ray.dz()==0) { if(z<minZ||z>maxZ)return Double.POSITIVE_INFINITY; }else { double a=(minZ-z)/ray.dz(),b=(maxZ-z)/ray.dz();low=Math.max(low,Math.min(a,b));high=Math.min(high,Math.max(a,b)); }
+            if(ray.dx()==0) { if(x<minX||x>maxX)return Double.POSITIVE_INFINITY; }else { double a=(minX-x)/ray.dx(),b=(maxX-x)/ray.dx();low=Math.max(low,outward?Math.nextDown(Math.min(a,b)):Math.min(a,b));high=Math.min(high,outward?Math.nextUp(Math.max(a,b)):Math.max(a,b)); }
+            if(ray.dy()==0) { if(y<minY||y>maxY)return Double.POSITIVE_INFINITY; }else { double a=(minY-y)/ray.dy(),b=(maxY-y)/ray.dy();low=Math.max(low,outward?Math.nextDown(Math.min(a,b)):Math.min(a,b));high=Math.min(high,outward?Math.nextUp(Math.max(a,b)):Math.max(a,b)); }
+            if(ray.dz()==0) { if(z<minZ||z>maxZ)return Double.POSITIVE_INFINITY; }else { double a=(minZ-z)/ray.dz(),b=(maxZ-z)/ray.dz();low=Math.max(low,outward?Math.nextDown(Math.min(a,b)):Math.min(a,b));high=Math.min(high,outward?Math.nextUp(Math.max(a,b)):Math.max(a,b)); }
             return low<=high?low:Double.POSITIVE_INFINITY;
         }
-        double nodeEntry(int node) { check();if(++nodes>options.nodeTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking node-test budget exceeded; no nearest hit can be certified");int at=node*6;return box(bounds[at],bounds[at+1],bounds[at+2],bounds[at+3],bounds[at+4],bounds[at+5],ox,oy,oz); }
+        double nodeEntry(int node) { check();if(++nodes>options.nodeTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking node-test budget exceeded; no nearest hit can be certified");int at=node*6;return candidate(bounds[at],bounds[at+1],bounds[at+2],bounds[at+3],bounds[at+4],bounds[at+5],ox,oy,oz); }
         void visit(int node,double entry) {
             check();if(!Double.isFinite(entry)||entry>nearest)return;
             if(section[node]>=0) { mesh(section[node]);return; }int a=left[node],b=right[node];double first=nodeEntry(a),second=nodeEntry(b);
@@ -197,12 +207,10 @@ public final class WorldPickIndex implements AutoCloseable {
         }
         void mesh(int sectionIndex) {
             sections++;var mesh=scene.sections().get(sectionIndex);var vertices=mesh.vertexBuffer();var indices=mesh.indexBuffer();double x=relative(mesh.origin().x(),anchor.x()),y=relative(mesh.origin().y(),anchor.y()),z=relative(mesh.origin().z(),anchor.z());
-            // Include the triangle query's barycentric edge allowance and relative-coordinate slab rounding.
-            double magnitude=Math.max(Math.abs(ox),Math.max(Math.abs(oy),Math.abs(oz))),margin=1e-6+8*Math.ulp(Math.max(magnitude,Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z)))+128));
             if(options.batchCulling()&&!mesh.faces().isEmpty()) {
                 int start=faceRanges.starts[sectionIndex];
                 for(int batch=start;batch<faceRanges.starts[sectionIndex+1];batch++) {
-                    check();batches++;if(!range(faceRanges,batch,x,y,z,margin)) { culledBatches++;continue; }
+                    check();batches++;if(!range(faceRanges,batch,x,y,z)) { culledBatches++;continue; }
                     int first=(batch-start)*BATCH_PRIMITIVES;
                     faceRange(mesh,sectionIndex,first,Math.min(mesh.faces().size(),first+BATCH_PRIMITIVES),vertices,indices,ox-x,oy-y,oz-z);
                 }
@@ -210,14 +218,14 @@ public final class WorldPickIndex implements AutoCloseable {
             if(options.batchCulling()&&!mesh.markers().isEmpty()) {
                 int start=markerRanges.starts[sectionIndex];
                 for(int batch=start;batch<markerRanges.starts[sectionIndex+1];batch++) {
-                    check();batches++;if(!range(markerRanges,batch,x,y,z,margin)) { culledBatches++;continue; }
+                    check();batches++;if(!range(markerRanges,batch,x,y,z)) { culledBatches++;continue; }
                     int first=(batch-start)*BATCH_PRIMITIVES;markerRange(mesh,sectionIndex,first,Math.min(mesh.markers().size(),first+BATCH_PRIMITIVES));
                 }
             }else markerRange(mesh,sectionIndex,0,mesh.markers().size());
         }
-        boolean range(Ranges ranges,int batch,double x,double y,double z,double margin) {
+        boolean range(Ranges ranges,int batch,double x,double y,double z) {
             int at=batch*6;var b=ranges.bounds;
-            double entry=box(x+b[at]-margin,y+b[at+1]-margin,z+b[at+2]-margin,x+b[at+3]+margin,y+b[at+4]+margin,z+b[at+5]+margin,ox,oy,oz);
+            double entry=candidate(x+b[at],y+b[at+1],z+b[at+2],x+b[at+3],y+b[at+4],z+b[at+5],ox,oy,oz);
             return Double.isFinite(entry)&&entry<=nearest;
         }
         void markerRange(WorldMesh mesh,int sectionIndex,int first,int end) {

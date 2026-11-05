@@ -1,6 +1,6 @@
 # World picking range culling
 
-Renderer implementation, 2026-11-04. All 128 CPU/OpenGL main sources compile with Java 25 and LWJGL 3.4.1 (87 CPU, 41 GL). Source inspection and compilation only: no picking/index/query/worker execution, renderer tests, native comparison, GL context, Windows visual checks or workflows ran. Renderer-stage execution remains deferred until implementation is complete. Unsupported previews remain disabled.
+Renderer implementation, 2026-11-05. All 129 CPU/OpenGL production sources plus four harnesses compile with Java 25 and LWJGL 3.4.1 (133 total; 88 CPU, 41 GL production). Source inspection and compilation only: no picking/index/query/worker execution, renderer tests, native comparison, GL context, Windows visual checks or workflows ran. Renderer-stage execution remains deferred until implementation is complete. Unsupported previews remain disabled.
 
 ## Bounded original-order ranges
 
@@ -10,7 +10,17 @@ Face bounds come from all four emitted vertices, after actual world-mesh placeme
 
 Ranges preserve section and primitive order. Faces still use the original two indexed triangles, barycentric UVs, back-face policy, displayed atlas alpha thresholds and clipping. Markers still use their existing clipped unit-box diagnostic approximation. Equal-distance ordering remains section, geometry-before-marker, then original face/marker index. Nearest results retain the same native position/state/biome/source and original indices; the range index never appears as a substitute hit identity.
 
-Bounds are expanded at query time by 1e-6 world units plus eight double ULPs at the relative-coordinate magnitude. The fixed margin exceeds the barycentric edge tolerance over the admitted +/-128 section geometry, while the ULP term allows slab arithmetic rounding. Uncertain boundary groups remain candidates; actual primitive tests decide hits. This is a conservative numerical policy, not proof of bitwise equivalence for ill-conditioned triangles or GPU edge pixels. Near-parallel, distant-anchor and edge/corner cases remain in the deferred comparison matrix.
+Hierarchy nodes and primitive ranges now share one conservative candidate-box path. Both expand bounds at query time by 1e-6 world units plus eight double ULPs at the maximum relative origin/bound magnitude plus 128. Bounds are then rounded outward with `nextDown`/`nextUp`, and nonparallel slab entry/exit intervals receive outward rounding too. Geometric clip intersection and the ray/current-nearest interval still bound traversal. Previously, range padding could not help a ray already rejected by exact root/leaf slabs; this could lose an edge-tolerant triangle hit or change the original-section winner at a shared-edge tie.
+
+The fixed margin exceeds the existing barycentric edge tolerance over admitted +/-128 section geometry; the ULP term accounts for relative slab arithmetic. Expansion affects candidate rejection only:
+
+| Stage | Boundary policy |
+| --- | --- |
+| Section hierarchy and primitive ranges | Shared padded bounds and outward slab intervals |
+| Actual triangles | Existing barycentric tolerance, back-face/alpha policy, exact geometric clip and ray-distance checks |
+| Actual diagnostic markers | Existing clipped unit-box slab test with no added padding or interval rounding |
+
+Uncertain boundaries therefore reach actual primitive tests without enlarging marker hit boxes, geometric scope or accepted ray distances. Equal-distance tie order remains unchanged. More uncertain candidates can be visited, so work counters and limit outcomes may differ; exhausted budgets still publish no partial nearest hit. The helper adds only bounded scalar arithmetic, with no new arrays, source copies or admission changes. This is a conservative numerical policy, not proof of bitwise equivalence for ill-conditioned triangles or GPU edge pixels.
 
 ## Options and work receipts
 
@@ -46,3 +56,7 @@ Compare culled and exhaustive queries with complete allowances across empty/one-
 Exercise current animated alpha holes/interpolation, both back-face policies, GEOMETRY/displayed alpha modes, exact source hit metadata and all counters. Verify sufficient-budget hit/miss equivalence independently of differing work counts; separately exhaust every budget after skipped/admitted groups and require no partial hit. Confirm old constructors and `withClip` retain the intended defaults/mode.
 
 Check exact and one-over array/combined/shared bounds, upper-bound calculations, all failure/cancellation construction points, count/emission consistency, marker coordinate conversion, source closure during active queries, pending worker replacement and final zero charge. Measure actual work/time on representative Windows scenes before claiming a performance improvement. Native visual fidelity, real GPU pixel boundaries, final editor routing and renderer-stage runtime tests remain pending.
+
+## Prepared hierarchy-boundary regressions
+
+A new `WorldCpuContracts` group uses analytic unit-cube front-plane hits at distance two for tiny edge/corner offsets inside the existing triangle tolerance, compares range and exhaustive section modes, and checks original-section ties across two leaves. It also covers a shifted exact anchor beyond double integer precision, exact clip boundaries, closed near/far endpoints, rays outside actual primitive tolerance and atomic primitive-budget rejection. The marker fixture separately checks that candidate padding does not create a diagnostic-box hit. All 61 prepared groups compile and remain unexecuted. Wider numerical, transformed-model, native and real GPU comparison remains deferred until renderer-stage validation.

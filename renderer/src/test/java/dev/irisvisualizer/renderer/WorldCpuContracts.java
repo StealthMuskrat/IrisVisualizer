@@ -147,6 +147,26 @@ public final class WorldCpuContracts {
             check(index.query(ray(transparent.snapshot()),LIVE).hit().isEmpty(),"displayed transparent pixels reject hit");check(index.query(ray(transparent.snapshot()),new WorldPickIndex.Options(100,100,0,false,WorldPickIndex.Alpha.GEOMETRY),null,LIVE).hit().isPresent(),"geometry-only mode retains transparent surface");
         }
     }
+    private static void pickingTraversalEdges() {
+        double edge=2e-11;var f=fixture(1,255,false);var position=f.snapshot().extent().position(0);
+        try(var cache=new WorldSectionCache();var owner=build(f,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+            for(var xy:new double[][]{{-edge,0.5},{1+edge,0.5},{0.5,-edge},{0.5,1+edge},{-edge,-edge},{1+edge,1+edge}}) {
+                var ray=new WorldRay(position,xy[0],xy[1],3,0,0,-1,0,10);var result=index.query(ray,LIVE);check(!result.requiresPlaceholder(),"edge query remains complete");var hit=result.hit().orElseThrow();near(2,hit.distance(),"edge-tolerant front plane remains the analytic hit");equal(position,hit.position(),"hierarchy padding preserves exact native position");equal(hit,index.query(ray,WorldPickIndex.Options.DEFAULT.withBatchCulling(false),null,LIVE).hit().orElseThrow(),"range/exhaustive edge hits agree");
+            }
+            for(double outside:new double[]{5e-7,1e-5}) {
+                var ray=new WorldRay(position,-outside,0.5,3,0,0,-1,0,10);for(boolean culling:new boolean[]{false,true}) { var result=index.query(ray,WorldPickIndex.Options.DEFAULT.withBatchCulling(culling),null,LIVE);check(!result.requiresPlaceholder()&&result.hit().isEmpty(),"candidate padding never invents a primitive hit"); }
+            }
+            var boundary=new WorldRay(position,0,0.5,3,0,0,-1,2,2);near(2,index.query(boundary,LIVE).hit().orElseThrow().distance(),"closed ray interval retains boundary hit");
+            check(index.query(new WorldRay(position,0.5,0.5,3,0,0,-1,0,Math.nextDown(2.0)),LIVE).hit().isEmpty(),"candidate padding does not extend ray maximum");check(index.query(new WorldRay(position,0.5,0.5,3,0,0,-1,Math.nextUp(2.0),2.5),LIVE).hit().isEmpty(),"candidate padding does not extend ray minimum");
+            var clip=new WorldClip(f.snapshot().extent());var clipped=WorldPickIndex.Options.DEFAULT.withClip(clip);check(index.query(new WorldRay(position,-edge,0.5,3,0,0,-1,0,10),clipped,null,LIVE).hit().isEmpty(),"geometric clipping stays exact outside the lower plane");check(index.query(new WorldRay(position,1+edge,0.5,3,0,0,-1,0,10),clipped,null,LIVE).hit().isEmpty(),"geometric clipping stays exact outside the upper plane");near(2,index.query(boundary,clipped,null,LIVE).hit().orElseThrow().distance(),"exact closed clip boundary remains inspectable");
+            var shifted=new WorldSnapshot.Position(position.x()+4096,position.y(),position.z());var shiftedRay=new WorldRay(shifted,-4096-edge,0.5,3,0,0,-1,0,10);equal(position,index.query(shiftedRay,LIVE).hit().orElseThrow().position(),"exact large anchors preserve a small near-edge relative ray");
+            var limited=index.query(new WorldRay(position,-edge,0.5,3,0,0,-1,0,10),new WorldPickIndex.Options(100,0,0,false,WorldPickIndex.Alpha.GEOMETRY),null,LIVE);check(limited.requiresPlaceholder()&&limited.hit().isEmpty(),"edge candidate respects atomic primitive-budget failure");equal(WorldProblem.Code.LIMIT,limited.problems().getFirst().code(),"edge budget reports the existing limit diagnostic");
+        }
+        var joined=fixture(2,255,false);try(var cache=new WorldSectionCache();var owner=build(joined,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+            equal(2,owner.scene().orElseThrow().sections().size(),"tie fixture spans two hierarchy leaves");var origin=joined.snapshot().extent().position(0);var ray=new WorldRay(origin,1+edge,0.5,3,0,0,-1,0,10);
+            for(boolean culling:new boolean[]{false,true}) { var hit=index.query(ray,WorldPickIndex.Options.DEFAULT.withBatchCulling(culling),null,LIVE).hit().orElseThrow();near(2,hit.distance(),"shared-edge tie remains at the front plane");equal(origin,hit.position(),"padded leaf preserves lower original-section tie order");equal(0,hit.section(),"lower section wins equal-distance edge tie"); }
+        }
+    }
     private static void ordering() {
         var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
             var scene=owner.scene().orElseThrow();var view=new WorldDrawOrder.View(f.snapshot().extent().position(0),0.5,0.5,4,0.5,0.5,0);var order=WorldDrawOrder.prepare(scene,view,LIVE);check(!order.requiresPlaceholder(),"complete global order");
@@ -317,7 +337,8 @@ public final class WorldCpuContracts {
             var entry=marker?WorldModels.Entry.placeholder(snapshot.states().getFirst(),List.of(diagnostic)):WorldModels.Entry.empty(snapshot.states().getFirst());var models=WorldModels.capture(snapshot,layout,List.of(entry),new int[]{0},LIVE);var plan=WorldScenePlan.plan(models,WorldVisibility.keepAll(snapshot,layout),LIVE);
             try(var cache=new WorldSectionCache();var owner=WorldScene.build(plan,raster,cache,LIVE);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
                 check(!owner.requiresPlaceholder()&&!index.requiresPlaceholder(),"complete diagnostic/empty scene");equal(0,owner.scene().orElseThrow().usage().faces(),"no fabricated block faces");var picked=index.query(ray(snapshot),LIVE);
-                if(marker) { var hit=picked.hit().orElseThrow();check(hit.placeholder()&&hit.surface().isEmpty(),"diagnostic marker hit");equal(snapshot.states().getFirst(),hit.state(),"marker retains unsupported original state");equal(List.of(diagnostic),hit.visualProblems(),"exact visual diagnostic");near(2,hit.distance(),"analytic marker box"); }
+                if(marker) { var hit=picked.hit().orElseThrow();check(hit.placeholder()&&hit.surface().isEmpty(),"diagnostic marker hit");equal(snapshot.states().getFirst(),hit.state(),"marker retains unsupported original state");equal(List.of(diagnostic),hit.visualProblems(),"exact visual diagnostic");near(2,hit.distance(),"analytic marker box");
+                    var outside=new WorldRay(snapshot.extent().position(0),-2e-11,0.5,3,0,0,-1,0,10);for(boolean culling:new boolean[]{false,true})check(index.query(outside,WorldPickIndex.Options.DEFAULT.withBatchCulling(culling),null,LIVE).hit().isEmpty(),"traversal padding never expands the actual marker box"); }
                 else check(picked.hit().isEmpty(),"explicit empty produces no pick");
             }
         }
@@ -342,6 +363,7 @@ public final class WorldCpuContracts {
         group("shared scene and cache ownership",WorldCpuContracts::cacheOwners);
         group("pinned cache replacement admission",WorldCpuContracts::pinnedReplacement);
         group("world geometry picking and alpha",WorldCpuContracts::picking);
+        group("conservative picking hierarchy boundaries",WorldCpuContracts::pickingTraversalEdges);
         group("independent translucent centroid ordering",WorldCpuContracts::ordering);
         group("pending sort replacement admission",WorldCpuContracts::pendingOrderAdmission);
         group("ready sort replacement admission",WorldCpuContracts::readyOrderAdmission);
