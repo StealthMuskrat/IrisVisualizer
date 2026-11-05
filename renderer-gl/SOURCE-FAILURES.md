@@ -57,6 +57,26 @@ Each view/animation marks disposal complete only after the close attempt, includ
 
 At renderer completion, inject a worker close/invalidation error before each GPU cleanup stage and combine it with upload/frame/source retirement errors. Verify every remaining owner is visited, the first error remains primary, later errors are suppressed and no resource is re-adopted. Include world shutdown at maximum animation revision, scene release without an animation owner, standalone borrowed-worker exhaustion followed by host close/retry, closed-status allocation failure, retained independent frames and repeated cleanup failure. Compare active reservations, deferred/quarantined charges and final released ownership on the original Windows GL context. These failure paths are source-inspected and compiled only; none has been executed.
 
+## Queue shutdown and terminal publication
+
+The six context-owned queues (`GlUploadQueue`, `GlMapQueue`, `GlImageQueue`, `GlAtlasQueue`, `GlFrameQueue` and `GlReadbackQueue`) now distinguish a closed input gate from successfully completed disposal. Close validates the original live device, thread, GLFW context and LWJGL capabilities before changing queue state, including for an empty queue. The frame queue also rejects close from its rendering callback before mutation. Close queues before closing their device; a previously successful queue close remains an idempotent no-op after device teardown.
+
+Once valid teardown begins, the input gate closes permanently. Cleanup is attempted first, then CLOSED publication is attempted independently. A cleanup error remains primary if status construction also fails; a distinct publication error is suppressed. Disposal becomes complete only when both steps succeed, so another close retries even if all owned resources were already released and only terminal metadata remains unfinished. Failed context validation leaves the previous gate, status, token and ownership unchanged.
+
+CLOSED metadata contains no source, progress, image or diagnostic payload. In particular, atlas shutdown no longer reads progress from an upload whose cleanup just failed. If terminal allocation itself fails, the previous status snapshot may remain; the closed gate still rejects invalidate, retry, submit/render, advance and take. The caller may inspect status and repeat close, but cannot recover output through a failed shutdown.
+
+| Queue | Queue-owned cleanup | Ownership kept independent |
+| --- | --- | --- |
+| World upload | Active upload and untaken scene, visiting both after an earlier cleanup error | Transferred GPU scenes and borrowed renderer/device |
+| Native-map/original-image upload | Active upload and untaken map/image, visiting both after an earlier cleanup error | Transferred GPU sources and borrowed input values |
+| Atlas update | Active patch upload | Displayed atlas, scene, worker and transferred atlas frame |
+| World frame | Untaken completed frame | Source scene/atlas/order and transferred frames |
+| Readback | Active transfer and untaken CPU pixels | Caller source frame and transferred raw/owned pixel packets |
+
+Existing release helpers preserve reachable unfinished owners and hand retired/quarantined allocations to the device journal under the same accounting rules. Queue disposal does not wait for fences, close the borrowed device, collect journals or uncharge independently transferred CPU inputs.
+
+At renderer completion, cover all six queues in empty, pending, READY and DELIVERED states as applicable. Inject RuntimeException and Error during each cleanup stage, terminal-status allocation alone and both failures together. Check primary/suppressed identity, repeated failure, successful retry after ownership has already cleared, terminal payload clearing, stable revision tokens and closed adoption guards. Reject wrong thread/context/capabilities before mutation; return to the original context and verify normal use or cleanup remains possible. Include close from the frame obsolete supplier, caller-transferred resources surviving queue close, close before device teardown and successful repeated close after device teardown. Verify retirement/quarantine charges until actual release on real Windows GL. These paths are source-inspected and compiled only; no GPU or failure-injection test ran.
+
 ## Deferred verification
 
 At renderer completion, inject invalidation/upload/old-owner cleanup failures before and after source-token changes in all four views. Preserve the old owner deliberately, then change camera, viewport, clip, fit/pan/zoom where permitted, redraw, advance and take. Verify no old-source draw, atlas work or frame transfer occurs under replacement tokens, and source diagnostics remain available through navigation. Include no-op/invalid display changes, repeated failures and retrying close with live caller frames.

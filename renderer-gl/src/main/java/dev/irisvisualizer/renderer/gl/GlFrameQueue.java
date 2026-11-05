@@ -17,7 +17,7 @@ public final class GlFrameQueue implements AutoCloseable {
     public record Status(long revision,Phase phase,Optional<WorldSnapshot.Source> source,Optional<GlFrame.Info> frame,Optional<GlFailure.Code> code,String reason) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);Objects.requireNonNull(frame);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
-    private final GlRenderer renderer;private final GlDevice device;private long revision;private boolean closed,rendering;private GlFrame completed;
+    private final GlRenderer renderer;private final GlDevice device;private long revision;private boolean closed,rendering,disposed;private GlFrame completed;
     private volatile Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),Optional.empty(),"");
     public GlFrameQueue(GlRenderer renderer) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation); }
     public Status status() { return status; }
@@ -44,5 +44,12 @@ public final class GlFrameQueue implements AutoCloseable {
         current();if(latestRevision<1)throw new IllegalArgumentException("Invalid frame revision");if(latestRevision>revision) { invalidate(latestRevision);return Optional.empty(); }
         if(latestRevision!=revision||status.phase()!=Phase.READY||completed==null||completed.info().revision()!=revision)return Optional.empty();var result=Optional.of(completed);var delivered=new Status(revision,Phase.DELIVERED,status.source(),status.frame(),Optional.empty(),"");completed=null;status=delivered;return result;
     }
-    @Override public void close() { if(closed&&completed==null)return;if(rendering)throw new GlFailure(GlFailure.Code.STATE,"Cannot close a frame queue from its obsolete supplier");closed=true;try { releaseOwned(); }finally { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),Optional.empty(),""); } }
+    @Override public void close() {
+        if(disposed)return;device.current();if(rendering)throw new GlFailure(GlFailure.Code.STATE,"Cannot close a frame queue from its obsolete supplier");closed=true;Throwable failure=null;
+        try { releaseOwned(); }catch(RuntimeException|Error error) { failure=error; }
+        try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        disposed=failure==null;
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

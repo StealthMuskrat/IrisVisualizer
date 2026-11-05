@@ -17,7 +17,7 @@ public final class GlReadbackQueue implements AutoCloseable {
         public GlReadback.Pixels pixels() { return input.value(); }
         @Override public void close() { input.close(); }
     }
-    private final GlDevice device;private final GlReadback.Limits limits;private long revision;private GlReadback active;private boolean closed;
+    private final GlDevice device;private final GlReadback.Limits limits;private long revision;private GlReadback active;private boolean closed,disposed;
     private volatile Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),"");
     public GlReadbackQueue(GlDevice device) { this(device,GlReadback.Limits.DEFAULT); }
     public GlReadbackQueue(GlDevice device,GlReadback.Limits limits) { this.device=Objects.requireNonNull(device);this.limits=Objects.requireNonNull(limits);device.current(); }
@@ -77,5 +77,12 @@ public final class GlReadbackQueue implements AutoCloseable {
             throw error;
         }
     }
-    @Override public void close() { if(closed&&active==null)return;closed=true;try { releaseOwned(); }finally { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),""); } }
+    @Override public void close() {
+        if(disposed)return;device.current();closed=true;Throwable failure=null;
+        try { releaseOwned(); }catch(RuntimeException|Error error) { failure=error; }
+        try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        disposed=failure==null;
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

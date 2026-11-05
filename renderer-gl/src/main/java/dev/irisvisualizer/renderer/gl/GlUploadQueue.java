@@ -13,7 +13,7 @@ public final class GlUploadQueue implements AutoCloseable {
         public Completion { if(revision<1)throw new IllegalArgumentException("Invalid upload revision");Objects.requireNonNull(scene); }
         @Override public void close() { scene.close(); }
     }
-    private final GlRenderer renderer;private final GlDevice device;private long revision;private GlUpload active;private GlScene completed;private boolean closed;
+    private final GlRenderer renderer;private final GlDevice device;private long revision;private GlUpload active;private GlScene completed;private boolean closed,disposed;
     private volatile Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),Optional.empty(),"");
     public GlUploadQueue(GlRenderer renderer) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation); }
     public Status status() { return status; }
@@ -86,7 +86,11 @@ public final class GlUploadQueue implements AutoCloseable {
     }
     /** Caller-transferred completions stay caller-owned; only queue-owned uploads/scenes are retired. */
     @Override public void close() {
-        if(closed&&active==null&&completed==null)return;closed=true;
-        try { releaseOwned(); }finally { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),Optional.empty(),""); }
+        if(disposed)return;device.current();closed=true;Throwable failure=null;
+        try { releaseOwned(); }catch(RuntimeException|Error error) { failure=error; }
+        try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        disposed=failure==null;
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

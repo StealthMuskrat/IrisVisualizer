@@ -248,3 +248,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Shutdown after CPU worker errors
 
 [View and animation shutdown](SOURCE-FAILURES.md) now attempts remaining GPU cleanup after worker close/invalidation failure and aggregates terminal-status errors without masking the first failure. World shutdown closes both owned workers before GPU owners; standalone animation keeps its borrowed-worker contract. All 129 production sources plus four harnesses compile; the 64 prepared groups and native/GPU failure paths remain unexecuted.
+
+## Retryable queue disposal
+
+[All six GPU queues](SOURCE-FAILURES.md#queue-shutdown-and-terminal-publication) now retain shutdown retry eligibility until cleanup and CLOSED publication both succeed. Cleanup errors remain primary when terminal metadata also fails, and the closed gate blocks further adoption throughout recovery. Original-context validation precedes teardown, atlas CLOSED publication reads no failed-upload progress, and independently transferred outputs retain their ownership. Close queues before their device. Full and dependency-free compilation passed; all 64 prepared groups and GPU/runtime validation remain unexecuted.

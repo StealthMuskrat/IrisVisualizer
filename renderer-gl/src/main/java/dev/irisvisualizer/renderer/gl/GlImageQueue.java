@@ -10,7 +10,7 @@ public final class GlImageQueue implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);Objects.requireNonNull(progress);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     public record Completion(long revision,GlImage image) implements AutoCloseable { public Completion { if(revision<1)throw new IllegalArgumentException("Invalid image revision");Objects.requireNonNull(image); }@Override public void close() { image.close(); } }
-    private final GlDevice device;private long revision;private boolean closed;private GlImageUpload active;private GlImage completed;
+    private final GlDevice device;private long revision;private boolean closed,disposed;private GlImageUpload active;private GlImage completed;
     private volatile Status status=new Status(0,Phase.IDLE,Optional.empty(),Optional.empty(),Optional.empty(),"");
     public GlImageQueue(GlDevice device) { this.device=Objects.requireNonNull(device);device.current(); }
     public Status status() { return status; }
@@ -55,5 +55,12 @@ public final class GlImageQueue implements AutoCloseable {
         if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.allocation.retired||completed.allocation.released)completed=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
-    @Override public void close() { if(closed&&active==null&&completed==null)return;closed=true;try { releaseOwned(); }finally { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),Optional.empty(),""); } }
+    @Override public void close() {
+        if(disposed)return;device.current();closed=true;Throwable failure=null;
+        try { releaseOwned(); }catch(RuntimeException|Error error) { failure=error; }
+        try { status=new Status(revision,Phase.CLOSED,Optional.empty(),Optional.empty(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        disposed=failure==null;
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }

@@ -14,7 +14,7 @@ public final class GlAtlasQueue implements AutoCloseable {
         @Override public void close() { frame.close(); }
     }
     private final GlScene scene;private final GlDevice device;private final long sceneRevision;
-    private long frameRevision;private GlAtlasUpload active;private boolean closed,obsolete;
+    private long frameRevision;private GlAtlasUpload active;private boolean closed,obsolete,disposed;
     private volatile Status status;
     public GlAtlasQueue(GlScene scene,long sceneRevision) {
         this.scene=Objects.requireNonNull(scene);device=scene.device;device.live(scene.allocation);if(sceneRevision<1)throw new IllegalArgumentException("Invalid scene revision");this.sceneRevision=sceneRevision;status=new Status(sceneRevision,0,Phase.IDLE,Optional.empty(),Optional.empty(),"");
@@ -75,5 +75,12 @@ public final class GlAtlasQueue implements AutoCloseable {
             active.take(displayed);active.close();active=null;status=delivered;return result;
         }catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
     }
-    @Override public void close() { if(closed&&active==null)return;closed=true;try { releaseOwned(); }finally { status=state(Phase.CLOSED,null,""); } }
+    @Override public void close() {
+        if(disposed)return;device.current();closed=true;Throwable failure=null;
+        try { releaseOwned(); }catch(RuntimeException|Error error) { failure=error; }
+        try { status=new Status(sceneRevision,frameRevision,Phase.CLOSED,Optional.empty(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        disposed=failure==null;
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
 }
