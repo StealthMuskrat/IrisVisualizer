@@ -264,3 +264,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## View setup ownership
 
 [Map/image/world construction](SOURCE-FAILURES.md#view-construction-before-worker-ownership) now completes empty queue setup before creating workers. World setup checks the caller-bounded atlas worker before creating ordering and preserves the original error if rollback close also fails. Borrowed renderer/device ownership, worker defaults and successful behavior remain unchanged. All production/harness sources compile; runtime/GPU failure injection and all 64 prepared groups remain unexecuted.
+
+## Transfer error preservation
+
+[All six incremental transfer paths](HOST-STATE.md#transfer-failures-remain-primary) now preserve original transfer/cancellation errors through host-state restoration and disposal failure. Atlas copy also preserves its original error through source detachment; world-upload setup aggregates source/journal cleanup errors. Restoration-only failure still prevents publication. Full and dependency-free compilation passed; all 64 prepared groups and runtime/GPU validation remain unexecuted.

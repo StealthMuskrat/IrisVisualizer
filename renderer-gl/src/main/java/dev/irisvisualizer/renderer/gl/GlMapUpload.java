@@ -42,6 +42,7 @@ public final class GlMapUpload implements AutoCloseable {
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
         long start=System.nanoTime(),storage=0;int bytes=0,actions=0,work=0;boolean finish=false;GlTransferState state=null;
+        Throwable failure=null;
         try {
             steps:while(work<budget.workUnits()&&(work==0||System.nanoTime()-start<budget.nanoseconds())) {
                 check(cancelled);boolean gpu=phase==Phase.STORAGE||phase==Phase.ROWS;if(gpu&&actions>=budget.actions())break;
@@ -61,7 +62,11 @@ public final class GlMapUpload implements AutoCloseable {
                 }
                 work++;if(gpu)actions++;if(finish)break;
             }
-        }finally { if(state!=null)state.close(); }
+        }catch(RuntimeException|Error error) { failure=error;throw error; }
+        finally {
+            if(state!=null)try { state.close(); }
+            catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        }
         if(finish) { check(cancelled);completed=new GlMap(device,allocation,width,height);raster=null;phase=Phase.READY; }
         return stepResult(start,bytes,storage,actions,work);
     }

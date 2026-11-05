@@ -65,3 +65,7 @@ Submit/invalidate during validation, row upload, geometry/marker phases, ready-b
 ## Borrowed scene/material preflight
 
 [World replacement checks](WORLD-PREFLIGHT.md) now run before newer-token invalidation in both queue and connected view. Direct begin shares exact successful-scene/tint/lighting checks and rejects missing required colors before its CPU journal. Resolved tint metadata flows into normal upload without color-array copies; bounded section/page validation and ownership/retirement rules remain in place. Runtime/GPU validation remains deferred.
+
+## Transfer and restoration error ordering
+
+[Host-state failure aggregation](HOST-STATE.md#transfer-failures-remain-primary) now preserves original upload/cancellation errors when restoration or later disposal also fails across world/map/image/scalar/atlas transfers. World setup also preserves the original failure through source-lease or journal cleanup errors, including Error. Atlas copy preserves its copy error through detachment and restoration failures. Successful transfer budgets and complete-only ownership transfer remain unchanged. Compilation passed; runtime/failure-injection validation remains deferred.

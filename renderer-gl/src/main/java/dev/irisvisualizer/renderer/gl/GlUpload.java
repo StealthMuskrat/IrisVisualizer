@@ -59,7 +59,8 @@ public final class GlUpload implements AutoCloseable {
             tint=validate(renderer,owner,tint,lighting);var scene=owner.scene().orElseThrow();
             allocation=device.reserve(0,scene.usage().knownPayloadBytes()+(tint==null?0:tint.bytes())+(lighting==null?0:lighting.bytes()),0,0,0,0,0,0,0,owner);allocation.retained=new Materials(tint,lighting);device.depend(allocation,renderer.allocation);return new GlUpload(renderer,scene,tint,lighting,allocation);
         }catch(RuntimeException|Error failure) {
-            if(allocation==null) { if(!alreadyOwned)owner.close(); }else try { device.retire(allocation); }catch(RuntimeException retirement) { failure.addSuppressed(retirement); }throw failure;
+            try { if(allocation==null) { if(!alreadyOwned)owner.close(); }else device.retire(allocation); }
+            catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
     }
     public WorldSnapshot.Source source() { return source; }
@@ -76,11 +77,12 @@ public final class GlUpload implements AutoCloseable {
         if(allocation==null||phase==Phase.FAILED||phase==Phase.CANCELLED)throw new GlFailure(GlFailure.Code.STATE,"Upload is no longer resumable");device.live(allocation);
         try { return advance(budget,cancelled); }
         catch(RuntimeException|Error failure) {
-            try { dispose(failure instanceof CancellationException?Phase.CANCELLED:Phase.FAILED); }catch(RuntimeException retirement) { failure.addSuppressed(retirement); }throw failure;
+            try { dispose(failure instanceof CancellationException?Phase.CANCELLED:Phase.FAILED); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
         long start=System.nanoTime(),storage=0;int bytes=0,actions=0,work=0;boolean finish=false;GlTransferState state=null;
+        Throwable failure=null;
         try {
             device.live(renderer.allocation);check(cancelled);
             units:while(work<budget.workUnits()&&(work==0||System.nanoTime()-start<budget.nanoseconds())) {
@@ -148,7 +150,11 @@ public final class GlUpload implements AutoCloseable {
                 }
                 bytes+=transferred;uploadedBytes+=transferred;work++;if(gpu)actions++;if(finish)break;
             }
-        }finally { if(state!=null)state.close(); }
+        }catch(RuntimeException|Error error) { failure=error;throw error; }
+        finally {
+            if(state!=null)try { state.close(); }
+            catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        }
         if(finish) { check(cancelled);var lightingInfo=lighting==null?GlScene.LightingInfo.SIMPLE:new GlScene.LightingInfo(true,lighting.policy());completed=new GlScene(device,allocation,sections,translucentFaces,lightingInfo);scene=null;tint=null;lighting=null;sections.clear();phase=Phase.READY; }
         return result(start,bytes,storage,actions,work);
     }

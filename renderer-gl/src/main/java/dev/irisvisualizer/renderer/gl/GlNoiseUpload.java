@@ -48,6 +48,7 @@ public final class GlNoiseUpload implements AutoCloseable {
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
         long start=System.nanoTime(),storage=0;int bytes=0,actions=0,units=0;boolean finish=false;GlTransferState state=null;
+        Throwable failure=null;
         try {
             device.live(allocation);
             steps:while(units<budget.workUnits()&&(units==0||System.nanoTime()-start<budget.nanoseconds())) {
@@ -70,7 +71,11 @@ public final class GlNoiseUpload implements AutoCloseable {
                 }
                 units++;if(gpu)actions++;if(finish)break;
             }
-        }finally { if(state!=null)state.close(); }
+        }catch(RuntimeException|Error error) { failure=error;throw error; }
+        finally {
+            if(state!=null)try { state.close(); }
+            catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        }
         if(finish) { check(cancelled);completed=new GlNoiseScene(device,allocation);phase=Phase.READY; }
         return new Step(progress(),bytes,storage,actions,units,System.nanoTime()-start);
     }

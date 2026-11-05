@@ -106,6 +106,7 @@ public final class GlReadback implements AutoCloseable {
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
         long start=System.nanoTime(),storage=0;int readNow=0,copiedNow=0,actions=0,units=0;boolean finish=false;GlPackState state=null;
+        Throwable failure=null;
         try {
             device.live(work);device.live(output);device.live(target.allocation);
             steps:while(units<budget.workUnits()&&(units==0||System.nanoTime()-start<budget.nanoseconds())) {
@@ -139,7 +140,11 @@ public final class GlReadback implements AutoCloseable {
                 }
                 units++;if(action)actions++;if(finish)break;
             }
-        }finally { if(state!=null)state.close(); }
+        }catch(RuntimeException|Error error) { failure=error;throw error; }
+        finally {
+            if(state!=null)try { state.close(); }
+            catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        }
         if(finish) {
             check(cancelled);var image=builder.finish();var result=new Pixels(world,map,noise,sourceImage,image);device.moveCpu(work,output,bytes,image);releaseWork();check(cancelled);completed=result;phase=Phase.READY;
         }

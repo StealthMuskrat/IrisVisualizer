@@ -58,6 +58,7 @@ public final class GlAtlasUpload implements AutoCloseable {
     }
     private Step advance(GlUploadBudget budget,BooleanSupplier cancelled) {
         long start=System.nanoTime(),storage=0;int copiedNow=0,uploadedNow=0,actions=0,units=0;boolean finish=false;GlTransferState state=null;
+        Throwable failure=null;
         try {
             device.live(scene.allocation);device.live(work);source.raster();
             steps:while(units<budget.workUnits()&&(units==0||System.nanoTime()-start<budget.nanoseconds())) {
@@ -80,9 +81,14 @@ public final class GlAtlasUpload implements AutoCloseable {
                     case COPY_ROWS -> {
                         int index=plan.changedPages().get(pageCursor);var target=pages.get(index);int rowBytes=target.pixels.width()*4,capacity=Math.min(65536,budget.transferBytes()-copiedNow-uploadedNow),rows=Math.min(target.pixels.height()-copyRow,capacity/rowBytes);if(rows==0)break steps;
                         glBindFramebuffer(GL_READ_FRAMEBUFFER,framebuffer.framebuffers[0]);glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,source.pages().get(index).texture(device),0);
+                        Throwable copyFailure=null;
                         try {
                             glReadBuffer(GL_COLOR_ATTACHMENT0);if(glCheckFramebufferStatus(GL_READ_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw new GlFailure(GlFailure.Code.GL_ERROR,"Atlas source framebuffer is incomplete");glBindTexture(GL_TEXTURE_2D,target.texture(device));glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,copyRow,0,copyRow,target.pixels.width(),rows);device.check("bounded atlas page copy");
-                        }finally { glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,0,0);device.check("atlas source detachment"); }
+                        }catch(RuntimeException|Error error) { copyFailure=error;throw error; }
+                        finally {
+                            try { glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,0,0);device.check("atlas source detachment"); }
+                            catch(RuntimeException|Error cleanup) { if(copyFailure==null)throw cleanup;if(cleanup!=copyFailure)copyFailure.addSuppressed(cleanup); }
+                        }
                         copyRow+=rows;int bytes=rows*rowBytes;copiedNow+=bytes;copied+=bytes;if(copyRow==target.pixels.height())phase=Phase.PATCH_ROWS;
                     }
                     case PATCH_ROWS -> {
@@ -95,7 +101,11 @@ public final class GlAtlasUpload implements AutoCloseable {
                 }
                 units++;if(gpu)actions++;if(finish)break;
             }
-        }finally { if(state!=null)state.close(); }
+        }catch(RuntimeException|Error error) { failure=error;throw error; }
+        finally {
+            if(state!=null)try { state.close(); }
+            catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        }
         if(finish) { check(cancelled);completed=GlAtlasFrame.create(scene,plan.raster().orElseThrow(),pages);releaseWork();phase=Phase.READY; }
         return new Step(progress(),copiedNow,uploadedNow,storage,actions,units,System.nanoTime()-start);
     }

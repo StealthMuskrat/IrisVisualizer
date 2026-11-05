@@ -78,3 +78,7 @@ Original pack images now enter through `GlReadback.begin(GlImageFrame)` and the 
 ## Replacement preflight and retry
 
 [Queue preflight/recovery](READBACK-RECOVERY.md) now checks the replacement target and exact device before invalidating earlier work. Closed/incomplete/foreign/over-limit source rejection preserves the previous token/status/progress and untaken output; explicit upstream invalidation remains available. `retry(expectedRevision)` reopens only the exact FAILED token after cleanup, then requires a caller-retained complete frame for ordinary same-token submission. No runtime/GPU checks have been executed.
+
+## Restoration failure diagnostics
+
+[Transfer failure aggregation](HOST-STATE.md#transfer-failures-remain-primary) now keeps the original readback or cancellation error primary if pack-state restoration also fails, then attempts ordinary disposal. A restoration-only error still fails the step before READY output publication. Pack bindings, row orientation, budgets, fence polling and independent taken pixels keep their existing contracts. Full and dependency-free compilation passed; all 64 prepared groups and Windows GL/failure-injection checks remain unexecuted.
