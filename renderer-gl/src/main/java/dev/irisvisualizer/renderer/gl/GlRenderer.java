@@ -104,7 +104,7 @@ public final class GlRenderer implements AutoCloseable {
             GlScene.floats(device,GL_ARRAY_BUFFER,FloatBuffer.wrap(corners),()->false);
             allocation.buffers[1]=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[1]);GlScene.integers(device,GL_ARRAY_BUFFER,IntBuffer.wrap(EDGES),()->false);
             var renderer=new GlRenderer(device,allocation);device.check("renderer initialization");return renderer;
-        }catch(RuntimeException|Error failure) { try { device.retire(allocation); }catch(RuntimeException retirement) { failure.addSuppressed(retirement); }throw failure; }
+        }catch(RuntimeException|Error failure) { try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     private static int uniform(int program,String name) { int location=glGetUniformLocation(program,name);if(location<0)throw new GlFailure(GlFailure.Code.SHADER,"Required renderer uniform is absent: "+name);return location; }
     private static void program(GlDevice device,GlDevice.Allocation allocation,int index,String vertex,String fragment) {

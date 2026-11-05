@@ -34,6 +34,25 @@ This is best-effort teardown. A failed native deletion or CPU owner release is n
 
 Normal retirement, including immediate CPU-only journal release, now quarantines a failed release instead of leaving the journal available for adoption. Recovery goes through explicit device teardown rather than ordinary collection. Fence-based retirement rejects an unusable zero fence explicitly after checking the GL error state. RuntimeException and Error during fence creation/flush, polling, deletion or release both quarantine the affected journal and propagate the original error. Existing GPU/CPU charges and dependency pins remain until actual release; `collect()` still polls with zero wait and does not retry quarantined journals. Explicit synchronized device teardown remains their recovery route.
 
+## Setup rollback before ownership escapes
+
+Device initialization now catches RuntimeException and Error after its shared account opens, including linkage/initialization errors during native staging allocation. It stores the allocated staging buffer before applying byte order, so a later setup failure can attempt to free that exact buffer. Cleanup attempts native free, account rollback when no possibly live buffer remains, and account closure independently, preserving the original failure and suppressing distinct cleanup errors. If native free fails, a managed account is sealed with its charge intact rather than reporting possibly live native bytes as free. Unrecoverable native/process-wide failure is not promised to become reclaimable through an unreturned device.
+
+Staging OutOfMemoryError retains its existing public `GlFailure.Code.MEMORY` mapping. The original error is now its cause, with rollback errors suppressed on that cause. Other runtime exceptions and Errors retain their original identity. Context/capability/staging-bound checks still precede account creation; limits and successful device construction remain unchanged.
+
+Journal-registration failure now catches RuntimeException and Error, removes any just-inserted uncommitted record and attempts shared-charge rollback without masking the original insertion error. Device byte/name counters are committed only after insertion succeeds. A failed reserve does not consume its supplied CPU owner; consuming callers retain their existing cleanup responsibility. A failed shared rollback stays visible as a suppressed error and conservative charge rather than a claimed successful release.
+
+| Resource setup | Cleanup/error preservation |
+| --- | --- |
+| Device staging/account | Attempt native free, permitted charge rollback and account close; retain original error or MEMORY wrapper with original cause |
+| Allocation journal insertion | Remove uncommitted record; attempt old shared charge; preserve insertion failure |
+| World renderer and offscreen target | Preserve setup/state-restoration failure through RuntimeException or Error from journal retirement; skip self-suppression |
+| Transfer-state capture | Always attempt restoring the original active texture unit after temporarily selecting unit zero; suppress a distinct restore error onto an earlier capture error |
+
+Map/scalar renderer factories already aggregate runtime exceptions and Errors from retirement and keep that behavior. Failed target/renderer journals remain device-owned under the usual retirement/quarantine contract; no partial result is returned. [Capture-state diagnostics](HOST-STATE.md#capture-and-factory-setup-errors) complete the same primary-error ordering before an incremental step owns its state guard.
+
+At renderer completion, inject account-admission rejection, native allocator runtime/linkage Error/OutOfMemoryError, failure after the staging pointer is assigned, native-free failure, account rollback/close failures, and combined failures. Verify exact error identity or MEMORY code plus original cause/suppressed errors, no empty leaked account after ordinary rejection and no false uncharge when native release fails. Inject journal insertion plus shared rollback failure and confirm old counters, no uncommitted journal and unchanged borrowed CPU ownership. On real Windows GL, combine renderer shader/buffer/uniform or target color/depth/framebuffer/state setup failure with retirement runtime/Error, including reuse of the same exception object. Verify primary errors, no partial output and conservative device journals through final teardown. These runtime checks remain deferred.
+
 ## Deferred verification
 
 On genuine Windows GL at renderer completion, exercise two independent dependency branches with a shared parent and allocation order placing parents before children. Inject RuntimeException and Error in child/parent object deletion, transfer/retirement-fence deletion and CPU-owner release. Verify independent branches are attempted, failed leaves are visited once per call, their parents stay pinned, first/suppressed errors preserve identity and later close retries finish without duplicate counter/dependency decrements. Include a failure after release commitment but during shared-admission publication.

@@ -40,10 +40,20 @@ public final class GlDevice implements AutoCloseable {
         if(limits.stagingBytes()>limits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Staging exceeds the working budget");
         admission=memory==null?null:openAdmission(memory);
         try {
-            admit(limits.stagingBytes());staging=MemoryUtil.memAlloc(limits.stagingBytes()).order(ByteOrder.nativeOrder());
-        }catch(RuntimeException|OutOfMemoryError failure) {
-            if(admission!=null) { admission.retained(0);admission.close(); }
-            if(failure instanceof OutOfMemoryError)throw new GlFailure(GlFailure.Code.MEMORY,"Could not allocate bounded native upload staging");throw failure;
+            admit(limits.stagingBytes());staging=MemoryUtil.memAlloc(limits.stagingBytes());staging.order(ByteOrder.nativeOrder());
+        }catch(RuntimeException|Error failure) {
+            if(staging!=null)try { MemoryUtil.memFree(staging);staging=null; }
+            catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(admission!=null) {
+                // A failed native free must not make its possibly live payload look uncharged.
+                if(staging==null)try { admission.retained(0); }
+                catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+                try { admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            }
+            if(failure instanceof OutOfMemoryError) {
+                var mapped=new GlFailure(GlFailure.Code.MEMORY,"Could not allocate bounded native upload staging");mapped.initCause(failure);throw mapped;
+            }
+            throw failure;
         }
     }
     /** Borrowed optional shared admission; frame/upload resources are charged automatically by this device. */
@@ -98,7 +108,12 @@ public final class GlDevice implements AutoCloseable {
         var allocation=new Allocation(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,owner);
         admit(gpuBytes+gpu+cpuBytes+cpu+limits.stagingBytes());
         try { allocations.add(allocation); }
-        catch(RuntimeException|OutOfMemoryError failure) { admit(gpuBytes+cpuBytes+limits.stagingBytes());throw failure; }
+        catch(RuntimeException|Error failure) {
+            allocations.remove(allocation);
+            try { admit(gpuBytes+cpuBytes+limits.stagingBytes()); }
+            catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            throw failure;
+        }
         gpuBytes+=gpu;cpuBytes+=cpu;names+=allocation.names;return allocation;
     }
     void live(Allocation allocation) { current();if(allocation.retired||allocation.released)throw new GlFailure(GlFailure.Code.STATE,"GPU resource is retired or released"); }

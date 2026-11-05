@@ -272,3 +272,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Retryable device shutdown
 
 [Device teardown](DEVICE-TEARDOWN.md) now preserves its first error while visiting independent eligible allocations, keeps failed dependencies charged and blocks new GPU work after shutdown starts. Close retry and context-affine statistics remain available; a failed allocation is visited once per attempt. Retirement/collection also quarantine Errors and retirement rejects a zero fence explicitly. Full and dependency-free compilation passed; all 64 prepared groups and Windows GPU/runtime validation remain unexecuted.
+
+## Device and resource setup rollback
+
+[Setup rollback](DEVICE-TEARDOWN.md#setup-rollback-before-ownership-escapes) now catches Errors after device-account creation, frees temporary staging when possible and preserves conservative charges if native release fails. Staging exhaustion keeps its MEMORY code and now retains its original cause. Journal insertion, world-renderer/target retirement and temporary texture-unit capture preserve original setup errors through rollback failures. All production/harness sources and the dependency-free set compile; all 64 prepared groups and runtime/GPU failure-injection checks remain unexecuted.

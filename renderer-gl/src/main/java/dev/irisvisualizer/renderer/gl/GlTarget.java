@@ -22,7 +22,7 @@ public final class GlTarget implements AutoCloseable {
             allocation.renderbuffers[0]=glGenRenderbuffers();glBindRenderbuffer(GL_RENDERBUFFER,allocation.renderbuffers[0]);glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24,width,height);device.check("target depth allocation");
             allocation.framebuffers[0]=glGenFramebuffers();glBindFramebuffer(GL_FRAMEBUFFER,allocation.framebuffers[0]);glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,allocation.textures[0],0);glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,allocation.renderbuffers[0]);glDrawBuffer(GL_COLOR_ATTACHMENT0);glReadBuffer(GL_COLOR_ATTACHMENT0);
             if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw new GlFailure(GlFailure.Code.GL_ERROR,"Offscreen target is incomplete");state.drawing();glViewport(0,0,width,height);glClearBufferfv(GL_COLOR,0,new float[]{0,0,0,0});glClearBufferfv(GL_DEPTH,0,new float[]{1});device.check("offscreen target creation");return new GlTarget(device,allocation,width,height);
-        }catch(RuntimeException|Error failure) { try { device.retire(allocation); }catch(RuntimeException retirement) { failure.addSuppressed(retirement); }throw failure; }
+        }catch(RuntimeException|Error failure) { try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public int width() { return width; }
     public int height() { return height; }
