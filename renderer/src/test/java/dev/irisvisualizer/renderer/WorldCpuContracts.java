@@ -164,7 +164,45 @@ public final class WorldCpuContracts {
             check(index.query(ray(transparent.snapshot()),LIVE).hit().isEmpty(),"displayed transparent pixels reject hit");check(index.query(ray(transparent.snapshot()),new WorldPickIndex.Options(100,100,0,false,WorldPickIndex.Alpha.GEOMETRY),null,LIVE).hit().isPresent(),"geometry-only mode retains transparent surface");
         }
     }
+    /** Axis-aligned source planes are an independent oracle for closed clipping and detached coordinates. */
+    private static void pickingFractionalPlanes() {
+        var f=fixture(1,255,false);var offsets=WorldOffsets.read(f.snapshot(),"synthetic fractional picking offsets",cell->new WorldOffsets.Offset(1e-8,1e-8,1e-8),LIVE);
+        var models=WorldModels.capture(f.snapshot(),f.layout(),List.of(WorldModels.Entry.from(f.prototype())),new int[]{0},offsets,WorldModels.Limits.DEFAULT,LIVE);check(!models.requiresPlaceholder(),"fractional world assignments complete");
+        var plan=WorldScenePlan.plan(models,WorldVisibility.keepAll(f.snapshot(),f.layout()),LIVE);check(!plan.requiresPlaceholder(),"fractional world plan complete");
+        try(var cache=new WorldSectionCache();var owner=WorldScene.build(plan,f.raster(),cache,LIVE);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+            check(!owner.requiresPlaceholder()&&!index.requiresPlaceholder(),"fractional world index complete");var position=f.snapshot().extent().position(0);double plane=(double)(float)1e-8;
+            for(int axis=0;axis<3;axis++)for(boolean culling:new boolean[]{false,true}) {
+                double[] origin={0.5,0.5,0.5},direction={0,0,0};origin[axis]=-1_000_000.1;direction[axis]=1;
+                var ray=new WorldRay(position,origin[0],origin[1],origin[2],direction[0],direction[1],direction[2],0,2_097_152);var hit=index.query(ray,WorldPickIndex.Options.DEFAULT.withBatchCulling(culling),null,LIVE).hit().orElseThrow();
+                double[] local={hit.localX(),hit.localY(),hit.localZ()};equal(plane,local[axis],"detached fractional normal retains the actual float vertex plane");equal(position,hit.position(),"fractional display offsets preserve native cell position");equal(state(407),hit.state(),"fractional display offsets preserve native state");near(1_000_000.1+plane,hit.distance(),"fractional plane distance");
+                for(int tangent=0;tangent<3;tangent++)if(tangent!=axis)equal(0.5,local[tangent],"fractional hit tangent unchanged");
+            }
+        }
+    }
+    private static void pickingPlanes() {
+        pickingFractionalPlanes();
+        var f=fixture(1,255,false);var position=f.snapshot().extent().position(0);
+        try(var cache=new WorldSectionCache();var owner=build(f,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+            for(int side=0;side<6;side++)for(double distance:new double[]{0.1,0.3,1.1,7.7,31.9,128.125,1_000_000.1,1_048_574.75}) {
+                int axis=side<2?1:side<4?2:0;boolean plus=(side&1)!=0;double plane=plus?1:0;
+                double[] origin={0.25,0.25,0.25},point={0.375,0.375,0.375};point[(axis+1)%3]=0.625;origin[axis]=plus?1+distance:-distance;point[axis]=plane;
+                double dx=point[0]-origin[0],dy=point[1]-origin[1],dz=point[2]-origin[2];
+                var clip=new WorldClip(new WorldSnapshot.Extent(position.x()+(axis==0?(plus?1:-1):0),position.y()+(axis==1?(plus?1:-1):0),position.z()+(axis==2?(plus?1:-1):0),1,1,1));
+                var ray=new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,0,2_097_152);WorldPick.Hit first=null;
+                for(boolean culling:new boolean[]{false,true}) {
+                    var options=WorldPickIndex.Options.DEFAULT.withClip(clip).withBatchCulling(culling);var result=index.query(ray,options,null,LIVE);check(!result.requiresPlaceholder(),"closed world-plane query complete");var hit=result.hit().orElseThrow();
+                    equal(position,hit.position(),"closed plane retains exact native position");equal(state(407),hit.state(),"closed plane retains native state");equal(BIOME,hit.biome(),"closed plane retains native biome");equal(ModelPlan.Direction.values()[side],hit.surface().orElseThrow().source().modelFace(),"original face direction retained");near(Math.hypot(Math.hypot(dx,dy),dz),hit.distance(),"analytic world-plane distance");
+                    double[] local={hit.localX(),hit.localY(),hit.localZ()};equal(plane,local[axis],"detached world normal is exact source plane");for(int tangent=0;tangent<3;tangent++)if(tangent!=axis)near(point[tangent],local[tangent],"detached tangent coordinate");
+                    if(first==null)first=hit;else equal(first,hit,"range/exhaustive plane receipts agree");
+                    var endpoint=new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,hit.distance(),hit.distance());check(index.query(endpoint,options,null,LIVE).hit().isPresent(),"closed world near/far endpoint retained");
+                    check(index.query(new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,0,Math.nextDown(hit.distance())),options,null,LIVE).hit().isEmpty(),"strict world far exclusion unchanged");
+                    check(index.query(new WorldRay(position,origin[0],origin[1],origin[2],dx,dy,dz,Math.nextUp(hit.distance()),2_097_152),options,null,LIVE).hit().isEmpty(),"strict world near exclusion unchanged");
+                }
+            }
+        }
+    }
     private static void pickingTraversalEdges() {
+        pickingPlanes();
         double edge=2e-11;var f=fixture(1,255,false);var position=f.snapshot().extent().position(0);
         try(var cache=new WorldSectionCache();var owner=build(f,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
             for(var xy:new double[][]{{-edge,0.5},{1+edge,0.5},{0.5,-edge},{0.5,1+edge},{-edge,-edge},{1+edge,1+edge}}) {

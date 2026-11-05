@@ -167,7 +167,7 @@ public final class WorldPickIndex implements AutoCloseable {
     private void releaseIfIdle() { if(closed&&queries==0&&!released) { owner.close();owner=null;scene=null;bounds=EMPTY_BOUNDS;left=EMPTY_NODES;right=EMPTY_NODES;section=EMPTY_NODES;faceRanges=Ranges.EMPTY;markerRanges=Ranges.EMPTY;released=true;admission.close(); } }
     @Override public synchronized void close() { closed=true;releaseIfIdle(); }
     private final class Query {
-        final WorldRay ray;final Options options;final WorldClip.Bounds clip;final AtlasRaster raster;final BooleanSupplier cancelled;final double ox,oy,oz;double nearest,hitU,hitV,normalX,normalY,normalZ;int hitSection=-1,hitFace=-1,hitMarker=-1;int nodes,sections,faces,markers,alphaRejected,batches,culledBatches;
+        final WorldRay ray;final Options options;final WorldClip.Bounds clip;final AtlasRaster raster;final BooleanSupplier cancelled;final double ox,oy,oz;double nearest,hitU,hitV,normalX,normalY,normalZ,hitX,hitY,hitZ;int hitSection=-1,hitFace=-1,hitMarker=-1;int nodes,sections,faces,markers,alphaRejected,batches,culledBatches;
         Query(WorldRay ray,Options options,AtlasRaster displayed,BooleanSupplier cancelled) {
             this.ray=ray;this.options=options;clip=options.clip().relative(anchor);this.cancelled=cancelled;raster=displayed==null?scene.raster():displayed;
             if(raster.requiresPlaceholder()||raster.layout()!=scene.layout())throw WorldProblem.fail(WorldProblem.Code.ATLAS,"Picking raster must match the exact displayed scene layout");
@@ -244,8 +244,14 @@ public final class WorldPickIndex implements AutoCloseable {
             if(hitSection<0)return null;var mesh=scene.sections().get(hitSection);WorldSnapshot.Position position;RenderBlockState state;WorldSnapshot.Biome biome;Optional<WorldPick.Surface> surface;List<ModelPlan.Problem> visualProblems;
             if(hitFace>=0) { position=mesh.positionForFace(hitFace);state=mesh.stateForFace(hitFace);biome=mesh.biomeForFace(hitFace);surface=Optional.of(new WorldPick.Surface(mesh.faces().get(hitFace).source().source(),hitU,hitV,normalX,normalY,normalZ));visualProblems=List.of(); }
             else { var marker=mesh.markers().get(hitMarker);position=marker.position();state=marker.state();biome=mesh.snapshot().biome(mesh.cells().get(marker.cell()).sourceCell());surface=Optional.empty();visualProblems=marker.problems(); }
-            double x=Math.subtractExact(position.x(),anchor.x()),y=(long)position.y()-anchor.y(),z=Math.subtractExact(position.z(),anchor.z());
-            return new WorldPick.Hit(position,state,biome,hitSection,hitFace,hitMarker,nearest,ox+ray.dx()*nearest-x,oy+ray.dy()*nearest-y,oz+ray.dz()*nearest-z,surface,visualProblems);
+            double x,y,z;
+            if(hitFace>=0) {
+                // Keep the accepted section-local point through detachment; do not reconstruct it at the index anchor.
+                x=hitX-Math.subtractExact(position.x(),mesh.origin().x());y=hitY-((long)position.y()-mesh.origin().y());z=hitZ-Math.subtractExact(position.z(),mesh.origin().z());
+            }else {
+                x=ox+ray.dx()*nearest-Math.subtractExact(position.x(),anchor.x());y=oy+ray.dy()*nearest-((long)position.y()-anchor.y());z=oz+ray.dz()*nearest-Math.subtractExact(position.z(),anchor.z());
+            }
+            return new WorldPick.Hit(position,state,biome,hitSection,hitFace,hitMarker,nearest,x,y,z,surface,visualProblems);
         }
         void triangle(WorldMesh mesh,int sectionIndex,int face,int triangle,FloatBuffer v,IntBuffer indices,double x,double y,double z) {
             int start=face*6+triangle*3,a=indices.get(start)*8,b=indices.get(start+1)*8,c=indices.get(start+2)*8;
@@ -253,7 +259,10 @@ public final class WorldPickIndex implements AutoCloseable {
             double px=ray.dy()*fz-ray.dz()*fy,py=ray.dz()*fx-ray.dx()*fz,pz=ray.dx()*fy-ray.dy()*fx,det=ex*px+ey*py+ez*pz;
             double epsilon=1e-12*Math.hypot(Math.hypot(ex,ey),ez)*Math.hypot(Math.hypot(fx,fy),fz);if(options.backFaces()?Math.abs(det)<=epsilon:det<=epsilon)return;
             double tx=x-ax,ty=y-ay,tz=z-az,beta=(tx*px+ty*py+tz*pz)/det,qx=ty*ez-tz*ey,qy=tz*ex-tx*ez,qz=tx*ey-ty*ex,gamma=(ray.dx()*qx+ray.dy()*qy+ray.dz()*qz)/det;
-            if(beta< -1e-10||gamma< -1e-10||beta+gamma>1+1e-10)return;double distance=(fx*qx+fy*qy+fz*qz)/det;if(!better(distance,sectionIndex,face,-1)||!clip.contains(ox+ray.dx()*distance,oy+ray.dy()*distance,oz+ray.dz()*distance))return;
+            if(beta< -1e-10||gamma< -1e-10||beta+gamma>1+1e-10)return;double distance=(fx*qx+fy*qy+fz*qz)/det;if(!better(distance,sectionIndex,face,-1))return;
+            // Constant vertex axes are known planes, even when ray reconstruction rounds across a closed clip.
+            double hx=ex==0&&fx==0?ax:Math.fma(ray.dx(),distance,x),hy=ey==0&&fy==0?ay:Math.fma(ray.dy(),distance,y),hz=ez==0&&fz==0?az:Math.fma(ray.dz(),distance,z);
+            if(!clip.contains(relative(mesh.origin().x(),anchor.x())+hx,relative(mesh.origin().y(),anchor.y())+hy,relative(mesh.origin().z(),anchor.z())+hz))return;
             beta=Math.max(0,beta);gamma=Math.max(0,gamma);double sum=beta+gamma;if(sum>1) { beta/=sum;gamma/=sum; }double weight=1-beta-gamma;
             double u=weight*v.get(a+6)+beta*v.get(b+6)+gamma*v.get(c+6),vv=weight*v.get(a+7)+beta*v.get(b+7)+gamma*v.get(c+7);var material=mesh.faces().get(face).source();
             if(options.alpha()==Alpha.DISPLAYED_BASE_LEVEL&&material.alpha()!=TexturePreparation.AlphaClass.OPAQUE) {
@@ -261,7 +270,7 @@ public final class WorldPickIndex implements AutoCloseable {
                 if(!material.alpha().acceptsAlpha(alpha)) { alphaRejected++;return; }
             }
             double nx=ey*fz-ez*fy,ny=ez*fx-ex*fz,nz=ex*fy-ey*fx,length=Math.hypot(Math.hypot(nx,ny),nz);
-            hitSection=sectionIndex;hitFace=face;hitMarker=-1;hitU=u;hitV=vv;normalX=nx/length;normalY=ny/length;normalZ=nz/length;nearest=distance;
+            hitSection=sectionIndex;hitFace=face;hitMarker=-1;hitU=u;hitV=vv;normalX=nx/length;normalY=ny/length;normalZ=nz/length;nearest=distance;hitX=hx;hitY=hy;hitZ=hz;
         }
     }
 }
