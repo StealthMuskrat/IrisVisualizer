@@ -208,3 +208,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## World CPU validation preparation
 
 [Prepared world contracts](../renderer/WORLD-CPU-VALIDATION.md) now supplement the map/scalar/image suite with model-to-atlas geometry, scene/cache ownership, picking and translucent order checks. Both harnesses compile alongside all 129 production sources; the runner remains compile-only by default. No contract, native or GPU execution occurred and unsupported previews stay disabled.
+
+## Prepared context-free display math
+
+[Camera, ray and frustum contracts](MATH-VALIDATION.md) now prepare 13 groups without an OpenGL context or LWJGL dependency. Analytic projection/navigation and direct homogeneous-corner culling expectations complement scalar full/clipped fitting. The compile-only runner includes the bounded helper set; all 129 production sources plus three harnesses compile. No tests or GPU operations ran and unsupported previews stay disabled.

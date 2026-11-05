@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04. `WorldCpuContracts` adds 13 synthetic contract groups alongside the initial 18 map/scalar/image/ownership groups: 31 prepared groups total. Both harness sources compile and neither has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04. `WorldCpuContracts` adds 13 synthetic contract groups alongside the initial 18 map/scalar/image/ownership groups: 31 prepared CPU groups. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups for 44 total. Both harness sources compile and neither has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -28,8 +28,8 @@ The winding, hit-distance and order expectations come from simple geometry and o
 
 ## Compile and eventual execution
 
-`./scripts/Validate-RendererCpu.ps1` continues to compile only by default. It now discovers both test sources and compiles them with the 88 dependency-free CPU production sources. Once renderer implementation is complete and stage execution is permitted, `-Execute` launches `RendererCpuContracts` and `WorldCpuContracts` in separate JVM processes and stops on either nonzero exit. A successful earlier suite cannot mask a later failure. No workflow was added or dispatched.
+`./scripts/Validate-RendererCpu.ps1` continues to compile only by default. It includes both CPU test sources plus the separate context-free math suite and four display helpers, alongside 88 dependency-free CPU production sources. Once renderer implementation is complete and stage execution is permitted, `-Execute` launches all three suite classes in separate JVM processes and stops on either nonzero exit. A successful earlier suite cannot mask a later failure. No workflow was added or dispatched.
 
-All 129 CPU/OpenGL production sources plus both harness sources compile with Java 25 and LWJGL 3.4.1 (131 total). The 88 CPU production sources plus both harnesses also compile independently without external dependencies (90 total). The Windows PowerShell runner was inspected only; no contract, native adapter, GL context, worker race, GPU upload/readback or workflow ran.
+All 129 CPU/OpenGL production sources plus three harness sources compile with Java 25 and LWJGL 3.4.1 (132 total). The default source set, including four display helpers and three harnesses, compiles without external dependencies (95 total). The Windows PowerShell runner was inspected only; no contract, native adapter, GL context, worker race, GPU upload/readback or workflow ran.
 
 The [initial CPU validation scope](CPU-VALIDATION.md) remains explicit. Worker concurrency/failure injection, weighted/multipart/transformed models, complex native geometry and fluids, tint/lighting, animation, broad codecs, camera/state math and all real Windows GPU/native comparisons still need stage validation. Full source/client assets, combined application memory and final editor integration remain pending.

@@ -293,3 +293,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared world pipeline contracts
 
 [The world CPU harness](WORLD-CPU-VALIDATION.md) adds 13 synthetic groups for cube model/atlas geometry, native assignments/visibility, complete scene metadata, cache lifetimes, exact picking and independent translucent ordering. The compile-only runner now includes both suites (31 prepared groups). All 129 production sources plus both harnesses compile; no tests ran and unsupported previews stay disabled.
+
+## Prepared display math contracts
+
+[Context-free camera/frustum contracts](../renderer-gl/MATH-VALIDATION.md) add 13 analytic and reference-oracle groups for projection, rays, exact anchors, navigation, scalar fitting and conservative culling. The default runner explicitly includes only four dependency-free backend helpers and three harnesses (44 prepared groups). All 129 production sources plus three harnesses compile; no tests ran and unsupported previews stay disabled.
