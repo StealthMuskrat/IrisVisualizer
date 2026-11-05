@@ -13,7 +13,7 @@ public final class GlMapView implements AutoCloseable {
     private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private UUID latestSamples;private MapRaster.Style latestStyle;private MapRaster.Limits latestLimits;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlMapView(GlMapRenderer renderer) { this(renderer,128L*1024*1024); }
-    public GlMapView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new MapRasterWorker(workerBytes,device.memory().orElse(null));uploads=new GlMapQueue(device); }
+    public GlMapView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);uploads=new GlMapQueue(device);worker=new MapRasterWorker(workerBytes,device.memory().orElse(null)); }
     public Status status() { return status; }
     public MapRasterWorker.Status workerStatus() { return worker.status(); }
     public long reservedCpuBytes() { return worker.reservedBytes(); }

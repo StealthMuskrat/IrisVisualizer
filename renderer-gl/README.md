@@ -260,3 +260,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Complete resource-bundle cleanup
 
 [Scene ticket release](../renderer/SCENES.md#complete-cleanup-attempts) and [atlas capture cleanup](ANIMATION.md#atlas-capture-cleanup) now attempt every remaining owned resource after a release error while preserving the first failure. Capture also attempts to close an already-created frame if temporary-owner cleanup prevents its return. Existing cache/device accounting and consumed-owner semantics remain intact. Full and dependency-free compilation passed; the expanded cache-ownership cases remain within 64 prepared, unexecuted groups.
+
+## View setup ownership
+
+[Map/image/world construction](SOURCE-FAILURES.md#view-construction-before-worker-ownership) now completes empty queue setup before creating workers. World setup checks the caller-bounded atlas worker before creating ordering and preserves the original error if rollback close also fails. Borrowed renderer/device ownership, worker defaults and successful behavior remain unchanged. All production/harness sources compile; runtime/GPU failure injection and all 64 prepared groups remain unexecuted.

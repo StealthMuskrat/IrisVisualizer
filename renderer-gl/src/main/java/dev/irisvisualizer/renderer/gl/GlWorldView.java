@@ -15,10 +15,14 @@ public final class GlWorldView implements AutoCloseable {
     public GlWorldView(GlRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlWorldView(GlRenderer renderer,long animationWorkingBytes) {
         this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);
-        var nextOrdering=new WorldOrderWorker(1024L*1024*1024,device.memory().orElse(null));AtlasFrameWorker nextAnimation=null;
-        try {
-            nextAnimation=new AtlasFrameWorker(animationWorkingBytes,device.memory().orElse(null));uploads=new GlUploadQueue(renderer);frames=new GlFrameQueue(renderer);ordering=nextOrdering;animationWorker=nextAnimation;
-        }catch(RuntimeException|Error failure) { nextOrdering.close();if(nextAnimation!=null)nextAnimation.close();throw failure; }
+        // Empty queues own no device journal; finish their fallible setup before creating workers.
+        uploads=new GlUploadQueue(renderer);frames=new GlFrameQueue(renderer);var memory=device.memory().orElse(null);
+        var nextAnimation=new AtlasFrameWorker(animationWorkingBytes,memory);
+        try { ordering=new WorldOrderWorker(1024L*1024*1024,memory);animationWorker=nextAnimation; }
+        catch(RuntimeException|Error failure) {
+            try { nextAnimation.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            throw failure;
+        }
     }
     public Status status() { return status; }
     public GlUploadQueue.Status uploadStatus() { return uploads.status(); }

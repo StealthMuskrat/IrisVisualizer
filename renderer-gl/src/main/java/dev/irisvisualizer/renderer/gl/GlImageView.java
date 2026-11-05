@@ -13,7 +13,7 @@ public final class GlImageView implements AutoCloseable {
     private GlImage image;private GlImageFrame completed;private int imageWidth,imageHeight;private MapView view;private SourceImage.Receipt latestReceipt;private int width,height;private long imageRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlImageView(GlMapRenderer renderer) { this(renderer,256L*1024*1024); }
-    public GlImageView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new ImageDecodeWorker(workerBytes,device.memory().orElse(null));uploads=new GlImageQueue(device); }
+    public GlImageView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);uploads=new GlImageQueue(device);worker=new ImageDecodeWorker(workerBytes,device.memory().orElse(null)); }
     public Status status() { return status; }
     public ImageDecodeWorker.Status workerStatus() { return worker.status(); }
     public long reservedCpuBytes() { return worker.reservedBytes(); }

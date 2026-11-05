@@ -345,3 +345,5 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Consistent CPU worker shutdown
 
 [All twelve CPU workers](WORKER-MEMORY.md) now retry unsuccessful shutdown attempts while keeping input gates closed, active reservations charged through unwind and caller-owned sources/completions independent. Pointer workers drop their request graph before releasing admission. Controlled checks for the remaining eight worker families bring the total to 64 prepared, unexecuted groups; all sources compile.
+
+[Worker invalidation and visual unwind](WORKER-MEMORY.md#invalidation-metadata-and-visual-unwind) now prepare IDLE metadata before cancellation in the remaining visual/render workers and clear the visual request graph before shrinking/releasing its hold. View setup also preserves worker ownership and primary errors across constructor failure. All sources compile; all 64 prepared groups remain unexecuted.

@@ -50,7 +50,7 @@ public final class WorldVisualWorker implements AutoCloseable {
     }
     /** Immediately prevents adoption even when no replacement world request is ready. */
     public long invalidate() {
-        synchronized(lock) { requireOpen();long next=nextRevision();cancelOwned();revision=next;status=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());return next; }
+        synchronized(lock) { requireOpen();long next=nextRevision();var waiting=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());cancelOwned();revision=next;status=waiting;return next; }
     }
     private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
     private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
@@ -74,7 +74,7 @@ public final class WorldVisualWorker implements AutoCloseable {
             }
             // All temporary assembler/plan/texture graphs unwind before the active reservation is removed.
             try { execute(job); }
-            finally { synchronized(lock) { active=null;job.admission.shrinkTo(job.retainedBytes);job.admission.close();job=null; } }
+            finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;job=null;hold.shrinkTo(retained);hold.close(); } }
         }
     }
     private void execute(Job job) {

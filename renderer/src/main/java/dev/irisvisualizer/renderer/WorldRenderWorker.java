@@ -107,7 +107,7 @@ public final class WorldRenderWorker implements AutoCloseable {
         }
     }
     public long invalidate() {
-        synchronized(lock) { requireOpen();long next=nextRevision();if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();refreshAdmission();revision=next;status=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());return next; }
+        synchronized(lock) { requireOpen();long next=nextRevision();var waiting=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);pending=null;dropCompleted();refreshAdmission();revision=next;status=waiting;return next; }
     }
     public Status status() { synchronized(lock) { return status; } }
     public WorldSectionCache.Stats cacheStats() { return cache.stats(); }
