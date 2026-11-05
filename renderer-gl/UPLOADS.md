@@ -61,3 +61,7 @@ Submit/invalidate during validation, row upload, geometry/marker phases, ready-b
 ## Owned lighting and unchanged vertex strides
 
 `GlUpload.beginLit` consumes admitted streamed lighting alongside a fresh scene owner, requiring the same tracked coordinator and retaining source admission through destination journal admission. The fourth byte of the existing material word now carries shade-direction/emission flags; attributes four/six read RGB24/raw flags, with the original 36/48-byte strides and transfer totals unchanged. See [MATERIAL-LIGHTING.md](MATERIAL-LIGHTING.md).
+
+## Borrowed scene/material preflight
+
+[World replacement checks](WORLD-PREFLIGHT.md) now run before newer-token invalidation in both queue and connected view. Direct begin shares exact successful-scene/tint/lighting checks and rejects missing required colors before its CPU journal. Resolved tint metadata flows into normal upload without color-array copies; bounded section/page validation and ownership/retirement rules remain in place. Runtime/GPU validation remains deferred.

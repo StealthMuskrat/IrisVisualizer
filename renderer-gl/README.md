@@ -228,3 +228,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Map and image replacement preflight
 
 [Raster queue guards](RASTER-PREFLIGHT.md) now validate complete sources and hardware/row-staging limits before replacing active or untaken output. Direct upload begin shares the same checks. Restored compilation also covers the preceding atlas preflight/retry fix; all 129 production sources plus four harnesses compile. Runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
+
+## World replacement preflight
+
+[World scene/material guards](WORLD-PREFLIGHT.md) now validate complete source and exact tint/lighting identity before queue/view invalidation. Missing required tint is rejected using prepared counts before journal admission; automatic native tint reuses captured metadata. Fresh-wrapper consumption and already-device-owned protection remain intact. All 129 CPU/OpenGL sources plus four harnesses compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.

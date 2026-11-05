@@ -40,16 +40,23 @@ public final class GlUpload implements AutoCloseable {
             }
         }finally { input.close();if(!handedOff&&!alreadyOwned)owner.close(); }
     }
+    /** Borrowed constant-time preflight. Returns resolved tint without consuming or admitting the source. */
+    static WorldTint validate(GlRenderer renderer,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {
+        Objects.requireNonNull(renderer);Objects.requireNonNull(owner);renderer.device.live(renderer.allocation);
+        var scene=owner.scene().orElseThrow(()->new GlFailure(GlFailure.Code.STATE,"A complete CPU scene is required"));
+        if(tint==null&&scene.plan().models().tints().hasColors())tint=WorldTint.fromInput(scene);
+        if(tint!=null&&tint.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete native tint capture is required");
+        if(tint!=null&&tint.scene()!=scene)throw new GlFailure(GlFailure.Code.STALE,"Native tint must match the exact CPU scene");
+        if(lighting!=null&&lighting.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete lighting capture is required");
+        if(lighting!=null&&lighting.scene()!=scene)throw new GlFailure(GlFailure.Code.STALE,"Lighting must match the exact CPU scene");
+        if(scene.usage().tintedFaces()>0&&tint==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Explicit native per-vertex tint colors are required for this scene");
+        return tint;
+    }
     public static GlUpload begin(GlRenderer renderer,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {
         Objects.requireNonNull(renderer);Objects.requireNonNull(owner);var device=renderer.device;GlDevice.Allocation allocation=null;boolean alreadyOwned=false;
         try {
             alreadyOwned=device.ownsCpu(owner);if(alreadyOwned)throw new GlFailure(GlFailure.Code.STATE,"This CPU result lease was already transferred to the device");
-            device.live(renderer.allocation);var scene=owner.scene().orElseThrow(()->new GlFailure(GlFailure.Code.STATE,"A complete CPU scene is required"));
-            if(tint==null&&scene.plan().models().tints().hasColors())tint=WorldTint.fromInput(scene);
-            if(tint!=null&&tint.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete native tint capture is required");
-            if(tint!=null&&tint.scene()!=scene)throw new GlFailure(GlFailure.Code.STALE,"Native tint must match the exact CPU scene");
-            if(lighting!=null&&lighting.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete lighting capture is required");
-            if(lighting!=null&&lighting.scene()!=scene)throw new GlFailure(GlFailure.Code.STALE,"Lighting must match the exact CPU scene");
+            tint=validate(renderer,owner,tint,lighting);var scene=owner.scene().orElseThrow();
             allocation=device.reserve(0,scene.usage().knownPayloadBytes()+(tint==null?0:tint.bytes())+(lighting==null?0:lighting.bytes()),0,0,0,0,0,0,0,owner);allocation.retained=new Materials(tint,lighting);device.depend(allocation,renderer.allocation);return new GlUpload(renderer,scene,tint,lighting,allocation);
         }catch(RuntimeException|Error failure) {
             if(allocation==null) { if(!alreadyOwned)owner.close(); }else try { device.retire(allocation); }catch(RuntimeException retirement) { failure.addSuppressed(retirement); }throw failure;

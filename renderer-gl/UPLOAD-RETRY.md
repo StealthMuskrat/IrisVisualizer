@@ -49,3 +49,7 @@ The connected scalar view now also provides [same-source upload recovery](SCALAR
 ## Connected map and image recovery
 
 [Retained-raster view retries](RASTER-RECOVERY.md) now preserve native-map/original-image source tokens while checking latest capture/style or successful decode receipt. Scoped queue restarts abandon partial work after view-side failures; public retry remains FAILED-only. Independent CPU source inputs survive GL closure and remain charged through destination admission. Runtime/failure-injection/GPU checks remain deferred.
+
+## Prepared world input rejection
+
+[World scene/material preflight](WORLD-PREFLIGHT.md) now rejects incomplete or mismatched CPU inputs before discarding prior queue/view work. This rejection accepts no new token and leaves existing WAITING/FAILED state unchanged; corrected complete data uses its ordinary submission contract. Existing upload retry remains for an accepted source failure, with retained CPU ownership and cleanup checks intact. Runtime/failure-injection/GPU checks remain deferred.

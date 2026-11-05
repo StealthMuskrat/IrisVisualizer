@@ -313,3 +313,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Map and image queue preservation
 
 [Upload replacement preflight](../renderer-gl/RASTER-PREFLIGHT.md) now preserves lower-level queue work/READY textures when a candidate source fails completeness or hardware/row-staging checks. Explicit upstream invalidation retains its existing behavior. All 129 production sources plus four harnesses compile, including the prior atlas fix; no tests ran and unsupported previews stay disabled.
+
+## World source and material preflight
+
+[World upload/view preflight](../renderer-gl/WORLD-PREFLIGHT.md) now preserves earlier owned output when a new CPU scene or its tint/lighting inputs are invalid. Verified tint-required counts avoid synchronous geometry scans, while fresh rejected scene wrappers are still consumed. All 129 CPU/OpenGL sources plus four harnesses compile; the 55 prepared groups remain unexecuted and unsupported previews stay disabled.

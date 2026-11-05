@@ -76,6 +76,7 @@ public final class GlWorldView implements AutoCloseable {
         try {
             current();if(device.ownsCpu(owner)) { handedOff=true;return false; }
             if(revision<1)throw new IllegalArgumentException("Invalid world revision");if(revision<worldRevision||revision==worldRevision&&status.phase()!=Phase.WAITING_CPU)return false;
+            tint=GlUpload.validate(renderer,owner,tint,lighting);
             if(revision>worldRevision)invalidate(revision);
             status=new Status(worldRevision,viewRevision,Phase.UPLOADING,Optional.of(owner.source()),List.of(),Optional.empty(),"");
             handedOff=true;

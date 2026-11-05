@@ -47,6 +47,7 @@ public final class GlUploadQueue implements AutoCloseable {
             if(device.ownsCpu(owner)) { handedOff=true;return false; }
             if(next<1)throw new IllegalArgumentException("Invalid request revision");
             if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+            tint=GlUpload.validate(renderer,owner,tint,lighting);
             if(next>revision)invalidate(next);
             status=new Status(revision,Phase.UPLOADING,Optional.of(owner.source()),Optional.empty(),Optional.empty(),"");
             handedOff=true;
