@@ -31,6 +31,15 @@ public final class GlAtlasUpload implements AutoCloseable {
             if(source!=null)try { source.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
     }
+    /** Consumes independent CPU plan ownership through destination admission or rejection. */
+    public static GlAtlasUpload begin(GlAtlasFrame current,RenderInput<AtlasFramePlan> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            Objects.requireNonNull(current);var memory=current.scene().device.memory().orElse(null);
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked atlas plan requires the same device coordinator");
+            return begin(current,source.value());
+        }finally { input.close(); }
+    }
     public Progress progress() { return new Progress(phase,pageCursor,changedCount,copied,totalCopy,uploaded,totalUpload); }
     public boolean ready() { return phase==Phase.READY; }
     GlAtlasFrame readyFrame() { device.current();if(!ready()||completed==null)throw new GlFailure(GlFailure.Code.STATE,"No complete atlas frame is available");return completed; }

@@ -301,3 +301,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Readback replacement guards
 
 [GPU readback preflight/recovery](../renderer-gl/READBACK-RECOVERY.md) now preserves earlier work and untaken pixels when a replacement frame is closed, foreign or over configured limits. Current failed requests can reopen after cleanup at the same token; independent raw/owned CPU outputs retain their existing lifetimes. All 129 production sources plus three harnesses compile; no tests ran and unsupported previews stay disabled.
+
+## Owned atlas plans and prepared animation checks
+
+[Independent atlas plan inputs](ANIMATION-OWNERS.md) now preserve shared admission beyond completion closure and feed consuming GPU upload/queue paths with coordinator checks. The connected animation controller uses this handoff. Eleven prepared schedule/interpolation/page-sharing/limit groups bring the total to 55. All 129 production sources plus four harnesses compile; no tests ran and unsupported previews stay disabled.

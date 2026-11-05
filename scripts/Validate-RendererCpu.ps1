@@ -23,7 +23,7 @@ Invoke-Checked -Program $javac -Arguments @('--release','25','-encoding','UTF-8'
 Write-Host "Compiled $($paths.Count) CPU and context-free display-math production/contract sources. No native adapter or LWJGL dependency was used."
 if ($Execute) {
     # Execute only after renderer implementation is complete, as required by AGENTS.md.
-    foreach ($suite in @('dev.irisvisualizer.renderer.RendererCpuContracts','dev.irisvisualizer.renderer.WorldCpuContracts','dev.irisvisualizer.renderer.gl.GlMathContracts')) {
+    foreach ($suite in @('dev.irisvisualizer.renderer.RendererCpuContracts','dev.irisvisualizer.renderer.WorldCpuContracts','dev.irisvisualizer.renderer.AnimationCpuContracts','dev.irisvisualizer.renderer.gl.GlMathContracts')) {
         Invoke-Checked -Program $java -Arguments @('-cp',$classes,$suite)
     }
 } else {

@@ -216,3 +216,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Readback preflight and recovery
 
 [Readback replacement guards](READBACK-RECOVERY.md) now validate complete targets, exact device and lowered limits before discarding prior work or READY pixels. An explicit current-failure retry reopens the same token only after cleanup, preserving retirement/quarantine ownership. All 129 production sources plus three harnesses compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.
+
+## Owned animation plan handoff
+
+[Atlas CPU ownership](../renderer/ANIMATION-OWNERS.md) now connects retained plan inputs to upload/queue admission with matching-coordinator checks, including the world animation controller. Exact raster baseline, old-frame lifetime and page sharing stay intact. Eleven additional animation contract groups are prepared; all 129 production sources plus four harnesses compile. Runtime/native/GPU validation remains deferred and unsupported previews stay disabled.

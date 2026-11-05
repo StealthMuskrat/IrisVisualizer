@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04. The `RendererCpuContracts` harness has 18 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add another 13 groups in a separate harness, and [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 more, for 44 prepared groups total. Its source compiles; it has **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04. The `RendererCpuContracts` harness has 18 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 13 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 55 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -10,7 +10,7 @@ On the supported Windows x64 environment with a Java 25 JDK:
 ./scripts/Validate-RendererCpu.ps1
 ```
 
-The default compiles CPU production sources, four context-free display helpers and all three contract harnesses into `build/renderer-cpu-validation/classes`. It uses an explicit UTF-8 source argument file, including quoted paths for repository locations with spaces. It executes no contract, includes no native adapter or driver-dependent backend source and does not require LWJGL, pinned native checkouts, a client asset JAR, a pack or a display server.
+The default compiles CPU production sources, four context-free display helpers and all four contract harnesses into `build/renderer-cpu-validation/classes`. It uses an explicit UTF-8 source argument file, including quoted paths for repository locations with spaces. It executes no contract, includes no native adapter or driver-dependent backend source and does not require LWJGL, pinned native checkouts, a client asset JAR, a pack or a display server.
 
 Once renderer implementation is complete and stage testing begins:
 
@@ -47,6 +47,6 @@ The exposure oracle enumerates occupied original cells and their six neighbors; 
 
 ## Current verification evidence and remaining work
 
-Compilation succeeded for all 129 CPU/OpenGL production sources plus three contract sources (132 total) with Java 25 and LWJGL 3.4.1. The default runner set also compiles without external dependencies: 88 CPU production sources, four display helpers and three harnesses (95 total). No contracts, worker/concurrency checks, native query, GL context, GPU upload/readback or workflow ran. The Windows PowerShell runner was inspected only.
+Compilation succeeded for all 129 CPU/OpenGL production sources plus four contract sources (133 total) with Java 25 and LWJGL 3.4.1. The default runner set also compiles without external dependencies: 88 CPU production sources, four display helpers and four harnesses (96 total). No contracts, worker/concurrency checks, native query, GL context, GPU upload/readback or workflow ran. The Windows PowerShell runner was inspected only.
 
 This is an initial suite, not renderer-stage completion. Broader world block/model/fluid/material/atlas coverage beyond the prepared synthetic world suite, worker races/failure injection, full PNG/JPEG matrices, broader camera math beyond the prepared context-free suite, GPU state/upload/draw/retirement, real pixel comparisons and native source parity still require their planned verification. Sixteen native adapters still require genuine pinned Windows compilation/execution. Final UI integration and combined application memory/GPU QA remain pending. Do not infer readiness or enable supported previews from successful compilation or from a future synthetic CPU suite result alone.

@@ -40,6 +40,15 @@ public final class GlAtlasQueue implements AutoCloseable {
         try { displayed.requireScene(scene);active=GlAtlasUpload.begin(displayed,plan);status=state(Phase.UPDATING,null,"");return true; }
         catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
     }
+    /** Consumes a retained CPU plan after queue/device admission, including stale or failed submissions. */
+    public boolean submit(long latestScene,long latestFrame,GlAtlasFrame displayed,RenderInput<AtlasFramePlan> input) {
+        Objects.requireNonNull(input);
+        try(var source=input.retain()) {
+            current();var memory=device.memory().orElse(null);
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked atlas plan requires the same queue coordinator");
+            return submit(latestScene,latestFrame,displayed,source.value());
+        }finally { input.close(); }
+    }
     public Status advance(GlUploadBudget budget,long latestScene,long latestFrame) {
         Objects.requireNonNull(budget);current();if(!observe(latestScene,latestFrame)||(status.phase()!=Phase.UPDATING&&status.phase()!=Phase.READY)||active==null)return status;
         try { device.live(scene.allocation);active.step(budget,()->false);status=state(active.ready()?Phase.READY:Phase.UPDATING,null,"");return status; }

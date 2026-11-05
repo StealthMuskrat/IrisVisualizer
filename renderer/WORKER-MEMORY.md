@@ -62,3 +62,7 @@ At renderer completion, exercise shared account/byte/owner-count limits; no empt
 ## Captured map style replacement
 
 [Map recoloring](MAP-RECOLOR.md) now retains the complete old raster through preparation, charging its old RGBA alongside replacement pixels. Equal value styles reuse the CPU raster and reserve only that source. The job graph is dropped before the hold shrinks to final native samples plus RGBA. `MapRasterWorker.Completion.retainInput()` creates independent CPU ownership; consuming worker/view recolor inputs retain it through destination admission or rejection, with matching-coordinator checks. Runtime and reservation checks remain deferred.
+
+## Owned atlas completion inputs
+
+[Atlas completion ownership](ANIMATION-OWNERS.md) now exposes `retainInput()` and consuming GPU upload/queue overloads. Connected animation uses an independently retained plan through destination admission, checks tracked coordinator identity and preserves the existing conservative overlap. The worker drops its request graph before job-hold shrink/release. Prepared timing/page-sharing/limit/ownership checks compile without executing; runtime validation remains deferred.

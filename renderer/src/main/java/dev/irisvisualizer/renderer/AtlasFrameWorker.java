@@ -43,6 +43,7 @@ public final class AtlasFrameWorker implements AutoCloseable {
     public record Completion(long revision,AtlasFramePlan plan,RenderMemory.Hold admission) implements AutoCloseable {
         public Completion { Objects.requireNonNull(plan);Objects.requireNonNull(admission);if(revision<1||plan.requiresPlaceholder())throw new IllegalArgumentException("Invalid complete atlas plan"); }
         public Completion(long revision,AtlasFramePlan plan) { this(revision,plan,RenderMemory.Hold.none()); }
+        public RenderInput<AtlasFramePlan> retainInput() { return RenderInput.own(plan,admission.retain()); }
         @Override public void close() { admission.close(); }
     }
     private static final class Job {
@@ -115,7 +116,7 @@ public final class AtlasFrameWorker implements AutoCloseable {
     private void drain() {
         while(true) {
             Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
-            try { execute(job); }finally { synchronized(lock) { active=null;job.admission.shrinkTo(job.retainedBytes);job.admission.close();job=null; } }
+            try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;job=null;hold.shrinkTo(retained);hold.close(); } }
         }
     }
     /** Nonblocking cancellation; active immutable inputs remain reserved until unwinding completes. */

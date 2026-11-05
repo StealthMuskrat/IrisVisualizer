@@ -1,12 +1,12 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04. `GlMathContracts` adds 13 deterministic groups for projection, pointer rays, navigation, clipping and conservative culling. Together with 18 initial CPU groups and 13 world-pipeline groups, 44 groups are now prepared. All three harnesses compile; none has been executed. This does not establish renderer-stage completion, native parity or GPU correctness. Unsupported previews remain disabled.
+Prepared 2026-11-04. `GlMathContracts` adds 13 deterministic groups for projection, pointer rays, navigation, clipping and conservative culling. Together with 18 initial CPU groups and 13 world-pipeline groups, 44 groups were prepared initially. [Animation contracts](../renderer/ANIMATION-OWNERS.md) add 11, for 55 total. All four harnesses compile; none has been executed. This does not establish renderer-stage completion, native parity or GPU correctness. Unsupported previews remain disabled.
 
 ## No context or driver required
 
 The suite uses exactly four backend production helpers: `GlFailure`, `GlCamera`, `GlOrbitCamera` and `GlFrustum`. They depend only on the CPU module and Java standard library. The harness invokes no LWJGL class, window/context creation, native library loading, shader, upload, draw or readback. Synthetic scalar fixtures supply original detached samples rather than evaluating a generator.
 
-`Validate-RendererCpu.ps1` includes these four helpers and this one test source by explicit path, alongside CPU production/tests. It deliberately does not sweep all backend/test sources, so future driver-dependent suites cannot silently enter this context-free runner. The default still compiles only. After renderer implementation is complete, explicit `-Execute` runs the three suite classes in separate JVM processes, stopping on the first failure.
+`Validate-RendererCpu.ps1` includes these four helpers and this one test source by explicit path, alongside CPU production/tests. It deliberately does not sweep all backend/test sources, so future driver-dependent suites cannot silently enter this context-free runner. The default still compiles only. After renderer implementation is complete, explicit `-Execute` runs the four suite classes in separate JVM processes, stopping on the first failure.
 
 ## Prepared checks
 
@@ -30,6 +30,6 @@ The culling oracle treats clearly separated outside boxes independently from nea
 
 ## Compilation evidence and remaining scope
 
-All 129 production sources plus three harness sources compile with Java 25 and LWJGL 3.4.1 (132 total). The actual context-free runner source set also compiles without external dependencies: 88 CPU production sources, four display helpers and three harnesses (95 total). Java compilation does not initialize the harnesses or run their assertions. The Windows PowerShell runner remains source-inspected only.
+All 129 production sources plus four harness sources compile with Java 25 and LWJGL 3.4.1 (133 total). The actual context-free runner source set also compiles without external dependencies: 88 CPU production sources, four display helpers and four harnesses (96 total). Java compilation does not initialize the harnesses or run their assertions. The Windows PowerShell runner remains source-inspected only.
 
 No test, worker/concurrency scenario, native adapter, GL context, shader, driver-state operation, GPU draw/readback or workflow ran. The prepared suite does not exercise connected view ownership, upload recovery, GPU culling submission, native world fitting, complex model overhangs or float pixel-edge parity. Those retain their existing deferred matrices. Native Windows compilation/execution, actual GPU comparison, final UI integration and combined application memory QA remain pending.
