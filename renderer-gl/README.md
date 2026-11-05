@@ -212,3 +212,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Prepared context-free display math
 
 [Camera, ray and frustum contracts](MATH-VALIDATION.md) now prepare 13 groups without an OpenGL context or LWJGL dependency. Analytic projection/navigation and direct homogeneous-corner culling expectations complement scalar full/clipped fitting. The compile-only runner includes the bounded helper set; all 129 production sources plus three harnesses compile. No tests or GPU operations ran and unsupported previews stay disabled.
+
+## Readback preflight and recovery
+
+[Readback replacement guards](READBACK-RECOVERY.md) now validate complete targets, exact device and lowered limits before discarding prior work or READY pixels. An explicit current-failure retry reopens the same token only after cleanup, preserving retirement/quarantine ownership. All 129 production sources plus three harnesses compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.

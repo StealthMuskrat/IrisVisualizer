@@ -77,9 +77,13 @@ public final class GlReadback implements AutoCloseable {
         Objects.requireNonNull(frame);Objects.requireNonNull(limits);var owner=frame.retain();
         try { return begin(new ImageSource(owner),limits); }catch(RuntimeException|Error failure) { try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
+    /** Metadata/liveness preflight shared by direct begin and queue replacement; allocates no journal or pixels. */
+    static void validate(GlTarget target,Limits limits) {
+        Objects.requireNonNull(target);Objects.requireNonNull(limits);if(!target.frameComplete())throw new GlFailure(GlFailure.Code.STATE,"Only complete immutable images may be read back");long bytes=(long)target.width()*target.height()*4;
+        if(bytes>limits.pixelBytes()||bytes*2>limits.workingBytes()||target.width()*4>target.device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Readback buffer/output or row-staging budget exceeded");
+    }
     private static GlReadback begin(Source source,Limits limits) {
-        var target=source.target();var device=target.device;if(!target.frameComplete())throw new GlFailure(GlFailure.Code.STATE,"Only complete immutable images may be read back");long bytes=(long)target.width()*target.height()*4;
-        if(bytes>limits.pixelBytes()||bytes*2>limits.workingBytes()||target.width()*4>device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Readback buffer/output or row-staging budget exceeded");
+        var target=source.target();validate(target,limits);var device=target.device;long bytes=(long)target.width()*target.height()*4;
         GlDevice.Allocation work=null,output=null;
         try {
             work=device.reserve(0,bytes,0,0,0,0,0,0,0,null);device.depend(work,source.journal());output=device.reserve(0,0,0,0,0,0,0,0,0,null);

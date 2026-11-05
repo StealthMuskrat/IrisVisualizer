@@ -74,3 +74,7 @@ Original pack images now enter through `GlReadback.begin(GlImageFrame)` and the 
 ## Owned CPU outputs
 
 `GlReadbackQueue.OwnedCompletion` closes its `RenderInput<Pixels>`; `pixels()` borrows the immutable packet and `input().retain()` creates an independent owner. For a managed device, destination image-byte admission precedes consuming the CPU output journal, with conservative overlap. Admission/setup rejection preserves READY pixels/status for another attempt. Taken inputs keep their shared charge through queue/device close and need no GL context for CPU use or release. The raw take APIs retain their external-accounting contract; see [owned readback handoffs](READBACK-OWNERS.md) for failure and deferred-verification details.
+
+## Replacement preflight and retry
+
+[Queue preflight/recovery](READBACK-RECOVERY.md) now checks the replacement target and exact device before invalidating earlier work. Closed/incomplete/foreign/over-limit source rejection preserves the previous token/status/progress and untaken output; explicit upstream invalidation remains available. `retry(expectedRevision)` reopens only the exact FAILED token after cleanup, then requires a caller-retained complete frame for ordinary same-token submission. No runtime/GPU checks have been executed.

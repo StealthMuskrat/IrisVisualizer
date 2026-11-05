@@ -297,3 +297,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared display math contracts
 
 [Context-free camera/frustum contracts](../renderer-gl/MATH-VALIDATION.md) add 13 analytic and reference-oracle groups for projection, rays, exact anchors, navigation, scalar fitting and conservative culling. The default runner explicitly includes only four dependency-free backend helpers and three harnesses (44 prepared groups). All 129 production sources plus three harnesses compile; no tests ran and unsupported previews stay disabled.
+
+## Readback replacement guards
+
+[GPU readback preflight/recovery](../renderer-gl/READBACK-RECOVERY.md) now preserves earlier work and untaken pixels when a replacement frame is closed, foreign or over configured limits. Current failed requests can reopen after cleanup at the same token; independent raw/owned CPU outputs retain their existing lifetimes. All 129 production sources plus three harnesses compile; no tests ran and unsupported previews stay disabled.

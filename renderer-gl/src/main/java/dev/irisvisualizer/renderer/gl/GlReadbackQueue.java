@@ -33,12 +33,20 @@ public final class GlReadbackQueue implements AutoCloseable {
         current();if(next<1)throw new IllegalArgumentException("Invalid readback revision");if(next<=revision)return false;var waiting=new Status(next,Phase.WAITING,Optional.empty(),Optional.empty(),"");revision=next;status=waiting;
         try { releaseOwned();return true; }catch(RuntimeException|Error error) { failed(error);throw error; }
     }
-    public boolean submit(long next,GlFrame frame) { Objects.requireNonNull(frame);return submit(next,()->GlReadback.begin(frame,limits)); }
-    public boolean submit(long next,GlMapFrame frame) { Objects.requireNonNull(frame);return submit(next,()->GlReadback.begin(frame,limits)); }
-    public boolean submit(long next,GlNoiseFrame frame) { Objects.requireNonNull(frame);return submit(next,()->GlReadback.begin(frame,limits)); }
-    public boolean submit(long next,GlImageFrame frame) { Objects.requireNonNull(frame);return submit(next,()->GlReadback.begin(frame,limits)); }
-    private boolean submit(long next,Supplier<GlReadback> begin) {
-        current();if(next<1)throw new IllegalArgumentException("Invalid readback revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;if(next>revision)invalidate(next);
+    /** Reopen only the exact failed token after cleanup; the caller resubmits a retained complete frame. */
+    public boolean retry(long expectedRevision) {
+        current();if(expectedRevision<1)throw new IllegalArgumentException("Invalid readback revision");if(expectedRevision!=revision||status.phase()!=Phase.FAILED)return false;
+        var waiting=new Status(revision,Phase.WAITING,Optional.empty(),Optional.empty(),"");
+        try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error error) { failed(error);throw error; }
+    }
+    public boolean submit(long next,GlFrame frame) { Objects.requireNonNull(frame);return submit(next,frame::readbackTarget,()->GlReadback.begin(frame,limits)); }
+    public boolean submit(long next,GlMapFrame frame) { Objects.requireNonNull(frame);return submit(next,frame::readbackTarget,()->GlReadback.begin(frame,limits)); }
+    public boolean submit(long next,GlNoiseFrame frame) { Objects.requireNonNull(frame);return submit(next,frame::readbackTarget,()->GlReadback.begin(frame,limits)); }
+    public boolean submit(long next,GlImageFrame frame) { Objects.requireNonNull(frame);return submit(next,frame::readbackTarget,()->GlReadback.begin(frame,limits)); }
+    private boolean submit(long next,Supplier<GlTarget> source,Supplier<GlReadback> begin) {
+        current();if(next<1)throw new IllegalArgumentException("Invalid readback revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+        var target=source.get();if(target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Readback image and queue must share one device");GlReadback.validate(target,limits);
+        if(next>revision)invalidate(next);
         try {
             var job=begin.get();active=job;
             if(job.device()!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Readback image and queue must share one device");
