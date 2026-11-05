@@ -200,3 +200,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Retained raster upload recovery
 
 [Native-map and original-image recovery](RASTER-RECOVERY.md) now retries complete CPU rasters at the current source token, with exact map capture/style or decoded image content receipts. Independently admitted raster inputs survive GL/frame closure and feed consuming retry/recolor paths without copying pixels. Navigation and old completed frames retain their existing ownership. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks remain deferred and unsupported previews stay disabled.
+
+## CPU validation preparation
+
+[Initial dependency-free CPU contracts](../renderer/CPU-VALIDATION.md) now compile alongside the renderer, preparing 18 deterministic groups before stage execution. They cover supplied map/scalar/image data and ownership, including independent exposure/light expectations; no GL context, driver, native parity or retry behavior is certified. All 129 production sources plus the harness compile; runtime tests remain deferred and unsupported previews stay disabled.

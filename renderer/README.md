@@ -285,3 +285,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Retained map and image inputs
 
 [Raster source ownership and upload recovery](../renderer-gl/RASTER-RECOVERY.md) now extend CPU admission beyond displayed map/image frame lifetime without copying pixels. Image decode completions can retain independent input handles; connected GPU retries verify current source provenance and preserve navigation without native sampling, colorization or decoding. All 129 CPU/OpenGL sources compile; runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
+
+## Prepared CPU stage contracts
+
+[The initial CPU validation harness](CPU-VALIDATION.md) now prepares 18 deterministic groups for map capture/color/relief/navigation, original PNG pixels, scalar exposure/recolor/picking and shared ownership. Independent face/light expectations supplement atomic failure and memory-boundary cases. The Windows runner compiles by default and requires explicit execution at renderer-stage validation. All 129 production sources plus the harness compile; no contracts ran and unsupported previews stay disabled.
