@@ -143,8 +143,11 @@ public final class GlNoiseView implements AutoCloseable {
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;sourceReady=false;worker.close();latestVolume=null;latestStyle=null;latestLimits=null;Throwable failure=null;try { releaseDisplay(); }catch(RuntimeException|Error error) { failure=error; }
-        status=new Status(dataRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");disposed=failure==null;
+        if(disposed)return;device.current();closed=true;sourceReady=false;latestVolume=null;latestStyle=null;latestLimits=null;Throwable failure=null;
+        try { worker.close(); }catch(RuntimeException|Error error) { failure=error; }
+        try { releaseDisplay(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        try { status=new Status(dataRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

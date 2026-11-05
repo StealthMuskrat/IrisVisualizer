@@ -167,7 +167,7 @@ public final class GlWorldView implements AutoCloseable {
     private void releaseScene() {
         Throwable failure=null;
         if(animation!=null)try { animation.close();animation=null; }catch(RuntimeException|Error error) { failure=error; }
-        else if(animationWorker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)animationWorker.invalidate();
+        else try { if(animationWorker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)animationWorker.invalidate(); }catch(RuntimeException|Error error) { failure=error; }
         if(order!=null)try { order.close();order=null; }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(scene!=null)try { scene.close();scene=null; }catch(RuntimeException|Error error) { if(scene.allocation.retired||scene.allocation.released)scene=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
@@ -175,12 +175,14 @@ public final class GlWorldView implements AutoCloseable {
     /** The renderer/device and all caller-transferred images remain caller-owned. Retry failed retirement. */
     @Override public void close() {
         if(disposed)return;
-        device.current();closed=true;sourceReady=false;ordering.close();Throwable failure=null;
-        try { frames.close(); }catch(RuntimeException|Error error) { failure=error; }
+        device.current();closed=true;sourceReady=false;Throwable failure=null;
+        try { ordering.close(); }catch(RuntimeException|Error error) { failure=error; }
+        try { animationWorker.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        try { frames.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         try { uploads.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         try { releaseScene(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
-        animationWorker.close();
-        status=new Status(worldRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");
+        try { status=new Status(worldRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         disposed=failure==null;
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }

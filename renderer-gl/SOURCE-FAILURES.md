@@ -35,6 +35,26 @@ These guards do not release or replace cleanup owners. Existing close/retry, fen
 
 No source-sized arrays, worker, GL resource, memory ceiling, generation setting or preview permission is added. Source adoption describes this view's completed upload only; native readiness, selected assets and final application validation remain separate requirements.
 
+## Shutdown continues after worker failure
+
+All four connected views now aggregate CPU shutdown errors alongside GPU cleanup errors. A worker close failure no longer skips later upload, frame or source disposal. World-view shutdown attempts both owned workers before closing frame/upload queues and scene owners; it does not need an animation revision increment just to tear down an exclusively owned worker. The first error is rethrown and later distinct errors are suppressed, including terminal-status publication failure. Successful terminal publication reports CLOSED even when cleanup failed; if that status allocation fails, the prior metadata snapshot may remain, while the closed/adoption guards still forbid further work.
+
+| Owner | Cleanup attempted after CPU shutdown error |
+| --- | --- |
+| World view | Other worker, completed-frame queue, upload queue, animation, draw order and scene |
+| Native-map view | Upload queue, untaken frame and map |
+| Original-image view | Upload queue, untaken frame and image |
+| Scalar view | Untaken frame, partial upload and scene |
+| Standalone world animation | Atlas queue, prior retirement frame and current atlas |
+
+World scene release also catches fallback animation-worker invalidation failure when no animation owner exists, then visits order and scene resources. This applies during replacement/recovery as well as shutdown. A failed retirement keeps its existing reachable owner or device-retired/quarantined charge; reaching CLOSED does not assert that driver fences or active CPU stacks have completed. Caller-transferred frames and borrowed renderers/devices keep their existing ownership.
+
+A standalone `GlWorldAnimation` still borrows its exclusive worker. If invalidation fails, for example at revision exhaustion, shutdown retains the first error but continues closing atlas owners. It clears pending CPU adoption metadata only after invalidation succeeds or the borrowed worker is already CLOSED. The host may close that worker and repeat animation close to finish the incomplete cancellation step. This does not turn a borrowed worker into an owned one.
+
+Each view/animation marks disposal complete only after the close attempt, including status publication, succeeds. An unsuccessful attempt stays eligible for another close; unfinished GL resources remain reachable under their prior cleanup contracts. Context/thread validation still occurs before any teardown. Cancellation remains nonblocking and active worker inputs retain their admission until unwind. No memory ceiling, source identity, preview gate or GPU retirement rule changes.
+
+At renderer completion, inject a worker close/invalidation error before each GPU cleanup stage and combine it with upload/frame/source retirement errors. Verify every remaining owner is visited, the first error remains primary, later errors are suppressed and no resource is re-adopted. Include world shutdown at maximum animation revision, scene release without an animation owner, standalone borrowed-worker exhaustion followed by host close/retry, closed-status allocation failure, retained independent frames and repeated cleanup failure. Compare active reservations, deferred/quarantined charges and final released ownership on the original Windows GL context. These failure paths are source-inspected and compiled only; none has been executed.
+
 ## Deferred verification
 
 At renderer completion, inject invalidation/upload/old-owner cleanup failures before and after source-token changes in all four views. Preserve the old owner deliberately, then change camera, viewport, clip, fit/pan/zoom where permitted, redraw, advance and take. Verify no old-source draw, atlas work or frame transfer occurs under replacement tokens, and source diagnostics remain available through navigation. Include no-op/invalid display changes, repeated failures and retrying close with live caller frames.

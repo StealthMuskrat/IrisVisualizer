@@ -78,12 +78,14 @@ public final class GlWorldAnimation implements AutoCloseable {
     /** Does not close the borrowed worker, base scene or independently completed images. */
     @Override public void close() {
         if(disposed)return;device.current();closed=true;Throwable failure=null;
-        if(!invalidated) { if(worker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)worker.invalidate();invalidated=true;request=null;cpuRevision=0; }
-        try { queue.close(); }catch(RuntimeException|Error error) { failure=error; }
+        if(!invalidated)try { if(worker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)worker.invalidate();invalidated=true;request=null;cpuRevision=0; }
+        catch(RuntimeException|Error error) { failure=error; }
+        try { queue.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         try { releaseRetiring(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(frame!=null)try { frame.close();frame=null; }catch(RuntimeException|Error error) { if(frame.closedOrReleased())frame=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         // A failed frame close may already have cleared its context-affine state.
-        status=new Status(sceneRevision,revision,Phase.CLOSED,tick,partialTick,status.displayedTick(),status.displayedPartialTick(),List.of(),Optional.empty(),"");disposed=failure==null;
+        try { status=new Status(sceneRevision,revision,Phase.CLOSED,tick,partialTick,status.displayedTick(),status.displayedPartialTick(),List.of(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }

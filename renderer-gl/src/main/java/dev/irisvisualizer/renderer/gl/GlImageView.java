@@ -126,10 +126,12 @@ public final class GlImageView implements AutoCloseable {
     }
     /** Leaves the borrowed renderer/device and caller-transferred frames owned by their callers. */
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;sourceReady=false;latestReceipt=null;worker.close();Throwable failure=null;
-        try { uploads.close(); }catch(RuntimeException|Error error) { failure=error; }
+        if(disposed)return;device.current();closed=true;sourceReady=false;latestReceipt=null;Throwable failure=null;
+        try { worker.close(); }catch(RuntimeException|Error error) { failure=error; }
+        try { uploads.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         try { releaseDisplay(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
-        status=new Status(imageRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),"");disposed=failure==null;
+        try { status=new Status(imageRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),""); }
+        catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }disposed=failure==null;
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
 }
