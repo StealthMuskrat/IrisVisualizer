@@ -20,10 +20,16 @@ public record MapView(int width,int height,double left,double top,double pixelsP
     }
     public double right() { return left+width*pixelsPerSample; }
     public double bottom() { return top+height*pixelsPerSample; }
-    public MapView pan(double deltaX,double deltaY) { return new MapView(width,height,left+deltaX,top+deltaY,pixelsPerSample); }
+    public MapView pan(double deltaX,double deltaY) { if(deltaX==0&&deltaY==0)return this;return new MapView(width,height,left+deltaX,top+deltaY,pixelsPerSample); }
     public MapView zoomAt(double factor,double screenX,double screenY) {
         if(!Double.isFinite(factor)||factor<=0||!Double.isFinite(screenX)||!Double.isFinite(screenY))throw new IllegalArgumentException("Invalid map zoom anchor");
-        return new MapView(width,height,screenX-(screenX-left)*factor,screenY-(screenY-top)*factor,pixelsPerSample*factor);
+        if(factor==1)return this;
+        return new MapView(width,height,zoomOrigin(left,screenX,factor),zoomOrigin(top,screenY,factor),pixelsPerSample*factor);
+    }
+    private static double zoomOrigin(double origin,double anchor,double factor) {
+        double delta=anchor-origin;
+        // Around unity, apply the small displacement to the origin instead of cancelling viewport-sized values.
+        return factor>=0.5&&factor<=2?Math.fma(1-factor,delta,origin):Math.fma(-factor,delta,anchor);
     }
     public Optional<Pixel> pixelAt(double screenX,double screenY) {
         if(!Double.isFinite(screenX)||!Double.isFinite(screenY)||screenX<left||screenX>=right()||screenY<top||screenY>=bottom())return Optional.empty();

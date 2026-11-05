@@ -68,6 +68,9 @@ public final class GlMathContracts {
     }
     private static void navigation() {
         scalarFocus();
+        var signed=new GlOrbitCamera(ANCHOR,-0.0,-0.0,-0.0,10,-0.0,-0.0,60,0.1,1000);
+        check(signed.orbit(0,-0.0)==signed,"zero orbit retains exact camera identity");check(signed.pan(0,-0.0,100)==signed,"zero camera pan preserves signed-zero centers");check(signed.dolly(1)==signed,"identity dolly retains exact camera");check(signed.rebase(new WorldSnapshot.Position(ANCHOR.x(),ANCHOR.y(),ANCHOR.z()))==signed,"equal anchor rebase retains exact camera");
+        throwsType(IllegalArgumentException.class,()->signed.pan(0,0,0),"zero pan still validates viewport");throwsType(IllegalArgumentException.class,()->signed.orbit(0,Double.NaN),"identity orbit does not bypass finite guards");throwsType(NullPointerException.class,()->signed.rebase(null),"identity rebase requires anchor");
         var original=orbit();var axial=original.camera();near(0,axial.eyeX(),1e-12,"zero-yaw eye X");near(10,axial.eyeZ(),1e-12,"zero-yaw eye Z");var turned=original.orbit(90,0).camera();near(10,turned.eyeX(),1e-12,"quarter orbit X");near(0,turned.eyeZ(),1e-12,"quarter orbit Z");
         var panned=original.pan(10,20,100);near(-2,panned.centerX(),1e-12,"analytic horizontal pan");near(4,panned.centerY(),1e-12,"analytic vertical pan");near(0,panned.centerZ(),1e-12,"pan keeps view plane");near(10,panned.distance(),1e-12,"pan distance unchanged");equal(ANCHOR,panned.anchor(),"pan anchor unchanged");
         near(89.9,original.orbit(0,1000).pitch(),1e-12,"upper pitch clamp");near(-89.9,original.orbit(0,-1000).pitch(),1e-12,"lower pitch clamp");check(original.dolly(Double.MIN_VALUE).distance()>original.near(),"dolly stays beyond near plane");check(original.dolly(Double.MAX_VALUE).distance()<original.far(),"dolly stays within far plane");near(20,original.dolly(2).distance(),1e-12,"ordinary dolly");

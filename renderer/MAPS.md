@@ -32,6 +32,14 @@ Absent samples produce transparent black; an all-empty successful map is valid. 
 
 `MapView` supplies fit-to-viewport, pointer-delta panning, anchor-preserving zoom and half-open pixel hit testing. Left/top are the displayed image origin; positive pan deltas move the image with the pointer. Display zoom does not change `blocksPerSample` or regenerate anything. Hits outside the image, including its right/bottom borders, return empty. Nonfinite or precision-collapsed transforms are refused. After a hit, use its pixel index on the matching raster's samples, check presence, and inspect the original terrain height, noise double or native biome. `grid.worldX/worldZ` provide the corresponding sample coordinates. The application must use a view whose dimensions belong to that displayed raster.
 
+## Identity and small zoom navigation
+
+A zero map pan or factor-one zoom returns the existing `MapView`, preserving fractional origins and signed zeros exactly. Zoom still rejects nonfinite anchors before taking that identity path. This prevents cancellation in an identity zoom from manufacturing a different transform and a needless connected-view revision.
+
+For zoom factors from 0.5 through 2, the new origin is computed as the old origin plus the small anchor-relative displacement, using fused multiply-add. Other factors use the anchor-relative form with fused multiply-add. Near unity this avoids subtracting nearly equal viewport-sized values to recover a small origin. Existing scale/origin limits and precision-collapse rejection still apply; nonidentity zoom is ordinary rounded double arithmetic, not an exact geometric invariant.
+
+The existing navigation contract prepares identity checks at fractional/signed-zero origins, finite anchors through the double range, invalid inputs and scale limits. Near-unity and broader factors are compared with an independent exact affine `BigDecimal` oracle over the binary inputs. These assertions remain unexecuted.
+
 ## Display boundary precision
 
 `MapView.pixelAt` now clamps a contained point to valid source indices and checks the adjacent displayed sample edges when screen precision distinguishes them. This corrects subtraction/division rounding after pan or zoom: a pointer immediately below an internal edge stays in the preceding sample, and a pointer immediately inside right/bottom remains inspectable. Exact internal boundaries select the following sample; left/top stay included and right/bottom stay excluded.

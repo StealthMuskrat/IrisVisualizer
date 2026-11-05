@@ -32,7 +32,7 @@ Execution is explicit rather than a CI trigger or default script side effect. As
 | Retained map recoloring | Exact source reuse for equal styles, immutable old pixels, old/new peak boundaries, lowered limits and wrong style |
 | Native biome identity and alpha | Palette order preserves original numeric IDs, transparent present values remain inspectable and missing palette colors fail |
 | Terrain relief | A plane with known slopes and upward light has independently calculated diffuse shading; edges/missing stencils stay flat |
-| Map navigation and hits | Letterbox/half-open bounds, fit/pan/zoom anchor invariance and absent versus real-zero inspection |
+| Map navigation and hits | Letterbox/half-open bounds, fit/pan/zoom anchors, exact identity navigation including signed zero, small zoom versus an exact affine oracle, argument/scale guards and absent versus real-zero inspection |
 | Map/image boundary precision | Analytic half-open edge ownership after cancellation-prone pan/zoom, positive internal edges, upper interior corners, coarse screen coordinates and unchanged map/transparent-image samples |
 | Full-height scalar capture | X-Z-Y ordering, fractional native coordinates, copied data and rejection instead of height truncation |
 | Exposed-face coverage | A separate voxel-neighbor enumerator compared with expanded CELLS/GREEDY rectangles over 18 fixed-seed fixtures, plus a uniform cuboid |

@@ -15,17 +15,17 @@ public record GlOrbitCamera(WorldSnapshot.Position anchor,double centerX,double 
         return new GlCamera(anchor,x+Math.sin(a)*horizontal,y+Math.sin(b)*distance,z+Math.cos(a)*horizontal,x,y,z,fov,near,far);
     }
     public GlCamera camera() { return pose(anchor,centerX,centerY,centerZ,distance,yaw,pitch,fieldOfView,near,far); }
-    public GlOrbitCamera orbit(double yawDelta,double pitchDelta) { if(!Double.isFinite(yawDelta)||!Double.isFinite(pitchDelta))throw new IllegalArgumentException("Nonfinite orbit delta");return new GlOrbitCamera(anchor,centerX,centerY,centerZ,distance,yaw+yawDelta,Math.clamp(pitch+pitchDelta,-89.9,89.9),fieldOfView,near,far); }
+    public GlOrbitCamera orbit(double yawDelta,double pitchDelta) { if(!Double.isFinite(yawDelta)||!Double.isFinite(pitchDelta))throw new IllegalArgumentException("Nonfinite orbit delta");if(yawDelta==0&&pitchDelta==0)return this;return new GlOrbitCamera(anchor,centerX,centerY,centerZ,distance,yaw+yawDelta,Math.clamp(pitch+pitchDelta,-89.9,89.9),fieldOfView,near,far); }
     public GlOrbitCamera dolly(double factor) {
-        if(!Double.isFinite(factor)||factor<=0)throw new IllegalArgumentException("Invalid camera dolly factor");double value=Math.clamp(distance*factor,Math.max(0.01,Math.nextUp(near)),Math.nextDown(far));
+        if(!Double.isFinite(factor)||factor<=0)throw new IllegalArgumentException("Invalid camera dolly factor");if(factor==1)return this;double value=Math.clamp(distance*factor,Math.max(0.01,Math.nextUp(near)),Math.nextDown(far));
         return new GlOrbitCamera(anchor,centerX,centerY,centerZ,value,yaw,pitch,fieldOfView,near,far);
     }
     public GlOrbitCamera pan(double pixelsX,double pixelsY,int viewportHeight) {
-        if(!Double.isFinite(pixelsX)||!Double.isFinite(pixelsY)||viewportHeight<1||viewportHeight>4096)throw new IllegalArgumentException("Invalid camera pan");var basis=camera().basis();double scale=2*distance*Math.tan(Math.toRadians(fieldOfView)/2)/viewportHeight;
+        if(!Double.isFinite(pixelsX)||!Double.isFinite(pixelsY)||viewportHeight<1||viewportHeight>4096)throw new IllegalArgumentException("Invalid camera pan");if(pixelsX==0&&pixelsY==0)return this;var basis=camera().basis();double scale=2*distance*Math.tan(Math.toRadians(fieldOfView)/2)/viewportHeight;
         return new GlOrbitCamera(anchor,centerX+(-pixelsX*basis[3]+pixelsY*basis[6])*scale,centerY+(-pixelsX*basis[4]+pixelsY*basis[7])*scale,centerZ+(-pixelsX*basis[5]+pixelsY*basis[8])*scale,distance,yaw,pitch,fieldOfView,near,far);
     }
     public GlOrbitCamera rebase(WorldSnapshot.Position next) {
-        Objects.requireNonNull(next);return new GlOrbitCamera(next,centerX+Math.subtractExact(anchor.x(),next.x()),centerY+((long)anchor.y()-next.y()),centerZ+Math.subtractExact(anchor.z(),next.z()),distance,yaw,pitch,fieldOfView,near,far);
+        Objects.requireNonNull(next);if(anchor.equals(next))return this;return new GlOrbitCamera(next,centerX+Math.subtractExact(anchor.x(),next.x()),centerY+((long)anchor.y()-next.y()),centerZ+Math.subtractExact(anchor.z(),next.z()),distance,yaw,pitch,fieldOfView,near,far);
     }
     /** Caller checks the current picking revision/index receipt before focusing its detached hit. */
     public GlOrbitCamera focus(WorldPick.Hit hit) {

@@ -17,7 +17,7 @@ The suite uses exactly four backend production helpers: `GlFailure`, `GlCamera`,
 | Center/corner rays | Closed-form normalized center/top-left directions and oblique clipping distances |
 | Pointer projection | Multiple pixel-center rays project back to the original top-left coordinates; near/far ray endpoints agree with projection planes |
 | Exact offsets | Small integer differences beyond double's exact integer range survive float conversion; rejected relative spans do not partially write output |
-| Orbit navigation | Cardinal orbit poses, analytic pan distance/direction, pitch clamps and dolly limits |
+| Orbit navigation | Cardinal orbit poses, analytic pan distance/direction, pitch clamps, dolly limits and exact identity orbit/pan/dolly/equal-anchor rebase with argument guards |
 | Anchor rebasing | Fractional target and eye offsets preserve world-relative position under exact integer-anchor changes; round trip and overflow rejection |
 | Input guards | Invalid aspect, pointer, pose and frustum inputs fail explicitly; viewport edges remain half-open |
 | Canonical frustum | Identity-volume inside/outside/translated bounds, closed plane contact and outward numerical allowance |

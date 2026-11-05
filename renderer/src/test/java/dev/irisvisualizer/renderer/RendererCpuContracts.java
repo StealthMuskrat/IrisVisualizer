@@ -1,6 +1,7 @@
 package dev.irisvisualizer.renderer;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.nio.*;
 import java.util.*;
 import java.util.concurrent.CancellationException;
@@ -105,7 +106,24 @@ public final class RendererCpuContracts {
         var flags=present(9);flags[3]=0;var incomplete=raster(terrain(3,3,heights,flags),style);equal(0xc8643280,incomplete.image().orElseThrow().rgba(1,1),"missing neighbor keeps base color");equal(0,incomplete.summary().orElseThrow().reliefSamples(),"missing stencil excluded");
         var unlit=raster(source,new MapRaster.TerrainStyle(colors,new MapRaster.Relief(1,1,1,0,0)));check(Arrays.equals(raster(source,colors).image().orElseThrow().copyPixels(),unlit.image().orElseThrow().copyPixels()),"zero-amount flat equality");
     }
+    /** Exact affine arithmetic over the supplied binary doubles, independent of production origin updates. */
+    private static double zoomOracle(double origin,double anchor,double factor) {
+        var f=new BigDecimal(factor);
+        return f.multiply(new BigDecimal(origin)).add(BigDecimal.ONE.subtract(f).multiply(new BigDecimal(anchor))).doubleValue();
+    }
+    private static void navigationIdentity() {
+        var original=new MapView(8,8,0.1,-0.3,1);
+        for(double anchor:new double[]{0,0.5,2047.5,4095.5,1e12,Double.MAX_VALUE})check(original.zoomAt(1,anchor,-anchor)==original,"identity zoom preserves exact origin and transform identity");
+        var signed=new MapView(2,2,-0.0,-0.0,1);check(signed.pan(0,-0.0)==signed,"zero pan preserves signed-zero origins");check(signed.zoomAt(1,0.25,0.5)==signed,"identity zoom preserves signed-zero origins");
+        throwsType(IllegalArgumentException.class,()->original.zoomAt(1,Double.NaN,0),"identity zoom still validates its anchor");throwsType(IllegalArgumentException.class,()->original.zoomAt(1,0,Double.POSITIVE_INFINITY),"identity zoom rejects infinite anchor");throwsType(IllegalArgumentException.class,()->original.pan(Double.NaN,0),"nonfinite pan still rejected");
+        for(double factor:new double[]{Math.nextDown(1.0),Math.nextUp(1.0),1-Math.scalb(1,-20),1+Math.scalb(1,-20),0.5,2,0.25,4,1e-6,1e6}) {
+            var changed=original.zoomAt(factor,4095.5,2047.5);double x=zoomOracle(original.left(),4095.5,factor),y=zoomOracle(original.top(),2047.5,factor);
+            check(Math.abs(changed.left()-x)<=2*Math.ulp(x),"zoom X stays within two ULPs of exact affine oracle");check(Math.abs(changed.top()-y)<=2*Math.ulp(y),"zoom Y stays within two ULPs of exact affine oracle");equal(original.pixelsPerSample()*factor,changed.pixelsPerSample(),"zoom scale unchanged");equal(original.width(),changed.width(),"zoom source width unchanged");equal(original.height(),changed.height(),"zoom source height unchanged");
+        }
+        throwsType(IllegalArgumentException.class,()->original.zoomAt(1e-7,0,0),"minimum zoom admission retained");throwsType(IllegalArgumentException.class,()->original.zoomAt(1e7,0,0),"maximum zoom admission retained");
+    }
     private static void navigation() {
+        navigationIdentity();
         var fitted=MapView.fit(4,2,10,20,100,100);near(25,fitted.pixelsPerSample(),"fit scale");near(45,fitted.top(),"letterbox top");
         check(fitted.pixelAt(10,44).isEmpty(),"letterbox excluded");check(fitted.pixelAt(fitted.right(),50).isEmpty(),"right edge excluded");check(fitted.pixelAt(50,fitted.bottom()).isEmpty(),"bottom edge excluded");
         var p=fitted.pixelAt(46,63).orElseThrow();equal(1,p.index(),"X-fastest hit");var zoomed=fitted.zoomAt(2,46,63);equal(p,zoomed.pixelAt(46,63).orElseThrow(),"zoom anchor preserves source pixel");

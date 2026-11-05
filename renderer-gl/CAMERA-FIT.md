@@ -58,3 +58,9 @@ Production picks supply the receipt automatically, including unit and greedy mes
 The existing navigation contract group now prepares end-to-end scalar picks/focus at positive and negative distant grid origins with 0.1 and 1e-8 spacing, both meshing modes and a nonzero Y sample. It checks original sample/volume identity, grid metadata, precise relative center, unchanged orbit/clipping settings, rebased world target, legacy hit construction/focus, mismatched metadata rejection and exact anchor overflow. CPU picking cases also check that produced hits retain the exact grid receipt. Group counts remain 13 display-math and 64 overall. Full and dependency-free compilation passed; none of these assertions has been executed.
 
 At renderer completion, run the prepared cases and compare focus targets with displayed scalar bins, frame-bound picks and readback while navigating/rebasing near both signed-32-bit coordinate limits. Include tiny/fractional spacing, full-height samples, greedy shared edges, empty hits, stale frame/volume receipts and externally retained hits after surface/frame/device closure. Check that no source-array lifetime or preview gate changes. Runtime, native and real-GPU parity remain deferred.
+
+## Identity navigation
+
+Zero orbit deltas, zero pan deltas, factor-one dolly and rebasing to an equal anchor return the existing immutable camera. They preserve signed-zero centers and pose components, avoiding spurious pose changes in exact comparisons. Argument checks still run first: zero pan requires a valid viewport, orbit deltas must be finite and rebasing requires a nonnull anchor. Nonzero navigation retains its existing bounds and clipping behavior.
+
+The existing navigation contract now prepares these identity and validation cases alongside the scalar-focus checks. Compilation only; assertions and runtime/GPU navigation remain deferred.
