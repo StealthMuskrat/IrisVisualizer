@@ -33,9 +33,7 @@ public final class GlWorldView implements AutoCloseable {
         atlasTick=tick;atlasPartialTick=partialTick;atlasClockSet=true;if(sourceReady&&animation!=null)animation.clock(tick,partialTick);
     }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"World view is closed"); }
-    private void dimensions(int width,int height) {
-        if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||(long)width*height>device.limits().targetPixels()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize()))throw new GlFailure(GlFailure.Code.LIMIT,"Requested world view exceeds device target bounds");
-    }
+    private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
     private long nextView() { if(viewRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"View revision counter exhausted");return viewRevision+1; }
     private void state(Phase phase) { status=new Status(worldRevision,viewRevision,phase,status.source(),List.of(),Optional.empty(),""); }
     /** A retained cleanup owner is not proof that this revision completed upload. */

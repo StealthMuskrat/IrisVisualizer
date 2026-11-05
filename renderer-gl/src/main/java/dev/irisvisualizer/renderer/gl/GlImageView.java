@@ -54,9 +54,7 @@ public final class GlImageView implements AutoCloseable {
         }finally { input.close(); }
     }
     public long submit(SourceImage.Encoded source) { return submit(new ImageDecodeWorker.Request(source)); }
-    private void dimensions(int width,int height) {
-        if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Image viewport exceeds device target bounds");
-    }
+    private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
     /** Display-only framing; original dimensions and pixels are never changed. */
     public long view(MapView view,int width,int height) {
         Objects.requireNonNull(view);current();dimensions(width,height);if(imageWidth==0||view.width()!=imageWidth||view.height()!=imageHeight)throw new GlFailure(GlFailure.Code.STALE,"Image view dimensions must match the decoded original image");

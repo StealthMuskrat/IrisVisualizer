@@ -30,7 +30,7 @@ public final class GlNoiseFrame implements AutoCloseable {
     }
     public static GlNoiseFrame render(GlNoiseRenderer renderer,long revision,GlNoiseScene source,GlCamera camera,int width,int height,WorldClip clip,BooleanSupplier obsolete) {
         Objects.requireNonNull(clip);Objects.requireNonNull(renderer);Objects.requireNonNull(source);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1)throw new IllegalArgumentException("Invalid scalar frame revision");
-        var device=renderer.device;device.live(renderer.allocation);if(source.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar frame inputs must share one device");var surface=source.surface();camera.matrix((double)width/height);check(obsolete);
+        var device=renderer.device;device.live(renderer.allocation);if(source.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar frame inputs must share one device");var surface=source.surface();camera.matrix((double)width/height);check(obsolete);GlTarget.validate(device,width,height);
         GlNoiseScene owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);check(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);check(obsolete);

@@ -61,20 +61,20 @@ public final class GlReadback implements AutoCloseable {
     public static GlReadback begin(GlMapFrame frame) { return begin(frame,Limits.DEFAULT); }
     public static GlReadback begin(GlNoiseFrame frame) { return begin(frame,Limits.DEFAULT); }
     public static GlReadback begin(GlNoiseFrame frame,Limits limits) {
-        Objects.requireNonNull(frame);Objects.requireNonNull(limits);var owner=frame.retain();
+        Objects.requireNonNull(frame);Objects.requireNonNull(limits);validate(frame.readbackTarget(),limits);var owner=frame.retain();
         try { return begin(new NoiseSource(owner),limits); }catch(RuntimeException|Error failure) { try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public static GlReadback begin(GlFrame frame,Limits limits) {
-        Objects.requireNonNull(frame);Objects.requireNonNull(limits);var owner=frame.retain();
+        Objects.requireNonNull(frame);Objects.requireNonNull(limits);validate(frame.readbackTarget(),limits);var owner=frame.retain();
         try { return begin(new WorldSource(owner),limits); }catch(RuntimeException|Error failure) { try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public static GlReadback begin(GlMapFrame frame,Limits limits) {
-        Objects.requireNonNull(frame);Objects.requireNonNull(limits);var owner=frame.retain();
+        Objects.requireNonNull(frame);Objects.requireNonNull(limits);validate(frame.readbackTarget(),limits);var owner=frame.retain();
         try { return begin(new MapSource(owner),limits); }catch(RuntimeException|Error failure) { try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public static GlReadback begin(GlImageFrame frame) { return begin(frame,Limits.DEFAULT); }
     public static GlReadback begin(GlImageFrame frame,Limits limits) {
-        Objects.requireNonNull(frame);Objects.requireNonNull(limits);var owner=frame.retain();
+        Objects.requireNonNull(frame);Objects.requireNonNull(limits);validate(frame.readbackTarget(),limits);var owner=frame.retain();
         try { return begin(new ImageSource(owner),limits); }catch(RuntimeException|Error failure) { try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     /** Metadata/liveness preflight shared by direct begin and queue replacement; allocates no journal or pixels. */

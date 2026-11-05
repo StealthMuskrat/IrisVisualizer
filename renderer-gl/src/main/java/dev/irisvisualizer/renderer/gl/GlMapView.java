@@ -71,9 +71,7 @@ public final class GlMapView implements AutoCloseable {
             return recolor(source.value(),style,limits);
         }finally { input.close(); }
     }
-    private void dimensions(int width,int height) {
-        if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Map viewport exceeds device target bounds");
-    }
+    private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
     /** Display-only framing; the source grid, sampling scale and native values are never changed. */
     public long view(MapView view,int width,int height) {
         Objects.requireNonNull(view);current();dimensions(width,height);if(grid==null||view.width()!=grid.width()||view.height()!=grid.height())throw new GlFailure(GlFailure.Code.STALE,"Map view dimensions must match the latest submitted native grid");

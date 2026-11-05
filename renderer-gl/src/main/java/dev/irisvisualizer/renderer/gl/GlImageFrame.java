@@ -21,7 +21,7 @@ public final class GlImageFrame implements AutoCloseable {
     public static GlImageFrame render(GlMapRenderer renderer,long revision,GlImage source,MapView view,int width,int height,BooleanSupplier obsolete) {
         Objects.requireNonNull(renderer);Objects.requireNonNull(source);Objects.requireNonNull(view);Objects.requireNonNull(obsolete);if(revision<1)throw new IllegalArgumentException("Invalid image frame revision");
         var device=renderer.device;device.live(renderer.allocation);if(source.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Image frame inputs must share the renderer device");
-        var raster=source.raster();if(view.width()!=source.width()||view.height()!=source.height())throw new GlFailure(GlFailure.Code.STALE,"Image frame transform differs from its source dimensions");check(obsolete);
+        var raster=source.raster();if(view.width()!=source.width()||view.height()!=source.height())throw new GlFailure(GlFailure.Code.STALE,"Image frame transform differs from its source dimensions");check(obsolete);GlTarget.validate(device,width,height);
         GlImage owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);journal.retained=raster;

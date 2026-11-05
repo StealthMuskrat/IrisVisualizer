@@ -69,9 +69,7 @@ public final class GlNoiseView implements AutoCloseable {
         current();var memory=device.memory().orElse(null);
         if(input.admission().tracked()&&(memory==null||!input.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar view requires the same tracked surface coordinator");
     }
-    private void dimensions(int width,int height) {
-        if(width<1||height<1||width>device.limits().targetDimension()||height>device.limits().targetDimension()||width>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||height>Math.min(device.maximumTextureSize(),device.maximumRenderbufferSize())||(long)width*height>device.limits().targetPixels())throw new GlFailure(GlFailure.Code.LIMIT,"Scalar viewport exceeds device bounds");
-    }
+    private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
     public long view(GlCamera camera,int width,int height) {
         Objects.requireNonNull(camera);current();dimensions(width,height);camera.matrix((double)width/height);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
         long next=nextView();var changed=displayStatus(next);this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
