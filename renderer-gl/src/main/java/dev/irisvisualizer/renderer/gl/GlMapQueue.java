@@ -33,7 +33,8 @@ public final class GlMapQueue implements AutoCloseable {
     }
     /** Immutable rasters are borrowed/retained, not consuming native generation leases. */
     public boolean submit(long next,MapRaster raster) {
-        Objects.requireNonNull(raster);current();if(next<1)throw new IllegalArgumentException("Invalid map revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;if(next>revision)invalidate(next);
+        Objects.requireNonNull(raster);current();if(next<1)throw new IllegalArgumentException("Invalid map revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+        GlMapUpload.validate(device,raster);if(next>revision)invalidate(next);
         status=new Status(revision,Phase.UPLOADING,Optional.of(raster.samples().context()),Optional.empty(),Optional.empty(),"");
         try { active=GlMapUpload.begin(device,raster);status=new Status(revision,Phase.UPLOADING,status.context(),Optional.of(active.progress()),Optional.empty(),"");return true; }
         catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }

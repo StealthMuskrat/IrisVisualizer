@@ -223,4 +223,8 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 
 ## Atlas replacement preflight and recovery
 
-[Atlas queue guards](ATLAS-RECOVERY.md) now preserve earlier same-scene work and untaken READY atlases when a replacement displayed frame or plan fails preflight. Exact FAILED scene/frame pairs can reopen only after cleanup; obsolete scenes retain their existing invalidation behavior. This batch was source-reviewed only because the execution environment is unavailable; compilation and runtime validation of these changes remain pending, and unsupported previews stay disabled.
+[Atlas queue guards](ATLAS-RECOVERY.md) now preserve earlier same-scene work and untaken READY atlases when a replacement displayed frame or plan fails preflight. Exact FAILED scene/frame pairs can reopen only after cleanup; obsolete scenes retain their existing invalidation behavior. Follow-up compilation in the restored workspace covers these changes; runtime/GPU validation remains pending and unsupported previews stay disabled.
+
+## Map and image replacement preflight
+
+[Raster queue guards](RASTER-PREFLIGHT.md) now validate complete sources and hardware/row-staging limits before replacing active or untaken output. Direct upload begin shares the same checks. Restored compilation also covers the preceding atlas preflight/retry fix; all 129 production sources plus four harnesses compile. Runtime/native/GPU validation remains deferred and unsupported previews stay disabled.

@@ -33,7 +33,8 @@ public final class GlImageQueue implements AutoCloseable {
     }
     /** Immutable decoded images are borrowed; no native generation owner is involved. */
     public boolean submit(long next,SourceImage raster) {
-        Objects.requireNonNull(raster);current();if(next<1)throw new IllegalArgumentException("Invalid image revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;if(next>revision)invalidate(next);
+        Objects.requireNonNull(raster);current();if(next<1)throw new IllegalArgumentException("Invalid image revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+        GlImageUpload.validate(device,raster);if(next>revision)invalidate(next);
         status=new Status(revision,Phase.UPLOADING,Optional.of(raster.identity()),Optional.empty(),Optional.empty(),"");
         try { active=GlImageUpload.begin(device,raster);status=new Status(revision,Phase.UPLOADING,status.source(),Optional.of(active.progress()),Optional.empty(),"");return true; }
         catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }

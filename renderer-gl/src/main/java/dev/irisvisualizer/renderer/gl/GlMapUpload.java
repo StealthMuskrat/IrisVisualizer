@@ -14,9 +14,13 @@ public final class GlMapUpload implements AutoCloseable {
     private final GlDevice device;private final MapSamples.Context context;private final int width,height;private final long totalBytes;
     private GlDevice.Allocation allocation;private MapRaster raster;private GlMap completed;private Phase phase=Phase.STORAGE;private int row;private long uploaded;
     private GlMapUpload(GlDevice device,MapRaster raster,GlDevice.Allocation allocation) { this.device=device;this.raster=raster;this.allocation=allocation;context=raster.samples().context();var image=raster.image().orElseThrow();width=image.width();height=image.height();totalBytes=image.bytes(); }
-    public static GlMapUpload begin(GlDevice device,MapRaster raster) {
+    /** Source/context/capability preflight; no upload journal, texture or staging payload is allocated. */
+    static void validate(GlDevice device,MapRaster raster) {
         Objects.requireNonNull(device);Objects.requireNonNull(raster);device.current();if(raster.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"A complete CPU map raster is required");var image=raster.image().orElseThrow();
         if(image.width()>device.maximumTextureSize()||image.height()>device.maximumTextureSize()||image.width()*4>device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.CAPABILITY,"Map exceeds hardware texture or bounded row-staging dimensions");
+    }
+    public static GlMapUpload begin(GlDevice device,MapRaster raster) {
+        validate(device,raster);
         GlDevice.Allocation allocation=null;
         try { allocation=device.reserve(0,raster.payloadBytes(),0,0,0,0,0,0,0,null);allocation.retained=raster;return new GlMapUpload(device,raster,allocation); }
         catch(RuntimeException|Error failure) { if(allocation!=null)try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }

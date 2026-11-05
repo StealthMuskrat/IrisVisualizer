@@ -43,4 +43,4 @@ The context-free runner set compiles without external dependencies: 88 CPU produ
 
 ## Queue replacement and failed-request recovery
 
-[Atlas queue preflight](../renderer-gl/ATLAS-RECOVERY.md) now preserves earlier same-scene work when the new displayed/plan baseline is invalid. Owned submission still consumes the supplied wrapper while independent owners remain live. Exact current FAILED tokens can reopen after cleanup, with no implicit plan retention or retry loop. These follow-up changes were source-reviewed only because the execution environment is unavailable; the earlier compilation evidence above does not cover them.
+[Atlas queue preflight](../renderer-gl/ATLAS-RECOVERY.md) now preserves earlier same-scene work when the new displayed/plan baseline is invalid. Owned submission still consumes the supplied wrapper while independent owners remain live. Exact current FAILED tokens can reopen after cleanup, with no implicit plan retention or retry loop. Follow-up compilation in the restored workspace now covers these queue changes; runtime/GPU validation remains pending.

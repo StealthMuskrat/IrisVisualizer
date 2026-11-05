@@ -58,4 +58,4 @@ The [connected world animation path](WORLD-ANIMATION.md) now schedules CPU patch
 
 ## Same-scene replacement preflight
 
-[Atlas recovery](ATLAS-RECOVERY.md) now validates displayed scene and exact successful CPU plan baseline before accepting a newer frame token. Rejected preflight preserves previous queued/READY work; explicit upstream invalidation and newer-scene obsolescence keep their existing behavior. `retry(expectedScene, expectedFrame)` reopens only a current FAILED pair after cleanup, then requires ordinary complete-plan resubmission. This batch has source review only; compilation and runtime/GPU checks remain pending.
+[Atlas recovery](ATLAS-RECOVERY.md) now validates displayed scene and exact successful CPU plan baseline before accepting a newer frame token. Rejected preflight preserves previous queued/READY work; explicit upstream invalidation and newer-scene obsolescence keep their existing behavior. `retry(expectedScene, expectedFrame)` reopens only a current FAILED pair after cleanup, then requires ordinary complete-plan resubmission. Follow-up compilation in the restored workspace covers these changes; runtime/GPU checks remain pending.

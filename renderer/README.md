@@ -308,4 +308,8 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 
 ## Atlas replacement guards
 
-[Atlas GPU queue preflight/recovery](../renderer-gl/ATLAS-RECOVERY.md) now checks exact displayed scene/raster identity before replacing same-scene work, with explicit current-failure cleanup/retry. CPU plan ownership and existing scene/frame adoption contracts remain intact. These changes were source-reviewed only; the unavailable execution environment prevented compilation. The 55 prepared groups remain unexecuted and unsupported previews stay disabled.
+[Atlas GPU queue preflight/recovery](../renderer-gl/ATLAS-RECOVERY.md) now checks exact displayed scene/raster identity before replacing same-scene work, with explicit current-failure cleanup/retry. CPU plan ownership and existing scene/frame adoption contracts remain intact. Follow-up compilation in the restored workspace now covers these changes. The 55 prepared groups remain unexecuted and unsupported previews stay disabled.
+
+## Map and image queue preservation
+
+[Upload replacement preflight](../renderer-gl/RASTER-PREFLIGHT.md) now preserves lower-level queue work/READY textures when a candidate source fails completeness or hardware/row-staging checks. Explicit upstream invalidation retains its existing behavior. All 129 production sources plus four harnesses compile, including the prior atlas fix; no tests ran and unsupported previews stay disabled.

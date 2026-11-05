@@ -1,6 +1,6 @@
 # Atlas replacement preflight and recovery
 
-Renderer implementation, 2026-11-05. Atlas queue submission now validates the displayed scene and exact CPU raster baseline before replacing earlier animation work. The exact current failed scene/frame request can also reopen after cleanup. This batch was source-reviewed through GitHub only: the execution environment is unavailable, so these changes have not been compiled or executed. The preceding commit compiled 129 production sources plus four harnesses; that evidence does not validate this new source revision. The 55 prepared contract groups remain unexecuted, and unsupported previews remain disabled.
+Renderer implementation, 2026-11-05. Atlas queue submission now validates the displayed scene and exact CPU raster baseline before replacing earlier animation work. The exact current failed scene/frame request can also reopen after cleanup. The original batch was source-reviewed through GitHub during an execution-environment outage. Follow-up compilation in the restored workspace now covers the atlas changes and all 129 production sources plus four harnesses (133 total); runtime/GPU validation remains deferred. The 55 prepared contract groups remain unexecuted, and unsupported previews remain disabled.
 
 ## Preserve work on invalid same-scene replacements
 
@@ -31,6 +31,6 @@ Cleanup uses the existing owner-release path. Resources still owned after a clea
 
 ## Deferred verification
 
-Compile the updated production sources before claiming validation of this revision. At renderer-stage execution, submit newer same-scene frame tokens with closed/foreign displayed frames, failed plans, matching-looking different raster captures and layout mismatches while the queue is WAITING, UPDATING or READY. Verify identical prior status/token/progress/owner/result on preflight rejection, no new journals/page owners and ordinary stale/duplicate short-circuit behavior.
+Follow-up compilation has completed; the runtime checks below remain pending. At renderer-stage execution, submit newer same-scene frame tokens with closed/foreign displayed frames, failed plans, matching-looking different raster captures and layout mismatches while the queue is WAITING, UPDATING or READY. Verify identical prior status/token/progress/owner/result on preflight rejection, no new journals/page owners and ordinary stale/duplicate short-circuit behavior.
 
 Exercise explicit invalidation separately, including newer GPU scenes becoming STALE regardless of candidate plan, and original-context/device enforcement. Cover current/stale/future/nonpositive retry pairs, obsolete queues, every nonfailed phase, repeated calls, status allocation failure before cleanup and failed cleanup retaining ownership. Verify successful same-pair raw/owned resubmission, foreign coordinators, consumed-input failure, retained displayed/old completed frames and final retirement/quarantine charges. Compare original and recovered atlas pixels/receipts on real Windows GL. Native/GPU comparison and final editor integration remain pending.
