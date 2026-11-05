@@ -220,3 +220,7 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 ## Owned animation plan handoff
 
 [Atlas CPU ownership](../renderer/ANIMATION-OWNERS.md) now connects retained plan inputs to upload/queue admission with matching-coordinator checks, including the world animation controller. Exact raster baseline, old-frame lifetime and page sharing stay intact. Eleven additional animation contract groups are prepared; all 129 production sources plus four harnesses compile. Runtime/native/GPU validation remains deferred and unsupported previews stay disabled.
+
+## Atlas replacement preflight and recovery
+
+[Atlas queue guards](ATLAS-RECOVERY.md) now preserve earlier same-scene work and untaken READY atlases when a replacement displayed frame or plan fails preflight. Exact FAILED scene/frame pairs can reopen only after cleanup; obsolete scenes retain their existing invalidation behavior. This batch was source-reviewed only because the execution environment is unavailable; compilation and runtime validation of these changes remain pending, and unsupported previews stay disabled.

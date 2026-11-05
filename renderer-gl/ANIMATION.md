@@ -55,3 +55,7 @@ Exercise exact scene/layout/raster/token/revision mismatches, stale CPU plans, s
 ## World-view scheduling
 
 The [connected world animation path](WORLD-ANIMATION.md) now schedules CPU patch/copy preparation through one bounded worker and routes complete plans through this GPU queue from `GlWorldView.clock`. It preserves these exact raster/token/page ownership rules, coalesces repeated source frames and redraws complete immutable images after adoption. Stepped and interpolated samples use the same immutable handoff; deferred renderer/native/GPU verification still applies.
+
+## Same-scene replacement preflight
+
+[Atlas recovery](ATLAS-RECOVERY.md) now validates displayed scene and exact successful CPU plan baseline before accepting a newer frame token. Rejected preflight preserves previous queued/READY work; explicit upstream invalidation and newer-scene obsolescence keep their existing behavior. `retry(expectedScene, expectedFrame)` reopens only a current FAILED pair after cleanup, then requires ordinary complete-plan resubmission. This batch has source review only; compilation and runtime/GPU checks remain pending.

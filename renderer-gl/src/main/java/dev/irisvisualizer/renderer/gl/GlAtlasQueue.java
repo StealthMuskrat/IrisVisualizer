@@ -36,9 +36,21 @@ public final class GlAtlasQueue implements AutoCloseable {
     }
     public void invalidate(long latestScene,long latestFrame) { current();observe(latestScene,latestFrame); }
     public boolean submit(long latestScene,long latestFrame,GlAtlasFrame displayed,AtlasFramePlan plan) {
-        Objects.requireNonNull(displayed);Objects.requireNonNull(plan);current();if(!observe(latestScene,latestFrame)||status.phase()!=Phase.WAITING)return false;
-        try { displayed.requireScene(scene);active=GlAtlasUpload.begin(displayed,plan);status=state(Phase.UPDATING,null,"");return true; }
+        Objects.requireNonNull(displayed);Objects.requireNonNull(plan);current();
+        if(latestScene<1||latestFrame<1)throw new IllegalArgumentException("Invalid atlas revision");
+        if(latestScene!=sceneRevision) { observe(latestScene,latestFrame);return false; }
+        if(obsolete||latestFrame<frameRevision||latestFrame==frameRevision&&status.phase()!=Phase.WAITING)return false;
+        displayed.requireScene(scene);GlAtlasUpload.validate(displayed,plan);
+        if(!observe(latestScene,latestFrame)||status.phase()!=Phase.WAITING)return false;
+        try { active=GlAtlasUpload.begin(displayed,plan);status=state(Phase.UPDATING,null,"");return true; }
         catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
+    }
+    /** Reopen only an exact failed scene/frame token after cleanup; the caller resubmits complete input. */
+    public boolean retry(long expectedScene,long expectedFrame) {
+        current();if(expectedScene<1||expectedFrame<1)throw new IllegalArgumentException("Invalid atlas revision");
+        if(obsolete||expectedScene!=sceneRevision||expectedFrame!=frameRevision||status.phase()!=Phase.FAILED)return false;
+        var waiting=new Status(sceneRevision,frameRevision,Phase.WAITING,Optional.empty(),Optional.empty(),"");
+        try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error error) { failure(error);throw error; }
     }
     /** Consumes a retained CPU plan after queue/device admission, including stale or failed submissions. */
     public boolean submit(long latestScene,long latestFrame,GlAtlasFrame displayed,RenderInput<AtlasFramePlan> input) {

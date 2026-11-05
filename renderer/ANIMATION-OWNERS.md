@@ -40,3 +40,7 @@ The atlas worker drops its active request reference before shrinking/releasing t
 The tiny fixture resolves a two-face JSON model and prepares two standard-library-generated PNG sprites through the production texture/atlas pipeline. A four-pixel page limit places animated/static slots on separate pages, making page sharing observable. One-pixel frame gutters and a half blend have direct known byte expectations. Synthetic catalog/source receipts identify a fixture, never a verified client archive or native engine result.
 
 The context-free runner set compiles without external dependencies: 88 CPU production sources, four display math helpers and four harnesses (96 total). GPU ownership/coordinator rejection, queue lifecycle, worker races, allocation/fence/cleanup failures, native timing parity and real pixel/readback comparisons still require deferred Windows validation. Existing interpolation/filtering/mipmap guards and final editor integration remain pending.
+
+## Queue replacement and failed-request recovery
+
+[Atlas queue preflight](../renderer-gl/ATLAS-RECOVERY.md) now preserves earlier same-scene work when the new displayed/plan baseline is invalid. Owned submission still consumes the supplied wrapper while independent owners remain live. Exact current FAILED tokens can reopen after cleanup, with no implicit plan retention or retry loop. These follow-up changes were source-reviewed only because the execution environment is unavailable; the earlier compilation evidence above does not cover them.

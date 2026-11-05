@@ -305,3 +305,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Owned atlas plans and prepared animation checks
 
 [Independent atlas plan inputs](ANIMATION-OWNERS.md) now preserve shared admission beyond completion closure and feed consuming GPU upload/queue paths with coordinator checks. The connected animation controller uses this handoff. Eleven prepared schedule/interpolation/page-sharing/limit groups bring the total to 55. All 129 production sources plus four harnesses compile; no tests ran and unsupported previews stay disabled.
+
+## Atlas replacement guards
+
+[Atlas GPU queue preflight/recovery](../renderer-gl/ATLAS-RECOVERY.md) now checks exact displayed scene/raster identity before replacing same-scene work, with explicit current-failure cleanup/retry. CPU plan ownership and existing scene/frame adoption contracts remain intact. These changes were source-reviewed only; the unavailable execution environment prevented compilation. The 55 prepared groups remain unexecuted and unsupported previews stay disabled.

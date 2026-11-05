@@ -19,10 +19,14 @@ public final class GlAtlasUpload implements AutoCloseable {
         scene=original.scene();device=scene.device;expectedToken=original.token();this.plan=plan;this.source=source;this.work=work;
         changedCount=plan.changedPages().size();totalCopy=plan.copiedBytes();totalUpload=plan.update().bytes();pages=new ArrayList<>(source.pages());owned=new ArrayList<>(changedCount);
     }
-    public static GlAtlasUpload begin(GlAtlasFrame current,AtlasFramePlan plan) {
-        Objects.requireNonNull(current);Objects.requireNonNull(plan);var scene=current.scene();var device=scene.device;
+    /** Metadata/liveness checks only; no source retain, allocation journal or GPU storage is created. */
+    static void validate(GlAtlasFrame current,AtlasFramePlan plan) {
+        Objects.requireNonNull(current);Objects.requireNonNull(plan);var raster=current.raster();
         if(plan.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"Atlas CPU frame preparation failed");
-        if(current.raster()!=plan.expected()||plan.raster().orElseThrow().layout()!=current.raster().layout())throw new GlFailure(GlFailure.Code.STALE,"Atlas update does not target the exact current CPU raster");
+        if(raster!=plan.expected()||plan.raster().orElseThrow().layout()!=raster.layout())throw new GlFailure(GlFailure.Code.STALE,"Atlas update does not target the exact current CPU raster");
+    }
+    public static GlAtlasUpload begin(GlAtlasFrame current,AtlasFramePlan plan) {
+        validate(current,plan);var scene=current.scene();var device=scene.device;
         GlAtlasFrame source=null;GlDevice.Allocation work=null;
         try {
             work=device.reserve(0,plan.extraCpuBytes(),0,0,0,0,0,0,0,null);work.retained=plan;source=current.retain();device.depend(work,source.journal());return new GlAtlasUpload(current,plan,source,work);
