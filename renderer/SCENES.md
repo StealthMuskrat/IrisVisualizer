@@ -8,6 +8,8 @@ Renderer implementation, 2026-11-03. All 57 CPU renderer sources compile with Ja
 
 `WorldScenePlan.plan(models, visibility, cancelled)` partitions the entire captured native extent into explicit sections. The default edge is 16 blocks, and clipped edge sections cover nonmultiples exactly. Ordering is Y, then Z, then X. Negative coordinates/Y and distant long X/Z origins retain the existing integer-coordinate representation. The planner checks section count and tile limits before expansion, counts every section, and checks aggregate mesh/metadata/working limits before scene output allocation.
 
+[Prepared material counts](MATERIAL-COUNTS.md) also retain surviving translucent and tint-required totals per section and complete scene. Section emission and complete scene construction independently verify these counts before publication; GPU validation and camera-sort admission can then consume metadata without scanning every source face.
+
 Every successful plan covers exactly `snapshot.extent().cells()`, including the complete configured height. It does not reduce area, sample resolution, vertical extent, model detail or selected generation features to fit. An over-budget scene fails explicitly. Section size is an assembly parameter; the specified 128 × 128 preview default and source volume are unchanged.
 
 The section count/emit passes now omit redundant cell-span records for fully hidden meshes. Cells emitting faces or explicit placeholder markers retain picking spans. All original cells, states and biomes remain in the native snapshot, including hidden and explicitly empty cells. This reduces cache metadata without dropping generated data, visible geometry or unsupported-content markers.

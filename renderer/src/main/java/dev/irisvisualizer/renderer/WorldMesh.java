@@ -21,9 +21,10 @@ public final class WorldMesh {
     }
     /** Output includes packed geometry, face-batch bounds and CPU-only translucent indices/centers. */
     public record Usage(long sourceIndexBytes,long visibilityBytes,long prototypeBytes,long atlasPayloadBytes,long outputBytes,
-                        int requestedCells,int nonEmptyCells,int faces,int markers,int translucentFaces) {
+                        int requestedCells,int nonEmptyCells,int faces,int markers,int translucentFaces,int tintedFaces) {
         public Usage(long sourceIndexBytes,long visibilityBytes,long prototypeBytes,long atlasPayloadBytes,long outputBytes,int requestedCells,int nonEmptyCells,int faces,int markers) { this(sourceIndexBytes,visibilityBytes,prototypeBytes,atlasPayloadBytes,outputBytes,requestedCells,nonEmptyCells,faces,markers,0); }
-        public Usage { if(sourceIndexBytes<0||visibilityBytes<0||prototypeBytes<0||atlasPayloadBytes<0||outputBytes<0||requestedCells<0||nonEmptyCells<0||faces<0||markers<0||translucentFaces<0||translucentFaces>faces)throw new IllegalArgumentException("Invalid world mesh usage"); }
+        public Usage(long sourceIndexBytes,long visibilityBytes,long prototypeBytes,long atlasPayloadBytes,long outputBytes,int requestedCells,int nonEmptyCells,int faces,int markers,int translucentFaces) { this(sourceIndexBytes,visibilityBytes,prototypeBytes,atlasPayloadBytes,outputBytes,requestedCells,nonEmptyCells,faces,markers,translucentFaces,0); }
+        public Usage { if(sourceIndexBytes<0||visibilityBytes<0||prototypeBytes<0||atlasPayloadBytes<0||outputBytes<0||requestedCells<0||nonEmptyCells<0||faces<0||markers<0||translucentFaces<0||translucentFaces>faces||tintedFaces<0||tintedFaces>faces)throw new IllegalArgumentException("Invalid world mesh usage"); }
         public long knownPayloadBytes() { return sourceIndexBytes+visibilityBytes+prototypeBytes+atlasPayloadBytes+outputBytes; }
     }
     private final WorldModels models;private final WorldVisibility visibility;private final WorldSnapshot.Extent extent;private final WorldSnapshot.Position origin;

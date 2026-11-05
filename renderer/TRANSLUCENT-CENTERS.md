@@ -12,7 +12,7 @@ Centers use the actual four section-relative float positions after model/fluid p
 
 ## Camera preparation
 
-`WorldDrawOrder` counts entries across sections before allocating its sorting arrays. Depth preparation visits only those entries; it still checks every section's exact anchor subtraction and relative-coordinate precision, including sections without translucent geometry. It uses the same camera-forward depth expression and section/face key as before. Stable merge sorting and deterministic equal-depth ties remain unchanged.
+`WorldDrawOrder` uses the [verified complete-scene translucent total](MATERIAL-COUNTS.md) before allocating its sorting arrays. Source-plus-scratch admission uses this actual count under existing ceilings; preparation still verifies section entry coverage. Depth preparation visits only those entries; it still checks every section's exact anchor subtraction and relative-coordinate precision, including sections without translucent geometry. It uses the same camera-forward depth expression and section/face key as before. Stable merge sorting and deterministic equal-depth ties remain unchanged.
 
 Repeated poses therefore avoid opaque/cutout face scans and vertex-buffer reads during depth preparation. This changes the work performed, without a measured timing claim. Sorting remains global back-to-front quad-centroid ordering; intersecting or cyclic transparent surfaces still require a different rendering solution. It introduces neither OIT nor per-pixel native parity.
 

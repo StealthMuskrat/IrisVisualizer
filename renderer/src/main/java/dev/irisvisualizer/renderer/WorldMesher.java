@@ -16,7 +16,7 @@ public final class WorldMesher {
     private static final class Work {
         final WorldModels models;final WorldSnapshot world;final WorldVisibility visibility;final WorldSnapshot.Extent extent;final Limits limits;final BooleanSupplier cancelled;
         final IdentityHashMap<AtlasMesh,Buffers> buffers=new IdentityHashMap<>();
-        int faceCount,markerCount,cellCount,translucentCount;float minX=Float.POSITIVE_INFINITY,minY=minX,minZ=minX,maxX=Float.NEGATIVE_INFINITY,maxY=maxX,maxZ=maxX;
+        int faceCount,markerCount,cellCount,translucentCount,tintedCount;float minX=Float.POSITIVE_INFINITY,minY=minX,minZ=minX,maxX=Float.NEGATIVE_INFINITY,maxY=maxX,maxZ=maxX;
         Work(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,Limits limits,BooleanSupplier cancelled) { this.models=models;world=models.snapshot();this.visibility=visibility;this.extent=extent;this.limits=limits;this.cancelled=cancelled; }
         int sourceCell(int x,int y,int z) {
             var source=world.extent();long dy=(long)extent.minY()-source.minY()+y,dz=extent.minZ()-source.minZ()+z,dx=extent.minX()-source.minX()+x;
@@ -37,7 +37,7 @@ public final class WorldMesher {
                 var mesh=entry.mesh().orElseThrow();int before=faceCount;
                 for(var face:mesh.faces()) {
                     WorldProblem.check(cancelled);if(hidden(cell,face))continue;
-                    faceCount++;if(face.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)translucentCount++;
+                    faceCount++;if(face.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)translucentCount++;if(face.source().tintIndex()>=0)tintedCount++;
                     if(faceCount>limits.faces()||outputBytes()>limits.meshBytes())throw WorldProblem.at(WorldProblem.Code.LIMIT,world.extent().position(cell),"World section face, packed or mesh-metadata budget reached");
                 }
                 if(faceCount>before)cellCount++;
@@ -49,7 +49,7 @@ public final class WorldMesher {
             int[] translucentFaces=new int[translucentCount];double[] translucentCenters=new double[translucentCount*3];
             float[] faceBatches=new float[(int)(WorldMesh.batchBytes(faceCount)/Float.BYTES)];
             var cells=new ArrayList<WorldMesh.Cell>(cellCount);var faces=new ArrayList<WorldMesh.Face>(faceCount);var markers=new ArrayList<WorldMesh.Marker>(markerCount);var ranges=new ArrayList<AtlasMesh.DrawRange>();
-            int rangeStart=0,rangePage=-1,translucentAt=0;TexturePreparation.AlphaClass rangeAlpha=null;
+            int rangeStart=0,rangePage=-1,translucentAt=0,tintedAt=0;TexturePreparation.AlphaClass rangeAlpha=null;
             for(int y=0;y<extent.height();y++)for(int z=0;z<extent.depth();z++)for(int x=0;x<extent.width();x++) {
                 WorldProblem.check(cancelled);int cell=sourceCell(x,y,z),entryIndex=models.entryIndex(cell);var entry=models.entries().get(entryIndex);if(entry.kind()==WorldModels.Kind.EMPTY)continue;
                 int cellRecord=cells.size(),first=faces.size();
@@ -61,6 +61,7 @@ public final class WorldMesher {
                 for(int f=0;f<mesh.faces().size();f++) {
                     WorldProblem.check(cancelled);var face=mesh.faces().get(f);if(hidden(cell,face))continue;int destination=faces.size(),sourceBase=f*4*MeshPacket.STRIDE_FLOATS,destinationBase=destination*4*MeshPacket.STRIDE_FLOATS;
                     boolean model=face.source().placement()==BlockMesh.Placement.MODEL;
+                    if(face.source().tintIndex()>=0)tintedAt++;
                     boolean translucent=face.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT;double centerX=0,centerY=0,centerZ=0;
                     double placedX=model?offsetX:x,placedY=model?offsetY:y,placedZ=model?offsetZ:z;
                     int batch=destination/WorldMesh.BATCH_FACES*6;
@@ -82,7 +83,7 @@ public final class WorldMesher {
                 if(faces.size()>first)cells.add(new WorldMesh.Cell(cell,entryIndex,first,faces.size()-first,-1));
             }
             if(rangePage>=0)ranges.add(new AtlasMesh.DrawRange(rangeStart,indices.length-rangeStart,rangePage,rangeAlpha));
-            if(faces.size()!=faceCount||markers.size()!=markerCount||cells.size()!=cellCount||translucentAt!=translucentCount)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Section count and emit passes disagree");
+            if(faces.size()!=faceCount||markers.size()!=markerCount||cells.size()!=cellCount||translucentAt!=translucentCount||tintedAt!=tintedCount)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Section count and emit passes disagree");
             WorldProblem.check(cancelled);return WorldMesh.success(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,faceBatches,cells,faces,markers,ranges,bounds(),usage);
         }
     }
@@ -106,7 +107,7 @@ public final class WorldMesher {
     }
     private static WorldMesh emit(WorldMeshPlan plan,BooleanSupplier cancelled) {
         var work=new Work(plan.models(),plan.visibility(),plan.extent(),plan.limits(),cancelled);var usage=plan.usage().orElseThrow();
-        work.faceCount=usage.faces();work.markerCount=usage.markers();work.cellCount=usage.nonEmptyCells();work.translucentCount=usage.translucentFaces();return work.build(usage);
+        work.faceCount=usage.faces();work.markerCount=usage.markers();work.cellCount=usage.nonEmptyCells();work.translucentCount=usage.translucentFaces();work.tintedCount=usage.tintedFaces();return work.build(usage);
     }
     private static WorldMeshPlan count(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,Limits limits,BooleanSupplier cancelled) {
         if(models.requiresPlaceholder())return WorldMeshPlan.placeholder(models,visibility,extent,limits,models.problems());
@@ -119,7 +120,7 @@ public final class WorldMesher {
         long atlas=models.layout().usage().orElseThrow().knownPayloadBytes()-models.layout().usage().orElseThrow().boundMeshBytes();
         if(source+mask+models.meshBytes()+atlas>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Combined world, prototype and atlas payload budget reached");
         var work=new Work(models,visibility,extent,limits,cancelled);work.count();
-        var usage=new WorldMesh.Usage(source,mask,models.meshBytes(),atlas,work.outputBytes(),(int)extent.cells(),work.cellCount,work.faceCount,work.markerCount,work.translucentCount);
+        var usage=new WorldMesh.Usage(source,mask,models.meshBytes(),atlas,work.outputBytes(),(int)extent.cells(),work.cellCount,work.faceCount,work.markerCount,work.translucentCount,work.tintedCount);
         if(usage.knownPayloadBytes()>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Combined world section output payload budget reached");
         WorldProblem.check(cancelled);return WorldMeshPlan.success(models,visibility,extent,limits,usage);
     }

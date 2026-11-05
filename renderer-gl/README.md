@@ -168,3 +168,7 @@ World camera sorting now consumes [prepared translucent face indices and centers
 ## Current-source adoption guards
 
 [Source/display failure handling](SOURCE-FAILURES.md) now distinguishes a completed current upload from an old GPU owner retained for cleanup across world, map, scalar and image views. Navigation preserves upstream diagnostics; redraw/frame transfer and world animation require current source adoption. Cleanup charges and caller-held old frames retain their existing lifetimes. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); failure injection, runtime/native/GPU checks and editor integration remain deferred, with unsupported previews disabled.
+
+## Material metadata validation
+
+World upload validation now consumes [prepared material counts](../renderer/MATERIAL-COUNTS.md) per section, preserving missing-tint, exact-raster/material identity and aggregate coverage checks before GPU storage. Face progress advances by validated section coverage; actual transfers keep their existing work/byte/action limits and layouts. Camera sorting uses the scene's verified translucent total for bounded scratch admission. All 129 CPU/OpenGL sources compile (88 CPU, 41 GL); runtime/native/GPU validation remains deferred and unsupported previews stay disabled.

@@ -12,9 +12,9 @@ Every admitted job owns a `RenderMemory.Hold`. Successful publication retains an
 | --- | --- | --- |
 | Map colorization | Native samples plus complete RGBA output | Samples plus complete raster |
 | Atlas preparation | Original layout payload plus padded patches and copied pages | Same conservative source/plan payload |
-| Camera sorting | Source scene plus bounded sorting scratch, within existing working limit | Source scene plus final order array |
+| Camera sorting | Source scene plus 32 bytes per verified translucent face, capped by existing sort/working limits | Source scene plus final order array |
 
-All existing local count, byte, scratch and aggregate limits still apply. These workers do not increase the shared 1 GiB ceiling. Each tracked job uses one bounded coordinator account, and each account supports at most 65,536 independent hold handles. Known source data may be conservatively charged in multiple subsystems; there is no cross-account array or source-identity deduplication.
+[Prepared scene material counts](MATERIAL-COUNTS.md) now size sort demand without a synchronous face scan. Valid jobs reserve actual complete key/depth scratch rather than the full configured scratch ceiling; invalid sort requests still report limits before array allocation. All existing local count, byte, scratch and aggregate limits still apply. These workers do not increase the shared 1 GiB ceiling. Each tracked job uses one bounded coordinator account, and each account supports at most 65,536 independent hold handles. Known source data may be conservatively charged in multiple subsystems; there is no cross-account array or source-identity deduplication.
 
 ## Taking and releasing output
 

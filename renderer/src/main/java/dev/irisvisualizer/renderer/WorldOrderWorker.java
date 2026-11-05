@@ -39,8 +39,7 @@ public final class WorldOrderWorker implements AutoCloseable {
                 if(active!=null&&active.owner==owner||pending!=null&&pending.owner==owner||completed!=null&&completed.owner()==owner) { consumed=true;throw new IllegalArgumentException("Draw-order worker already owns this scene wrapper"); }
                 Objects.requireNonNull(view);Objects.requireNonNull(limits);long next=nextRevision();
                 var scene=owner.scene().orElseThrow(()->new IllegalArgumentException("Translucent ordering requires a successful CPU scene"));
-                if(scene.usage().knownPayloadBytes()>limits.workingBytes())throw new IllegalArgumentException("Sort source scene exceeds its declared working budget");
-                long reservation=Math.min(limits.workingBytes(),scene.usage().knownPayloadBytes()+limits.sortBytes());
+                long reservation=WorldDrawOrder.reservation(scene,limits);
                 if(reservation>workingBytes-(active==null?0:active.reservation))throw new IllegalArgumentException("Active and pending sort requests exceed the worker budget");
                 var job=new Job(next,reservation,owner,view,limits,scene.snapshot().id());var queued=status(job,Phase.QUEUED,List.of());
                 freshAdmission=memory==null?RenderMemory.Hold.none():memory.hold("Translucent ordering",reservation);job.admission=freshAdmission;

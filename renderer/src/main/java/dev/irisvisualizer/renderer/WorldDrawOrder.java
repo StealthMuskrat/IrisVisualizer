@@ -5,6 +5,7 @@ import java.util.function.BooleanSupplier;
 
 /** Stable global back-to-front centroid order; not a native OIT or intersecting-surface solution. */
 public final class WorldDrawOrder {
+    public static final int WORKING_BYTES_PER_FACE=2*(Long.BYTES+Double.BYTES);
     public record View(WorldSnapshot.Position anchor,double eyeX,double eyeY,double eyeZ,double targetX,double targetY,double targetZ) {
         public View { Objects.requireNonNull(anchor);double[] values={eyeX,eyeY,eyeZ,targetX,targetY,targetZ};for(double value:values)if(!Double.isFinite(value)||Math.abs(value)>1048576)throw new IllegalArgumentException("View exceeds finite relative-coordinate bounds");if(eyeX==targetX&&eyeY==targetY&&eyeZ==targetZ)throw new IllegalArgumentException("View direction is empty"); }
     }
@@ -22,15 +23,22 @@ public final class WorldDrawOrder {
         catch(ArithmeticException overflow) { WorldProblem.check(cancelled);return new WorldDrawOrder(scene,view,new long[0],List.of(new WorldProblem(WorldProblem.Code.COORDINATE,Optional.empty(),"World/view anchor difference exceeds its exact coordinate range"))); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return new WorldDrawOrder(scene,view,new long[0],List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to sort translucent faces; no partial order was published"))); }
     }
+    /** Metadata-only reservation; invalid sort requests still report their limit on the worker. */
+    static long reservation(WorldScene scene,Limits limits) {
+        long source=scene.usage().knownPayloadBytes(),scratch=(long)scene.usage().translucentFaces()*WORKING_BYTES_PER_FACE;
+        if(source>limits.workingBytes())throw new IllegalArgumentException("Sort source scene exceeds its declared working budget");
+        return Math.min(limits.workingBytes(),source+Math.min(limits.sortBytes(),scratch));
+    }
     private static WorldDrawOrder execute(WorldScene scene,View view,Limits limits,BooleanSupplier cancelled) {
-        int count=0;
-        for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.translucentCount()>limits.faces()-count)throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent face count exceeds the global sorting budget");count+=mesh.translucentCount(); }
-        long bytes=(long)count*32;if(bytes>limits.sortBytes()||scene.usage().knownPayloadBytes()+bytes>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent order/scratch or combined CPU payload budget exceeded");
+        int count=scene.usage().translucentFaces();
+        if(count>limits.faces())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent face count exceeds the global sorting budget");
+        long bytes=(long)count*WORKING_BYTES_PER_FACE;if(bytes>limits.sortBytes()||scene.usage().knownPayloadBytes()+bytes>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent order/scratch or combined CPU payload budget exceeded");
         long[] keys=new long[count],scratchKeys=new long[count];double[] depths=new double[count],scratchDepths=new double[count];
         double fx=view.targetX()-view.eyeX(),fy=view.targetY()-view.eyeY(),fz=view.targetZ()-view.eyeZ(),length=Math.sqrt(fx*fx+fy*fy+fz*fz);if(length<1e-8)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"View direction is too small for stable sorting");fx/=length;fy/=length;fz/=length;int at=0;
         for(int section=0;section<scene.sections().size();section++) {
             WorldProblem.check(cancelled);var mesh=scene.sections().get(section);long dx=Math.subtractExact(mesh.origin().x(),view.anchor().x()),dz=Math.subtractExact(mesh.origin().z(),view.anchor().z()),dy=(long)mesh.origin().y()-view.anchor().y();
             if(Math.abs((double)dx)>1048576||Math.abs((double)dy)>1048576||Math.abs((double)dz)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Section lies outside view-relative precision bounds");
+            if(mesh.translucentCount()>count-at)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Section translucent count exceeds the complete scene receipt");
             for(int index=0;index<mesh.translucentCount();index++) {
                 if((index&1023)==0)WorldProblem.check(cancelled);int face=mesh.translucentFace(index);
                 keys[at]=(long)section<<32|face&0xffffffffL;depths[at]=(dx+mesh.translucentCenter(index,0)-view.eyeX())*fx+(dy+mesh.translucentCenter(index,1)-view.eyeY())*fy+(dz+mesh.translucentCenter(index,2)-view.eyeZ())*fz;if(!Double.isFinite(depths[at]))throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Translucent depth is not finite");at++;

@@ -265,3 +265,7 @@ Native fluid faces now carry [whole-source material alpha groups](FLUID-MATERIAL
 ## Prepared world face bounds
 
 [World solid-face ranges](../renderer-gl/WORLD-RANGES.md) now accumulate six bounds floats per 128 original emitted faces, charged before output allocation. Opaque/cutout drawing can reject hidden portions of visible sections while coalescing adjacent surviving material spans; picking-index preparation copies the prepared bounds without rescanning vertices. Source identity, transparent ordering and existing memory ceilings remain intact. All 129 CPU/OpenGL sources compile; runtime/native/GPU validation and editor integration remain deferred, with unsupported previews disabled.
+
+## Prepared material counts
+
+[Verified section/scene material totals](MATERIAL-COUNTS.md) now carry surviving tint-required and translucent face counts from CPU count/emission into GPU validation and camera-sort admission. Sorting reserves actual primitive scratch within the existing ceilings; depth/key ordering and native identity remain intact. No face-sized arrays are added. All 129 CPU/OpenGL sources compile; runtime/native/GPU comparisons and editor integration remain deferred, with unsupported previews disabled.

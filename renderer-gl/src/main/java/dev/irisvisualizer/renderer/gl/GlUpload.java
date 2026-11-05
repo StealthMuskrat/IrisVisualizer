@@ -18,8 +18,8 @@ public final class GlUpload implements AutoCloseable {
     private record Materials(WorldTint tint,WorldLighting lighting) {}
     private final GlRenderer renderer;private final GlDevice device;private final WorldSnapshot.Source source;
     private final int totalSections,totalFaces,vertexWords,vertexBytes;private final long totalBytes;
-    private WorldScene scene;private WorldTint tint;private WorldLighting lighting;private int translucentFaces;private GlDevice.Allocation allocation;private GlScene completed;private final List<GlScene.Section> sections;
-    private Phase phase=Phase.VALIDATING;private int validatedSection,validatedFace,validationFace=-1,validatedPage,geometryCount,markerSections;
+    private WorldScene scene;private WorldTint tint;private WorldLighting lighting;private int translucentFaces,tintedFaces;private GlDevice.Allocation allocation;private GlScene completed;private final List<GlScene.Section> sections;
+    private Phase phase=Phase.VALIDATING;private int validatedSection,validatedFace,validatedPage,geometryCount,markerSections;
     private long markerBytes,uploadedBytes;private int page,pageRow,section,bufferSlot,vaoSlot,geometryVao,markerVao,vertexBuffer,indexBuffer,markerBuffer,vertexWordOffset,indexOffset,markerOffset;
     private GlUpload(GlRenderer renderer,WorldScene scene,WorldTint tint,WorldLighting lighting,GlDevice.Allocation allocation) {
         this.renderer=renderer;device=renderer.device;this.scene=scene;this.tint=tint;this.lighting=lighting;this.allocation=allocation;vertexWords=lighting==null?9:12;vertexBytes=vertexWords*4;source=scene.snapshot().source();
@@ -83,7 +83,7 @@ public final class GlUpload implements AutoCloseable {
                 switch(phase) {
                     case VALIDATING -> validateUnit();
                     case RESERVING -> {
-                        if(validatedFace!=totalFaces||markerBytes!=(long)scene.usage().markers()*12)throw new GlFailure(GlFailure.Code.STATE,"Upload validation counts disagree with the CPU scene");
+                        if(validatedFace!=totalFaces||translucentFaces!=scene.usage().translucentFaces()||tintedFaces!=scene.usage().tintedFaces()||markerBytes!=(long)scene.usage().markers()*12)throw new GlFailure(GlFailure.Code.STATE,"Upload validation counts disagree with the CPU scene");
                         device.expand(allocation,totalBytes,geometryCount*2+markerSections,scene.raster().pages().size(),geometryCount+markerSections);phase=scene.raster().pages().isEmpty()?Phase.SECTION:Phase.TEXTURE_STORAGE;
                     }
                     case TEXTURE_STORAGE -> {
@@ -149,10 +149,10 @@ public final class GlUpload implements AutoCloseable {
     private Step result(long start,int bytes,long storage,int actions,int work) { return new Step(progress(),bytes,storage,actions,work,System.nanoTime()-start); }
     private void validateUnit() {
         if(validatedSection<totalSections) {
-            var mesh=scene.sections().get(validatedSection);
-            if(validationFace<0) { mesh.requireRaster(scene.raster());if(mesh.indexCount()>0)geometryCount++;if(!mesh.markers().isEmpty())markerSections++;markerBytes+=(long)mesh.markers().size()*12;validationFace=0; }
-            else if(validationFace<mesh.faces().size()) { var face=mesh.faces().get(validationFace++);validatedFace++;if(face.source().alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)translucentFaces++;if(face.source().source().tintIndex()>=0&&tint==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Explicit native per-vertex tint colors are required for this scene"); }
-            else { validatedSection++;validationFace=-1; }
+            var mesh=scene.sections().get(validatedSection);mesh.requireRaster(scene.raster());var usage=mesh.usage().orElseThrow();
+            if(usage.tintedFaces()>0&&tint==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Explicit native per-vertex tint colors are required for this scene");
+            if(mesh.indexCount()>0)geometryCount++;if(!mesh.markers().isEmpty())markerSections++;markerBytes+=(long)mesh.markers().size()*12;
+            validatedFace+=usage.faces();translucentFaces+=usage.translucentFaces();tintedFaces+=usage.tintedFaces();validatedSection++;
         } else if(validatedPage<scene.raster().pages().size()) {
             var image=scene.raster().pages().get(validatedPage++);if(image.width()>device.maximumTextureSize()||image.height()>device.maximumTextureSize()||image.width()*4>device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.CAPABILITY,"Atlas exceeds hardware or bounded row-staging dimensions");
         } else phase=Phase.RESERVING;
