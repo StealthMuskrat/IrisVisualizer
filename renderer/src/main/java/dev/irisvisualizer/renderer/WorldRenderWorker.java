@@ -198,6 +198,7 @@ public final class WorldRenderWorker implements AutoCloseable {
     }
     private void execute(Job job) {
         WorldScene.Result result=null;WorldTint tint=null;List<WorldProblem> problems=List.of();List<ModelPlan.Problem> assets=List.of();boolean retained=false;
+        Throwable escapingFailure=null;
         try {
             try { result=build(job);if(result.requiresPlaceholder())problems=result.problems();else if(result.scene().orElseThrow().plan().models().tints().hasColors())tint=WorldTint.fromInput(result.scene().orElseThrow()); }
             catch(CancellationException superseded) { /* No stale result or status adoption. */ }
@@ -211,7 +212,11 @@ public final class WorldRenderWorker implements AutoCloseable {
                     else { if(problems.isEmpty()&&assets.isEmpty())problems=List.of(problem(WorldProblem.Code.WORKER,"CPU world rendering ended without a complete scene"));status=status(job,Phase.FAILED,problems,assets); }
                 }
             }
-        }finally { if(!retained&&result!=null)result.close(); }
+        }catch(RuntimeException|Error failure) { escapingFailure=failure;throw failure; }
+        finally {
+            try { if(!retained&&result!=null)result.close(); }
+            catch(RuntimeException|Error cleanup) { if(escapingFailure==null)throw cleanup;if(cleanup!=escapingFailure)escapingFailure.addSuppressed(cleanup); }
+        }
     }
     @Override public void close() {
         Throwable failure=null;

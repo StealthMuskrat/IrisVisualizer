@@ -265,7 +265,51 @@ public final class RendererCpuContracts {
         var corrupt=pngFixture();corrupt[corrupt.length-1]^=1;var failed=SourceImage.decode(SourceImage.Encoded.capture(identity,corrupt),LIVE);check(failed.requiresPlaceholder()&&failed.image().isEmpty()&&failed.receipt().isEmpty(),"bad PNG CRC withholds pixels and receipt");
         throwsType(CancellationException.class,()->SourceImage.decode(encoded,()->true),"decode cancellation separate");
     }
+    /** Test-only registration fault commits the set operation before throwing, so rollback has real work. */
+    private static final class OwnersFault implements AutoCloseable {
+        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Error primary,rollback;
+        @SuppressWarnings("unchecked") OwnersFault(RenderMemory memory,Error primary,Error rollback) {
+            this.memory=memory;this.primary=primary;this.rollback=rollback;
+            try {
+                field=RenderMemory.class.getDeclaredField("owners");field.setAccessible(true);original=(Set<RenderMemory.Account>)field.get(memory);
+                field.set(memory,new AbstractSet<RenderMemory.Account>() {
+                    @Override public int size() { return original.size(); }
+                    @Override public Iterator<RenderMemory.Account> iterator() { return original.iterator(); }
+                    @Override public boolean add(RenderMemory.Account value) { boolean added=original.add(value);if(OwnersFault.this.primary!=null)throw OwnersFault.this.primary;return added; }
+                    @Override public boolean remove(Object value) { boolean removed=original.remove(value);if(OwnersFault.this.rollback!=null)throw OwnersFault.this.rollback;return removed; }
+                });
+            }catch(ReflectiveOperationException failure) { throw new AssertionError("controlled account registration fault unavailable",failure); }
+        }
+        @Override public void close() {
+            try { field.set(memory,original); }catch(ReflectiveOperationException failure) { throw new AssertionError("account registration fault restore failed",failure); }
+        }
+    }
+    private static void accountRegistrationFailures() {
+        for(int kind=0;kind<3;kind++)for(boolean oom:new boolean[]{false,true})for(boolean cleanupError:new boolean[]{false,true}) {
+            try(var memory=new RenderMemory(new RenderMemory.Limits(100,kind==2?1:2));var old=kind==2?memory.hold("old",80):RenderMemory.Hold.none()) {
+                var before=memory.stats();Error primary=oom?new OutOfMemoryError("injected account registration OOM"):new AssertionError("injected account registration error");Error rollback=cleanupError?new AssertionError("injected post-remove rollback error"):null;
+                try(var fault=new OwnersFault(memory,primary,rollback)) {
+                    Throwable actual=null;
+                    try { switch(kind) { case 0->memory.open("new account");case 1->memory.hold("new hold",10);default->memory.holdReplacing("replacement",90,old); } }catch(RuntimeException|Error failure) { actual=failure; }
+                    check(actual==primary,"account registration preserves exact original Error");equal(cleanupError?1:0,primary.getSuppressed().length,"account rollback suppression count");if(cleanupError)check(primary.getSuppressed()[0]==rollback,"rollback error suppressed onto registration error");equal(before,memory.stats(),"registration failure preserves exact old admission and removes partial account");if(kind==2)equal(80L,old.bytes(),"failed registration consumes no replaced owner credit");
+                }
+                if(kind==2)try(var retry=memory.holdReplacing("retry",90,old)) { equal(0L,old.bytes(),"successful retry consumes old owner once");equal(90L,retry.bytes(),"successful retry retains exact replacement charge");equal(1,memory.stats().accounts(),"successful retry remains within one-account limit"); }
+                else try(var retry=memory.hold("retry",10)) { equal(10L,retry.bytes(),"failed registration leaves account slot reusable"); }
+                equal(0L,memory.stats().chargedBytes(),"registration/retry leaves no final charge");equal(0,memory.stats().accounts(),"registration/retry leaves no final account");
+            }
+        }
+        try(var memory=new RenderMemory(new RenderMemory.Limits(100,1))) {
+            var rollback=new AssertionError("injected failed-hold account close error");
+            try(var fault=new OwnersFault(memory,null,rollback)) {
+                Throwable actual=null;try { memory.hold("oversized",101); }catch(RuntimeException|Error failure) { actual=failure; }
+                check(actual instanceof RenderMemory.LimitException,"failed hold preserves original payload-limit rejection");check(actual.getSuppressed().length==1&&actual.getSuppressed()[0]==rollback,"account-close error suppressed onto payload-limit rejection");equal(0L,memory.stats().chargedBytes(),"failed oversized hold releases charge");equal(0,memory.stats().accounts(),"failed oversized hold removes empty account");
+            }
+            try(var retry=memory.hold("retry",10)) { equal(10L,retry.bytes(),"account close failure leaves slot reusable after rollback"); }
+            equal(0,memory.stats().accounts(),"failed-hold retry leaves no account");
+        }
+    }
     private static void memoryOwnership() {
+        accountRegistrationFailures();
         try(var memory=new RenderMemory(new RenderMemory.Limits(100,4))) {
             var owner=memory.hold("source",60);var input=RenderInput.own("immutable",owner);var retained=input.retain();input.close();
             equal(60L,memory.stats().chargedBytes(),"retained input remains charged");equal("immutable",retained.value(),"independent input live");

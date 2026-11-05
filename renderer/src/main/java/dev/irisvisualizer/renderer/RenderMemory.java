@@ -69,7 +69,7 @@ public final class RenderMemory implements AutoCloseable {
     public synchronized Hold hold(String label,long bytes) {
         var account=open(label);
         try { var hold=new Hold(new Holding(this,account));update(account,0,bytes);return hold; }
-        catch(RuntimeException|OutOfMemoryError failure) { account.close();throw failure; }
+        catch(RuntimeException|Error failure) { try { account.close(); }catch(RuntimeException|Error rollback) { if(rollback!=failure)failure.addSuppressed(rollback); }throw failure; }
     }
     /** Atomically replaces idle, caller-owned holds; active/shared owners never supply release credit. */
     public synchronized Hold holdReplacing(String label,long bytes,Hold... replaced) {
@@ -89,7 +89,7 @@ public final class RenderMemory implements AutoCloseable {
         }
         if(bytes-credit>limits.bytes()-charged||owners.size()+1-released>limits.accounts())throw new LimitException("Replacement renderer hold exceeds shared bytes or account allowance");
         var account=new Account(label);var result=new Hold(new Holding(this,account));var iterator=handles.iterator();
-        try { owners.add(account); }catch(RuntimeException|OutOfMemoryError failure) { owners.remove(account);throw failure; }
+        try { owners.add(account); }catch(RuntimeException|Error failure) { try { owners.remove(account); }catch(RuntimeException|Error rollback) { if(rollback!=failure)failure.addSuppressed(rollback); }throw failure; }
         // All allocations and rejection checks precede consuming the idle handles.
         while(iterator.hasNext())iterator.next().close();account.reserved=bytes;charged+=bytes;return result;
     }
@@ -100,7 +100,7 @@ public final class RenderMemory implements AutoCloseable {
     public synchronized Account open(String label) {
         Objects.requireNonNull(label);if(label.isBlank()||label.length()>128)throw new IllegalArgumentException("A bounded renderer memory owner label is required");
         if(closed)throw new IllegalStateException("Shared renderer admission is closed");if(owners.size()>=limits.accounts())throw new LimitException("Shared renderer memory account limit reached");
-        var owner=new Account(label);try { owners.add(owner); }catch(RuntimeException|OutOfMemoryError failure) { owners.remove(owner);throw failure; }return owner;
+        var owner=new Account(label);try { owners.add(owner); }catch(RuntimeException|Error failure) { try { owners.remove(owner); }catch(RuntimeException|Error rollback) { if(rollback!=failure)failure.addSuppressed(rollback); }throw failure; }return owner;
     }
     private void update(Account owner,long retained,long reserved) {
         if(retained<0||reserved<0||retained>limits.bytes()||reserved>limits.bytes())throw new LimitException("Shared renderer memory demand exceeds its bound");

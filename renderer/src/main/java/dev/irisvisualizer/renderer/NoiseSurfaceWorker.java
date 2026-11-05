@@ -87,22 +87,28 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
     }
     private void execute(Job job) {
         RenderInput<NoiseSurface> output=null;
+        Throwable escapingFailure=null;
         try {
-            synchronized(lock) { if(current(job))status=state(job,job.request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,List.of()); }
-            var request=job.request;var result=request.geometry().isPresent()?NoiseSurface.recolor(request.geometry().orElseThrow(),request.style().colors(),request.limits(),job::cancelled):NoiseSurface.prepare(request.volume(),request.style(),request.limits(),job::cancelled);
-            synchronized(lock) {
-                if(current(job)) {
-                    if(result.requiresPlaceholder())status=state(job,Phase.FAILED,result.problems());
-                    else {
-                        if(result.payloadBytes()>job.request.reservation())throw new IllegalStateException("Scalar output exceeds its admitted peak");
-                        output=RenderInput.own(result,job.admission.retain());var complete=new Completion(job.revision,output);var ready=state(job,Phase.READY,List.of());
-                        job.retainedBytes=result.payloadBytes();completed=complete;completedBytes=job.retainedBytes;status=ready;output=null;
+            try {
+                synchronized(lock) { if(current(job))status=state(job,job.request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,List.of()); }
+                var request=job.request;var result=request.geometry().isPresent()?NoiseSurface.recolor(request.geometry().orElseThrow(),request.style().colors(),request.limits(),job::cancelled):NoiseSurface.prepare(request.volume(),request.style(),request.limits(),job::cancelled);
+                synchronized(lock) {
+                    if(current(job)) {
+                        if(result.requiresPlaceholder())status=state(job,Phase.FAILED,result.problems());
+                        else {
+                            if(result.payloadBytes()>job.request.reservation())throw new IllegalStateException("Scalar output exceeds its admitted peak");
+                            output=RenderInput.own(result,job.admission.retain());var complete=new Completion(job.revision,output);var ready=state(job,Phase.READY,List.of());
+                            job.retainedBytes=result.payloadBytes();completed=complete;completedBytes=job.retainedBytes;status=ready;output=null;
+                        }
                     }
                 }
-            }
-        }catch(CancellationException cancellation) { /* Obsolete displays do not publish. */ }
-        catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } } }
-        finally { if(output!=null)output.close(); }
+            }catch(CancellationException cancellation) { /* Obsolete displays do not publish. */ }
+            catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } } }
+        }catch(RuntimeException|Error failure) { escapingFailure=failure;throw failure; }
+        finally {
+            try { if(output!=null)output.close(); }
+            catch(RuntimeException|Error cleanup) { if(escapingFailure==null)throw cleanup;if(cleanup!=escapingFailure)escapingFailure.addSuppressed(cleanup); }
+        }
     }
     /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
     private void startFailed(Job job,Throwable failure) {

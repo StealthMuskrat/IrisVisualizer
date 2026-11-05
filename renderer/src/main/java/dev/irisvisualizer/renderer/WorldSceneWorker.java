@@ -153,6 +153,7 @@ public final class WorldSceneWorker implements AutoCloseable {
     }
     private void execute(Job job) {
         WorldScene.Result result=null;List<WorldProblem> failure=List.of();boolean retained=false;
+        Throwable escapingFailure=null;
         try {
             try {
                 phase(job,Phase.PLANNING);var request=job.request;var plan=WorldScenePlan.plan(request.models(),request.visibility(),request.sceneLimits(),request.sectionLimits(),job::cancelled);
@@ -166,7 +167,11 @@ public final class WorldSceneWorker implements AutoCloseable {
                     else { var problems=result!=null?result.problems():failure;if(problems.isEmpty())problems=List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"CPU scene request ended without a complete result"));status=status(job,Phase.FAILED,problems); }
                 }
             }
-        }finally { if(!retained&&result!=null)result.close(); }
+        }catch(RuntimeException|Error escaped) { escapingFailure=escaped;throw escaped; }
+        finally {
+            try { if(!retained&&result!=null)result.close(); }
+            catch(RuntimeException|Error cleanup) { if(escapingFailure==null)throw cleanup;if(cleanup!=escapingFailure)escapingFailure.addSuppressed(cleanup); }
+        }
     }
     /** Cancels cooperatively; external scene leases keep the cache admission until their last release. */
     @Override public void close() {

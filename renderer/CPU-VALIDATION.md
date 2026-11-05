@@ -40,7 +40,7 @@ Execution is explicit rather than a CI trigger or default script side effect. As
 | Scalar front-face picking | Analytic plane distances, all six clipped normal planes in unit/greedy modes, closed near/far endpoints, decimal far-origin receipts, merged original-sample ties, original values and atomic face allowance |
 | RGBA builder | No incomplete publication, reversed source rows without cursor mutation, immutable pixel views and one-shot sealing |
 | Original PNG pixels and receipts | Standard-library-built tiny RGBA fixture, straight alpha/transparent RGB, unchanged original dimensions, identical-content receipts and bad CRC/limit rejection |
-| CPU admission lifetime | Retained input charge across original-input/coordinator close, lowered scratch and final account release |
+| CPU admission lifetime | Retained input charge, coordinator close and final release; account registration rollback for OOM/other Error, suppressed removal/close failures, unchanged replaced handles and bounded-slot retry |
 | Shared hold replacement | No credit for external owners, atomic rejection, duplicate handles, foreign coordinator rejection and bounded account reuse |
 | Completion inputs | Map/image completion ownership survives closure in an independently retained input without copying payload |
 

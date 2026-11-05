@@ -98,20 +98,26 @@ public final class ClientAssetWorker implements AutoCloseable {
     }
     private void execute(Job job) {
         RenderInput<ClientAssetSnapshot> output=null;
+        Throwable escapingFailure=null;
         try {
-            job.check();synchronized(lock) { if(current(job))status=state(job,Phase.READING,Optional.empty(),List.of()); }
-            var request=job.request;var assets=ClientAssets.load(request.selected(),request.expectedVersion(),request.limits(),job::cancelled);job.check();
-            if(assets.receipt().capturedAssetBytes()>request.limits().capturedBytes())throw new IllegalStateException("Loaded catalog exceeds its admitted capture");
-            output=RenderInput.own(assets,job.admission.retain());
-            synchronized(lock) {
-                if(current(job)) {
-                    var result=new Completion(job.revision,output);var ready=state(job,Phase.READY,Optional.of(assets.receipt()),List.of());
-                    job.retainedBytes=assets.receipt().capturedAssetBytes();completed=result;completedBytes=job.retainedBytes;status=ready;output=null;
+            try {
+                job.check();synchronized(lock) { if(current(job))status=state(job,Phase.READING,Optional.empty(),List.of()); }
+                var request=job.request;var assets=ClientAssets.load(request.selected(),request.expectedVersion(),request.limits(),job::cancelled);job.check();
+                if(assets.receipt().capturedAssetBytes()>request.limits().capturedBytes())throw new IllegalStateException("Loaded catalog exceeds its admitted capture");
+                output=RenderInput.own(assets,job.admission.retain());
+                synchronized(lock) {
+                    if(current(job)) {
+                        var result=new Completion(job.revision,output);var ready=state(job,Phase.READY,Optional.of(assets.receipt()),List.of());
+                        job.retainedBytes=assets.receipt().capturedAssetBytes();completed=result;completedBytes=job.retainedBytes;status=ready;output=null;
+                    }
                 }
-            }
-        }catch(CancellationException cancelled) { /* Obsolete selection never becomes a ready catalog. */ }
-        catch(IOException|RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } } }
-        finally { if(output!=null)output.close(); }
+            }catch(CancellationException cancelled) { /* Obsolete selection never becomes a ready catalog. */ }
+            catch(IOException|RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } } }
+        }catch(RuntimeException|Error failure) { escapingFailure=failure;throw failure; }
+        finally {
+            try { if(output!=null)output.close(); }
+            catch(RuntimeException|Error cleanup) { if(escapingFailure==null)throw cleanup;if(cleanup!=escapingFailure)escapingFailure.addSuppressed(cleanup); }
+        }
     }
     /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
     private void startFailed(Job job,Throwable failure) {
