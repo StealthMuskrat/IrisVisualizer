@@ -13,6 +13,7 @@ import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
+import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import java.util.zip.*;
 
@@ -515,8 +516,67 @@ public final class WorldCpuContracts {
             check(!owner.closed()&&!index.closed(),"startup failure and retry preserve independent scene/index owners");equal(12,samples.height(1),"startup failure does not alter native map samples");near(1,volume.value(0),"startup failure does not alter scalar samples");equal(0L,f.raster().tick(),"startup failure does not alter atlas clock");
         }
     }
+    /** Runs queued tasks explicitly; a recovery dispatch can independently fail before accepting its task. */
+    private static final class DrainExecutor extends AbstractExecutorService {
+        final List<Runnable> queued=new ArrayList<>();Throwable nextFailure;int attempts;boolean shutdown;
+        @Override public void execute(Runnable command) {
+            if(shutdown)throw new RejectedExecutionException("test executor closed");attempts++;
+            if(nextFailure!=null) { var failure=nextFailure;nextFailure=null;if(failure instanceof Error error)throw error;throw (RuntimeException)failure; }queued.add(Objects.requireNonNull(command));
+        }
+        void runNext() { queued.remove(0).run(); }
+        @Override public void shutdown() { shutdown=true; }
+        @Override public List<Runnable> shutdownNow() { shutdown=true;var result=List.copyOf(queued);queued.clear();return result; }
+        @Override public boolean isShutdown() { return shutdown; }
+        @Override public boolean isTerminated() { return shutdown&&queued.isEmpty(); }
+        @Override public boolean awaitTermination(long timeout,TimeUnit unit) { return isTerminated(); }
+        @Override public void close() { shutdownNow(); }
+    }
+    /** Test-only scene read fault: sizes and all reads after the first retain the original immutable data. */
+    private static final class FaultSections extends AbstractList<WorldMesh> {
+        final List<WorldMesh> original;final Runnable beforeFailure;final Error failure;boolean fired;
+        FaultSections(List<WorldMesh> original,Runnable beforeFailure,Error failure) { this.original=original;this.beforeFailure=beforeFailure;this.failure=failure; }
+        @Override public int size() { return original.size(); }
+        @Override public WorldMesh get(int index) { if(!fired) { fired=true;beforeFailure.run();throw failure; }return original.get(index); }
+    }
+    private static void replaceSections(WorldScene scene,List<WorldMesh> sections) {
+        try { var field=WorldScene.class.getDeclaredField("sections");field.setAccessible(true);field.set(scene,sections); }
+        catch(ReflectiveOperationException failure) { throw new AssertionError("controlled source fault unavailable",failure); }
+    }
+    private static void drainRecovery(WorldScene.Result owner,DrainExecutor executor,LongSupplier submit,Supplier<String> phase,LongSupplier revision,LongSupplier reserved,LongConsumer takeReady,List<WorldScene.Result> supplied,RenderMemory memory,int mode) {
+        equal(1L,submit.getAsLong(),"initial drain request admitted");var scene=owner.scene().orElseThrow();var original=scene.sections();var primary=new AssertionError("injected active scene read error");
+        Throwable dispatch=mode==2?new RejectedExecutionException("injected recovery rejection"):mode==3?new AssertionError("injected recovery dispatch error"):null;
+        var fault=new FaultSections(original,()->{ if(mode>0) { equal(2L,submit.getAsLong(),"replacement accepted during active source read");executor.nextFailure=dispatch; } },primary);replaceSections(scene,fault);
+        try {
+            Throwable actual=null;try { executor.runNext(); }catch(RuntimeException|Error failure) { actual=failure; }check(actual==primary&&fault.fired,"escaping task error retains exact identity");check(supplied.getFirst().closed()&&!owner.closed(),"failed active task releases only its fresh source");
+            long expected;
+            if(mode==0) {
+                equal("FAILED",phase.get(),"current aborted task reports failure");equal(1L,revision.getAsLong(),"failed active revision retained");equal(0L,reserved.getAsLong(),"failed active reservation released");equal(0L,memory.stats().chargedBytes(),"failed active shared charge released");check(executor.queued.isEmpty(),"no automatic task without pending work");expected=submit.getAsLong();equal(2L,expected,"later submission retries stopped drain");
+            }else if(mode==1) {
+                equal("QUEUED",phase.get(),"old failure does not overwrite newer pending status");equal(2L,revision.getAsLong(),"pending revision retained");equal(1,executor.queued.size(),"already accepted replacement automatically redispatched");check(!supplied.get(1).closed(),"replacement source remains live");expected=2;
+            }else {
+                equal("FAILED",phase.get(),"failed recovery dispatch reports pending failure");equal(2L,revision.getAsLong(),"rejected pending revision remains spent");check(supplied.get(1).closed(),"unscheduled replacement source consumed");equal(0L,reserved.getAsLong(),"recovery rejection releases local reservation");equal(0L,memory.stats().chargedBytes(),"recovery rejection releases shared admission");check(executor.queued.isEmpty(),"rejected recovery task absent");check(Arrays.stream(primary.getSuppressed()).anyMatch(value->value==dispatch),"recovery dispatch failure suppressed onto active error");expected=submit.getAsLong();equal(3L,expected,"fresh request retries failed recovery dispatch");
+            }
+            equal(1,executor.queued.size(),"exactly one surviving drain queued");check(memory.stats().chargedBytes()>0,"surviving source remains admitted");executor.runNext();equal("READY",phase.get(),"surviving task publishes complete output");equal(expected,revision.getAsLong(),"ready revision matches surviving request");check(executor.queued.isEmpty(),"no duplicate recovery drain");takeReady.accept(expected);equal(0L,reserved.getAsLong(),"transferred output absent from worker reservation");equal(0L,memory.stats().chargedBytes(),"closed completion releases shared source/output charge");for(var input:supplied)check(input.closed(),"all transferred worker scene wrappers eventually close");
+        }finally { replaceSections(scene,original); }
+    }
+    private static void workerDrainRecovery() {
+        var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+            for(int mode=0;mode<4;mode++) {
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new WorldOrderWorker(4*1024*1024,memory,()->executor)) {
+                    var supplied=new ArrayList<WorldScene.Result>();LongSupplier submit=()->{ var fresh=owner.retain();supplied.add(fresh);return worker.submit(fresh,orderView(f)); };
+                    drainRecovery(owner,executor,submit,()->worker.status().phase().name(),()->worker.status().revision(),worker::reservedBytes,revision->{ try(var result=worker.take(revision).orElseThrow()) { check(!result.order().requiresPlaceholder()&&result.order().scene()==owner.scene().orElseThrow(),"recovered order uses exact original scene");equal(12,result.order().size(),"recovered order retains complete face coverage"); } },supplied,memory,mode);worker.close();noWorkerCharge(memory);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new WorldPickIndexWorker(4*1024*1024,memory,()->executor)) {
+                    var supplied=new ArrayList<WorldScene.Result>();LongSupplier submit=()->{ var fresh=owner.retain();supplied.add(fresh);return worker.submit(fresh); };
+                    drainRecovery(owner,executor,submit,()->worker.status().phase().name(),()->worker.status().revision(),worker::reservedBytes,revision->{ try(var result=worker.take(revision).orElseThrow()) { check(result.index().matches(owner.scene().orElseThrow()),"recovered index uses exact original scene");var hit=result.index().query(ray(f.snapshot()),LIVE).hit().orElseThrow();equal(state(407),hit.state(),"recovered index preserves native state");equal(BIOME,hit.biome(),"recovered index preserves native biome"); } },supplied,memory,mode);worker.close();noWorkerCharge(memory);
+                }
+            }
+            check(!owner.closed(),"drain recovery preserves independently retained scene");
+        }
+    }
     private static void noWorkerCharge(RenderMemory memory) { equal(0L,memory.stats().chargedBytes(),"closed worker has no idle shared charge");equal(0,memory.stats().accounts(),"closed worker has no idle account"); }
     private static void remainingWorkerShutdownRecovery() {
+        workerDrainRecovery();
         workerStartRecovery();
         var f=fixture(2,128,false);var context=new MapSamples.Context(f.snapshot().source(),"test","shutdown","supplied synthetic samples");
         var samples=MapSamples.terrain(context,new MapSamples.Grid(0,0,2,1,1),new MapSamples.Vertical(-64,384),new int[]{0,12},new byte[]{1,1},LIVE);var colors=new MapRaster.ScalarStyle(-64,320,MapRamp.GRAYSCALE);
@@ -597,7 +657,7 @@ public final class WorldCpuContracts {
         group("transferred sort ownership and admission",WorldCpuContracts::transferredOrderAdmission);
         group("active sort cancellation and admission",WorldCpuContracts::activeOrderAdmission);
         group("scene-worker shutdown recovery",WorldCpuContracts::workerShutdownRecovery);
-        group("worker startup and remaining shutdown recovery",WorldCpuContracts::remainingWorkerShutdownRecovery);
+        group("worker startup drain and remaining shutdown recovery",WorldCpuContracts::remainingWorkerShutdownRecovery);
         group("explicit empty and unsupported markers",WorldCpuContracts::emptyAndMarkers);
         group("picking-index admission and source release",WorldCpuContracts::indexOwnership);
         System.out.println("PASS "+groups+" synthetic world contract groups; native/GPU parity is outside this harness.");

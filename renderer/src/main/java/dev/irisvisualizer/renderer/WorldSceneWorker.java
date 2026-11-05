@@ -106,18 +106,50 @@ public final class WorldSceneWorker implements AutoCloseable {
             if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
         }
     }
+    /** An escaping job failure may publish only for that job, never over a newer pending request. */
+    private void taskFailed(Job job,Throwable failure) {
+        synchronized(lock) {
+            if(!closed&&job.revision==revision&&!job.cancelled.get()&&completed==null)try { status=status(job,Phase.FAILED,List.of(problem(failure,"CPU scene drain failed"))); }
+            catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
+        }
+    }
+    /** The previous drain has unwound; keep an already accepted latest request dispatchable. */
+    private void drainFailed(Throwable failure) {
+        synchronized(lock) {
+            if(active!=null)taskFailed(active,failure);active=null;scheduled=false;
+            try { refreshAdmission(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(!closed&&pending!=null) {
+                var next=pending;scheduled=true;
+                try { executor.execute(this::drain); }
+                catch(RuntimeException|Error dispatch) {
+                    try { startFailed(next,dispatch); }catch(RuntimeException|Error cleanup) { if(cleanup!=dispatch)dispatch.addSuppressed(cleanup); }
+                    if(dispatch!=failure)failure.addSuppressed(dispatch);
+                }
+            }
+        }
+    }
     private void drain() {
+        Throwable drainFailure=null;
         try {
             while(true) {
                 Job job;synchronized(lock) {
-                    if(closed||pending==null) { active=null;scheduled=false;refreshAdmission();return; }
+                    if(closed||pending==null) { active=null;refreshAdmission();scheduled=false;return; }
                     job=pending;job.admissionBytes=Math.max(job.request.sceneLimits().workingBytes(),cache.stats().knownPayloadBytes()+job.request.inputBytes());pending=null;active=job;refreshAdmission();
                 }
+                Throwable failure=null;
                 try { execute(job); }
-                finally { synchronized(lock) { active=null;job=null;refreshAdmission(); } }
+                catch(RuntimeException|Error error) { failure=error;taskFailed(job,error);throw error; }
+                finally {
+                    synchronized(lock) {
+                        active=null;job=null;
+                        try { refreshAdmission(); }catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+                    }
+                }
             }
-        }catch(RuntimeException|Error failure) { synchronized(lock) { active=null;scheduled=false;refreshAdmission(); }throw failure; }
-        finally { synchronized(lock) { if(closed)cache.close(); } }
+        }catch(RuntimeException|Error failure) { drainFailure=failure;drainFailed(failure);throw failure; }
+        finally {
+            synchronized(lock) { if(closed)try { cache.close(); }catch(RuntimeException|Error cleanup) { if(drainFailure==null)throw cleanup;if(cleanup!=drainFailure)drainFailure.addSuppressed(cleanup); } }
+        }
     }
     private void execute(Job job) {
         WorldScene.Result result=null;List<WorldProblem> failure=List.of();boolean retained=false;

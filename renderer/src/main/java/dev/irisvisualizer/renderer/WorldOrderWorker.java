@@ -76,30 +76,69 @@ public final class WorldOrderWorker implements AutoCloseable {
             if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
         }
     }
-    private void drain() {
-        while(true) {
-            Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
-            try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;long retained=job.retainedBytes;boolean release=job.releaseAdmission;job=null;if(release) { hold.shrinkTo(retained);hold.close(); } } }
+    /** An escaping job failure may publish only for that job, never over a newer pending request. */
+    private void taskFailed(Job job,Throwable failure) {
+        synchronized(lock) {
+            if(!closed&&job.revision==revision&&!job.cancelled.get()&&completed==null)try { status=status(job,Phase.FAILED,List.of(problem(failure,"Translucent order drain failed"))); }
+            catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
         }
     }
-    private void execute(Job job) {
-        WorldDrawOrder result=null;List<WorldProblem> problems=List.of();boolean retained=false;
-        try {
-            synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,Phase.SORTING,List.of()); }
-            try { result=WorldDrawOrder.prepare(job.owner.scene().orElseThrow(),job.view,job.limits,job::cancelled);if(result.requiresPlaceholder())problems=result.problems(); }
-            catch(CancellationException superseded) { /* Superseded sorting never replaces newer status. */ }
-            catch(RuntimeException|OutOfMemoryError failure) { problems=List.of(problem(failure,"Translucent face sorting failed")); }
-            synchronized(lock) {
-                if(!closed&&revision==job.revision&&!job.cancelled.get()) {
-                    if(result!=null&&!result.requiresPlaceholder()) { var ready=status(job,Phase.READY,List.of());long bytes=job.owner.scene().orElseThrow().usage().knownPayloadBytes()+result.bytes();var hold=job.admission.retain();Completion value;
-                        try { value=new Completion(job.revision,job.owner,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
-                        job.retainedBytes=bytes;completed=value;completedReservation=bytes;retained=true;status=ready; }
-                    else { if(problems.isEmpty())problems=List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Sorting ended without a complete face order"));status=status(job,Phase.FAILED,problems); }
+    /** The previous drain has unwound; keep an already accepted latest request dispatchable. */
+    private void drainFailed(Throwable failure) {
+        synchronized(lock) {
+            if(active!=null)taskFailed(active,failure);active=null;scheduled=false;
+            if(!closed&&pending!=null) {
+                var next=pending;scheduled=true;
+                try { executor.execute(this::drain); }
+                catch(RuntimeException|Error dispatch) {
+                    try { startFailed(next,dispatch); }catch(RuntimeException|Error cleanup) { if(cleanup!=dispatch)dispatch.addSuppressed(cleanup); }
+                    if(dispatch!=failure)failure.addSuppressed(dispatch);
                 }
             }
-        }catch(RuntimeException|OutOfMemoryError failure) {
-            synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,Phase.FAILED,List.of(problem(failure,"Translucent order publication failed"))); }
-        }finally { if(!retained)job.owner.close();job.releaseAdmission=true; }
+        }
+    }
+    private void drain() {
+        try {
+            while(true) {
+                Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
+                Throwable failure=null;
+                try { execute(job); }
+                catch(RuntimeException|Error error) { failure=error;taskFailed(job,error);throw error; }
+                finally {
+                    synchronized(lock) {
+                        active=null;var hold=job.admission;long retained=job.retainedBytes;boolean release=job.releaseAdmission;job=null;
+                        try { if(release)try(hold) { hold.shrinkTo(retained); } }
+                        catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+                    }
+                }
+            }
+        }catch(RuntimeException|Error failure) { drainFailed(failure);throw failure; }
+    }
+    private void execute(Job job) {
+        WorldDrawOrder result=null;List<WorldProblem> problems=List.of();boolean retained=false;Throwable escapingFailure=null;
+        try {
+            try {
+                synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,Phase.SORTING,List.of()); }
+                try { result=WorldDrawOrder.prepare(job.owner.scene().orElseThrow(),job.view,job.limits,job::cancelled);if(result.requiresPlaceholder())problems=result.problems(); }
+                catch(CancellationException superseded) { /* Superseded sorting never replaces newer status. */ }
+                catch(RuntimeException|OutOfMemoryError failure) { problems=List.of(problem(failure,"Translucent face sorting failed")); }
+                synchronized(lock) {
+                    if(!closed&&revision==job.revision&&!job.cancelled.get()) {
+                        if(result!=null&&!result.requiresPlaceholder()) { var ready=status(job,Phase.READY,List.of());long bytes=job.owner.scene().orElseThrow().usage().knownPayloadBytes()+result.bytes();var hold=job.admission.retain();Completion value;
+                            try { value=new Completion(job.revision,job.owner,result,hold); }catch(RuntimeException|OutOfMemoryError failure) { hold.close();throw failure; }
+                            job.retainedBytes=bytes;completed=value;completedReservation=bytes;retained=true;status=ready; }
+                        else { if(problems.isEmpty())problems=List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Sorting ended without a complete face order"));status=status(job,Phase.FAILED,problems); }
+                    }
+                }
+            }catch(RuntimeException|OutOfMemoryError failure) {
+                synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,Phase.FAILED,List.of(problem(failure,"Translucent order publication failed"))); }
+            }
+        }catch(RuntimeException|Error failure) { escapingFailure=failure;throw failure; }
+        finally {
+            try { if(!retained)job.owner.close(); }
+            catch(RuntimeException|Error cleanup) { if(escapingFailure==null)throw cleanup;if(cleanup!=escapingFailure)escapingFailure.addSuppressed(cleanup); }
+            finally { job.releaseAdmission=true; }
+        }
     }
     @Override public void close() {
         Throwable failure=null;

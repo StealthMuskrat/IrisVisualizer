@@ -91,8 +91,43 @@ public final class WorldPickWorker implements AutoCloseable {
             if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
         }
     }
+    /** An escaping job failure may publish only for that job, never over a newer pending request. */
+    private void taskFailed(Job job,Throwable failure) {
+        synchronized(lock) {
+            if(!closed&&job.revision==revision&&!job.cancelled.get()&&completed==null)try { status=failed(job,failure); }
+            catch(RuntimeException|Error publication) { if(publication!=failure)failure.addSuppressed(publication); }
+        }
+    }
+    /** The previous drain has unwound; keep an already accepted latest request dispatchable. */
+    private void drainFailed(Throwable failure) {
+        synchronized(lock) {
+            if(active!=null)taskFailed(active,failure);active=null;scheduled=false;
+            if(!closed&&pending!=null) {
+                var next=pending;scheduled=true;
+                try { executor.execute(this::drain); }
+                catch(RuntimeException|Error dispatch) {
+                    try { startFailed(next,dispatch); }catch(RuntimeException|Error cleanup) { if(cleanup!=dispatch)dispatch.addSuppressed(cleanup); }
+                    if(dispatch!=failure)failure.addSuppressed(dispatch);
+                }
+            }
+        }
+    }
     private void drain() {
-        while(true) { Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;job=null;hold.close(); } } }
+        try {
+            while(true) {
+                Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }
+                Throwable failure=null;
+                try { execute(job); }
+                catch(RuntimeException|Error error) { failure=error;taskFailed(job,error);throw error; }
+                finally {
+                    synchronized(lock) {
+                        active=null;var hold=job.admission;job=null;
+                        try { hold.close(); }
+                        catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+                    }
+                }
+            }
+        }catch(RuntimeException|Error failure) { drainFailed(failure);throw failure; }
     }
     /** Caller-owned indices and atlas frames are never closed by the worker. */
     @Override public void close() {
