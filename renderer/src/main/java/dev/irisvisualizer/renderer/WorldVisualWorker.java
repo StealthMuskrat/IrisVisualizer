@@ -43,7 +43,7 @@ public final class WorldVisualWorker implements AutoCloseable {
             if(!scheduled) {
                 scheduled=true;
                 try { executor.execute(this::drain); }
-                catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;job.admission.close();status=status(next,Phase.FAILED,request,List.of(problem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,"The CPU visual worker could not be started")),List.of()); }
+                catch(RuntimeException|Error failure) { startFailed(job,failure); }
             }
             return next;
         }
@@ -65,6 +65,16 @@ public final class WorldVisualWorker implements AutoCloseable {
     private long nextRevision() { if(revision==Long.MAX_VALUE)throw new IllegalStateException("Visual revision counter exhausted");return revision+1; }
     private static WorldProblem problem(WorldProblem.Code code,String reason) { return new WorldProblem(code,Optional.empty(),reason); }
     private static Status status(long revision,Phase phase,WorldVisuals.Request request,List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Status(revision,phase,Optional.of(request.source()),Optional.of(request.snapshotId()),problems,assets); }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { job.admission.close(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=status(job.revision,Phase.FAILED,job.request,List.of(problem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,"The CPU visual worker could not be started")),List.of()); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
+    }
     private void drain() {
         while(true) {
             Job job;

@@ -49,7 +49,7 @@ public final class MapRasterWorker implements AutoCloseable {
             var job=new Job(next,request);var queued=new Status(next,Phase.QUEUED,Optional.of(request.samples().context()),List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Map colorization",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.admission());
             cancelOwned();pending=job;revision=next;status=queued;
-            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;job.admission.close();status=failed(next,request.samples().context(),failure); } }return next;
+            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }return next;
         }
     }
     /** Consumes a detached native map input after destination admission or rejection. */
@@ -93,6 +93,16 @@ public final class MapRasterWorker implements AutoCloseable {
             }
         }catch(CancellationException cancelled) { /* Superseded inputs never publish a frame. */ }
         catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get()) { dropCompleted();status=failed(revision,job.request.samples().context(),failure); } } }
+    }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { job.admission.close(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=failed(job.revision,job.request.samples().context(),failure); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
     }
     private void drain() {
         while(true) {

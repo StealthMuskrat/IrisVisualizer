@@ -50,7 +50,7 @@ public final class WorldOrderWorker implements AutoCloseable {
                 cancelOwned();pending=job;consumed=true;revision=next;status=queued;
                 if(!scheduled) {
                     scheduled=true;try { executor.execute(this::drain); }
-                    catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;owner.close();job.admission.close();status=status(job,Phase.FAILED,List.of(problem(failure,"Draw-order worker could not be started"))); }
+                    catch(RuntimeException|Error failure) { startFailed(job,failure); }
                 }
                 return next;
             }
@@ -65,6 +65,17 @@ public final class WorldOrderWorker implements AutoCloseable {
     public Optional<Completion> take(long expectedRevision) { synchronized(lock) { if(closed||revision!=expectedRevision||completed==null)return Optional.empty();var result=Optional.of(completed);var delivered=new Status(revision,Phase.DELIVERED,status.snapshotId(),List.of());completed=null;completedReservation=0;status=delivered;return result; } }
     private static Status status(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.snapshotId),problems); }
     private static WorldProblem problem(Throwable error,String reason) { return new WorldProblem(error instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,Optional.empty(),reason+": "+error.getClass().getSimpleName()); }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { job.owner.close(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { job.admission.close(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=status(job,Phase.FAILED,List.of(problem(failure,"Draw-order worker could not be started"))); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
+    }
     private void drain() {
         while(true) {
             Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }

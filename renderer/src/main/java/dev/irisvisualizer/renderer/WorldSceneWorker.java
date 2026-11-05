@@ -67,7 +67,7 @@ public final class WorldSceneWorker implements AutoCloseable {
             if(!scheduled) {
                 scheduled=true;
                 try { executor.execute(this::drain); }
-                catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;refreshAdmission();status=status(job,Phase.FAILED,List.of(problem(failure,"The CPU scene worker could not be started"))); }
+                catch(RuntimeException|Error failure) { startFailed(job,failure); }
             }
             return next;
         }
@@ -96,6 +96,16 @@ public final class WorldSceneWorker implements AutoCloseable {
     private static WorldProblem problem(Throwable failure,String reason) { return new WorldProblem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,Optional.empty(),reason+": "+failure.getClass().getSimpleName()); }
     private static Status status(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.request.models().snapshot().source()),problems); }
     private void phase(Job job,Phase phase) { synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get())status=status(job,phase,List.of()); } }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { refreshAdmission(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=status(job,Phase.FAILED,List.of(problem(failure,"The CPU scene worker could not be started"))); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
+    }
     private void drain() {
         try {
             while(true) {

@@ -51,7 +51,7 @@ public final class WorldPickWorker implements AutoCloseable {
             var job=new Job(next,reservation,request);var queued=state(job,Phase.QUEUED,List.of());
             if(memory!=null)job.admission=memory.holdReplacing("Pointer picking request",reservation,pending==null?RenderMemory.Hold.none():pending.admission);
             cancelOwned();pending=job;revision=next;status=queued;
-            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;job.admission.close();status=failed(job,failure); } }return next;
+            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }return next;
         }
     }
     public Status status() { synchronized(lock) { return status; } }
@@ -80,6 +80,16 @@ public final class WorldPickWorker implements AutoCloseable {
             }
         }catch(CancellationException cancelled) { synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get())status=failed(job,cancelled); } }
         catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get()) { completed=null;status=failed(job,failure); } } }
+    }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { job.admission.close(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=failed(job,failure); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
     }
     private void drain() {
         while(true) { Job job;synchronized(lock) { if(closed||pending==null) { active=null;scheduled=false;return; }job=pending;pending=null;active=job; }try { execute(job); }finally { synchronized(lock) { active=null;var hold=job.admission;job=null;hold.close(); } } }

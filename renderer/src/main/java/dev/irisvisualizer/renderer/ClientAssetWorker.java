@@ -78,7 +78,7 @@ public final class ClientAssetWorker implements AutoCloseable {
             var job=new Job(next,request);var queued=state(job,Phase.QUEUED,Optional.empty(),List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Client asset capture",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.input().admission());
             cancelOwned();pending=job;revision=next;status=queued;
-            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;job.admission.close();status=failed(job,failure); } }
+            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }
             return next;
         }
     }
@@ -112,6 +112,16 @@ public final class ClientAssetWorker implements AutoCloseable {
         }catch(CancellationException cancelled) { /* Obsolete selection never becomes a ready catalog. */ }
         catch(IOException|RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } } }
         finally { if(output!=null)output.close(); }
+    }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { job.admission.close(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=failed(job,failure); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
     }
     private void drain() {
         while(true) {

@@ -99,7 +99,7 @@ public final class WorldRenderWorker implements AutoCloseable {
             if(active!=null)active.cancelled.set(true);if(pending!=null)pending.cancelled.set(true);dropCompleted();pending=job;revision=next;status=queued;
             if(!scheduled) {
                 scheduled=true;try { executor.execute(this::drain); }
-                catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;refreshAdmission();status=status(job,Phase.FAILED,List.of(problem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,"The CPU render worker could not be started")),List.of()); }
+                catch(RuntimeException|Error failure) { startFailed(job,failure); }
             }
             return next;
         }
@@ -118,6 +118,16 @@ public final class WorldRenderWorker implements AutoCloseable {
     private static WorldProblem problem(WorldProblem.Code code,String reason) { return new WorldProblem(code,Optional.empty(),reason); }
     private static Status status(Job job,Phase phase,List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Status(job.revision,phase,Optional.of(job.request.snapshot().source()),Optional.of(job.request.snapshot().id()),problems,assets); }
     private void phase(Job job,Phase phase) { synchronized(lock) { if(!closed&&revision==job.revision&&!job.cancelled.get())status=status(job,phase,List.of(),List.of()); } }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { refreshAdmission(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=status(job,Phase.FAILED,List.of(problem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,"The CPU render worker could not be started")),List.of()); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
+    }
     private void drain() {
         try {
             while(true) {

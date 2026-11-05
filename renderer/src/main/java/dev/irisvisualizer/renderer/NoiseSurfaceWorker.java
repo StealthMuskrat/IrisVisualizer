@@ -60,7 +60,7 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
             var job=new Job(next,request);var queued=state(job,Phase.QUEUED,List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Scalar surface preparation",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.input().admission());
             cancelOwned();pending=job;revision=next;status=queued;
-            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|OutOfMemoryError failure) { scheduled=false;pending=null;job.admission.close();status=failed(job,failure); } }return next;
+            if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }return next;
         }
     }
     /** Consumes a captured scalar owner after destination admission, including all rejection/failure outcomes. */
@@ -103,6 +103,16 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
         }catch(CancellationException cancellation) { /* Obsolete displays do not publish. */ }
         catch(RuntimeException|OutOfMemoryError failure) { synchronized(lock) { if(current(job)) { dropCompleted();status=failed(job,failure); } } }
         finally { if(output!=null)output.close(); }
+    }
+    /** Caller holds the worker lock; a task that was never scheduled must not keep the dispatch gate set. */
+    private void startFailed(Job job,Throwable failure) {
+        scheduled=false;pending=null;boolean cleanupFailed=false;
+        try { job.admission.close(); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        try { status=failed(job,failure); }catch(RuntimeException|Error cleanup) { cleanupFailed=true;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        // Preserve existing FAILED-token returns for ordinary rejection/OOM; propagate other errors after cleanup.
+        if(cleanupFailed||failure instanceof Error&&!(failure instanceof OutOfMemoryError)) {
+            if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;
+        }
     }
     private void drain() {
         while(true) {

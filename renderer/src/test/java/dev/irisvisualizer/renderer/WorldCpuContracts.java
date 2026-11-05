@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BooleanSupplier;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import java.util.zip.*;
 
 /** Synthetic world pipeline contracts. No client archive is opened and no native parity is claimed. */
@@ -441,8 +443,81 @@ public final class WorldCpuContracts {
             }
         }
     }
+    /** Rejects the first scheduling attempt without running it, then queues a retry for deterministic inspection. */
+    private static final class StartExecutor extends AbstractExecutorService {
+        final Throwable failure;final List<Runnable> queued=new ArrayList<>();int attempts;boolean shutdown;
+        StartExecutor(int kind) { failure=switch(kind) { case 0->new RejectedExecutionException("injected task rejection");case 1->new OutOfMemoryError("injected task startup OOM");default->new AssertionError("injected task startup error"); }; }
+        @Override public void execute(Runnable command) {
+            if(shutdown)throw new RejectedExecutionException("test executor closed");Objects.requireNonNull(command);
+            if(++attempts==1) { if(failure instanceof Error error)throw error;throw (RuntimeException)failure; }queued.add(command);
+        }
+        @Override public void shutdown() { shutdown=true; }
+        @Override public List<Runnable> shutdownNow() { shutdown=true;var result=List.copyOf(queued);queued.clear();return result; }
+        @Override public boolean isShutdown() { return shutdown; }
+        @Override public boolean isTerminated() { return shutdown&&queued.isEmpty(); }
+        @Override public boolean awaitTermination(long timeout,TimeUnit unit) { return isTerminated(); }
+        @Override public void close() { shutdownNow(); }
+    }
+    private static void startRecovery(StartExecutor executor,LongSupplier submit,Supplier<String> phase,LongSupplier revision,Supplier<String> code,String ordinaryCode,RenderMemory memory,Runnable rejectedChecks,AutoCloseable worker) {
+        Throwable actual=null;try { equal(1L,submit.getAsLong(),"ordinary scheduling rejection returns its admitted revision"); }catch(RuntimeException|Error failure) { actual=failure; }
+        if(executor.failure instanceof Error&&!(executor.failure instanceof OutOfMemoryError))check(actual==executor.failure,"unexpected startup Error preserves exact identity");else if(actual!=null)throw new AssertionError("ordinary rejection/OOM must retain FAILED-token behavior",actual);
+        equal(1,executor.attempts,"failed dispatch attempted once");check(executor.queued.isEmpty(),"rejected task was never queued");equal("FAILED",phase.get(),"startup failure publishes failed phase");equal(1L,revision.getAsLong(),"accepted failed revision is retained");equal(executor.failure instanceof OutOfMemoryError?"MEMORY":ordinaryCode,code.get(),"startup failure classification retained");equal(0L,memory.stats().chargedBytes(),"unscheduled input and scratch charges released");rejectedChecks.run();
+        equal(2L,submit.getAsLong(),"retry spends exactly one new revision");equal(2,executor.attempts,"retry reaches executor after dispatch gate reset");equal(1,executor.queued.size(),"one latest retry task queued");equal("QUEUED",phase.get(),"retry queued phase");check(memory.stats().chargedBytes()>0,"queued retry remains admitted");
+        try { worker.close(); }catch(Exception failure) { throw new AssertionError("startup recovery close failed",failure); }check(executor.isTerminated(),"close releases queued retry task");noWorkerCharge(memory);
+    }
+    private static void workerStartRecovery() {
+        var f=fixture(2,128,false);var context=new MapSamples.Context(f.snapshot().source(),"test","startup","supplied synthetic samples");var colors=new MapRaster.ScalarStyle(-64,320,MapRamp.GRAYSCALE);
+        var samples=MapSamples.terrain(context,new MapSamples.Grid(0,0,2,1,1),new MapSamples.Vertical(-64,384),new int[]{0,12},new byte[]{1,1},LIVE);
+        var volume=NoiseVolume.capture(context,new NoiseVolume.Grid(new MapSamples.Grid(0,0,1,1,1),new MapSamples.Vertical(0,1)),new double[]{1},new byte[]{1},NoiseVolume.Limits.DEFAULT,LIVE);var style=new NoiseSurface.Style(1,1,colors);var surface=NoiseSurface.prepare(volume,style,NoiseSurface.Limits.DEFAULT,LIVE);
+        var visualLimits=new WorldVisuals.Limits(4,4,4,16,16,1024*1024,4*1024*1024);var visuals=WorldVisuals.Request.capture(f.assets(),f.snapshot(),List.of(new WorldVisuals.EmptyChoice(0)),new int[2],0,0,visualLimits,LIVE);
+        var encoded=SourceImage.Encoded.capture(new SourceImage.Identity("fixtures/startup.png",1),pixel(128));var imageLimits=new SourceImage.Limits(8,64,1024,256,1024*1024);
+        try(var cache=new WorldSectionCache();var owner=build(f,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+            for(int kind=0;kind<3;kind++) {
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new ClientAssetWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new ClientAssetWorker.Request(Path.of("never-opened-startup-client.jar"),BlockModels.PROFILE,new ClientAssets.Limits(1024,1024,1024,16,4096))),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed archive startup holds no reservation");check(worker.take(1).isEmpty(),"failed archive task has no output"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new ImageDecodeWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new ImageDecodeWorker.Request(encoded,imageLimits)),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed decode startup holds no reservation");check(worker.take(1).isEmpty(),"failed decode task has no output"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new MapRasterWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new MapRasterWorker.Request(samples,colors)),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed map startup holds no reservation");check(worker.take(1).isEmpty(),"failed map task has no output"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new NoiseSurfaceWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new NoiseSurfaceWorker.Request(volume,style,new NoiseSurface.Limits(16,1024*1024))),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed scalar startup holds no reservation");check(worker.take(1).isEmpty(),"failed scalar task has no output"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new WorldVisualWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(visuals),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ check(worker.take(1).isEmpty(),"failed visual task has no output"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new WorldSceneWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new WorldSceneWorker.Request(f.models(),f.visibility(),f.raster(),f.plan().limits(),f.plan().sectionLimits())),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ check(worker.take(1).isEmpty(),"failed scene task has no output");check(!worker.cacheStats().closed(),"failed scene startup keeps cache available for retry"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new WorldRenderWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new WorldRenderWorker.Request(visuals,WorldVisibility.Input.keepAll(f.snapshot()),f.plan().limits(),f.plan().sectionLimits(),4*1024*1024)),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ check(worker.take(1).isEmpty(),"failed render task has no output");check(!worker.cacheStats().closed(),"failed render startup keeps cache available for retry"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new AtlasFrameWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(AtlasFrameWorker.Request.capture(f.raster(),1,0)),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"ATLAS",memory,()->{ equal(0L,worker.reservedBytes(),"failed atlas startup holds no reservation");check(worker.take(1).isEmpty(),"failed atlas task has no output"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new WorldPickWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new WorldPickWorker.Request(index,ray(f.snapshot()))),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed world query startup holds no reservation");check(worker.take(1).isEmpty()&&!index.closed(),"failed world query preserves borrowed index"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new NoisePickWorker(4*1024*1024,memory,()->executor)) {
+                    startRecovery(executor,()->worker.submit(new NoisePickWorker.Request(surface,new WorldRay(new WorldSnapshot.Position(0,0,0),0.5,0.5,3,0,0,-1,0,10),new NoisePick.Options(16))),()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed scalar query startup holds no reservation");check(worker.take(1).isEmpty(),"failed scalar query has no output"); },worker);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new WorldOrderWorker(4*1024*1024,memory,()->executor)) {
+                    var submitted=new ArrayList<WorldScene.Result>();LongSupplier submit=()->{ var fresh=owner.retain();submitted.add(fresh);return worker.submit(fresh,orderView(f)); };
+                    startRecovery(executor,submit,()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed scene-owning startup holds no reservation");check(submitted.getFirst().closed()&&!owner.closed(),"failed startup consumes only its fresh scene wrapper");check(worker.take(1).isEmpty(),"failed scene-owning task has no output"); },worker);for(var supplied:submitted)check(supplied.closed(),"close consumes queued retry scene wrapper");
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new StartExecutor(kind);var worker=new WorldPickIndexWorker(4*1024*1024,memory,()->executor)) {
+                    var submitted=new ArrayList<WorldScene.Result>();LongSupplier submit=()->{ var fresh=owner.retain();submitted.add(fresh);return worker.submit(fresh); };
+                    startRecovery(executor,submit,()->worker.status().phase().name(),()->worker.status().revision(),()->worker.status().problems().getFirst().code().name(),"WORKER",memory,()->{ equal(0L,worker.reservedBytes(),"failed scene-owning startup holds no reservation");check(submitted.getFirst().closed()&&!owner.closed(),"failed startup consumes only its fresh scene wrapper");check(worker.take(1).isEmpty(),"failed scene-owning task has no output"); },worker);for(var supplied:submitted)check(supplied.closed(),"close consumes queued retry scene wrapper");
+                }
+            }
+            check(!owner.closed()&&!index.closed(),"startup failure and retry preserve independent scene/index owners");equal(12,samples.height(1),"startup failure does not alter native map samples");near(1,volume.value(0),"startup failure does not alter scalar samples");equal(0L,f.raster().tick(),"startup failure does not alter atlas clock");
+        }
+    }
     private static void noWorkerCharge(RenderMemory memory) { equal(0L,memory.stats().chargedBytes(),"closed worker has no idle shared charge");equal(0,memory.stats().accounts(),"closed worker has no idle account"); }
     private static void remainingWorkerShutdownRecovery() {
+        workerStartRecovery();
         var f=fixture(2,128,false);var context=new MapSamples.Context(f.snapshot().source(),"test","shutdown","supplied synthetic samples");
         var samples=MapSamples.terrain(context,new MapSamples.Grid(0,0,2,1,1),new MapSamples.Vertical(-64,384),new int[]{0,12},new byte[]{1,1},LIVE);var colors=new MapRaster.ScalarStyle(-64,320,MapRamp.GRAYSCALE);
         var volume=NoiseVolume.capture(context,new NoiseVolume.Grid(new MapSamples.Grid(0,0,1,1,1),new MapSamples.Vertical(0,1)),new double[]{1},new byte[]{1},NoiseVolume.Limits.DEFAULT,LIVE);var style=new NoiseSurface.Style(1,1,colors);var surface=NoiseSurface.prepare(volume,style,NoiseSurface.Limits.DEFAULT,LIVE);check(!surface.requiresPlaceholder(),"shutdown scalar fixture is complete");
@@ -522,7 +597,7 @@ public final class WorldCpuContracts {
         group("transferred sort ownership and admission",WorldCpuContracts::transferredOrderAdmission);
         group("active sort cancellation and admission",WorldCpuContracts::activeOrderAdmission);
         group("scene-worker shutdown recovery",WorldCpuContracts::workerShutdownRecovery);
-        group("remaining worker shutdown recovery",WorldCpuContracts::remainingWorkerShutdownRecovery);
+        group("worker startup and remaining shutdown recovery",WorldCpuContracts::remainingWorkerShutdownRecovery);
         group("explicit empty and unsupported markers",WorldCpuContracts::emptyAndMarkers);
         group("picking-index admission and source release",WorldCpuContracts::indexOwnership);
         System.out.println("PASS "+groups+" synthetic world contract groups; native/GPU parity is outside this harness.");
