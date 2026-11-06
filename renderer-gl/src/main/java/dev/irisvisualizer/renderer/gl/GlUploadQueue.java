@@ -50,9 +50,7 @@ public final class GlUploadQueue implements AutoCloseable {
             tint=GlUpload.validate(renderer,owner,tint,lighting);
             // A fresh journal must fit alongside old work before any accepted token/source is changed.
             handedOff=true;fresh=GlUpload.begin(renderer,owner,tint,lighting);
-            var queued=new Status(next,Phase.UPLOADING,Optional.of(owner.source()),Optional.of(fresh.progress()),Optional.empty(),"");
-            try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
-            active=fresh;fresh=null;revision=next;status=queued;return true;
+            install(next,fresh);fresh=null;return true;
         }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
         finally {
             if(fresh!=null)try { fresh.close(); }
@@ -60,6 +58,19 @@ public final class GlUploadQueue implements AutoCloseable {
             if(!handedOff)try { owner.close(); }
             catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); }
         }
+    }
+    /** Borrow a complete source and exact replacement materials; initial admission preserves previous queue work. */
+    public boolean materials(long next,GlScene source,WorldTint tint,WorldLighting lighting) {
+        Objects.requireNonNull(source);current();if(next<1)throw new IllegalArgumentException("Invalid request revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+        GlUpload fresh=null;Throwable rejection=null;
+        try { fresh=GlUpload.materials(renderer,source,tint,lighting);install(next,fresh);fresh=null;return true; }
+        catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
+    }
+    private void install(long next,GlUpload fresh) {
+        var queued=new Status(next,Phase.UPLOADING,Optional.of(fresh.source()),Optional.of(fresh.progress()),Optional.empty(),"");
+        try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        active=fresh;revision=next;status=queued;
     }
     /** The caller supplies its current CPU/edit revision each frame; obsolete work is never advanced. */
     public Status advance(GlUploadBudget budget,long latestRevision) {

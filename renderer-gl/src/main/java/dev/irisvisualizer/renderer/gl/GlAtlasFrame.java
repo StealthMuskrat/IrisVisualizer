@@ -18,7 +18,7 @@ public final class GlAtlasFrame implements AutoCloseable {
         this.scene=scene;device=scene.device;this.raster=raster;this.pages=List.copyOf(pages);this.journal=journal;textures=new int[pages.size()];for(int i=0;i<textures.length;i++)textures[i]=pages.get(i).allocation.textures[pages.get(i).slot];
     }
     public static GlAtlasFrame capture(GlScene scene) {
-        Objects.requireNonNull(scene);scene.device.live(scene.allocation);var raster=scene.cpuScene().raster();var pages=new ArrayList<Page>(raster.pages().size());
+        Objects.requireNonNull(scene);scene.live();var raster=scene.cpuScene().raster();var pages=new ArrayList<Page>(raster.pages().size());
         for(int i=0;i<raster.pages().size();i++)pages.add(new Page(scene.allocation,i,raster.pages().get(i),false));
         GlAtlasFrame frame=null;Throwable failure=null;
         try { frame=create(scene,raster,pages); }catch(RuntimeException|Error error) { failure=error; }
@@ -31,7 +31,7 @@ public final class GlAtlasFrame implements AutoCloseable {
         return frame;
     }
     static GlAtlasFrame create(GlScene scene,AtlasRaster raster,List<Page> pages) {
-        var device=scene.device;device.live(scene.allocation);
+        var device=scene.device;scene.live();
         if(raster.requiresPlaceholder()||raster.layout()!=scene.cpuScene().layout()||pages.size()!=raster.pages().size())throw new GlFailure(GlFailure.Code.STALE,"Atlas frame does not match its original scene/layout");
         GlDevice.Allocation journal=null;int retained=0;
         try {
@@ -50,7 +50,7 @@ public final class GlAtlasFrame implements AutoCloseable {
         return failure;
     }
     void requireScene(GlScene expected) {
-        if(closed)throw new GlFailure(GlFailure.Code.STATE,"Atlas frame is closed");device.live(journal);device.live(scene.allocation);
+        if(closed)throw new GlFailure(GlFailure.Code.STATE,"Atlas frame is closed");device.live(journal);scene.live();
         if(scene!=expected)throw new GlFailure(GlFailure.Code.STALE,"Atlas frame belongs to a different GPU scene");
     }
     GlAtlasFrame retain() { requireScene(scene);return create(scene,raster,pages); }

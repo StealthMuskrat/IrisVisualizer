@@ -8,7 +8,7 @@ public final class GlDrawPlan implements AutoCloseable {
     final GlDevice device;private final GlDevice.Allocation allocation;private final GlScene scene;
     private GlDrawPlan(GlScene scene,GlDevice.Allocation allocation) { this.scene=scene;device=scene.device;this.allocation=allocation; }
     public static GlDrawPlan create(GlScene scene,WorldDrawOrder order) {
-        Objects.requireNonNull(scene);Objects.requireNonNull(order);var device=scene.device;device.live(scene.allocation);
+        Objects.requireNonNull(scene);Objects.requireNonNull(order);var device=scene.device;scene.live();
         if(order.requiresPlaceholder())throw new GlFailure(GlFailure.Code.MATERIAL,"A complete translucent face order is required");
         if(order.scene()!=scene.cpuScene()||order.size()!=scene.translucentFaces)throw new GlFailure(GlFailure.Code.STALE,"Face order belongs to a different CPU scene");
         GlDevice.Allocation allocation=null;
@@ -17,7 +17,7 @@ public final class GlDrawPlan implements AutoCloseable {
         }catch(RuntimeException|Error failure) { if(allocation!=null)try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     WorldDrawOrder order(GlScene expected,GlCamera camera) {
-        device.live(allocation);device.live(scene.allocation);
+        device.live(allocation);scene.live();
         if(scene!=expected)throw new GlFailure(GlFailure.Code.STALE,"Face order belongs to a different GPU scene");
         var order=(WorldDrawOrder)allocation.retained;
         if(!order.view().equals(camera.drawView()))throw new GlFailure(GlFailure.Code.STALE,"Translucent face order does not match the current camera pose");return order;

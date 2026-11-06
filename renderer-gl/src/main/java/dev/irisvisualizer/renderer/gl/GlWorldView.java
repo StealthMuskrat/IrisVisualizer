@@ -101,6 +101,17 @@ public final class GlWorldView implements AutoCloseable {
             catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); }
         }
     }
+    /** Refresh exact-source tint/final lighting without native regeneration, CPU remeshing or CPU geometry upload. */
+    public boolean materials(long revision,WorldTint tint,WorldLighting lighting) {
+        current();if(revision<1)throw new IllegalArgumentException("Invalid world revision");if(revision<=worldRevision)return false;
+        if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current world scene is required for material refresh");
+        long next=nextView();var queued=new Status(revision,next,Phase.UPLOADING,status.source(),List.of(),Optional.empty(),"");var previousUpload=uploads.status();
+        try { if(!uploads.materials(revision,scene,tint,lighting))throw new GlFailure(GlFailure.Code.STATE,"World upload did not accept its current materials"); }
+        catch(RuntimeException|Error failure) { if(uploads.status()!=previousUpload)failed(failure);throw failure; }
+        worldRevision=revision;viewRevision=next;sourceReady=false;dirty=false;sortRevision=0;status=queued;
+        try { ordering.invalidate();frames.invalidate(viewRevision);releaseScene();return true; }
+        catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
     public WorldClip clip() { current();return clip; }
     /** Geometric display clipping preserves source meshes and the existing complete transparent order. */
     public long clip(WorldClip clip) {

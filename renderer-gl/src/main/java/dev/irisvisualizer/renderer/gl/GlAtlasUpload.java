@@ -64,7 +64,7 @@ public final class GlAtlasUpload implements AutoCloseable {
         long start=System.nanoTime(),storage=0;int copiedNow=0,uploadedNow=0,actions=0,units=0;boolean finish=false;GlTransferState state=null;
         Throwable failure=null;
         try {
-            device.live(scene.allocation);device.live(work);source.raster();
+            scene.live();device.live(work);source.raster();
             steps:while(units<budget.workUnits()&&(units==0||System.nanoTime()-start<budget.nanoseconds())) {
                 check(cancelled);boolean gpu=phase!=Phase.VALIDATING&&phase!=Phase.FINISHING;if(gpu&&actions>=budget.actions())break;
                 if(gpu&&state==null) { state=new GlTransferState(device);GlTransferState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }

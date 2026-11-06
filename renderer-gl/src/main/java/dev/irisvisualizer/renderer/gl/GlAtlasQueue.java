@@ -17,7 +17,7 @@ public final class GlAtlasQueue implements AutoCloseable {
     private long frameRevision;private GlAtlasUpload active;private boolean closed,obsolete,disposed;
     private volatile Status status;
     public GlAtlasQueue(GlScene scene,long sceneRevision) {
-        this.scene=Objects.requireNonNull(scene);device=scene.device;device.live(scene.allocation);if(sceneRevision<1)throw new IllegalArgumentException("Invalid scene revision");this.sceneRevision=sceneRevision;status=new Status(sceneRevision,0,Phase.IDLE,Optional.empty(),Optional.empty(),"");
+        this.scene=Objects.requireNonNull(scene);device=scene.device;scene.live();if(sceneRevision<1)throw new IllegalArgumentException("Invalid scene revision");this.sceneRevision=sceneRevision;status=new Status(sceneRevision,0,Phase.IDLE,Optional.empty(),Optional.empty(),"");
     }
     public Status status() { return status; }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"Atlas queue is closed"); }
@@ -81,7 +81,7 @@ public final class GlAtlasQueue implements AutoCloseable {
     }
     public Status advance(GlUploadBudget budget,long latestScene,long latestFrame) {
         Objects.requireNonNull(budget);current();if(!observe(latestScene,latestFrame)||(status.phase()!=Phase.UPDATING&&status.phase()!=Phase.READY)||active==null)return status;
-        try { device.live(scene.allocation);active.step(budget,()->false);status=state(active.ready()?Phase.READY:Phase.UPDATING,null,"");return status; }
+        try { scene.live();active.step(budget,()->false);status=state(active.ready()?Phase.READY:Phase.UPDATING,null,"");return status; }
         catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
     }
     /** Caller adopts only against its still-displayed frame; neither stale nor failed work closes it. */

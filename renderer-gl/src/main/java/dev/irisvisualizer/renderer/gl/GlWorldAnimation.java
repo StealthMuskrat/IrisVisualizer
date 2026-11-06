@@ -13,7 +13,7 @@ public final class GlWorldAnimation implements AutoCloseable {
     private GlAtlasFrame frame,retiring;private AtlasFrameWorker.Request request;private long revision,cpuRevision,tick;private double partialTick;
     private boolean clockDirty,closed,disposed,invalidated;private volatile Status status;
     public GlWorldAnimation(GlScene scene,long sceneRevision,AtlasFrameWorker worker) {
-        this.scene=Objects.requireNonNull(scene);device=scene.device;this.worker=Objects.requireNonNull(worker);device.live(scene.allocation);
+        this.scene=Objects.requireNonNull(scene);device=scene.device;this.worker=Objects.requireNonNull(worker);scene.live();
         if(sceneRevision<1)throw new IllegalArgumentException("Invalid scene revision");worker.validateDestination(device.memory().orElse(null));
         this.sceneRevision=sceneRevision;queue=new GlAtlasQueue(scene,sceneRevision);
         try { frame=GlAtlasFrame.capture(scene);tick=frame.raster().tick();partialTick=frame.raster().partialTick();state(Phase.CURRENT,List.of(),null,""); }

@@ -61,3 +61,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Two-array face sorting](BOUNDED-FACE-SORT.md) reduces verified temporary sort payload and adds one world CPU group. All 94 groups remain unexecuted (76 CPU/context-free, 18 GPU); full/default compilation now covers 143/105 files, including 94 dependency-free CPU production sources.
 
 [GPU transfer replacement admission](../renderer-gl/REPLACEMENT-ADMISSION.md) adds two GPU groups. The four CPU/context-free suites remain at 76 groups; the total is now 96 with 20 GPU groups, all unexecuted.
+
+[World material refresh](../renderer-gl/WORLD-MATERIAL-REFRESH.md) adds two GPU groups. All 98 groups remain unexecuted: the unchanged 76 CPU/context-free groups plus 22 GPU groups. Full compilation remains 143 files; the dependency-free set is unchanged at 105.

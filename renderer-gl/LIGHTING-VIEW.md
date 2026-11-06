@@ -16,10 +16,10 @@ Samples cost 48 bytes per face, under a configurable hard ceiling of 96 MiB. Sce
 
 Pass the optional capture through `GlUpload.begin(renderer, cpuOwner, tint, lighting)`, `queue.submit(revision, cpuOwner, tint, lighting)` or `GlScene.upload(renderer, cpuOwner, tint, lighting, cancelled)`. Tint can be null for entirely untinted scenes. Failed lighting produces a material failure; a different exact CPU scene produces a stale-input failure. Fresh CPU lease consumption and already-owned duplicate protection follow the existing upload contract. Sample arrays are retained and charged with tint and the CPU lease through scene retirement; paused uploads cannot release their charge early. A failed preflight has no scene GL storage to retire.
 
-| GPU geometry mode | Vertex stride | Quad vertices + indices | Additional GPU bytes over the CPU quad |
+| GPU geometry mode | Geometry + material strides | Quad vertices + indices | Additional GPU bytes over the CPU quad |
 | --- | --- | --- | --- |
-| Simple lighting, optional tint | 36 bytes | 168 bytes | 16 bytes |
-| Supplied RGB lighting, optional tint | 48 bytes | 216 bytes | 64 bytes |
+| Simple lighting, optional tint | 32 + 4 bytes | 168 bytes | 16 bytes |
+| Supplied RGB lighting, optional tint | 32 + 16 bytes | 216 bytes | 64 bytes |
 
 The unchanged CPU layout has eight floats per vertex and six indices per face. GPU attribute four stores RGB24 tint, integer attribute six reads the packed shading/emission byte, and attribute five stores RGB32F lighting only in the supplied-sample layout. The same bounded staging buffer streams whole four-byte words, so a yield may split an RGB triple or vertex. Storage admission and transfer totals include the selected stride before scene GL names are created. No extra full-mesh packed array is allocated.
 
@@ -54,3 +54,5 @@ Compare batched and individual transparent submissions across section/page chang
 ## Streamed capture and material hints
 
 [Material lighting](MATERIAL-LIGHTING.md) now applies declared shade direction and a display-only emission floor in the simple path, while supplied final RGB bypasses both. `WorldLighting.read` streams scoped components without intermediate caller arrays; `readOwned` retains shared scene/sample admission through `beginLit` / `submitLit`. `NativeLightingInputs` supplies the explicit native resolver boundary. Completed world images/readback now retain their actual simple/supplied policy receipt. Native/GPU validation remains deferred.
+
+[World material refresh](WORLD-MATERIAL-REFRESH.md) now places tint/shading/final RGB in a separate immutable stream and can switch lighting modes while copying original geometry/base atlas on the GPU. The table above preserves the same total payload; the three-buffer layout increases object-name demand within the existing ceiling. Runtime/GPU validation remains deferred.

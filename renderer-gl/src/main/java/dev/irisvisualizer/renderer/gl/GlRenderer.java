@@ -151,7 +151,7 @@ public final class GlRenderer implements AutoCloseable {
     }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) {
         Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
-        if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");device.live(scene.allocation);device.live(target.allocation);scene.cpuScene();device.collect();
+        if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");scene.live();device.live(target.allocation);scene.cpuScene();device.collect();
         if(plan!=null&&plan.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Face order and renderer must share one device");
         if(scene.translucentFaces>0&&plan==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Prepare a complete global translucent order for this scene and camera before drawing");
         var order=plan==null?null:plan.order(scene,camera);
