@@ -120,6 +120,19 @@ public final class GlMathContracts {
         var source=surface(true);var full=GlOrbitCamera.fit(source,1);var clip=new WorldClip(new WorldSnapshot.Extent(-36,-15,91,2,2,1));var fit=GlOrbitCamera.fit(source,1,clip);near(2,fit.centerX(),1e-12,"clipped X center");near(2,fit.centerY(),1e-12,"clipped Y center");near(0.5,fit.centerZ(),1e-12,"clipped Z center");check(fit.distance()<full.distance(),"smaller clipped volume fits closer");equal(full.anchor(),fit.anchor(),"clipped fit retains source anchor");
         var touching=GlOrbitCamera.fit(source,1,new WorldClip(new WorldSnapshot.Extent(-33,-16,91,1,4,2)));near(4,touching.centerX(),1e-12,"closed boundary intersection fits plane");throwsType(GlFailure.class,()->GlOrbitCamera.fit(source,1,new WorldClip(new WorldSnapshot.Extent(100,100,100,1,1,1))),"nonintersecting clip explicit failure");equal(full,GlOrbitCamera.fit(source,1,WorldClip.NONE),"unbounded overload preserves full-source fit");
     }
+    private static void worldGroups() {
+        for(boolean mixed:new boolean[]{false,true})try(var fixture=WorldGpuFixture.culling(mixed)) {
+            var scene=fixture.scene();var origin=scene.snapshot().extent().position(0);var camera=new GlCamera(origin,16,18,48,16,0.5,28,60,0.1,128);var clip=new WorldClip(new WorldSnapshot.Extent(origin.x(),origin.y(),Math.addExact(origin.z(),24),32,1,8));
+            equal(1,scene.sections().size(),"one complete 32x32 synthetic section");equal(6144,scene.usage().faces(),"six faces for every explicitly uncullled fixture cell");equal(48,scene.usage().faceBatches(),"complete 128-face group coverage");equal(1093L,GlWorldCulling.workingBytes(scene,true),"admitted matrix/section/index/cache payload");equal(1037L,GlWorldCulling.workingBytes(scene,false),"no range cache in disabled mode");
+            var culling=new GlWorldCulling(scene,camera,1,clip,true);equal(1,culling.visible,"clipped section remains drawable");equal(0,culling.tests(),"face decisions are lazy");var mesh=scene.sections().getFirst();boolean[] visible=new boolean[mesh.faces().size()];int guaranteedOutside=0;
+            for(int face=0;face<visible.length;face++) { visible[face]=culling.face(0,face);if(mesh.faceBatchMaximum(face/WorldMesh.BATCH_FACES,2)<24) { check(!visible[face],"group strictly below the clip's Z plane must be rejected");guaranteedOutside++; } }
+            check(guaranteedOutside>0&&culling.rejected()>0,"analytic outside groups were rejected");equal(48,culling.tests(),"one test per source group across a complete face walk");for(int face=visible.length-1;face>=0;face--)equal(visible[face],culling.face(0,face),"nonmonotonic material/sort traversal reuses the same decision");equal(48,culling.tests(),"reverse traversal introduces no repeated group tests");
+            int inside=(28*32+16)*6+ModelPlan.Direction.UP.ordinal();check(culling.face(0,inside),"group containing the central visible top face survives");throwsType(IndexOutOfBoundsException.class,()->culling.face(-1,0),"invalid source section");throwsType(IndexOutOfBoundsException.class,()->culling.face(0,visible.length),"invalid source face");equal(48,culling.tests(),"invalid queries do not touch cache counters");
+            var disabled=new GlWorldCulling(scene,camera,1,clip,false);for(int face=0;face<visible.length;face++)check(disabled.face(0,face),"disabled group rejection retains every face of a visible section");equal(0,disabled.tests(),"disabled mode allocates no decisions");
+            var disjoint=new GlWorldCulling(scene,camera,1,new WorldClip(new WorldSnapshot.Extent(Math.addExact(origin.x(),64),origin.y(),origin.z(),1,1,1)),true);check(!disjoint.sections[0]&&!disjoint.face(0,0),"whole-section clip rejection precedes group work");equal(0,disjoint.tests(),"invisible section needs no face tests");throwsType(IllegalArgumentException.class,()->new GlWorldCulling(scene,camera,Double.NaN,clip,true),"invalid aspect preflight");
+        }
+        try(var fixture=WorldGpuFixture.empty()) { var camera=new GlCamera(fixture.scene().snapshot().extent().position(0),0.5,0.5,3,0.5,0.5,0.5,60,0.1,20);var empty=new GlWorldCulling(fixture.scene(),camera,1,WorldClip.NONE,true);equal(1,empty.empty,"empty section retains no dummy face group");equal(0,empty.visible,"empty section is not drawable");equal(0,empty.tests(),"empty scene needs no face test"); }
+    }
     public static void main(String[] arguments) {
         if(arguments.length!=0)throw new IllegalArgumentException("No arguments supported");
         group("orthonormal and vertical camera bases",GlMathContracts::basis);
@@ -135,6 +148,7 @@ public final class GlMathContracts {
         group("scalar range and clip rejection",GlMathContracts::scalarBatchClipping);
         group("full and empty scalar fitting",GlMathContracts::scalarFit);
         group("clipped scalar fitting",GlMathContracts::clippedFit);
+        group("shared conservative world face-group decisions",GlMathContracts::worldGroups);
         System.out.println("PASS "+groups+" context-free display math groups; no OpenGL/native parity is claimed.");
     }
 }

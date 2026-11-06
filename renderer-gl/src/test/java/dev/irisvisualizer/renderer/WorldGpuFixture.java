@@ -22,6 +22,11 @@ public final class WorldGpuFixture implements AutoCloseable {
     public static WorldGpuFixture neighbors() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0,0},2,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture cutout() { return build(List.of(new Material(0x00ff00ff,false,false,false,true)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture translucent() { return build(List.of(new Material(0x0000ff80,false,false,false,false),new Material(0xff000080,false,false,false,false)),new int[]{0,1},1,2,WorldModels.Kind.MESH); }
+    public static WorldGpuFixture culling(boolean mixed) {
+        var materials=mixed?List.of(new Material(0x60a0e080,false,false,false,false),new Material(0xd0a060ff,false,false,false,false)):List.of(new Material(0x60a0e080,false,false,false,false));
+        int[] assignments=new int[32*32];if(mixed)for(int z=0;z<32;z++)Arrays.fill(assignments,z*32,(z+1)*32,z&1);
+        return build(materials,assignments,32,32,WorldModels.Kind.MESH);
+    }
     public static WorldGpuFixture animated(boolean interpolate) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture empty() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.EMPTY); }
     public static WorldGpuFixture placeholder() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.PLACEHOLDER); }
@@ -69,7 +74,7 @@ public final class WorldGpuFixture implements AutoCloseable {
         }
         var models=WorldModels.capture(snapshot,layout,entries,assignments,LIVE);check(!models.requiresPlaceholder(),"complete synthetic world assignments: "+models.problems());var masks=new byte[assignments.length];
         if(width==2&&depth==1) { masks[0]=(byte)(1<<ModelPlan.Direction.EAST.ordinal());masks[1]=(byte)(1<<ModelPlan.Direction.WEST.ordinal()); }
-        var visibility=WorldVisibility.capture(snapshot,layout,"explicit synthetic neighbor masks",masks,LIVE);var plan=WorldScenePlan.plan(models,visibility,new WorldScenePlan.Limits(2,32,256,256,64,1024*1024,4*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);check(!plan.requiresPlaceholder(),"complete synthetic world plan: "+plan.problems());var raster=AtlasImages.capture(layout,0,0,LIVE);check(!raster.requiresPlaceholder(),"complete synthetic atlas raster");
+        var visibility=WorldVisibility.capture(snapshot,layout,"explicit synthetic neighbor masks",masks,LIVE);var plan=WorldScenePlan.plan(models,visibility,new WorldScenePlan.Limits(width>2||depth>2?32:2,32,8192,2048,64,2*1024*1024,8*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);check(!plan.requiresPlaceholder(),"complete synthetic world plan: "+plan.problems());var raster=AtlasImages.capture(layout,0,0,LIVE);check(!raster.requiresPlaceholder(),"complete synthetic atlas raster");
         var cache=new WorldSectionCache();try { var owner=WorldScene.build(plan,raster,cache,LIVE);if(owner.requiresPlaceholder()) { var problems=owner.problems();owner.close();throw new AssertionError("synthetic CPU world build failed: "+problems); }return new WorldGpuFixture(cache,owner); }catch(RuntimeException|Error failure) { try { cache.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public WorldLighting lighting(float red,float green,float blue) {

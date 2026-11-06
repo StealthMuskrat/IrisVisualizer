@@ -11,10 +11,12 @@ $paths = @(
     Get-ChildItem -LiteralPath (Join-Path $root 'renderer/src/main/java') -Recurse -File -Filter '*.java'
     Get-ChildItem -LiteralPath (Join-Path $root 'renderer/src/test/java') -Recurse -File -Filter '*.java'
     # Deliberately bounded to context-free helpers; the remaining GL sources require LWJGL.
-    foreach ($name in @('GlFailure','GlCamera','GlOrbitCamera','GlFrustum')) {
+    foreach ($name in @('GlFailure','GlCamera','GlOrbitCamera','GlFrustum','GlWorldCulling')) {
         Get-Item -LiteralPath (Join-Path $root "renderer-gl/src/main/java/dev/irisvisualizer/renderer/gl/$name.java")
     }
     Get-Item -LiteralPath (Join-Path $root 'renderer-gl/src/test/java/dev/irisvisualizer/renderer/gl/GlMathContracts.java')
+    # Detached CPU fixture also used by context-free world culling contracts; no GPU code.
+    Get-Item -LiteralPath (Join-Path $root 'renderer-gl/src/test/java/dev/irisvisualizer/renderer/WorldGpuFixture.java')
 ) | Sort-Object FullName
 $sourceList = Join-Path $destination 'sources.txt'
 $entries = @($paths | ForEach-Object { '"' + $_.FullName.Replace('\','/') + '"' })

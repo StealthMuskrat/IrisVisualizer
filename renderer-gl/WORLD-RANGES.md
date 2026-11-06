@@ -16,7 +16,7 @@ Whole-section frustum/clip rejection remains the first stage. Within each visibl
 
 Adjacent surviving intersections within the same material range are submitted as one contiguous original index span. No index buffer, texture, VAO, tint or lighting data is rebuilt. When every intersection is visible, each material range retains its previous single draw call. Rejected gaps can split one range into multiple draws: fewer submitted triangles is not a guarantee of fewer calls or lower elapsed time.
 
-The globally sorted translucent pass and diagnostic-marker pass retain their existing section rejection and submission policy. Mixed-alpha groups can widen solid bounds conservatively; they do not change pass selection, blend/depth state, atlas playback or transparent ordering. Fragment clipping still decides actual boundary pixels, with no invented caps or geometry removal from the native source.
+The later [shared group path](TRANSLUCENT-CULLING.md) also filters the original translucent order through these same bounds; diagnostic markers retain section rejection. Mixed-alpha groups can widen solid bounds conservatively; they do not change pass selection, blend/depth state, atlas playback or transparent ordering. Fragment clipping still decides actual boundary pixels, with no invented caps or geometry removal from the native source.
 
 ## Counts and comparison mode
 
@@ -45,3 +45,5 @@ GPU storage/transfer totals continue to cover actual vertex/index/material/light
 At renderer completion, compare prepared bounds against an independent exhaustive emitted-vertex scan for empty, marker-only, 1/127/128/129-face and maximum sections, hidden faces, native offsets, fluid/model layers, overhangs, reversed winding and distant/negative anchors. Verify exact count/output/cache/shared admission at group boundaries, cancellation/failure publication, cached reuse and old pinned-source ownership.
 
 Compare enabled/disabled pixel output and original submission spans on real Windows GL contexts. Cover frustum/near-plane crossings, clip planes through vertices and group bounds, extreme relative coordinates, all-visible/all-rejected/alternating groups, material boundaries inside groups, multiple atlas pages, cutout holes and mixed transparent/marker scenes. Confirm contiguous-run coalescing, exact counter meanings, unchanged upload byte completion, native picking equivalence and old-frame/readback receipts. Profile CPU bound checks, draw-call splitting and triangle reduction separately before claiming a performance gain or enabling supported previews. No renderer-stage tests ran for this batch.
+
+[Shared translucent decisions and admitted draw scratch](TRANSLUCENT-CULLING.md) now cache each original group once across material passes, retain global sorted order and provide unique-test/transparent-cull counters plus an immutable differential frame mode. Full/dependency-free compilation passed; all 90 prepared groups remain unexecuted.

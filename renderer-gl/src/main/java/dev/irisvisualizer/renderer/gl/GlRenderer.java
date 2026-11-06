@@ -2,8 +2,8 @@ package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.TexturePreparation;
 import dev.irisvisualizer.renderer.WorldClip;
-import dev.irisvisualizer.renderer.BlockMesh;
 import dev.irisvisualizer.renderer.WorldMesh;
+import dev.irisvisualizer.renderer.WorldDrawOrder;
 import java.nio.*;
 import java.util.Objects;
 import static org.lwjgl.opengl.GL33C.*;
@@ -128,17 +128,22 @@ public final class GlRenderer implements AutoCloseable {
         Objects.requireNonNull(atlas);Objects.requireNonNull(plan);draw(scene,atlas,plan,target,camera);
     }
     /** Submission counts are returned only after a complete draw and host-state restoration. */
-    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces) {
+    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces) {
         public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,0,0,0); }
+        public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,solidRangeTests,culledSolidRanges,culledSolidFaces,0,0,0); }
         public FrameStats {
-            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0||solidRangeTests<0||culledSolidRanges<0||culledSolidRanges>solidRangeTests||culledSolidFaces<0)throw new IllegalArgumentException("Invalid frame submission counts");
+            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0||solidRangeTests<0||culledSolidRanges<0||culledSolidRanges>solidRangeTests||culledSolidFaces<0||faceBatchTests<0||culledFaceBatches<0||culledFaceBatches>faceBatchTests||culledTranslucentFaces<0)throw new IllegalArgumentException("Invalid frame submission counts");
         }
+    }
+    /** Metadata-only temporary CPU admission size; excludes retained scene/target and host-state bookkeeping. */
+    public long drawScratchBytes(GlScene scene,boolean rangeCulling) {
+        Objects.requireNonNull(scene);device.live(allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Draw scratch source belongs to another device");return GlWorldCulling.workingBytes(scene.cpuScene(),rangeCulling);
     }
     public FrameStats renderFrame(GlScene scene,GlTarget target,GlCamera camera) { return draw(scene,null,null,target,camera); }
     /** Null atlas/order select the base raster/no order; translucent scenes still require an order. */
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) { return draw(scene,atlas,plan,target,camera); }
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip) { return draw(scene,atlas,plan,target,camera,clip); }
-    /** Disable only solid face-range rejection for later differential pixel/submission comparisons. */
+    /** Disable face-group rejection in both material passes for differential pixel/submission comparisons. */
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) { return draw(scene,atlas,plan,target,camera,clip,rangeCulling); }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) { return draw(scene,atlas,plan,target,camera,WorldClip.NONE); }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip) {
@@ -151,13 +156,16 @@ public final class GlRenderer implements AutoCloseable {
         if(scene.translucentFaces>0&&plan==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Prepare a complete global translucent order for this scene and camera before drawing");
         var order=plan==null?null:plan.order(scene,camera);
         int[] textures=atlas==null?scene.allocation.textures:atlas.textures(scene);
-        float[] matrix=camera.matrix((double)target.width()/target.height());float[] offsets=new float[scene.sections.size()*3];boolean[] visible=new boolean[scene.sections.size()];var frustum=new GlFrustum(matrix);var clipBounds=clip.relative(camera.anchor());int empty=0,shown=0,culled=0;
-        for(int i=0;i<scene.sections.size();i++) {
-            var section=scene.sections.get(i);camera.offset(section.origin(),offsets,i*3);
-            if(section.bounds().isEmpty()) { empty++;continue; }
-            visible[i]=frustum.visible(section.bounds().orElseThrow(),offsets,i*3)&&(!clip.enabled()||clipVisible(clipBounds,section.bounds().orElseThrow(),offsets,i*3));if(visible[i])shown++;else culled++;
-        }
-        int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0,rangeTests=0,culledRanges=0,culledFaces=0;long indices=0;var meshes=scene.cpuScene().sections();
+        var scratch=device.reserve(0,GlWorldCulling.workingBytes(scene.cpuScene(),rangeCulling),0,0,0,0,0,0,0,null);Throwable escaping=null;FrameStats result;
+        try { result=drawAdmitted(scene,target,camera,clip,rangeCulling,order,textures); }
+        catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
+        finally { try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }
+        target.complete=true;return result;
+    }
+    /** This stack drops all temporary array owners before its covering admission is released. */
+    private FrameStats drawAdmitted(GlScene scene,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling,WorldDrawOrder order,int[] textures) {
+        var culling=new GlWorldCulling(scene.cpuScene(),camera,(double)target.width()/target.height(),clip,rangeCulling);var matrix=culling.matrix;var offsets=culling.offsets;var visible=culling.sections;var clipBounds=culling.clip;
+        int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0,rangeTests=0,culledRanges=0,culledFaces=0,culledTranslucent=0;long indices=0;var meshes=scene.cpuScene().sections();
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
             glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);glUniform1i(geometryLighting,scene.nativeLighting?1:0);geometryClip.set(clip.enabled(),clipBounds);
@@ -170,7 +178,7 @@ public final class GlRenderer implements AutoCloseable {
                     int end=(range.firstIndex()+range.indexCount())/6,run=-1;
                     for(int face=range.firstIndex()/6;face<end;) {
                         int batch=face/WorldMesh.BATCH_FACES,stop=Math.min(end,(batch+1)*WorldMesh.BATCH_FACES);rangeTests++;
-                        if(frustum.visible(mesh,batch,offsets,i*3,clip.enabled()?clipBounds:null)) { if(run<0)run=face; }
+                        if(culling.face(i,face)) { if(run<0)run=face; }
                         else {
                             culledRanges++;culledFaces+=stop-face;
                             if(run>=0) { int count=(face-run)*6;glDrawElements(GL_TRIANGLES,count,GL_UNSIGNED_INT,(long)run*24);solidCalls++;indices+=count;run=-1; }
@@ -184,9 +192,9 @@ public final class GlRenderer implements AutoCloseable {
             if(order!=null&&order.size()>0) {
                 state.translucent();glUniform1i(geometryPass,2);int boundSection=-1,boundPage=-1;
                 for(int at=0;at<order.size();) {
-                    int index=order.section(at),face=order.face(at);if(!visible[index]) { at++;continue; }var section=scene.sections.get(index);var faces=meshes.get(index).faces();int page=faces.get(face).source().page(),count=1;
+                    int index=order.section(at),face=order.face(at);if(!visible[index]) { at++;continue; }if(!culling.face(index,face)) { culledTranslucent++;at++;continue; }var section=scene.sections.get(index);var faces=meshes.get(index).faces();int page=faces.get(face).source().page(),count=1;
                     // Merge only consecutive source indices already adjacent in the sorted order.
-                    while(at+count<order.size()&&order.section(at+count)==index&&order.face(at+count)==face+count&&faces.get(face+count).source().page()==page)count++;
+                    while(at+count<order.size()&&order.section(at+count)==index&&order.face(at+count)==face+count&&faces.get(face+count).source().page()==page&&culling.face(index,face+count))count++;
                     if(boundSection!=index) { glUniform3f(geometryOffset,offsets[index*3],offsets[index*3+1],offsets[index*3+2]);glBindVertexArray(section.geometryVao());boundSection=index; }
                     if(boundPage!=page) { glBindTexture(GL_TEXTURE_2D,textures[page]);boundPage=page; }
                     glDrawElements(GL_TRIANGLES,count*6,GL_UNSIGNED_INT,(long)face*24);translucentCalls++;translucentFaces+=count;indices+=(long)count*6;at+=count;
@@ -196,13 +204,7 @@ public final class GlRenderer implements AutoCloseable {
             for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(!visible[i]||section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount());markerCalls++;markers+=section.markerCount(); }
             device.check("complete offscreen scene draw");
         }
-        target.complete=true;return new FrameStats(scene.sections.size(),empty,shown,culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices,rangeTests,culledRanges,culledFaces);
-    }
-    private static boolean clipVisible(WorldClip.Bounds clip,BlockMesh.Bounds bounds,float[] offsets,int at) {
-        float minX=offsets[at]+bounds.min().x(),minY=offsets[at+1]+bounds.min().y(),minZ=offsets[at+2]+bounds.min().z();
-        float maxX=offsets[at]+bounds.max().x(),maxY=offsets[at+1]+bounds.max().y(),maxZ=offsets[at+2]+bounds.max().z();
-        double ulp=Math.max(Math.ulp(Math.max(Math.abs(minX),Math.abs(maxX))),Math.max(Math.ulp(Math.max(Math.abs(minY),Math.abs(maxY))),Math.ulp(Math.max(Math.abs(minZ),Math.abs(maxZ))))),margin=4*ulp+1e-6;
-        return clip.intersects(minX-margin,minY-margin,minZ-margin,maxX+margin,maxY+margin,maxZ+margin);
+        return new FrameStats(scene.sections.size(),culling.empty,culling.visible,culling.culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices,rangeTests,culledRanges,culledFaces,culling.tests(),culling.rejected(),culledTranslucent);
     }
     @Override public void close() { device.retire(allocation); }
 }
