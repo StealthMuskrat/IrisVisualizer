@@ -43,23 +43,35 @@ public final class NativeCapture {
     private static <T> Captured<T> success(T value,long bytes) { return new Captured<>(Optional.of(value),bytes,List.of(),List.of()); }
     private static <T> Captured<T> failure(List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Captured<>(Optional.empty(),0,problems,assets); }
     private static <T> Result<T> failed(Kind kind,WorldSnapshot.Source source,List<WorldProblem> problems,List<ModelPlan.Problem> assets) { return new Result<>(kind,source,Optional.empty(),problems,assets); }
+    /** A completed capture stays local until consuming source scopes have closed successfully. */
+    private static void discard(Result<?> result,Throwable failure) {
+        if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+    }
     private static <T> Result<T> capture(Kind kind,NativeRenderContext context,RenderMemory memory,long reservation,Capture<T> capture,BooleanSupplier cancelled) {
         Objects.requireNonNull(context);Objects.requireNonNull(capture);Objects.requireNonNull(cancelled);var source=context.source();RenderMemory.Hold hold=RenderMemory.Hold.none();RenderInput<T> input=null;boolean transferred=false;
+        Throwable escapingFailure=null;
         try {
-            check(cancelled);if(reservation<0||reservation>WORLD_BYTES)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native capture aggregate working reservation exceeds 512 MiB");
-            // Rejection precedes any session/native sampler call or output array allocation.
-            if(memory!=null)hold=memory.hold("Native "+kind.name().toLowerCase(Locale.ROOT)+" capture",reservation);
-            context.check();var result=capture.run();context.check();check(cancelled);
-            if(result.value().isEmpty())return failed(kind,source,result.problems(),result.assets());
-            if(result.bytes()<0||result.bytes()>reservation)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Detached native output exceeds its admitted capture peak");
-            hold.shrinkTo(result.bytes());input=RenderInput.own(result.value().orElseThrow(),hold);
-            var complete=new Result<>(kind,source,Optional.of(input),List.of(),List.of());transferred=true;return complete;
-        }catch(WorldCapture.ReadFailure failure) { check(cancelled);return failed(kind,source,List.of(failure.problem()),List.of()); }
-        catch(RenderMemory.LimitException failure) { check(cancelled);return failed(kind,source,List.of(new WorldProblem(WorldProblem.Code.LIMIT,Optional.empty(),failure.getMessage())),List.of()); }
-        catch(CancellationException cancellation) { throw cancellation; }
-        catch(RuntimeException failure) { check(cancelled);return failed(kind,source,List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Admitted native capture failed: "+failure.getClass().getSimpleName())),List.of()); }
-        catch(OutOfMemoryError exhausted) { check(cancelled);return failed(kind,source,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory for native capture; no partial input published")),List.of()); }
-        finally { if(!transferred&&input!=null)input.close();hold.close(); }
+            try {
+                check(cancelled);if(reservation<0||reservation>WORLD_BYTES)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Native capture aggregate working reservation exceeds 512 MiB");
+                // Rejection precedes any session/native sampler call or output array allocation.
+                if(memory!=null)hold=memory.hold("Native "+kind.name().toLowerCase(Locale.ROOT)+" capture",reservation);
+                context.check();var result=capture.run();context.check();check(cancelled);
+                if(result.value().isEmpty())return failed(kind,source,result.problems(),result.assets());
+                if(result.bytes()<0||result.bytes()>reservation)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Detached native output exceeds its admitted capture peak");
+                hold.shrinkTo(result.bytes());input=RenderInput.own(result.value().orElseThrow(),hold);
+                var complete=new Result<>(kind,source,Optional.of(input),List.of(),List.of());transferred=true;return complete;
+            }catch(WorldCapture.ReadFailure failure) { check(cancelled);return failed(kind,source,List.of(failure.problem()),List.of()); }
+            catch(RenderMemory.LimitException failure) { check(cancelled);return failed(kind,source,List.of(new WorldProblem(WorldProblem.Code.LIMIT,Optional.empty(),failure.getMessage())),List.of()); }
+            catch(CancellationException cancellation) { throw cancellation; }
+            catch(RuntimeException failure) { check(cancelled);return failed(kind,source,List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Admitted native capture failed: "+failure.getClass().getSimpleName())),List.of()); }
+            catch(OutOfMemoryError exhausted) { check(cancelled);return failed(kind,source,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory for native capture; no partial input published")),List.of()); }
+        }catch(RuntimeException|Error failure) { escapingFailure=failure;throw failure; }
+        finally {
+            Throwable failure=escapingFailure;
+            try { if(!transferred&&input!=null)input.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { hold.close(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(escapingFailure==null) { if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error; }
+        }
     }
     /** Reads caller-frozen completed chunks; generation/chunk storage is external to this reservation. */
     public static Result<WorldSnapshot> volume(NativeRenderContext context,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,NativeWorldCapture.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
@@ -94,24 +106,24 @@ public final class NativeCapture {
     }
     /** Consumes a fresh loaded catalog owner on every outcome; retain another owner for later regeneration. */
     public static Result<WorldRenderWorker.ModelRequest> models(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);
-        try(var source=assets.retain()) { catalogOwner(source,memory);return models(context,source.value(),extent,chunks,tick,partialTick,limits,options,memory,cancelled); }
-        finally { assets.close(); }
+        Objects.requireNonNull(assets);Result<WorldRenderWorker.ModelRequest> result=null;
+        try(assets;var source=assets.retain()) { catalogOwner(source,memory);result=models(context,source.value(),extent,chunks,tick,partialTick,limits,options,memory,cancelled); }
+        catch(RuntimeException|Error failure) { discard(result,failure);throw failure; }return result;
     }
     /** Default weighted capture owns a fresh pinned model-selection source inside admitted native work. */
     public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);
-        try(var source=assets.retain()) { catalogOwner(source,memory);return weighted(context,source.value(),extent,chunks,tick,partialTick,limits,options,memory,cancelled); }
-        finally { assets.close(); }
+        Objects.requireNonNull(assets);Result<WorldRenderWorker.Request> result=null;
+        try(assets;var source=assets.retain()) { catalogOwner(source,memory);result=weighted(context,source.value(),extent,chunks,tick,partialTick,limits,options,memory,cancelled); }
+        catch(RuntimeException|Error failure) { discard(result,failure);throw failure; }return result;
     }
     public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
         return weighted(context,assets,extent,chunks,Optional.empty(),tick,partialTick,limits,options,memory,cancelled);
     }
     /** Same consuming catalog handoff for native weighted model selection; RNG policy remains caller-owned. */
     public static Result<WorldRenderWorker.Request> weighted(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);
-        try(var source=assets.retain()) { catalogOwner(source,memory);return weighted(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,memory,cancelled); }
-        finally { assets.close(); }
+        Objects.requireNonNull(assets);Result<WorldRenderWorker.Request> result=null;
+        try(assets;var source=assets.retain()) { catalogOwner(source,memory);result=weighted(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,memory,cancelled); }
+        catch(RuntimeException|Error failure) { discard(result,failure);throw failure; }return result;
     }
     /** Unit-weight inspection remains deferred to WorldRenderWorker; missing native producers stay guarded. */
     public static Result<WorldRenderWorker.ModelRequest> models(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,RenderMemory memory,BooleanSupplier cancelled) {
@@ -142,9 +154,9 @@ public final class NativeCapture {
         return fluidScene(context,assets,extent,chunks,tick,partialTick,limits,options,fluids,Optional.empty(),memory,cancelled);
     }
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);Objects.requireNonNull(neighbors);
-        try(var source=assets.retain()) { catalogOwner(source,memory);return fluidScene(context,source.value(),extent,chunks,tick,partialTick,limits,options,fluids,neighbors,memory,cancelled); }
-        finally { assets.close(); }
+        Objects.requireNonNull(assets);Objects.requireNonNull(neighbors);Result<WorldRenderWorker.Request> result=null;
+        try(assets;var source=assets.retain()) { catalogOwner(source,memory);result=fluidScene(context,source.value(),extent,chunks,tick,partialTick,limits,options,fluids,neighbors,memory,cancelled); }
+        catch(RuntimeException|Error failure) { discard(result,failure);throw failure; }return result;
     }
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
         return fluidScene(context,assets,extent,chunks,tick,partialTick,limits,options,fluids,Optional.empty(),memory,cancelled);
@@ -158,9 +170,9 @@ public final class NativeCapture {
     }
     /** Additional detached neighbors stay borrowed through capture and are not retained by output. */
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,RenderInput<ClientAssetSnapshot> assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,Optional<WorldSnapshot> neighbors,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(assets);Objects.requireNonNull(neighbors);
-        try(var source=assets.retain()) { catalogOwner(source,memory);return fluidScene(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,fluids,neighbors,memory,cancelled); }
-        finally { assets.close(); }
+        Objects.requireNonNull(assets);Objects.requireNonNull(neighbors);Result<WorldRenderWorker.Request> result=null;
+        try(assets;var source=assets.retain()) { catalogOwner(source,memory);result=fluidScene(context,source.value(),extent,chunks,random,tick,partialTick,limits,options,fluids,neighbors,memory,cancelled); }
+        catch(RuntimeException|Error failure) { discard(result,failure);throw failure; }return result;
     }
     /** No detached base-only fluid request is published, even if later sampling or admission fails. */
     public static Result<WorldRenderWorker.Request> fluidScene(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot.Extent extent,List<NativeWorldCapture.Chunk> chunks,RandomSource random,long tick,double partialTick,WorldLimits limits,WorldOptions options,NativeFluidInputs.Limits fluids,RenderMemory memory,BooleanSupplier cancelled) {
@@ -191,26 +203,26 @@ public final class NativeCapture {
     }
     /** Consumes a ready choice request; strict optional neighbor data stays borrowed through capture. */
     public static Result<WorldRenderWorker.Request> fluids(NativeRenderContext context,RenderInput<WorldRenderWorker.Request> original,Optional<WorldSnapshot> neighbors,NativeFluidInputs.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(original);Objects.requireNonNull(neighbors);Objects.requireNonNull(limits);
-        try(var source=original.retain()) {
+        Objects.requireNonNull(original);Objects.requireNonNull(neighbors);Objects.requireNonNull(limits);Result<WorldRenderWorker.Request> result=null;
+        try(original;var source=original.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Fluid capture requires the same source coordinator");
-            var request=source.value();return capture(Kind.FLUIDS,context,memory,Math.min(limits.edits().workingBytes(),request.workingBytes()),()->{
-                var result=NativeFluidInputs.capture(context,request,neighbors,limits,cancelled);
-                return result.requiresPlaceholder()?failure(result.problems(),List.of()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
+            var request=source.value();result=capture(Kind.FLUIDS,context,memory,Math.min(limits.edits().workingBytes(),request.workingBytes()),()->{
+                var captured=NativeFluidInputs.capture(context,request,neighbors,limits,cancelled);
+                return captured.requiresPlaceholder()?failure(captured.problems(),List.of()):success(captured.request().orElseThrow(),captured.request().orElseThrow().inputBytes());
             },cancelled);
-        }finally { original.close(); }
+        }catch(RuntimeException|Error failure) { discard(result,failure);throw failure; }return result;
     }
     /** Consumes an owned ready request on every outcome; explicit geometry producers remain caller supplied. */
     public static Result<WorldRenderWorker.Request> edit(NativeRenderContext context,RenderInput<WorldRenderWorker.Request> original,NativeVisualInputs.Provider provider,WorldVisualEdits.Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
-        Objects.requireNonNull(original);Objects.requireNonNull(provider);Objects.requireNonNull(limits);
-        try(var source=original.retain()) {
+        Objects.requireNonNull(original);Objects.requireNonNull(provider);Objects.requireNonNull(limits);Result<WorldRenderWorker.Request> result=null;
+        try(original;var source=original.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Native visual edits require the same source coordinator");
             var request=source.value();
-            return capture(Kind.VISUAL_EDIT,context,memory,Math.min(limits.workingBytes(),request.workingBytes()),()->{
-                var result=NativeVisualInputs.capture(context,request,provider,limits,cancelled);
-                return result.requiresPlaceholder()?failure(result.problems(),List.of()):success(result.request().orElseThrow(),result.request().orElseThrow().inputBytes());
+            result=capture(Kind.VISUAL_EDIT,context,memory,Math.min(limits.workingBytes(),request.workingBytes()),()->{
+                var captured=NativeVisualInputs.capture(context,request,provider,limits,cancelled);
+                return captured.requiresPlaceholder()?failure(captured.problems(),List.of()):success(captured.request().orElseThrow(),captured.request().orElseThrow().inputBytes());
             },cancelled);
-        }finally { original.close(); }
+        }catch(RuntimeException|Error failure) { discard(result,failure);throw failure; }return result;
     }
     private static Result<MapRasterWorker.Request> map(Kind kind,NativeRenderContext context,MapRaster.Style style,MapRaster.Limits rasterLimits,MapCapture.Limits limits,RenderMemory memory,Samples sampler,BooleanSupplier cancelled) {
         Objects.requireNonNull(style);Objects.requireNonNull(rasterLimits);Objects.requireNonNull(limits);

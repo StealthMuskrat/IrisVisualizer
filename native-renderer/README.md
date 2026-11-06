@@ -120,6 +120,12 @@ Exercise report/epoch faults during sampling, during immutable copy and at final
 
 `NativeLightingInputs` now streams explicit native per-vertex final RGB into owned `WorldLighting` output. Shared scene/sample admission precedes native callbacks; original state/biome/position, asset receipt, full height and healthy-session gates are validated, and no native/provider graph escapes. `GlUpload.beginLit` and `GlWorldView.submitLit` keep that source charged through destination admission. See [MATERIAL-LIGHTING.md](../renderer-gl/MATERIAL-LIGHTING.md). No default light/AO factory, propagation or biome blending policy is implemented or verified. Genuine pinned Windows compilation and actual native/pixel comparisons remain pending.
 
+## Capture cleanup and transfer
+
+[Consuming native capture](../renderer/NATIVE-CAPTURE.md#consuming-capture-cleanup) now keeps new results locally owned until the supplied catalog/request and temporary source retain have closed. Failed source cleanup closes the unreturned result and preserves the original error. The common capture and native lighting boundaries also preserve escaping errors through untransferred input/hold release, attempting every owned step. Native callbacks, existing diagnostic mapping, source/native identity, asset/session checks and configured memory ceilings remain unchanged.
+
+All sixteen bridge sources syntax-parse with Java 25, and their source-manifest hashes and coverage are verified. Public declarations/imports and the native lighting reader body are unchanged. Genuine Windows native type checking and failure/runtime/GPU validation remain pending; no native adapter or renderer test has been executed.
+
 ## Selected vanilla colormap tint sources
 
 `NativeColormapTints.capture` now derives radius-zero world-model tints from version-matched `ClientColormaps`, actual native biome climate/effects/modifiers and native redstone/state properties. `NativeCapture.WorldOptions.vanillaUnblended(maps)` connects it to deterministic and weighted capture with source/copy/palette admission. It does not install global color tables or load selected archive classes. Particle-only water sources, fluid geometry, neighboring-biome blending and actual Windows native/GPU validation remain pending. See [VANILLA-TINTS.md](../renderer/VANILLA-TINTS.md).

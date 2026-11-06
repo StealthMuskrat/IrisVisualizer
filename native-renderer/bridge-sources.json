@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeCapture.java",
-      "sha256": "3f553ea13c895dcb975f11c63fcc1e0f08d80ca6e228dfc5c5845645f132294c"
+      "sha256": "d642a4eb06d00a2cb48e5a30bf1ae497bfc2f614ad9c70ba3adfefc1a9ab1b3b"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeColormapTints.java",
@@ -24,7 +24,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeLightingInputs.java",
-      "sha256": "6a50f08e0a1fd889ccbb990230afce8ab471c679bf0e2ffbf341db222f25dfee"
+      "sha256": "714893432d84f4d6fb82cc127d53845e2d330a04c018f09a86525aa7af7b4b22"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeMapSampler.java",
