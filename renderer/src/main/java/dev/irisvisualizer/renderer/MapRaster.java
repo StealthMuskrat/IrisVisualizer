@@ -12,6 +12,13 @@ public final class MapRaster {
             if(minimum==maximum)return 0.5;if(value<=minimum)return 0;if(value>=maximum)return 1;double span=maximum-minimum;
             return Double.isFinite(span)?(value-minimum)/span:(value/2-minimum/2)/(maximum/2-minimum/2);
         }
+        /** Display-legend interpolation, including ranges whose subtraction overflows. */
+        public double valueAt(double position) {
+            if(!Double.isFinite(position)||position<0||position>1)throw new IllegalArgumentException("Legend position must be in [0,1]");
+            if(position==0)return minimum;if(position==1)return maximum;if(minimum==maximum)return minimum;double span=maximum-minimum;
+            double value=Double.isFinite(span)?minimum+span*position:minimum*(1-position)+maximum*position;
+            return Math.clamp(value,minimum,maximum);
+        }
     }
     /** Colors correspond exactly to the source biome palette, never to a replacement registry. */
     public record BiomeStyle(List<Integer> rgba) implements Style { public BiomeStyle { Objects.requireNonNull(rgba);if(rgba.isEmpty()||rgba.size()>8192)throw new IllegalArgumentException("Invalid biome color palette");rgba=List.copyOf(rgba); } }
@@ -41,6 +48,13 @@ public final class MapRaster {
     public static ScalarStyle terrainStyle(MapSamples samples) { if(samples.kind()!=MapSamples.Kind.TERRAIN||samples.requiresPlaceholder())throw new IllegalArgumentException("Complete terrain samples required");var range=samples.vertical().orElseThrow();return new ScalarStyle(range.minY(),range.maxY()-1,MapRamp.GRAYSCALE); }
     /** Explicit opt-in; the existing terrainStyle helper remains a flat full-height gradient. */
     public static TerrainStyle terrainReliefStyle(MapSamples samples) { return new TerrainStyle(terrainStyle(samples),Relief.DEFAULT); }
+    /** Explicit worker-side histogram of the complete original scalar map at this display range. */
+    public ScalarHistogram histogram(ScalarHistogram.Limits limits,BooleanSupplier cancelled) {
+        if(requiresPlaceholder())throw new IllegalStateException("Complete map raster required for a display histogram");
+        if(style instanceof BiomeStyle)throw new IllegalStateException("Biome maps are categorical, not scalar histograms");
+        var colors=style instanceof TerrainStyle terrain?terrain.colors():(ScalarStyle)style;
+        return ScalarHistogram.capture(samples,Optional.of(new ScalarHistogram.Range(colors.minimum(),colors.maximum())),Objects.requireNonNull(limits).reserve(payloadBytes()-samples.payloadBytes()),cancelled);
+    }
     /** Complete old raster plus prospective replacement RGBA; equal value styles reuse the original image. */
     public static long recolorReservation(MapRaster source,Style style) {
         Objects.requireNonNull(source);Objects.requireNonNull(style);if(source.requiresPlaceholder())throw new IllegalArgumentException("Complete map raster required for recoloring");

@@ -29,6 +29,11 @@ public final class NoiseSurface {
         public long knownPeakBytes() { return sourceBytes+meshBytes+scratchBytes; }
     }
     public static final int UNIT_FACE_BYTES=9,GREEDY_FACE_BYTES=13,COLOR_BYTES=4,BATCH_FACES=1024;
+    /** Full original volume distribution, independent of selected bins, mesh faces and geometric clipping. */
+    public ScalarHistogram histogram(ScalarHistogram.Limits limits,BooleanSupplier cancelled) {
+        if(requiresPlaceholder())throw new IllegalStateException("Complete scalar surface required for a display histogram");
+        var colors=style.colors();return ScalarHistogram.capture(volume,Optional.of(new ScalarHistogram.Range(colors.minimum(),colors.maximum())),Objects.requireNonNull(limits).reserve(payloadBytes()-volume.payloadBytes()),cancelled);
+    }
     private static long batchBytes(int faces) { return ((faces+(long)BATCH_FACES-1)/BATCH_FACES)*6*Integer.BYTES; }
     private static long meshBytes(int faces,Meshing mode) { return (long)faces*(mode==Meshing.GREEDY?GREEDY_FACE_BYTES:UNIT_FACE_BYTES)+batchBytes(faces); }
     /** Detached inspection of the original native scalar and its displayed bin face, without volume arrays. */
