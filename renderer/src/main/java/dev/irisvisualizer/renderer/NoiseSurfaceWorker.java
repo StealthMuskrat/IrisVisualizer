@@ -7,17 +7,23 @@ import java.util.function.Supplier;
 
 /** One active and one latest pending scalar display mesh, without native sampling on this executor. */
 public final class NoiseSurfaceWorker implements AutoCloseable {
-    public record Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry,Optional<ScalarHistogram.Limits> histogram) {
+    public record Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry,Optional<ScalarHistogram.Limits> histogram,Optional<ScalarHistogram> reusableHistogram) {
+        public Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry,Optional<ScalarHistogram.Limits> histogram) { this(volume,style,limits,geometry,histogram,Optional.empty()); }
         public Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry) { this(volume,style,limits,geometry,Optional.empty()); }
         public Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits) { this(volume,style,limits,Optional.empty()); }
         public Request {
-            Objects.requireNonNull(volume);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(geometry);Objects.requireNonNull(histogram);
+            Objects.requireNonNull(volume);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(geometry);Objects.requireNonNull(histogram);Objects.requireNonNull(reusableHistogram);
+            if(histogram.isEmpty()&&reusableHistogram.isPresent())throw new IllegalArgumentException("Reusable histogram requires requested histogram limits");
             var bounded=bounded(volume,limits,histogram);
             if(volume.requiresPlaceholder()||volume.payloadBytes()>bounded.workingBytes())throw new IllegalArgumentException("A complete scalar source within the working bound is required");
             if(geometry.isPresent()) {
                 var source=geometry.orElseThrow();
                 if(source.requiresPlaceholder()||source.volume()!=volume||!source.style().sameGeometry(style))throw new IllegalArgumentException("Scalar recoloring requires the exact complete volume and geometry policy");
                 if(source.size()>bounded.faces()||NoiseSurface.recolorReservation(source,style.colors())>bounded.workingBytes())throw new IllegalArgumentException("Scalar recolor source and replacement colors exceed their declared allowance");
+            }
+            if(reusableHistogram.isPresent()) {
+                var colors=style.colors();var expected=new ScalarHistogram.Range(colors.minimum(),colors.maximum());var requested=histogram.orElseThrow();
+                reusableHistogram=reusableHistogram.filter(value->value.bins()==requested.bins()&&value.matches(ScalarHistogram.receipt(volume),expected));
             }
         }
         public static Request recolor(NoiseSurface source,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
@@ -29,6 +35,8 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
             return new NoiseSurface.Limits(limits.faces(),working-bytes);
         }
         public Request withHistogram(ScalarHistogram.Limits histogram) { return new Request(volume,style,limits,geometry,Optional.of(histogram)); }
+        /** Borrow a detached candidate through admission; incompatible source/range/bin metadata falls back to capture. */
+        public Request withHistogram(ScalarHistogram.Limits histogram,ScalarHistogram candidate) { return new Request(volume,style,limits,geometry,Optional.of(histogram),Optional.of(candidate)); }
         NoiseSurface.Limits preparationLimits() { return bounded(volume,limits,histogram); }
         long histogramBytes() { return histogram.map(value->ScalarHistogram.requestedBytes(volume,value)).orElse(0L); }
         public long reservation() { return (geometry.isPresent()?NoiseSurface.recolorReservation(geometry.orElseThrow(),style.colors()):NoiseSurface.reservation(volume,style,preparationLimits()))+histogramBytes(); }
@@ -123,8 +131,8 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
             try {
                 synchronized(lock) { if(current(job))status=state(job,job.request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,List.of()); }
                 var request=job.request;var result=request.geometry().isPresent()?NoiseSurface.recolor(request.geometry().orElseThrow(),request.style().colors(),request.preparationLimits(),job::cancelled):NoiseSurface.prepare(request.volume(),request.style(),request.preparationLimits(),job::cancelled);
-                Optional<ScalarHistogram> histogram=Optional.empty();
-                if(!result.requiresPlaceholder()&&request.histogram().isPresent()) {
+                Optional<ScalarHistogram> histogram=request.reusableHistogram();
+                if(!result.requiresPlaceholder()&&request.histogram().isPresent()&&histogram.isEmpty()) {
                     long extra=request.reservation()-request.histogramBytes()-result.payloadBytes();
                     var captured=result.histogram(request.histogram().orElseThrow().reserve(Math.max(0,extra)),job::cancelled);
                     if(captured.requiresPlaceholder()) { synchronized(lock) { if(current(job))status=state(job,Phase.FAILED,captured.problems()); }return; }

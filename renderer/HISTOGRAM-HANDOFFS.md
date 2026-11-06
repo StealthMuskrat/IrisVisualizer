@@ -13,7 +13,7 @@ var volumeRequest = new NoiseSurfaceWorker.Request(volume, style, meshLimits)
         .withHistogram(histogramLimits);
 ```
 
-Enabled requests capture the complete original scalar distribution at the request's explicit display color range after successful raster/mesh preparation, on that same CPU worker. They do not choose automatic ranges or limit counts to visible pixels, selected surface samples, clipping or camera bounds. Recolor requests retain exact source values and recompute the opted-in distribution without native resampling. Categorical maps and known sample/visit/payload violations reject during metadata preflight.
+Enabled requests capture the complete original scalar distribution at the request's explicit display color range after successful raster/mesh preparation, on that same CPU worker. They do not choose automatic ranges or limit counts to visible pixels, selected surface samples, clipping or camera bounds. Recolor requests retain exact source values. Requests without a compatible [reuse candidate](HISTOGRAM-REUSE.md) recompute the opted-in distribution without native resampling. Categorical maps and known sample/visit/payload violations reject during metadata preflight.
 
 READY requires the requested pair to succeed: raster/surface plus matching histogram. Histogram failure publishes its structured diagnostics without a partial completion. Source preparation failure preserves the original diagnostics. Existing revision replacement, cancellation and single-delivery rules still apply. Pending/completed bundles detach before fallible release, cleanup attempts both owners, and failed old-work cleanup releases any uninstalled replacement hold. Closed completions cannot escape after a release error.
 

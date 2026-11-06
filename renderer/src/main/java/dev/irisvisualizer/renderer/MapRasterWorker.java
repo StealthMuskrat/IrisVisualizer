@@ -7,11 +7,13 @@ import java.util.function.Supplier;
 
 /** One active colorization and one latest pending request; never samples or regenerates a world. */
 public final class MapRasterWorker implements AutoCloseable {
-    public record Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits,Optional<MapRaster> source,Optional<ScalarHistogram.Limits> histogram) {
+    public record Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits,Optional<MapRaster> source,Optional<ScalarHistogram.Limits> histogram,Optional<ScalarHistogram> reusableHistogram) {
+        public Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits,Optional<MapRaster> source,Optional<ScalarHistogram.Limits> histogram) { this(samples,style,limits,source,histogram,Optional.empty()); }
         public Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits,Optional<MapRaster> source) { this(samples,style,limits,source,Optional.empty()); }
         public Request(MapSamples samples,MapRaster.Style style,MapRaster.Limits limits) { this(samples,style,limits,Optional.empty()); }
         public Request {
-            Objects.requireNonNull(samples);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(source);Objects.requireNonNull(histogram);
+            Objects.requireNonNull(samples);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(source);Objects.requireNonNull(histogram);Objects.requireNonNull(reusableHistogram);
+            if(histogram.isEmpty()&&reusableHistogram.isPresent())throw new IllegalArgumentException("Reusable histogram requires requested histogram limits");
             if(source.isPresent()&&(source.orElseThrow().requiresPlaceholder()||source.orElseThrow().samples()!=samples))throw new IllegalArgumentException("Map recoloring requires a complete raster with the exact native samples");
             if(histogram.isPresent()) {
                 if(samples.kind()==MapSamples.Kind.BIOME||style instanceof MapRaster.BiomeStyle)throw new IllegalArgumentException("Map histograms require scalar display data");
@@ -19,10 +21,16 @@ public final class MapRasterWorker implements AutoCloseable {
                 long base=source.isPresent()?MapRaster.recolorReservation(source.orElseThrow(),style):samples.requiresPlaceholder()?0:samples.payloadBytes()+samples.grid().count()*4;
                 if(base+bytes>Math.min(limits.workingBytes(),histogram.orElseThrow().workingBytes()))throw new IllegalArgumentException("Map and requested histogram exceed their combined working allowance");
             }
+            if(reusableHistogram.isPresent()) {
+                var colors=style instanceof MapRaster.TerrainStyle terrain?terrain.colors():(MapRaster.ScalarStyle)style;var expected=new ScalarHistogram.Range(colors.minimum(),colors.maximum());var requested=histogram.orElseThrow();
+                reusableHistogram=reusableHistogram.filter(value->value.bins()==requested.bins()&&value.matches(ScalarHistogram.receipt(samples),expected));
+            }
         }
         public Request(MapSamples samples,MapRaster.Style style) { this(samples,style,MapRaster.Limits.DEFAULT); }
         public static Request recolor(MapRaster source,MapRaster.Style style,MapRaster.Limits limits) { Objects.requireNonNull(source);return new Request(source.samples(),style,limits,Optional.of(source)); }
         public Request withHistogram(ScalarHistogram.Limits histogram) { return new Request(samples,style,limits,source,Optional.of(histogram)); }
+        /** Borrow a detached candidate through admission; incompatible source/range/bin metadata falls back to capture. */
+        public Request withHistogram(ScalarHistogram.Limits histogram,ScalarHistogram candidate) { return new Request(samples,style,limits,source,Optional.of(histogram),Optional.of(candidate)); }
         long histogramBytes() { return histogram.map(value->ScalarHistogram.requestedBytes(samples,value)).orElse(0L); }
         long reservation() { return (source.isPresent()?MapRaster.recolorReservation(source.orElseThrow(),style):samples.requiresPlaceholder()?0:samples.payloadBytes()+samples.grid().count()*4)+histogramBytes(); }
     }
@@ -111,8 +119,8 @@ public final class MapRasterWorker implements AutoCloseable {
         try {
             synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get())status=new Status(job.revision,job.request.source().isPresent()?Phase.RECOLORING:Phase.RENDERING,Optional.of(job.request.samples().context()),List.of()); }
             var request=job.request;var result=request.source().isPresent()?MapRaster.recolor(request.source().orElseThrow(),request.style(),request.limits(),job::cancelled):MapRaster.render(request.samples(),request.style(),request.limits(),job::cancelled);
-            Optional<ScalarHistogram> histogram=Optional.empty();
-            if(!result.requiresPlaceholder()&&request.histogram().isPresent()) {
+            Optional<ScalarHistogram> histogram=request.reusableHistogram();
+            if(!result.requiresPlaceholder()&&request.histogram().isPresent()&&histogram.isEmpty()) {
                 long extra=request.reservation()-request.histogramBytes()-result.payloadBytes();
                 var captured=result.histogram(request.histogram().orElseThrow().reserve(Math.max(0,extra)),job::cancelled);
                 if(captured.requiresPlaceholder()) { synchronized(lock) { if(!closed&&job.revision==revision&&!job.cancelled.get())status=new Status(job.revision,Phase.FAILED,Optional.of(result.samples().context()),captured.problems()); }return; }

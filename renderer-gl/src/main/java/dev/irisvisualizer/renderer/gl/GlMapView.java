@@ -48,7 +48,9 @@ public final class GlMapView implements AutoCloseable {
     }
     /** Capability preflight and worker admission precede changes to the current view, tokens and work. */
     public long submit(MapRasterWorker.Request request) {
-        Objects.requireNonNull(request);current();var requestedGrid=request.samples().grid();GlMapUpload.dimensions(device,requestedGrid.width(),requestedGrid.height());long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,request.source().isPresent()?Phase.RECOLORING:Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
+        Objects.requireNonNull(request);current();
+        if(request.histogram().isPresent()&&request.reusableHistogram().isEmpty()&&histogram!=null)request=request.withHistogram(request.histogram().orElseThrow(),histogram.value());
+        var requestedGrid=request.samples().grid();GlMapUpload.dimensions(device,requestedGrid.width(),requestedGrid.height());long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,request.source().isPresent()?Phase.RECOLORING:Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
         long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;latestSamples=request.samples().id();latestStyle=request.style();latestLimits=request.limits();latestHistogram=request.histogram();status=queued;grid=request.samples().grid();
         if(view!=null&&(view.width()!=grid.width()||view.height()!=grid.height()))view=null;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }

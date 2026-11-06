@@ -375,6 +375,55 @@ public final class WorldCpuContracts {
             var tooFew=new ScalarHistogram.Limits(4,1,4,65536,65536);var invalid=RenderInput.own(samples,RenderMemory.Hold.none());throwsType(IllegalArgumentException.class,()->worker.submitMap(invalid,range,tooFew),"histogram sample preflight");check(invalid.closed(),"sample rejection consumes fresh owner");
         }
     }
+    private static void histogramReuse() {
+        var context=new MapSamples.Context(snapshot(1).source(),"noise","fixture","histogram reuse contract");var grid=new MapSamples.Grid(0,0,2,1,1);byte[] present={1,1};
+        var samples=MapSamples.noise(context,grid,new double[]{0,1},present,LIVE);var colors=new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE);
+        var changed=new MapRaster.ScalarStyle(0,1,new MapRamp(List.of(new MapRamp.Stop(0,0x112233ff),new MapRamp.Stop(1,0xaabbccff))));
+        var range=Optional.of(new ScalarHistogram.Range(0,1));var limits=new ScalarHistogram.Limits(4,2,2,65536,65536);var mapLimits=new MapRaster.Limits(8,65536);
+        var histogram=ScalarHistogram.capture(samples,range,limits,LIVE);var raster=MapRaster.render(samples,colors,LIVE);
+        var plain=MapRasterWorker.Request.recolor(raster,changed,mapLimits).withHistogram(limits);var reuse=plain.withHistogram(limits,histogram);
+        check(reuse.reusableHistogram().orElseThrow()==histogram,"map reuse keeps detached immutable identity");equal(plain.reservation(),reuse.reservation(),"map reuse retains complete original admission");
+        check(plain.reusableHistogram().isEmpty(),"legacy histogram request still captures");check(reuse.withHistogram(limits).reusableHistogram().isEmpty(),"ordinary option explicitly drops candidate");
+        var other=MapSamples.noise(context,grid,new double[]{0,1},present,LIVE);check(new MapRasterWorker.Request(other,changed,mapLimits).withHistogram(limits,histogram).reusableHistogram().isEmpty(),"equal map values do not replace source UUID");
+        var wider=new MapRaster.ScalarStyle(0,2,MapRamp.GRAYSCALE);var staleRange=new MapRasterWorker.Request(samples,wider,mapLimits).withHistogram(limits,histogram);check(staleRange.reusableHistogram().isEmpty(),"map range change selects capture");
+        var moreBins=new ScalarHistogram.Limits(8,2,2,65536,65536);check(plain.withHistogram(moreBins,histogram).reusableHistogram().isEmpty(),"map bin change selects capture");
+        var tooFew=new ScalarHistogram.Limits(4,2,1,65536,65536);throwsType(IllegalArgumentException.class,()->plain.withHistogram(tooFew,histogram),"reused histogram cannot bypass visit policy");
+        throwsType(IllegalArgumentException.class,()->new MapRasterWorker.Request(samples,colors,mapLimits,Optional.empty(),Optional.empty(),Optional.of(histogram)),"candidate cannot silently enable histogram");
+        long peak=reuse.reservation();
+        try(var memory=new RenderMemory(new RenderMemory.Limits(peak+histogram.bytes(),3));var executor=new DrainExecutor();var worker=new MapRasterWorker(peak+16,memory,()->executor)) {
+            var old=RenderInput.own(histogram,memory.hold("Old detached map histogram",histogram.bytes()));long obsolete=worker.submit(reuse);equal(peak+histogram.bytes(),memory.stats().chargedBytes(),"external candidate earns no replacement credit");old.close();
+            var blocker=memory.hold("Histogram reuse rejection",histogram.bytes());var prior=worker.status();
+            // The pending bundle is replaceable, but the unrelated blocker still prevents a larger request.
+            var larger=plain.withHistogram(moreBins,histogram);throwsType(RenderMemory.LimitException.class,()->worker.submit(larger),"reused request respects combined shared allowance");equal(prior,worker.status(),"reuse rejection preserves accepted revision");blocker.close();
+            long revision=worker.submit(reuse);executor.runNext();check(worker.take(obsolete).isEmpty(),"reused obsolete completion withheld");
+            try(var completion=worker.take(revision).orElseThrow()) {
+                check(completion.histogram().orElseThrow()==histogram,"map worker publishes reused counts without recapture");equal(changed,completion.raster().style(),"gradient still recolored");equal(completion.payloadBytes(),memory.stats().chargedBytes(),"reused map shrinks to complete bundle");
+                var kept=completion.retainHistogram();completion.close();worker.close();check(kept.value()==histogram,"reused map histogram survives producer shutdown");kept.close();
+            }noWorkerCharge(memory);
+        }
+        try(var executor=new DrainExecutor();var worker=new MapRasterWorker(65536,null,()->executor)) {
+            long revision=worker.submit(staleRange);executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().orElseThrow()!=histogram,"range mismatch actually captures new map histogram");check(completion.histogram().orElseThrow().matches(completion.raster()),"captured range matches new display"); }
+        }
+        var volume=NoiseVolume.capture(context,new NoiseVolume.Grid(grid,new MapSamples.Vertical(-64,1)),new double[]{0,1},present,NoiseVolume.Limits.DEFAULT,LIVE);
+        var volumeHistogram=ScalarHistogram.capture(volume,range,limits,LIVE);var meshLimits=new NoiseSurface.Limits(64,65536);var style=new NoiseSurface.Style(0,1,colors,NoiseSurface.Meshing.CELLS);var surface=NoiseSurface.prepare(volume,style,meshLimits,LIVE);
+        var scalarPlain=NoiseSurfaceWorker.Request.recolor(surface,changed,meshLimits).withHistogram(limits);var scalarReuse=scalarPlain.withHistogram(limits,volumeHistogram);
+        check(scalarReuse.reusableHistogram().orElseThrow()==volumeHistogram,"scalar gradient reuse identity");equal(scalarPlain.reservation(),scalarReuse.reservation(),"scalar reuse retains mesh and histogram peak");
+        check(scalarPlain.withHistogram(limits,histogram).reusableHistogram().isEmpty(),"map histogram cannot masquerade as volume histogram");check(scalarPlain.withHistogram(moreBins,volumeHistogram).reusableHistogram().isEmpty(),"scalar bin change selects capture");
+        var rebuilt=new NoiseSurfaceWorker.Request(volume,new NoiseSurface.Style(1,1,changed,NoiseSurface.Meshing.GREEDY),meshLimits).withHistogram(limits,volumeHistogram);check(rebuilt.reusableHistogram().isPresent(),"full-volume counts survive inclusion and meshing changes");
+        var scalarRange=NoiseSurfaceWorker.Request.recolor(surface,wider,meshLimits).withHistogram(limits,volumeHistogram);check(scalarRange.reusableHistogram().isEmpty(),"scalar range change selects capture");
+        throwsType(IllegalArgumentException.class,()->scalarPlain.withHistogram(tooFew,volumeHistogram),"scalar reuse respects visit policy");
+        long scalarPeak=scalarReuse.reservation();
+        try(var memory=new RenderMemory(new RenderMemory.Limits(scalarPeak,2));var executor=new DrainExecutor();var worker=new NoiseSurfaceWorker(scalarPeak,memory,()->executor)) {
+            long revision=worker.submit(scalarReuse);equal(scalarPeak,memory.stats().chargedBytes(),"scalar reused bins admitted before mesh work");executor.runNext();
+            try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().orElseThrow()==volumeHistogram,"scalar worker reuses detached count array");check(completion.surface().sharesGeometry(surface),"gradient edit keeps original scalar geometry");equal(completion.surface().payloadBytes()+volumeHistogram.bytes(),memory.stats().chargedBytes(),"scalar reused retained charge"); }noWorkerCharge(memory);
+            revision=worker.submit(scalarReuse);worker.invalidate();executor.runNext();check(worker.take(revision).isEmpty(),"cancelled reuse publishes no partial pair");noWorkerCharge(memory);
+            revision=worker.submit(scalarReuse);executor.runNext();worker.take(revision).orElseThrow().close();noWorkerCharge(memory);
+        }
+        try(var executor=new DrainExecutor();var worker=new NoiseSurfaceWorker(65536,null,()->executor)) {
+            long revision=worker.submit(scalarRange);executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().orElseThrow()!=volumeHistogram,"scalar range mismatch captures new bins");check(completion.histogram().orElseThrow().matches(completion.surface()),"scalar fallback matches new range"); }
+            revision=worker.submit(rebuilt);executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().orElseThrow()==volumeHistogram,"rebuilt geometry keeps full-source histogram");equal(2,completion.histogram().orElseThrow().summary().orElseThrow().present(),"inclusion never truncates full-source counts"); }
+        }
+    }
     private static void histogramWorkerHandoffs() {
         var context=new MapSamples.Context(snapshot(1).source(),"noise","fixture","histogram worker contract");var grid=new MapSamples.Grid(0,0,2,1,1);byte[] present={1,1};
         var samples=MapSamples.noise(context,grid,new double[]{0,1},present,LIVE);var colors=new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE);var histLimits=new ScalarHistogram.Limits(4,2,2,65536,4L*1024*1024);var mapLimits=new MapRaster.Limits(8,4096);
@@ -1296,6 +1345,7 @@ public final class WorldCpuContracts {
         group("detached bounded visual limitation reports",WorldCpuContracts::visualReports);
         group("background visual report ownership and recovery",WorldCpuContracts::reportWorkers);
         group("map and scalar histogram worker handoffs",WorldCpuContracts::histogramWorkerHandoffs);
+        group("admitted immutable histogram reuse and fallback",WorldCpuContracts::histogramReuse);
         group("detached background histogram ownership and ranges",WorldCpuContracts::detachedHistogramWorkers);
         group("background histogram failure and drain recovery",WorldCpuContracts::histogramWorkerFailures);
         group("model cube winding and provenance",WorldCpuContracts::geometry);

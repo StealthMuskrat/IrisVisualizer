@@ -47,7 +47,9 @@ public final class GlNoiseView implements AutoCloseable {
     }
     /** Grid precision preflight and CPU admission precede token changes and disposal of prior output. */
     public long submit(NoiseSurfaceWorker.Request request) {
-        Objects.requireNonNull(request);current();GlNoiseUpload.precision(request.volume().grid());long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
+        Objects.requireNonNull(request);current();
+        if(request.histogram().isPresent()&&request.reusableHistogram().isEmpty()&&histogram!=null)request=request.withHistogram(request.histogram().orElseThrow(),histogram.value());
+        GlNoiseUpload.precision(request.volume().grid());long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
         GlNoiseScene kept=null;Throwable escaping=null;
         try {
             if(request.geometry().isPresent()) {
