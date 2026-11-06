@@ -605,6 +605,7 @@ public final class WorldCpuContracts {
     }
     private static void noWorkerCharge(RenderMemory memory) { equal(0L,memory.stats().chargedBytes(),"closed worker has no idle shared charge");equal(0,memory.stats().accounts(),"closed worker has no idle account"); }
     private static void remainingWorkerShutdownRecovery() {
+        activeWorldAdmission();
         workerDrainRecovery();
         workerStartRecovery();
         var f=fixture(2,128,false);var context=new MapSamples.Context(f.snapshot().source(),"test","shutdown","supplied synthetic samples");
@@ -681,10 +682,55 @@ public final class WorldCpuContracts {
     private static Throwable caughtFailure(Runnable action) {
         try { action.run(); }catch(RuntimeException|Error failure) { return failure; }throw new AssertionError("expected cleanup failure missing");
     }
-    /** Read the worker-owned READY result without transferring it; fault injection remains in the shared ticket list. */
+    /** Read-only lifecycle inspection; source gates never rewrite worker jobs or admission. */
     private static Object workerField(Object worker,String name) {
         try { var field=worker.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(worker); }
         catch(ReflectiveOperationException failure) { throw new AssertionError("controlled worker ownership inspection unavailable",failure); }
+    }
+    /** Same captured catalog entries; one lookup pauses preparation for synchronous admission checks. */
+    private static final class AssetLookupGate implements AutoCloseable {
+        final ClientAssetSnapshot assets;final java.lang.reflect.Field field;final NavigableMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset> original;boolean fired;
+        @SuppressWarnings("unchecked") AssetLookupGate(ClientAssetSnapshot assets,Runnable beforeLookup) {
+            this.assets=assets;
+            try {
+                field=ClientAssetSnapshot.class.getDeclaredField("assets");field.setAccessible(true);original=(NavigableMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset>)field.get(assets);
+                field.set(assets,new TreeMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset>(original) {
+                    @Override public ClientAssetSnapshot.Asset get(Object key) { if(!fired) { fired=true;beforeLookup.run(); }return super.get(key); }
+                });
+            }catch(ReflectiveOperationException failure) { throw new AssertionError("controlled catalog lookup gate unavailable",failure); }
+        }
+        @Override public void close() { try { field.set(assets,original); }catch(ReflectiveOperationException failure) { throw new AssertionError("catalog lookup gate restore failed",failure); } }
+    }
+    private static void activeWorldAdmission() {
+        var f=fixture(2,128,false);var visualLimits=new WorldVisuals.Limits(4,4,4,16,16,1024*1024,4*1024*1024);
+        var visuals=WorldVisuals.Request.capture(f.assets(),f.snapshot(),List.of(new WorldVisuals.ModelChoice(0,List.of(0))),new int[2],0,0,visualLimits,LIVE);
+        var keep=WorldVisibility.Input.keepAll(f.snapshot());var masks=WorldVisibility.Input.capture(f.snapshot(),"supplied zero masks",new byte[2],LIVE);
+        var decisions=WorldModelInputs.Request.capture(f.assets(),f.snapshot(),List.of(WorldModelInputs.Decision.model()),0,0,new WorldModelInputs.Limits(visualLimits,BlockModels.Limits.DEFAULT,4,16),LIVE);
+        long resident=f.plan().usage().orElseThrow().knownPayloadBytes(),activeInput=visuals.inputBytes()+keep.bytes(),activePeak=resident+activeInput;check(resident>masks.bytes(),"fixture has a nontrivial old cache/input coexistence peak");
+        var activeRequest=new WorldRenderWorker.Request(visuals,keep,f.plan().limits(),f.plan().sectionLimits(),activeInput);
+        for(boolean tracked:new boolean[]{false,true})for(boolean modelPending:new boolean[]{false,true}) {
+            long pendingInput=(modelPending?decisions.inputBytes():visuals.inputBytes())+keep.bytes(),limit=activePeak+pendingInput;
+            var exact=new WorldRenderWorker.Request(visuals,keep,f.plan().limits(),f.plan().sectionLimits(),limit);var over=new WorldRenderWorker.Request(visuals,masks,f.plan().limits(),f.plan().sectionLimits(),limit);
+            var exactModel=new WorldRenderWorker.ModelRequest(decisions,keep,f.plan().limits(),f.plan().sectionLimits(),limit);var overModel=new WorldRenderWorker.ModelRequest(decisions,masks,f.plan().limits(),f.plan().sectionLimits(),limit);
+            try(var memory=new RenderMemory(new RenderMemory.Limits(limit*4,4));var executor=new DrainExecutor();var worker=new WorldRenderWorker(limit,tracked?memory:null,()->executor)) {
+                var cache=(WorldSectionCache)workerField(worker,"cache");
+                // Populate through real cache/scene APIs, then leave only resident unleased payload before submission.
+                try(var seed=build(f,cache)) { equal(resident,cache.stats().knownPayloadBytes(),"independent complete-scene receipt predicts cached source/mesh bytes"); }
+                equal(0L,cache.stats().leases(),"prior scene leaves only unleased cache payload");
+                LongSupplier submitExact=modelPending?()->worker.submit(exactModel):()->worker.submit(exact);LongSupplier submitOver=modelPending?()->worker.submit(overModel):()->worker.submit(over);
+                try(var gate=new AssetLookupGate(f.assets(),()->{
+                    var active=workerField(worker,"active");check(active!=null,"catalog lookup occurs inside active preparation");equal(activePeak,(long)workerField(active,"admissionBytes"),"active peak covers original cache plus frozen input");equal(0L,cache.stats().knownPayloadBytes(),"old cache was evicted but its admitted execution peak remains");
+                    var status=worker.status();var shared=memory.stats();var cached=cache.stats();var cancelled=(java.util.concurrent.atomic.AtomicBoolean)workerField(active,"cancelled");check(!cancelled.get(),"active request initially uncancelled");
+                    throwsType(IllegalArgumentException.class,()->submitOver.getAsLong(),"active peak plus larger pending input exceeds local bound even with shared headroom");equal(status,worker.status(),"local rejection preserves exact current status/revision");equal(shared,memory.stats(),"local rejection preserves exact shared admission");equal(cached,cache.stats(),"local rejection performs no cache mutation");check(workerField(worker,"pending")==null&&!cancelled.get(),"local rejection retains active ownership without installing work");
+                    equal(2L,submitExact.getAsLong(),"exact active-peak plus pending-input boundary accepted");var pending=workerField(worker,"pending");check(pending!=null&&cancelled.get(),"accepted latest input cancels active work cooperatively");equal(tracked?limit:0,memory.stats().chargedBytes(),"exact acceptance stays within shared and local ceiling");
+                    var queued=worker.status();var admitted=memory.stats();throwsType(IllegalArgumentException.class,()->submitOver.getAsLong(),"over-bound replacement cannot displace an admitted pending request");check(workerField(worker,"pending")==pending,"rejected replacement preserves exact pending request");equal(queued,worker.status(),"rejected replacement preserves accepted token/status");equal(admitted,memory.stats(),"rejected replacement keeps exact pending charge");
+                    equal(3L,submitExact.getAsLong(),"exact replacement reuses the one pending slot without double charging");equal(tracked?limit:0,memory.stats().chargedBytes(),"exact replacement retains one pending charge");equal(1,executor.attempts,"active drain owns all submissions without duplicate dispatch");worker.close();equal(tracked?activePeak:0,memory.stats().chargedBytes(),"close drops pending input but retains the active execution peak through unwind");
+                })) {
+                    equal(1L,worker.submit(activeRequest),"cache/input coexistence job admitted before its later phase budget");executor.runNext();check(gate.fired,"active preparation reached controlled catalog lookup");
+                }
+                equal(WorldRenderWorker.Phase.CLOSED,worker.status().phase(),"active cancellation retains terminal metadata");equal(3L,worker.status().revision(),"only accepted submissions spend revisions");check(worker.take(1).isEmpty()&&worker.take(3).isEmpty(),"closed cancelled preparation publishes no scene");noWorkerCharge(memory);check(cache.stats().closed()&&cache.stats().leases()==0,"active unwind retires empty cache");equal(state(407),f.snapshot().states().getFirst(),"admission checks preserve original native state");equal(BIOME,f.snapshot().biomes().getFirst(),"admission checks preserve original native biome");
+            }
+        }
     }
     private static void sceneCompletionCleanupFailures() {
         var f=fixture(2,128,false);var sceneRequest=new WorldSceneWorker.Request(f.models(),f.visibility(),f.raster(),f.plan().limits(),f.plan().sectionLimits());

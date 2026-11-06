@@ -92,11 +92,11 @@ public final class WorldRenderWorker implements AutoCloseable {
     }
     private long submit(Submission request) {
         Objects.requireNonNull(request);synchronized(lock) {
-            requireOpen();long running=active==null?cache.stats().knownPayloadBytes():active.request.workingBytes();
+            requireOpen();long running=active==null?cache.stats().knownPayloadBytes():active.admissionBytes;
             if(Math.max(request.workingBytes(),running+request.inputBytes())>workingBytes)throw new IllegalArgumentException("Active render/cache and pending input exceed the worker CPU budget");
             long next=nextRevision();var job=new Job(next,request);var queued=status(job,Phase.QUEUED,List.of(),List.of());
             // Reject shared admission before changing revisions, cancelling jobs or dropping old output.
-            reserve(Math.max(request.workingBytes(),(active==null?running:active.admissionBytes)+request.inputBytes()));
+            reserve(Math.max(request.workingBytes(),running+request.inputBytes()));
             cancelOwned();pending=job;revision=next;status=queued;
             if(!scheduled) {
                 scheduled=true;try { executor.execute(this::drain); }
