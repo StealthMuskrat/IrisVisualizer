@@ -8,17 +8,16 @@ This connects the [full-height scalar capture and boundary meshes](../renderer/N
 
 `GlNoiseUpload.begin(device, surface)` borrows a complete immutable `NoiseSurface` and immediately charges its retained sample/mesh payload to a CPU-only device journal. The consuming `RenderInput<NoiseSurface>` overload retains the source through destination admission, requires the same shared coordinator for tracked input, and closes the supplied wrapper on every outcome. Retain a retry owner first if needed.
 
-The admitted instance buffer uses twelve bytes per emitted rectangle, supporting both [greedy and unit surfaces](../renderer/SCALAR-GREEDY.md):
+The admitted instance data uses twelve bytes per emitted rectangle, supporting both [greedy and unit surfaces](../renderer/SCALAR-GREEDY.md). [Separated geometry/colors](SCALAR-GPU-RECOLOR.md) now use two immutable buffers:
 
-| Word | Encoding |
+| Buffer | Encoding |
 | --- | --- |
-| First unsigned 32-bit word | Original anchor sample index shifted left three bits, plus cardinal direction-enum ordinal 0..5 |
-| Second unsigned 32-bit word | Explicit display RGBA8 in `RRGGBBAA` bit order |
-| Third unsigned 32-bit word | U/V lengths minus one in two 12-bit fields; zero means one unit in each tangent |
+| Geometry, eight bytes | Original anchor sample index shifted left three bits plus direction ordinal 0..5; U/V lengths minus one in two 12-bit fields |
+| Color, four bytes | Explicit display RGBA8 in `RRGGBBAA` bit order |
 
-The source sample cap is 16,777,216, so the packed sample/direction word fits without truncation. No second full CPU vertex/color/index array is allocated. Existing staging writes whole twelve-byte instances, at most 64 KiB per transfer action, in native byte order. The existing per-step byte/action/work ceilings and cooperative elapsed target apply. Storage bytes are reported separately. Base RGBA is now [prepared on the CPU](../renderer/SCALAR-COLORS.md); uploads perform direct color lookups. Driver calls and staging still cannot provide a hard elapsed-time guarantee.
+The source sample cap is 16,777,216, so the packed sample/direction word fits without truncation. No second full CPU vertex/color/index array is allocated. Whole geometry/color records transfer in chunks of at most 64 KiB. Recolor uploads may copy the exact old GPU geometry and upload only new colors; CPU transfer and GPU copy counts remain separate under a combined per-step byte ceiling. Base RGBA stays [prepared on the CPU](../renderer/SCALAR-COLORS.md). Storage bytes are reported separately; driver calls still cannot provide a hard elapsed-time guarantee.
 
-The first storage action admits the complete GPU buffer plus one VAO before names/storage. The instance attribute is an integer triple with divisor one. Layout setup follows complete data transfer. Only full face coverage and successful host-binding restoration allow READY/take. Zero-face surfaces need neither buffer nor VAO and still produce a successful scene. Cancellation or failure retires only upload-owned work under existing fence/quarantine accounting.
+The first storage action admits the complete GPU buffers plus one VAO before names/storage. Both integer attributes have divisor one. Layout setup follows complete geometry/color coverage, and both offsets reset for each visible batch run. Only full coverage, successful host-binding restoration and source-owner release allow READY/take. Zero-face surfaces need neither buffers nor VAO and still produce a successful scene. Cancellation or failure retires upload-owned work and attempts retained-source release under existing fence/quarantine accounting.
 
 `GlNoiseScene` is an independently retainable scene owner. Its journal keeps the exact CPU surface and full scalar volume charged until actual retirement. A last-owner close retires its resources; another retained owner stays live. Pending GPU commands, dependencies and failed cleanup preserve existing device charges. Every operation uses the original thread, GLFW context and LWJGL capabilities.
 

@@ -10,7 +10,7 @@ public final class GlNoiseView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlNoiseRenderer renderer;private final GlDevice device;private final NoiseSurfaceWorker worker;
-    private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private NoiseSurface.Limits latestLimits;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private GlNoiseUpload upload;private GlNoiseScene scene,recolorSource;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private NoiseSurface.Limits latestLimits;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private RenderInput<ScalarHistogram> histogram;private Optional<ScalarHistogram.Limits> latestHistogram=Optional.empty();
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlNoiseView(GlNoiseRenderer renderer) { this(renderer,1024L*1024*1024); }
@@ -48,8 +48,16 @@ public final class GlNoiseView implements AutoCloseable {
     /** Grid precision preflight and CPU admission precede token changes and disposal of prior output. */
     public long submit(NoiseSurfaceWorker.Request request) {
         Objects.requireNonNull(request);current();GlNoiseUpload.precision(request.volume().grid());long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;sourceReady=false;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();latestLimits=request.limits();latestHistogram=request.histogram();status=queued;
-        try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        GlNoiseScene kept=null;Throwable escaping=null;
+        try {
+            if(request.geometry().isPresent()) {
+                var geometry=request.geometry().orElseThrow();var candidate=sourceReady&&scene!=null?scene:recolorSource;
+                if(candidate!=null&&candidate.surface().sharesGeometry(geometry))kept=candidate.retain();
+            }
+            long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;sourceReady=false;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();latestLimits=request.limits();latestHistogram=request.histogram();status=queued;
+            try { releaseDisplay();recolorSource=kept;kept=null;return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        }catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
+        finally { if(kept!=null)try { kept.close(); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }
     }
     /** Consumes detached native samples after destination admission; retain another input for retries/style changes. */
     public long submit(RenderInput<NoiseVolume> input,NoiseSurface.Style style,NoiseSurface.Limits limits) {
@@ -140,7 +148,8 @@ public final class GlNoiseView implements AutoCloseable {
                 if(result.isPresent())try(var prepared=result.orElseThrow()) {
                     if(histogram!=null)throw new GlFailure(GlFailure.Code.STATE,"A prior scalar histogram survived source invalidation");
                     histogram=prepared.histogram().isPresent()?prepared.retainHistogram():null;
-                    upload=GlNoiseUpload.begin(device,prepared.input());cpuRevision=0;state(Phase.UPLOADING);
+                    upload=recolorSource!=null&&recolorSource.surface().sharesGeometry(prepared.surface())?GlNoiseUpload.recolor(recolorSource,prepared.input()):GlNoiseUpload.begin(device,prepared.input());
+                    releaseRecolorSource();cpuRevision=0;state(Phase.UPLOADING);
                 }
                 else {
                     var cpu=worker.status();if(cpu.revision()!=cpuRevision||cpu.phase()==NoiseSurfaceWorker.Phase.CLOSED)throw new GlFailure(GlFailure.Code.STALE,"Scalar worker changed before adoption");
@@ -160,8 +169,10 @@ public final class GlNoiseView implements AutoCloseable {
         var value=Optional.of(completed);var delivered=new Status(dataRevision,viewRevision,Phase.DELIVERED,status.context(),List.of(),Optional.empty(),"");completed=null;status=delivered;return value;
     }
     private void releaseFrame() { if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error failure) { if(completed.closed())completed=null;throw failure; } }
+    private void releaseRecolorSource() { if(recolorSource!=null)try { recolorSource.close();recolorSource=null; }catch(RuntimeException|Error failure) { if(recolorSource.closed())recolorSource=null;throw failure; } }
     private void releaseDisplay() {
         Throwable failure=null;try { releaseFrame(); }catch(RuntimeException|Error error) { failure=error; }
+        try { releaseRecolorSource(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(upload!=null)try { upload.close();upload=null; }catch(RuntimeException|Error error) { if(!upload.ownsResources())upload=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(scene!=null)try { scene.close();scene=null; }catch(RuntimeException|Error error) { if(scene.closed())scene=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(histogram!=null) { var old=histogram;histogram=null;try { old.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); } }

@@ -54,4 +54,4 @@ This is an initial suite, not renderer-stage completion. Broader world block/mod
 
 [Detached scalar histograms](SCALAR-HISTOGRAMS.md) add the twentieth CPU group, preparing original-value/missing coverage, automatic/explicit ranges, stable legends, map/volume identity, display-range matching, complete-source admission and owned cleanup. All 72 groups remain unexecuted.
 
-The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds ten prepared groups and its own explicit runner. It does not enter the dependency-free source set or change the four-suite CPU runner. Full compilation now covers 134 production files and five harnesses (139 files); the default CPU set remains 101 files. All 82 groups across the five harnesses remain unexecuted.
+The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds eleven prepared groups and its own explicit runner. It does not enter the dependency-free source set or change the four-suite CPU runner. Full compilation now covers 134 production files and five harnesses (139 files); the default CPU set remains 101 files. All 83 groups across the five harnesses remain unexecuted.

@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains ten synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 72 prepared, unexecuted groups, making 82 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains eleven synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 72 prepared, unexecuted groups, making 83 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -37,6 +37,7 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | Readback recovery | Invalid replacement preserving READY output, exact owned pixel transfer and single delivery |
 | Host state | Unusual viewport/scissor, blend/depth/cull/color masks, sRGB/discard/clip distance, active texture and pack/unpack row state restored across upload/draw/readback |
 | Scalar display | Supplied full-height samples, bounded instance upload, nonempty rendering, disjoint clip culling, original volume/range identity and exact frame readback receipts |
+| Scalar GPU recoloring | Exact shared geometry, bounded GPU copies/four-byte CPU colors, full-upload pixel equivalence, batch offsets, copy bindings, cancellation/ownership and connected rapid recolor/histogram adoption |
 | Budgets and lifetimes | GPU-budget rejection without allocation, independently owned readback surviving frame/device closure and retained wrapper release |
 
 The synthetic PNG has four explicit RGBA texels, including transparent color. Pixel expectations use those original values rather than a second renderer run. Navigation expectations come from integer nearest-neighbor replication and an explicit clear border. Scalar checks distinguish rendered interior from the same target's fully clipped clear output; they do not claim a native shading/pixel baseline. All loops have a twenty-second deadline plus a step ceiling. Hard transfer/action/work limits are checked separately from cooperative elapsed-time targets.
@@ -49,7 +50,7 @@ Each group uses a fresh bounded `GlDevice` and shared `RenderMemory`; device shu
 
 ## Successful execution evidence
 
-The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all ten groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
+The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all eleven groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
 
 A real report records the synthetic scope, successful group names/count, start/completion instants, OS/architecture, Java and LWJGL versions, and the actual driver receipt. It is a narrow run result, not a source/dependency fingerprint manifest, independently captured native baseline, final renderer approval or an authorization to enable previews. Use fresh execution with the intended checked-out sources and retain the corresponding build/commit information when collecting final validation evidence.
 
@@ -57,4 +58,4 @@ A real report records the synthetic scope, successful group names/count, start/c
 
 Direct Java 25 compilation passed for all 134 CPU/OpenGL production sources plus five harness sources (139 files). The existing 101-file dependency-free set also compiles and continues to exclude this LWJGL/GLFW harness. No Java harness, GLFW initialization, shader, upload, readback, native adapter or CI workflow was run. Gradle/PowerShell task execution remains source-inspected only in this workspace.
 
-The GPU harness is an initial real-driver path. Full world meshes/materials/transparency/animation and native visual comparisons, connected-view asynchronous workers, histogram frame submissions, hostile indexed/extension state, wrong native contexts/devices, allocation/fence/restoration fault injection, interactive Windows GUI/DPI behavior and performance/total-memory measurements still require their planned renderer/integration validation. The ten groups do not replace those checks or the earlier CPU suites.
+The GPU harness is an initial real-driver path. Full world meshes/materials/transparency/animation and native visual comparisons, broader connected-view asynchronous workers and histogram frame submissions, hostile indexed/extension state, wrong native contexts/devices, allocation/fence/restoration fault injection, interactive Windows GUI/DPI behavior and performance/total-memory measurements still require their planned renderer/integration validation. The eleven groups do not replace those checks or the earlier CPU suites.

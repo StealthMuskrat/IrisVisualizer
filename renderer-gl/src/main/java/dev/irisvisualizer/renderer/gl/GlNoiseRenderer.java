@@ -8,7 +8,8 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class GlNoiseRenderer implements AutoCloseable {
     private static final String VERTEX="""
         #version 330 core
-        layout(location=0) in uvec3 instance;
+        layout(location=0) in uvec2 geometry;
+        layout(location=1) in uint rgba;
         uniform mat4 viewProjection;
         uniform vec3 gridOffset;
         uniform uvec2 gridSize;
@@ -25,13 +26,13 @@ public final class GlNoiseRenderer implements AutoCloseable {
             vec3(1,1,1),vec3(1,0,1),vec3(1,0,0),vec3(1,1,0));
         const vec3 normal[6]=vec3[6](vec3(0,-1,0),vec3(0,1,0),vec3(0,0,-1),vec3(0,0,1),vec3(-1,0,0),vec3(1,0,0));
         void main() {
-            uint cell=instance.x>>3u,side=instance.x&7u;
+            uint cell=geometry.x>>3u,side=geometry.x&7u;
             vec3 origin=vec3(float(cell%gridSize.x),float(cell/(gridSize.x*gridSize.y)),float((cell/gridSize.x)%gridSize.y));
-            float u=float((instance.z&4095u)+1u),v=float((instance.z>>12u)+1u);
+            float u=float((geometry.y&4095u)+1u),v=float((geometry.y>>12u)+1u);
             vec3 extent=side<2u?vec3(u,1.0,v):(side<4u?vec3(u,v,1.0):vec3(1.0,v,u));
             vec3 local=(origin+corner[int(side)*4+triangle[gl_VertexID]]*extent)*vec3(horizontalScale,1.0,horizontalScale);
             worldPosition=gridOffset+local;gl_Position=viewProjection*vec4(worldPosition,1.0);
-            vec3 rgb=vec3(float((instance.y>>24u)&255u),float((instance.y>>16u)&255u),float((instance.y>>8u)&255u))/255.0;
+            vec3 rgb=vec3(float((rgba>>24u)&255u),float((rgba>>16u)&255u),float((rgba>>8u)&255u))/255.0;
             faceColor=rgb*(0.35+0.65*max(0.0,dot(normal[int(side)],normalize(vec3(0.4,0.8,0.25)))));
         }
         """;
@@ -78,14 +79,14 @@ public final class GlNoiseRenderer implements AutoCloseable {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
             if(surface.size()>0) { glUseProgram(allocation.programs[0]);glUniformMatrix4fv(matrix,false,transform);glUniform3f(offset,relative[0],relative[1],relative[2]);glUniform2ui(size,grid.width(),grid.depth());glUniform1f(scale,step);glUniform1i(clipEnabled,clip.enabled()?1:0);
                 if(clip.enabled()) { glUniform3f(clipMin,plane(clipBounds.minX()),plane(clipBounds.minY()),plane(clipBounds.minZ()));glUniform3f(clipMax,plane(clipBounds.maxX()),plane(clipBounds.maxY()),plane(clipBounds.maxZ())); }
-                glBindVertexArray(scene.allocation.vaos[0]);glBindBuffer(GL_ARRAY_BUFFER,scene.allocation.buffers[0]);
+                glBindVertexArray(scene.allocation.vaos[0]);
                 int first=-1,count=0;
                 for(int batch=0;batch<=surface.batchCount();batch++) {
                     boolean show=batch<surface.batchCount()&&frustum.visible(surface,batch,step,relative,clip.enabled()?clipBounds:null);
                     if(show) { visible++;if(first<0)first=surface.batchFirst(batch);count+=surface.batchSize(batch); }
                     else {
                         if(batch<surface.batchCount()) { culled++;culledFaces+=surface.batchSize(batch); }
-                        if(first>=0) { glVertexAttribIPointer(0,3,GL_UNSIGNED_INT,GlNoiseUpload.INSTANCE_BYTES,(long)first*GlNoiseUpload.INSTANCE_BYTES);glDrawArraysInstanced(GL_TRIANGLES,0,6,count);calls++;submitted+=count;first=-1;count=0; }
+                        if(first>=0) { GlNoiseUpload.bindInstances(scene.allocation,first);glDrawArraysInstanced(GL_TRIANGLES,0,6,count);calls++;submitted+=count;first=-1;count=0; }
                     }
                 }
             }device.check("complete scalar draw");

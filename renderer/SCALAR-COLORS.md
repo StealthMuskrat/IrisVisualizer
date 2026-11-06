@@ -49,3 +49,5 @@ For connected views, cover recoloring during pending work/upload, the current-sc
 ## Independent displayed CPU sources
 
 [Scalar source handoff](../renderer-gl/SCALAR-RECOVERY.md) now admits an independent CPU input from a displayed scene/frame without copying geometry, volume or prepared colors. The input can outlive GL closure and feed consuming connected-view recolor requests. Keep a retained retry owner before consuming submission. Full-style upload recovery is separate from geometry-sharing recoloring, preserving the latest requested display colors. Runtime/GPU checks remain deferred.
+
+The [GPU handoff](../renderer-gl/SCALAR-GPU-RECOLOR.md) now uses `sharesGeometry` to attest the exact immutable CPU layout without scanning. Matching retained scenes copy eight geometry bytes per face on the GPU and upload only four prepared color bytes per face from the CPU. Independently prepared equal layouts require full upload. Existing CPU recoloring contracts were extended; all 83 current renderer groups remain unexecuted.

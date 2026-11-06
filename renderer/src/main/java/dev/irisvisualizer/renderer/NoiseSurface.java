@@ -42,6 +42,10 @@ public final class NoiseSurface {
     private NoiseSurface(NoiseVolume volume,Style style,int[] cells,byte[] sides,int[] spans,int[] batches,int[] colors,Optional<Bounds> bounds,Optional<Usage> usage,List<WorldProblem> problems) {
         this.volume=volume;this.style=style;this.cells=cells;this.sides=sides;this.spans=spans;this.batches=batches;this.colors=colors;this.bounds=bounds;this.usage=usage;this.problems=List.copyOf(problems);
     }
+    /** Constant-time proof of the exact immutable face layout reused by recoloring; never a value scan. */
+    public boolean sharesGeometry(NoiseSurface other) {
+        Objects.requireNonNull(other);return !requiresPlaceholder()&&!other.requiresPlaceholder()&&volume==other.volume&&style.sameGeometry(other.style)&&cells==other.cells&&sides==other.sides&&spans==other.spans&&batches==other.batches;
+    }
     private static final ModelPlan.Direction[] DIRECTIONS=ModelPlan.Direction.values();
     private static final int[] X={0,0,0,0,-1,1},Y={-1,1,0,0,0,0},Z={0,0,-1,1,0,0};
     private static boolean selected(NoiseVolume volume,Style style,int cell) { return volume.present(cell)&&style.includes(volume.value(cell)); }
