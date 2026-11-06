@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 22 synthetic contract groups alongside 19 map/scalar/image/ownership groups: 41 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 65 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 23 synthetic contract groups alongside 19 map/scalar/image/ownership groups: 42 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 66 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -22,6 +22,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Geometry picking | Analytic unit-cube plane distance and exact source identities, batch/exhaustive agreement, clipping, budget failure and alpha/geometry modes |
 | Conservative picking hierarchy | Analytic edge/corner hits survive node/range rejection; six exact source planes and tiny translated planes retain detached coordinates; section-local tiny inside/outside points, six marker entry planes, inside-box near distances, closed clip/ray endpoints, strict exclusions, shifted anchors, lower-section ties, atomic budget failure and unexpanded actual marker boxes |
 | Translucent ordering | An independent vertex-centroid reference sort checks complete global back-to-front keys and stable ties; scratch deficit withholds the entire order |
+| Blended fluid materials | Native water palette averaging through forward/reverse/overlay geometry, packed/atlas color and policy preservation, whole-fluid alpha, independent JSON-base tint/placement, lava, missing dependencies, budgets and cancellation |
 | Native biome blending | Exact halo/source/overlap/height validation, radius-zero and radius-seven RGB averages, signed-coordinate boundaries, per-neighbor positions, cumulative sample limits, cancellation and failure without partial tint output |
 | Translucent view preflight | Tiny/subnormal directions preserve pending/READY status, tokens and admission; fresh rejected wrappers are consumed, existing owners protected, and the exact minimum direction keeps the ordinary axial order |
 | Empty/diagnostic visuals | Empty scenes use no dummy texture/geometry; unsupported markers preserve original state and diagnostic without fabricated block faces |

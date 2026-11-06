@@ -32,8 +32,14 @@ public final class FluidGeometry {
     private static final List<ModelPlan.Direction> SIDES=List.of(ModelPlan.Direction.NORTH,ModelPlan.Direction.EAST,ModelPlan.Direction.SOUTH,ModelPlan.Direction.WEST);
     /** Same complete input key permits prototype reuse within the exact original state/snapshot. */
     public static BlockMesh bake(ClientAssetSnapshot assets,WorldSnapshot snapshot,int cell,Cell input,NativeGeometry.Limits limits,BooleanSupplier cancelled) {
-        Objects.requireNonNull(input);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
-        return NativeGeometry.read(assets,snapshot,cell,NativeMeshSource.Kind.FLUID,"Vanilla fluid render inputs; radius-zero water color; exact-input shared prototype",new NativeGeometry.Reader() {
+        Objects.requireNonNull(input);
+        return bake(assets,snapshot,cell,input,input.kind()==Kind.WATER?"supplied water material RGB":"supplied lava material RGB",limits,cancelled);
+    }
+    /** Retains the caller's bounded captured color policy independently of the model tint layers. */
+    public static BlockMesh bake(ClientAssetSnapshot assets,WorldSnapshot snapshot,int cell,Cell input,String colorPolicy,NativeGeometry.Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(input);Objects.requireNonNull(colorPolicy);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
+        if(colorPolicy.isBlank()||colorPolicy.length()>128)throw new IllegalArgumentException("Fluid color policy must be nonblank and at most 128 characters");
+        return NativeGeometry.read(assets,snapshot,cell,NativeMeshSource.Kind.FLUID,"Vanilla fluid render inputs; "+colorPolicy+"; exact-input shared prototype",new NativeGeometry.Reader() {
             private List<NativeGeometry.Quad> values;
             @Override public int size() { return quadCount(input); }
             @Override public NativeGeometry.Quad quad(int index) { if(values==null)values=quads(input,cancelled);return values.get(index); }

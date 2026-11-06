@@ -24,10 +24,13 @@ import java.util.function.BooleanSupplier;
 /** Source-reviewed vanilla pure-fluid and verified JSON-base fluid layer producer. */
 public final class NativeFluidInputs {
     private NativeFluidInputs() {}
-    private static final String POLICY="Vanilla water/lava surfaces; native height/flow/occlusion; radius-zero water color; simple display lighting";
-    public record Limits(WorldVisualEdits.Limits edits,NativeGeometry.Limits geometry,long queries) {
+    private static final String POLICY="Vanilla water/lava surfaces; native height/flow/occlusion; simple display lighting";
+    public record Limits(WorldVisualEdits.Limits edits,NativeGeometry.Limits geometry,long queries,Optional<WorldBiomeBlend.Limits> waterBlend) {
         public static final Limits DEFAULT=new Limits(WorldVisualEdits.Limits.DEFAULT,NativeGeometry.Limits.DEFAULT,67108864);
-        public Limits { Objects.requireNonNull(edits);Objects.requireNonNull(geometry);if(queries<0||queries>268435456)throw new IllegalArgumentException("Fluid query bound exceeded"); }
+        public Limits(WorldVisualEdits.Limits edits,NativeGeometry.Limits geometry,long queries) { this(edits,geometry,queries,Optional.empty()); }
+        public Limits { Objects.requireNonNull(edits);Objects.requireNonNull(geometry);Objects.requireNonNull(waterBlend);if(queries<0||queries>268435456)throw new IllegalArgumentException("Fluid query bound exceeded"); }
+        /** Explicit water-only averaging over the existing borrowed neighbor capture. */
+        public Limits withWaterBlend(WorldBiomeBlend.Limits blend) { return new Limits(edits,geometry,queries,Optional.of(blend)); }
     }
     private record Key(int state,FluidGeometry.Cell input) {}
     private record ProblemKey(int state,String reason) {}
@@ -43,17 +46,18 @@ public final class NativeFluidInputs {
         return capture(context,original,neighbors,limits,true,cancelled);
     }
     private static NativeVisualInputs.Result capture(NativeRenderContext context,WorldRenderWorker.Request original,Optional<WorldSnapshot> neighbors,Limits limits,boolean reservedNeighbors,BooleanSupplier cancelled) {
-        Objects.requireNonNull(context);Objects.requireNonNull(original);Objects.requireNonNull(neighbors);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);var input=original.visuals();var snapshot=input.snapshot();
+        Objects.requireNonNull(context);Objects.requireNonNull(original);Objects.requireNonNull(neighbors);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);var input=original.visuals();var snapshot=input.snapshot();String colorsPolicy=colorPolicy(limits),policy=POLICY+"; "+colorsPolicy;
         try {
             check(cancelled);context.check();if(!snapshot.source().equals(context.source()))throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Fluid capture requires its exact native context");
             var halo=neighbors.orElse(snapshot);
             if(halo.requiresPlaceholder()||!halo.source().equals(snapshot.source())||halo.extent().minY()!=snapshot.extent().minY()||halo.extent().height()!=snapshot.extent().height())throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Fluid neighbor capture has another native epoch or height");
-            long extra=halo==snapshot?0:halo.indexBytes(),known=Math.min(original.workingBytes()-original.visibility().bytes(),input.limits().workingBytes());
-            long working=Math.min(known-(reservedNeighbors?0:extra),limits.edits().workingBytes()-extra);
+            long extra=halo==snapshot?0:halo.indexBytes(),colorBytes=limits.waterBlend().isPresent()?(long)halo.biomes().size()*Integer.BYTES:0,known=Math.min(original.workingBytes()-original.visibility().bytes(),input.limits().workingBytes());
+            long working=Math.min(known-(reservedNeighbors?0:extra)-colorBytes,limits.edits().workingBytes()-extra-colorBytes);
             if(working<0||input.inputBytes()+(long)snapshot.cellCount()*8>working)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid neighbors and visual edit copy peak exceed the working allowance");
+            var water=limits.waterBlend().isPresent()?new WaterColors(context,snapshot,halo,limits.waterBlend().orElseThrow(),cancelled):null;
             var view=new View(context,snapshot,halo,limits.queries(),cancelled);var cache=new HashMap<Key,WorldVisuals.Choice>();var layers=new HashMap<LayerKey,WorldVisuals.Choice>();var missing=new HashMap<ProblemKey,WorldVisuals.Choice>();var empty=new HashMap<Integer,WorldVisuals.Choice>();var missingAssets=new EnumMap<FluidGeometry.Kind,Optional<AssetId>>(FluidGeometry.Kind.class);var budget=new Budget();
             var edits=new WorldVisualEdits.Limits(limits.edits().cells(),limits.edits().changes(),limits.edits().packets(),limits.edits().addedPackedBytes(),working);
-            var provider=new NativeVisualInputs.Provider(input.assets().receipt(),POLICY,(cell,state,biome,position,prior)->{
+            var provider=new NativeVisualInputs.Provider(input.assets().receipt(),policy,(cell,state,biome,position,prior)->{
                 check(cancelled);var fluid=state.getFluidState();if(fluid.isEmpty())return prior;
                 if(prior instanceof WorldVisuals.NativeChoice||prior instanceof WorldVisuals.EmptyChoice)return prior;
                 var kind=kind(fluid);boolean base=prior instanceof WorldVisuals.ModelChoice&&modelBase(state,snapshot.state(cell).block());
@@ -62,23 +66,39 @@ public final class NativeFluidInputs {
                 if(base&&state.hasOffsetFunction()&&input.offsets().mode()!=WorldOffsets.Mode.NATIVE)
                     return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),"Missing fluid base offset"),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,snapshot.state(cell).block(),"/native/fluid/offset","Fluid base requires captured native model offsets"))));
                 try {
-                    var sample=sample(view,state,fluid,position,kind,biome);if(sample.faces()==0&&base)return prior;if(sample.faces()==0)return empty.computeIfAbsent(prior.stateIndex(),WorldVisuals.EmptyChoice::new);
+                    var sample=sample(view,state,fluid,position,kind,biome,water);if(sample.faces()==0&&base)return prior;if(sample.faces()==0)return empty.computeIfAbsent(prior.stateIndex(),WorldVisuals.EmptyChoice::new);
                     var absentAsset=missingAssets.computeIfAbsent(kind,value->missingAsset(input.assets(),value));
                     if(absentAsset.isPresent())return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),"Missing fluid sprites"),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.MISSING_ASSET,ClientAssetSnapshot.Kind.TEXTURE,absentAsset.orElseThrow(),"","Selected archive lacks a required vanilla fluid sprite"))));
                     var key=new Key(prior.stateIndex(),sample);var previous=cache.get(key);if(previous!=null)return layered(prior,previous,layers,input.limits().choices());
                     long bytes=FluidGeometry.packedBytes(sample);
                     if(cache.size()>=edits.packets()||bytes>edits.addedPackedBytes()-budget.added||input.inputBytes()+(long)snapshot.cellCount()*8+budget.added+bytes>working)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Fluid prototype or packed/copy working allowance reached");
-                    var mesh=FluidGeometry.bake(input.assets(),snapshot,cell,sample,limits.geometry(),cancelled);
+                    var mesh=FluidGeometry.bake(input.assets(),snapshot,cell,sample,kind==FluidGeometry.Kind.WATER?colorsPolicy:"native lava color; white",limits.geometry(),cancelled);
                     WorldVisuals.Choice choice=mesh.requiresPlaceholder()?new WorldVisuals.ProblemChoice(prior.stateIndex(),mesh.problems()):new WorldVisuals.NativeChoice(prior.stateIndex(),mesh);cache.put(key,choice);budget.added+=mesh.packet().map(MeshPacket::packedBytes).orElse(0L);return layered(prior,choice,layers,input.limits().choices());
                 }catch(Missing absent) {
                     return missing.computeIfAbsent(new ProblemKey(prior.stateIndex(),absent.getMessage()),ignored->new WorldVisuals.ProblemChoice(prior.stateIndex(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,snapshot.state(cell).block(),"/native/fluid/neighbors",absent.getMessage()))));
                 }
             });
             return NativeVisualInputs.capture(context,original,provider,edits,cancelled);
-        }catch(WorldCapture.ReadFailure failure) { check(cancelled);return failed(snapshot,List.of(failure.problem())); }
+        }catch(WorldCapture.ReadFailure failure) { check(cancelled);return failed(snapshot,policy,List.of(failure.problem())); }
         catch(CancellationException cancellation) { throw cancellation; }
-        catch(RuntimeException failure) { check(cancelled);return failed(snapshot,List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Native fluid capture failed: "+failure.getClass().getSimpleName()))); }
-        catch(OutOfMemoryError exhausted) { check(cancelled);return failed(snapshot,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory for native fluid capture"))); }
+        catch(RuntimeException failure) { check(cancelled);return failed(snapshot,policy,List.of(new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"Native fluid capture failed: "+failure.getClass().getSimpleName()))); }
+        catch(OutOfMemoryError exhausted) { check(cancelled);return failed(snapshot,policy,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory for native fluid capture"))); }
+    }
+    private static String colorPolicy(Limits limits) { return limits.waterBlend().map(value->"native water color; horizontal RGB blend radius "+value.radius()).orElse("radius-zero native water color"); }
+    /** Palette-sized primitive storage, admitted before native registry/color reads. No native handle escapes. */
+    private static final class WaterColors {
+        final WorldBiomeBlend blend;final int[] rgb;
+        WaterColors(NativeRenderContext context,WorldSnapshot target,WorldSnapshot halo,WorldBiomeBlend.Limits limits,BooleanSupplier cancelled) {
+            var extent=halo.extent();
+            if(extent.minX()<Integer.MIN_VALUE||extent.minZ()<Integer.MIN_VALUE||extent.maxX()-1>Integer.MAX_VALUE||extent.maxZ()-1>Integer.MAX_VALUE)throw NativeIdentities.failure(WorldProblem.Code.COORDINATE,"Water color halo exceeds signed native coordinates");
+            blend=new WorldBiomeBlend(target,halo,limits,cancelled);rgb=new int[halo.biomes().size()];
+            for(int at=0;at<rgb.length;at++) {
+                check(cancelled);context.checkSession();var expected=halo.biomes().get(at);var biome=context.biomes().byId(expected.nativeBiomeId());var key=biome==null?null:context.biomes().getKey(biome);
+                if(key==null||context.biomes().getId(biome)!=expected.nativeBiomeId()||!key.toString().equals(expected.original())||!AssetId.parse(key.toString()).equals(expected.id()))throw NativeIdentities.failure(WorldProblem.Code.PALETTE,"Water color halo differs from the native biome registry");
+                rgb[at]=biome.getWaterColor()&0xffffff;
+            }
+        }
+        int rgb(BlockPos position) { return blend.rgb(new WorldSnapshot.Position(position.getX(),position.getY(),position.getZ()),(at,x,y,z)->rgb[at]); }
     }
     /** Keep the exact selected tickets; only identical fluid recipes share the native layer packet. */
     private static WorldVisuals.Choice layered(WorldVisuals.Choice prior,WorldVisuals.Choice fluid,Map<LayerKey,WorldVisuals.Choice> layers,int limit) {
@@ -139,7 +159,7 @@ public final class NativeFluidInputs {
         w=weight(self);if(w!=0) { sum+=self*w;count+=w; }w=weight(b);if(w!=0) { sum+=b*w;count+=w; }w=weight(a);if(w!=0) { sum+=a*w;count+=w; }return sum/count;
     }
     private static int bit(ModelPlan.Direction face) { return 1<<face.ordinal(); }
-    private static FluidGeometry.Cell sample(View view,BlockState host,FluidState fluid,BlockPos position,FluidGeometry.Kind kind,Biome biome) {
+    private static FluidGeometry.Cell sample(View view,BlockState host,FluidState fluid,BlockPos position,FluidGeometry.Kind kind,Biome biome,WaterColors water) {
         var type=fluid.getType();var down=view.getBlockState(position.below());var up=view.getBlockState(position.above());
         var north=view.getBlockState(position.north());var south=view.getBlockState(position.south());var east=view.getBlockState(position.east());var west=view.getBlockState(position.west());
         boolean top=!same(type,up.getFluidState()),bottom=render(fluid,host,Direction.DOWN,down)&&!occluded(Direction.DOWN,0.8888889f,down);
@@ -157,9 +177,10 @@ public final class NativeFluidInputs {
         boolean flowing=false,back=false;float sin=0,cos=0;
         if(top) { var flow=fluid.getFlow(view,position);if(!Double.isFinite(flow.x)||!Double.isFinite(flow.z))throw new Missing("Native fluid flow is not finite");flowing=flow.x!=0||flow.z!=0;
             if(flowing) { float angle=(float)Mth.atan2(flow.z,flow.x)-(float)(Math.PI/2);sin=Mth.sin(angle)*0.25f;cos=Mth.cos(angle)*0.25f; }back=fluid.shouldRenderBackwardUpFace(view,position.above()); }
-        return new FluidGeometry.Cell(kind,nw,sw,se,ne,faces,overlays,back,flowing,sin,cos,kind==FluidGeometry.Kind.WATER?biome.getWaterColor()&0xffffff:0xffffff,host.getLightEmission());
+        int rgb=kind==FluidGeometry.Kind.WATER&&faces!=0?(water==null?biome.getWaterColor()&0xffffff:water.rgb(position)):0xffffff;
+        return new FluidGeometry.Cell(kind,nw,sw,se,ne,faces,overlays,back,flowing,sin,cos,rgb,host.getLightEmission());
     }
     private static boolean overlay(BlockState state) { return state.getBlock() instanceof HalfTransparentBlock||state.getBlock() instanceof LeavesBlock; }
-    private static NativeVisualInputs.Result failed(WorldSnapshot snapshot,List<WorldProblem> problems) { return new NativeVisualInputs.Result(snapshot.source(),snapshot.id(),POLICY,Optional.empty(),Optional.empty(),problems); }
+    private static NativeVisualInputs.Result failed(WorldSnapshot snapshot,String policy,List<WorldProblem> problems) { return new NativeVisualInputs.Result(snapshot.source(),snapshot.id(),policy,Optional.empty(),Optional.empty(),problems); }
     private static void check(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("Native fluid capture cancelled"); }
 }

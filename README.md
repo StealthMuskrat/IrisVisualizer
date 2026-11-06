@@ -46,3 +46,5 @@ Dimension stacking now supports staged ordered layers, native host/mutual-exclus
 Custom-biome definitions now have bounded climate, color, enum, tag, particle and spawn controls with lossless nested list editing. Registry/datapack/version compatibility remains unvalidated, and unsupported previews remain disabled.
 
 Renderer implementation now includes optional [captured-neighbor biome tint blending](renderer/BIOME-BLENDING.md), with explicit radius, complete native halo checks and bounded sample/memory costs. The four renderer harnesses contain 65 prepared groups and compile; execution and genuine native/GPU validation remain pending.
+
+Renderer implementation now also supports optional [native water-color blending](renderer/FLUID-COLORS.md) through existing fluid capture, with strict borrowed-halo/palette validation, bounded sample work and palette admission. Accurate color provenance survives fluid geometry and atlas binding. All 66 prepared renderer groups compile and remain unexecuted; Windows native/GPU validation is pending.

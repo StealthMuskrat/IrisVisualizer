@@ -16,7 +16,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeFluidInputs.java",
-      "sha256": "ea01c59af2d1d6454359a8ea91c11bac8f7b80088783a59a4e1737cba56882c5"
+      "sha256": "e99980d93d629f513a28da8761e8c9deb52bb10ec0875ef893f1d6ae7f6369c3"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeIdentities.java",

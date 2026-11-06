@@ -33,7 +33,7 @@ At renderer completion, additionally reject closed/exhausted workers, tracked fo
 
 ## Prepared animation suite
 
-`AnimationCpuContracts` adds 11 groups to the three earlier harnesses. With the subsequent sorting, shutdown-recovery and world/map/image boundary groups, 65 groups are now prepared (including the later native biome-blending group) in total. Its sources compile; no assertion has been executed or claimed to pass. The default Windows validation runner compiles only and now includes four suite classes. At renderer-stage validation, explicit `-Execute` launches each suite in its own JVM and stops on failure. The runner remains inspected only on this host.
+`AnimationCpuContracts` adds 11 groups to the three earlier harnesses. With the subsequent sorting, shutdown-recovery and world/map/image boundary groups, 66 groups are now prepared (including the later native biome-blending and fluid-material groups) in total. Its sources compile; no assertion has been executed or claimed to pass. The default Windows validation runner compiles only and now includes four suite classes. At renderer-stage validation, explicit `-Execute` launches each suite in its own JVM and stops on failure. The runner remains inspected only on this host.
 
 | Group | Prepared expectation |
 | --- | --- |

@@ -152,6 +152,51 @@ public final class WorldCpuContracts {
         check(!completeTint.requiresPlaceholder(),"complete blended tint detaches through ordinary pipeline");equal(0xff0000,completeTint.rgb(0,0),"lower captured biome Y");equal(0x00ff00,completeTint.rgb(1,0),"upper captured biome Y");equal(target.id(),completeTint.snapshot().id(),"original native snapshot identity retained");equal(407,completeTint.snapshot().state(0).nativeStateId(),"original native state ID retained");
         throwsType(IllegalArgumentException.class,()->new WorldBiomeBlend.Limits(8,1),"radius hard bound");throwsType(IllegalArgumentException.class,()->new WorldBiomeBlend.Limits(1,0),"positive sample budget");
     }
+    private static final AssetId WET_BLOCK=AssetId.minecraft("oak_slab"),WET_MODEL=AssetId.minecraft("block/synthetic_wet_base"),WET_SPRITE=AssetId.minecraft("block/synthetic_wet_pixel");
+    private static ClientAssetSnapshot fluidAssets(Optional<AssetId> absent) {
+        var values=new TreeMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset>();
+        for(var kind:FluidGeometry.Kind.values())for(var sprite:kind.alphaSprites())if(!absent.equals(Optional.of(sprite)))add(values,ClientAssetSnapshot.Kind.TEXTURE,sprite,pixel(kind==FluidGeometry.Kind.WATER?160:255));
+        add(values,ClientAssetSnapshot.Kind.TEXTURE,WET_SPRITE,pixel(255));
+        add(values,ClientAssetSnapshot.Kind.BLOCKSTATE,WET_BLOCK,("{\"variants\":{\"\":{\"model\":\""+WET_MODEL+"\"}}}").getBytes(StandardCharsets.UTF_8));
+        var faces=new StringJoiner(",");for(var direction:ModelPlan.Direction.values())faces.add("\""+direction.name().toLowerCase(Locale.ROOT)+"\":{\"texture\":\"#all\",\"tintindex\":0}");
+        String model="{\"textures\":{\"all\":\""+WET_SPRITE+"\"},\"elements\":[{\"from\":[0,0,0],\"to\":[16,8,16],\"faces\":{"+faces+"}}]}";
+        add(values,ClientAssetSnapshot.Kind.MODEL,WET_MODEL,model.getBytes(StandardCharsets.UTF_8));
+        long bytes=values.values().stream().mapToLong(ClientAssetSnapshot.Asset::bytes).sum();
+        return new ClientAssetSnapshot(new ClientAssetSnapshot.Receipt(Path.of("synthetic-fluid-fixture"),digest((model+absent).getBytes(StandardCharsets.UTF_8)),bytes,BlockModels.PROFILE,BlockModels.PROFILE,values.size(),0,bytes),values);
+    }
+    private static void fluidBlendMaterials() {
+        var original=new RenderBlockState(407,"minecraft:oak_slab[type=bottom,waterlogged=true]",WET_BLOCK,Map.of("type","bottom","waterlogged","true"),Map.of("type",Set.of("bottom","top","double"),"waterlogged",Set.of("false","true")));
+        var source=snapshot(1).source();var target=WorldSnapshot.capture(source,new WorldSnapshot.Extent(0,-64,0,1,1,1),List.of(original),List.of(BIOME),new int[1],new int[1],LIVE);
+        var second=new WorldSnapshot.Biome(911,"fixture:water_second",new AssetId("fixture","water_second"));int[] indices={0,0,1,0,0,1,0,0,1};
+        var halo=WorldSnapshot.capture(source,new WorldSnapshot.Extent(-1,-64,-1,3,1,3),List.of(original),List.of(BIOME,second),new int[9],indices,LIVE);
+        var blend=new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,9),LIVE);
+        int water=blend.rgb(target.extent().position(0),(at,x,y,z)->at==0?0x102030:0x405060);equal(0x203040,water,"native water palette channel average");
+        String policy="native water color; horizontal RGB blend radius 1";var assets=fluidAssets(Optional.empty());
+        int north=1<<ModelPlan.Direction.NORTH.ordinal();
+        var cell=new FluidGeometry.Cell(FluidGeometry.Kind.WATER,0.9f,0.8f,0.7f,0.6f,63,north,true,true,0.15f,0.2f,water,0);
+        var mesh=FluidGeometry.bake(assets,target,0,cell,policy,NativeGeometry.Limits.DEFAULT,LIVE);
+        check(!mesh.requiresPlaceholder(),"complete blended water geometry: "+mesh.problems());equal(10,mesh.quads().size(),"reverse top/sides and one overlay");equal(FluidGeometry.packedBytes(cell),mesh.packet().orElseThrow().packedBytes(),"complete packed fluid allowance");
+        equal(original,mesh.state(),"original waterlogged native state preserved");equal(target.id(),mesh.nativeSource().orElseThrow().snapshotId(),"original native snapshot preserved");
+        for(var quad:mesh.quads()) {
+            equal(water,quad.material().colorRgb(),"water RGB on every forward/reverse/overlay quad");equal(water,quad.material().multiplyRgb(0xffffff),"fluid uses independent white block tint");equal(-1,quad.tintIndex(),"fluid allocates no block tint layer");equal(BlockMesh.Placement.CELL,quad.placement(),"fluid ignores native model offsets");check(quad.nativeSource().orElseThrow().policy().contains(policy),"actual color policy retained in native provenance");
+        }
+        var prepared=TextureMaterials.prepare(assets,mesh,LIVE);check(!prepared.requiresPlaceholder(),"prepared blended fluid textures");
+        var layout=AtlasBuilder.plan(List.of(prepared),AtlasBuilder.Limits.DEFAULT,LIVE);check(!layout.requiresPlaceholder(),"planned fluid atlas");var atlas=AtlasMeshes.bind(layout,prepared,LIVE);check(!atlas.requiresPlaceholder(),"bound fluid atlas");
+        for(var face:atlas.faces()) { equal(TexturePreparation.AlphaClass.TRANSLUCENT,face.alpha(),"whole water source remains translucent");equal(water,face.source().material().colorRgb(),"atlas retains blended material RGB");check(face.source().nativeSource().orElseThrow().policy().contains(policy),"atlas retains color provenance"); }
+        var basePlan=BlockModels.resolve(assets,original,LIVE);check(!basePlan.requiresPlaceholder(),"synthetic waterlogged JSON base resolves");var base=GeometryBaker.bake(basePlan,new int[]{0},LIVE);check(!base.requiresPlaceholder(),"synthetic JSON slab base bakes");
+        var complete=NativeGeometry.combine(base,mesh,LIVE);check(!complete.requiresPlaceholder(),"complete base and fluid composition");equal(base.quads().size()+mesh.quads().size(),complete.quads().size(),"neither layer is dropped");
+        for(int i=0;i<complete.quads().size();i++) { var quad=complete.quads().get(i);boolean model=i<base.quads().size();equal(model?0:-1,quad.tintIndex(),"independent base and fluid tint indices");equal(model?0xffffff:water,quad.material().colorRgb(),"independent base and fluid colors");equal(model?BlockMesh.Placement.MODEL:BlockMesh.Placement.CELL,quad.placement(),"independent model/fluid placement"); }
+        var lava=new FluidGeometry.Cell(FluidGeometry.Kind.LAVA,1,1,1,1,63,0,false,false,0,0,0xffffff,15);var lavaMesh=FluidGeometry.bake(assets,target,0,lava,NativeGeometry.Limits.DEFAULT,LIVE);check(!lavaMesh.requiresPlaceholder(),"lava compatibility factory");
+        for(var quad:lavaMesh.quads()) { equal(0xffffff,quad.material().colorRgb(),"lava remains white");equal(15,quad.lightEmission(),"lava emission retained");check(!quad.nativeSource().orElseThrow().policy().contains("water color"),"lava provenance makes no water-color claim"); }
+        var supplied=FluidGeometry.bake(assets,target,0,cell,NativeGeometry.Limits.DEFAULT,LIVE);check(!supplied.requiresPlaceholder(),"supplied color compatibility factory");check(supplied.nativeSource().orElseThrow().policy().contains("supplied water material RGB")&&!supplied.nativeSource().orElseThrow().policy().contains("radius-zero"),"low-level RGB input does not invent a sampling radius");
+        var missing=FluidGeometry.bake(fluidAssets(Optional.of(FluidGeometry.Kind.WATER.flow())),target,0,cell,policy,NativeGeometry.Limits.DEFAULT,LIVE);
+        check(missing.requiresPlaceholder()&&missing.quads().isEmpty()&&missing.packet().isEmpty(),"missing dependency publishes no partial colored mesh");
+        long bytes=FluidGeometry.packedBytes(cell);var exact=new NativeGeometry.Limits(10,0,bytes,bytes,8);
+        check(!FluidGeometry.bake(assets,target,0,cell,policy,exact,LIVE).requiresPlaceholder(),"exact packed color geometry budget");
+        var shortBytes=new NativeGeometry.Limits(10,0,bytes-1,bytes,8);var rejected=FluidGeometry.bake(assets,target,0,cell,policy,shortBytes,LIVE);check(rejected.requiresPlaceholder()&&rejected.quads().isEmpty(),"one-byte deficit withholds whole fluid geometry");
+        throwsType(IllegalArgumentException.class,()->FluidGeometry.bake(assets,target,0,cell," ",NativeGeometry.Limits.DEFAULT,LIVE),"blank color policy rejected");throwsType(IllegalArgumentException.class,()->FluidGeometry.bake(assets,target,0,cell,"x".repeat(129),NativeGeometry.Limits.DEFAULT,LIVE),"color policy bound");
+        throwsType(CancellationException.class,()->FluidGeometry.bake(assets,target,0,cell,policy,NativeGeometry.Limits.DEFAULT,()->true),"fluid bake cancellation escapes");
+    }
     private static void nativeSnapshot() {
         var state=state(407);var source=snapshot(1).source();var states=new int[]{0,0};var biomes=new int[]{0,0};var world=WorldSnapshot.capture(source,new WorldSnapshot.Extent(4,-64,8,2,1,1),List.of(state),List.of(BIOME),states,biomes,LIVE);states[0]=99;biomes[1]=99;
         equal(state,world.state(0),"exact native state");equal(407,world.state(0).nativeStateId(),"native numeric state ID");equal(BIOME,world.biome(1),"exact native biome");equal(16L,world.indexBytes(),"two complete index arrays");
@@ -1013,6 +1058,7 @@ public final class WorldCpuContracts {
         if(arguments.length!=0)throw new IllegalArgumentException("No arguments supported");
         group("native snapshot identity and atomic failure",WorldCpuContracts::nativeSnapshot);
         group("bounded exact native biome blending",WorldCpuContracts::biomeBlending);
+        group("blended fluid materials and native provenance",WorldCpuContracts::fluidBlendMaterials);
         group("model cube winding and provenance",WorldCpuContracts::geometry);
         group("atlas extrusion and exact binding",WorldCpuContracts::atlas);
         group("native visual assignment guards",WorldCpuContracts::assignments);
