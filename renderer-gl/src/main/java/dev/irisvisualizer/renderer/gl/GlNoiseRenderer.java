@@ -68,13 +68,24 @@ public final class GlNoiseRenderer implements AutoCloseable {
     public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera) { return render(scene,target,camera,WorldClip.NONE); }
     // Scalar local span and camera offset are each <=2^20; saturated planes stay strictly beyond them.
     private static float plane(double value) { return (float)Math.clamp(value,-4194304,4194304); }
-    public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip) {
+    /** Constant metadata sizing before source/target drawing; excludes retained payload and host state. */
+    public long drawScratchBytes(GlNoiseScene scene,boolean rangeCulling) {
+        Objects.requireNonNull(scene);device.live(allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar scratch source belongs to another device");return GlNoiseCulling.workingBytes(scene.surface(),rangeCulling);
+    }
+    public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip) { return render(scene,target,camera,clip,true); }
+    /** Disable group rejection for separately rendered differential images; fragment clipping stays active. */
+    public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) {
         Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
-        if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar draw inputs must share their original device");device.live(target.allocation);
-        var surface=scene.surface();var grid=surface.volume().grid();float[] transform=camera.matrix((double)target.width()/target.height()),relative=new float[3];camera.offset(new WorldSnapshot.Position(grid.horizontal().originX(),grid.vertical().minY(),grid.horizontal().originZ()),relative,0);
-        float step=(float)grid.horizontal().blocksPerSample();double magnitude=Math.max(Math.abs((double)relative[0])+grid.width()*(double)step,Math.abs((double)relative[2])+grid.depth()*(double)step);
-        if(step<4*Math.ulp((float)magnitude))throw new GlFailure(GlFailure.Code.LIMIT,"Scalar sample spacing is too small for this camera anchor's float precision");
-        var clipBounds=clip.relative(camera.anchor());var frustum=new GlFrustum(transform);int calls=0,submitted=0,visible=0,culled=0,culledFaces=0;
+        if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar draw inputs must share their original device");device.live(target.allocation);var surface=scene.surface();
+        var scratch=device.reserve(0,GlNoiseCulling.workingBytes(surface,rangeCulling),0,0,0,0,0,0,0,null);Throwable escaping=null;Stats result;
+        try { result=drawAdmitted(scene,target,camera,clip,rangeCulling,surface); }
+        catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
+        finally { try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }
+        target.complete=true;return result;
+    }
+    /** Array/math owners unwind before the outer draw releases their covering CPU journal. */
+    private Stats drawAdmitted(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling,NoiseSurface surface) {
+        var culling=new GlNoiseCulling(surface,camera,(double)target.width()/target.height(),clip,rangeCulling);var grid=surface.volume().grid();var transform=culling.matrix;var relative=culling.relative;var clipBounds=culling.clip;float step=culling.scale;int calls=0,submitted=0;
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
             if(surface.size()>0) { glUseProgram(allocation.programs[0]);glUniformMatrix4fv(matrix,false,transform);glUniform3f(offset,relative[0],relative[1],relative[2]);glUniform2ui(size,grid.width(),grid.depth());glUniform1f(scale,step);glUniform1i(clipEnabled,clip.enabled()?1:0);
@@ -82,16 +93,15 @@ public final class GlNoiseRenderer implements AutoCloseable {
                 glBindVertexArray(scene.allocation.vaos[0]);
                 int first=-1,count=0;
                 for(int batch=0;batch<=surface.batchCount();batch++) {
-                    boolean show=batch<surface.batchCount()&&frustum.visible(surface,batch,step,relative,clip.enabled()?clipBounds:null);
-                    if(show) { visible++;if(first<0)first=surface.batchFirst(batch);count+=surface.batchSize(batch); }
+                    boolean show=batch<surface.batchCount()&&culling.batch(batch);
+                    if(show) { if(first<0)first=surface.batchFirst(batch);count+=surface.batchSize(batch); }
                     else {
-                        if(batch<surface.batchCount()) { culled++;culledFaces+=surface.batchSize(batch); }
                         if(first>=0) { GlNoiseUpload.bindInstances(scene.allocation,first);glDrawArraysInstanced(GL_TRIANGLES,0,6,count);calls++;submitted+=count;first=-1;count=0; }
                     }
                 }
             }device.check("complete scalar draw");
         }
-        target.complete=true;return new Stats(calls,submitted,(long)submitted*2,surface.batchCount(),visible,culled,culledFaces);
+        return new Stats(calls,submitted,(long)submitted*2,surface.batchCount(),culling.visible,culling.culled,culling.culledFaces);
     }
     @Override public void close() { device.retire(allocation); }
 }

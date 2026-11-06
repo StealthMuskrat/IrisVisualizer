@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 17 synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 73 prepared, unexecuted groups, making 90 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 18 synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 74 prepared, unexecuted groups, making 92 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -44,6 +44,7 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | World materials | Explicit tint/final lighting, consuming/foreign material owner guards, exact lighting policy and hostile host-state restoration |
 | World diagnostics/recovery | Empty/placeholder geometry, original diagnostic picking, upload cancellation and completed-frame preflight/retry/lifetime |
 | Shared world group culling | Separate immutable enabled/disabled pixel results, exact sorted-face coverage, cache reuse across material passes, draw-scratch admission/release and deficient-budget target/state preservation |
+| Scalar draw admission | Separate enabled/disabled clipped pixels, full original face coverage, source/style receipts, temporary CPU charge, deficient shared memory and precision-failure target/state preservation |
 | Budgets and lifetimes | GPU-budget rejection without allocation, independently owned readback surviving frame/device closure and retained wrapper release |
 
 The synthetic PNG has four explicit RGBA texels, including transparent color. Pixel expectations use those original values rather than a second renderer run. Navigation expectations come from integer nearest-neighbor replication and an explicit clear border. Scalar checks distinguish rendered interior from the same target's fully clipped clear output; they do not claim a native shading/pixel baseline. All loops have a twenty-second deadline plus a step ceiling. Hard transfer/action/work limits are checked separately from cooperative elapsed-time targets.
@@ -56,12 +57,12 @@ Each group uses a fresh bounded `GlDevice` and shared `RenderMemory`; device shu
 
 ## Successful execution evidence
 
-The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all 17 groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
+The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all 18 groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
 
 A real report records the synthetic scope, successful group names/count, start/completion instants, OS/architecture, Java and LWJGL versions, and the actual driver receipt. It is a narrow run result, not a source/dependency fingerprint manifest, independently captured native baseline, final renderer approval or an authorization to enable previews. Use fresh execution with the intended checked-out sources and retain the corresponding build/commit information when collecting final validation evidence.
 
 ## Actual preparation and remaining checks
 
-Direct Java 25 compilation passed for all 135 CPU/OpenGL production sources plus five harness sources and one test fixture (141 files). The 103-file dependency-free set also compiles and continues to exclude this LWJGL/GLFW harness. No Java harness, GLFW initialization, shader, upload, readback, native adapter or CI workflow was run. Gradle/PowerShell task execution remains source-inspected only in this workspace.
+Direct Java 25 compilation passed for all 136 CPU/OpenGL production sources plus five harness sources and one test fixture (142 files). The 104-file dependency-free set also compiles and continues to exclude this LWJGL/GLFW harness. No Java harness, GLFW initialization, shader, upload, readback, native adapter or CI workflow was run. Gradle/PowerShell task execution remains source-inspected only in this workspace.
 
-The GPU harness is an initial real-driver path. The new [synthetic world groups](WORLD-GPU-VALIDATION.md) prepare small mesh/material/transparency/animation cases; broader world coverage and native visual comparisons, broader connected-view asynchronous workers and histogram frame submissions, hostile indexed/extension state, wrong native contexts/devices, allocation/fence/restoration fault injection, interactive Windows GUI/DPI behavior and performance/total-memory measurements still require their planned renderer/integration validation. The 17 groups do not replace those checks or the earlier CPU suites.
+The GPU harness is an initial real-driver path. The new [synthetic world groups](WORLD-GPU-VALIDATION.md) prepare small mesh/material/transparency/animation cases; broader world coverage and native visual comparisons, broader connected-view asynchronous workers and histogram frame submissions, hostile indexed/extension state, wrong native contexts/devices, allocation/fence/restoration fault injection, interactive Windows GUI/DPI behavior and performance/total-memory measurements still require their planned renderer/integration validation. The 18 groups do not replace those checks or the earlier CPU suites.

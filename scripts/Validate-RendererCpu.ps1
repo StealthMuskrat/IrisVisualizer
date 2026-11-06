@@ -11,7 +11,7 @@ $paths = @(
     Get-ChildItem -LiteralPath (Join-Path $root 'renderer/src/main/java') -Recurse -File -Filter '*.java'
     Get-ChildItem -LiteralPath (Join-Path $root 'renderer/src/test/java') -Recurse -File -Filter '*.java'
     # Deliberately bounded to context-free helpers; the remaining GL sources require LWJGL.
-    foreach ($name in @('GlFailure','GlCamera','GlOrbitCamera','GlFrustum','GlWorldCulling')) {
+    foreach ($name in @('GlFailure','GlCamera','GlOrbitCamera','GlFrustum','GlWorldCulling','GlNoiseCulling')) {
         Get-Item -LiteralPath (Join-Path $root "renderer-gl/src/main/java/dev/irisvisualizer/renderer/gl/$name.java")
     }
     Get-Item -LiteralPath (Join-Path $root 'renderer-gl/src/test/java/dev/irisvisualizer/renderer/gl/GlMathContracts.java')

@@ -19,10 +19,7 @@ public final class GlNoiseUpload implements AutoCloseable {
     private final GlDevice device;private final int count;private GlDevice.Allocation allocation;private GlNoiseScene completed;private Phase phase=Phase.STORAGE;private int geometryFace,face;private GlNoiseScene geometrySource;private final boolean copiedGeometry;
     private GlNoiseUpload(GlDevice device,GlDevice.Allocation allocation,int count,GlNoiseScene geometrySource) { this.device=device;this.allocation=allocation;this.count=count;this.geometrySource=geometrySource;copiedGeometry=geometrySource!=null; }
     /** Grid-only precision bounds, available before scalar meshing or recoloring. */
-    static void precision(NoiseVolume.Grid g) {
-        Objects.requireNonNull(g);float scale=(float)g.horizontal().blocksPerSample();
-        if(!Float.isFinite(scale)||scale<Float.MIN_NORMAL||Math.max((double)g.width()*scale,(double)g.depth()*scale)>1048576)throw new GlFailure(GlFailure.Code.LIMIT,"Scalar bins exceed supported float scale/relative-span bounds; data was not reduced");
-    }
+    static void precision(NoiseVolume.Grid g) { GlNoiseCulling.displayScale(g); }
     /** Borrowed completeness/context/precision checks; no journal or source owner is admitted. */
     static void validate(GlDevice device,NoiseSurface surface) {
         Objects.requireNonNull(device);Objects.requireNonNull(surface);device.current();if(surface.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"A complete scalar boundary surface is required");precision(surface.volume().grid());

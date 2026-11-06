@@ -1,6 +1,6 @@
 # Prepared world rendering GPU contracts
 
-Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 17 GPU groups alongside 73 CPU/context-free groups: 90 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 18 GPU groups alongside 74 CPU/context-free groups: 92 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
 
 ## Synthetic fixture boundary
 
@@ -26,9 +26,9 @@ Every world upload uses the ordinary incremental API with the harness's minimum 
 
 ## Build and later execution
 
-The [Windows GPU runner](GPU-VALIDATION.md) remains compile-only by default. Its existing Gradle test source set automatically includes the fixture and five new groups; no workflow or execution default was added. Successful execution evidence requires all 17 groups and context cleanup, rather than accepting the earlier eleven-group count.
+The [Windows GPU runner](GPU-VALIDATION.md) remains compile-only by default. Its existing Gradle test source set automatically includes the fixture and five new groups; no workflow or execution default was added. Successful execution evidence requires all 18 groups and context cleanup, rather than accepting the earlier eleven-group count.
 
-Actual preparation here: Java 25/LWJGL compilation passed for 135 CPU/OpenGL production sources, five harness sources and one test fixture (141 files). The 103-file dependency-free set also compiles; it includes the CPU-only fixture and excludes the GPU harness. No test main, fixture constructor, synthetic rendering, GLFW initialization, native adapter, shader, readback, Gradle/PowerShell runner or CI workflow was executed. Compilation establishes type compatibility only.
+Actual preparation here: Java 25/LWJGL compilation passed for 136 CPU/OpenGL production sources, five harness sources and one test fixture (142 files). The 104-file dependency-free set also compiles; it includes the CPU-only fixture and excludes the GPU harness. No test main, fixture constructor, synthetic rendering, GLFW initialization, native adapter, shader, readback, Gradle/PowerShell runner or CI workflow was executed. Compilation establishes type compatibility only.
 
 The synthetic world cases still require real Windows GPU execution. They do not prove independent native world agreement, selected-client asset fidelity, native special visuals/lighting/tint factories, broad model/UV/texture coverage, large-world face-range differential rendering, every animation/alpha material, connected world worker races, fence/quarantine/restoration fault injection, cross-context behavior, total application memory, measured performance or interactive editor/DPI integration. Keep those remaining renderer/integration checks explicit before enabling a supported preview.
 

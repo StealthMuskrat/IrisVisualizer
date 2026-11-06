@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 28 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 14 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 73 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 28 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 15 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 74 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -54,4 +54,4 @@ This is an initial suite, not renderer-stage completion. Broader world block/mod
 
 [Detached scalar histograms](SCALAR-HISTOGRAMS.md) add the twentieth CPU group, preparing original-value/missing coverage, automatic/explicit ranges, stable legends, map/volume identity, display-range matching, complete-source admission and owned cleanup. All 72 groups remain unexecuted.
 
-The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 17 prepared groups and its own explicit runner. It does not enter the dependency-free source set or change the four-suite CPU runner. Full compilation now covers 135 production files, five harnesses and one shared test fixture (141 files); the default CPU set contains 103 files, explicitly including the fifth context-free helper and CPU-only world fixture. All 90 groups across the five harnesses remain unexecuted.
+The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 prepared groups and its own explicit runner. It does not enter the dependency-free source set or change the four-suite CPU runner. Full compilation now covers 136 production files, five harnesses and one shared test fixture (142 files); the default CPU set contains 104 files, explicitly including the sixth context-free helper and CPU-only world fixture. All 92 groups across the five harnesses remain unexecuted.

@@ -88,3 +88,5 @@ Scalar navigation/clipping now preserves upstream failure diagnostics even if an
 ## Prepared-source recovery
 
 [Explicit upload recovery](SCALAR-RECOVERY.md) now accepts complete exact-volume/style surfaces after a source failure at the same data revision. It preserves camera/viewport/clip, advances the display revision and cancels obsolete CPU adoption before cleanup and new upload admission. `GlNoiseScene.retainInput()` and `GlNoiseFrame.retainSurfaceInput()` produce independently admitted CPU ownership without copying arrays; consuming view recolor/retry overloads hold input through admission or rejection. Runtime/GPU checks remain deferred.
+
+[Admitted draw preparation](SCALAR-DRAW-ADMISSION.md) now charges bounded scalar camera/frustum/group arrays under existing device/shared limits. A context-free helper shares grid precision checks with uploads, and explicit immutable frame overloads support enabled/disabled culling comparison. New context-free/GPU accounting and target-preservation checks are prepared only; all 92 renderer groups remain unexecuted.
