@@ -40,7 +40,11 @@ public final class GlAtlasQueue implements AutoCloseable {
             return false;
         }
         if(obsolete)return false;
-        if(latestFrame>frameRevision) { frameRevision=latestFrame;status=state(Phase.WAITING,null,"");try { releaseOwned(); }catch(RuntimeException|Error error) { failure(error);throw error; }status=state(Phase.WAITING,null,""); }
+        if(latestFrame>frameRevision) {
+            var waiting=new Status(sceneRevision,latestFrame,Phase.WAITING,Optional.empty(),Optional.empty(),"");
+            frameRevision=latestFrame;status=waiting;
+            try { releaseOwned(); }catch(RuntimeException|Error error) { failure(error);throw error; }
+        }
         return latestFrame==frameRevision;
     }
     public void invalidate(long latestScene,long latestFrame) { current();observe(latestScene,latestFrame); }
@@ -78,11 +82,17 @@ public final class GlAtlasQueue implements AutoCloseable {
     /** Caller adopts only against its still-displayed frame; neither stale nor failed work closes it. */
     public Optional<Completion> take(long latestScene,long latestFrame,GlAtlasFrame displayed) {
         Objects.requireNonNull(displayed);current();if(!observe(latestScene,latestFrame)||status.phase()!=Phase.READY||active==null||!active.ready())return Optional.empty();
+        boolean consuming=false;
         try {
-            displayed.requireScene(scene);if(displayed.token()!=active.expectedToken()) { releaseOwned();status=state(Phase.STALE,GlFailure.Code.STALE,"The displayed atlas baseline changed");return Optional.empty(); }
+            displayed.requireScene(scene);if(displayed.token()!=active.expectedToken()) {
+                var stale=new Status(sceneRevision,frameRevision,Phase.STALE,Optional.empty(),Optional.of(GlFailure.Code.STALE),"The displayed atlas baseline changed");
+                consuming=true;releaseOwned();status=stale;return Optional.empty();
+            }
             var result=Optional.of(new Completion(sceneRevision,frameRevision,active.readyFrame()));var delivered=new Status(sceneRevision,frameRevision,Phase.DELIVERED,status.progress(),Optional.empty(),"");
-            active.take(displayed);active.close();active=null;status=delivered;return result;
-        }catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
+            consuming=true;active.take(displayed);active.close();active=null;status=delivered;return result;
+        }catch(RuntimeException|Error error) {
+            if(consuming) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error); }throw error;
+        }
     }
     @Override public void close() {
         if(disposed)return;device.current();closed=true;Throwable failure=null;

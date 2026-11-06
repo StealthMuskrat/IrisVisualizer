@@ -123,7 +123,11 @@ public final class GlAtlasUpload implements AutoCloseable {
         if(work!=null)try { device.retire(work);work=null; }catch(RuntimeException|Error error) { if(work.retired||work.released)work=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
         if(source!=null)try { source.close();source=null; }catch(RuntimeException|Error error) { if(source.closedOrReleased())source=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
         if(pendingPage!=null)try { device.retire(pendingPage);pendingPage=null; }catch(RuntimeException|Error error) { if(pendingPage.retired||pendingPage.released)pendingPage=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
-        var iterator=owned.iterator();while(iterator.hasNext()) { var page=iterator.next();try { page.release(device);iterator.remove(); }catch(RuntimeException|Error error) { if(page.references==0)iterator.remove();if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); } }
+        for(int i=0;i<owned.size();) {
+            var page=owned.get(i);
+            try { page.release(device);owned.remove(i); }
+            catch(RuntimeException|Error error) { if(page.references==0)owned.remove(i);else i++;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        }
         if(work==null) { plan=null;if(pages!=null)pages.clear();pages=null; }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
@@ -134,7 +138,7 @@ public final class GlAtlasUpload implements AutoCloseable {
     }
     private boolean nativeReleased() {
         if(work!=null&&!work.released||framebuffer!=null&&!framebuffer.released||pendingPage!=null&&!pendingPage.released||source!=null&&!source.closedOrReleased()||completed!=null&&!completed.closedOrReleased())return false;
-        for(var page:owned)if(!page.allocation.released)return false;return true;
+        for(int i=0;i<owned.size();i++)if(!owned.get(i).allocation.released)return false;return true;
     }
     @Override public void close() { if(phase==Phase.TAKEN||phase==Phase.CLOSED&&!ownsResources())return;if(!nativeReleased())device.current();dispose(Phase.CLOSED); }
 }
