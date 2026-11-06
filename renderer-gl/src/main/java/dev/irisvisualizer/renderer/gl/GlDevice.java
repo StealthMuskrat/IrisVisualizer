@@ -20,6 +20,16 @@ public final class GlDevice implements AutoCloseable {
     public record Stats(long gpuBytes,long cpuPayloadBytes,int stagingBytes,int allocations,int names,int retired,int quarantined) {
         public long knownWorkingBytes() { return gpuBytes+cpuPayloadBytes+stagingBytes; }
     }
+    /** Immutable context provenance for diagnostics; contains no native/context handle or readiness claim. */
+    public record Driver(String vendor,String renderer,String version,String shadingLanguage,int major,int minor,int contextFlags,int profileMask,
+                         int maximumTexture,int maximumRenderbuffer,int maximumVertexAttributes,int maximumTextureUnits,List<String> optionalFeatures) {
+        public Driver {
+            for(var value:List.of(vendor,renderer,version,shadingLanguage))if(value.isBlank()||value.length()>4096)throw new IllegalArgumentException("Invalid OpenGL driver identity");
+            optionalFeatures=List.copyOf(optionalFeatures);
+            if(major<3||minor<0||maximumTexture<1||maximumRenderbuffer<1||maximumVertexAttributes<1||maximumTextureUnits<1||optionalFeatures.size()>16)throw new IllegalArgumentException("Invalid OpenGL capability receipt");
+            for(var feature:optionalFeatures)if(feature.isBlank()||feature.length()>128)throw new IllegalArgumentException("Invalid OpenGL feature receipt");
+        }
+    }
     static final class Allocation {
         int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;long gpu,cpu;int names;WorldScene.Result owner;Object retained;
         boolean retired,released,quarantined;long fence,transferFence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
@@ -28,7 +38,7 @@ public final class GlDevice implements AutoCloseable {
         }
     }
     private final Thread thread=Thread.currentThread();private final long context;private final GLCapabilities capabilities;private final Limits limits;private final RenderMemory memory;private final RenderMemory.Account admission;
-    private final int maximumTexture,maximumRenderbuffer;private List<Allocation> allocations=new ArrayList<>();private ByteBuffer staging;
+    private final int maximumTexture,maximumRenderbuffer;private final Driver driver;private List<Allocation> allocations=new ArrayList<>();private ByteBuffer staging;
     private long gpuBytes,cpuBytes;private int names;private boolean closing,closed;
     public GlDevice() { this(Limits.DEFAULT); }
     public GlDevice(Limits limits) { this(limits,null); }
@@ -36,7 +46,13 @@ public final class GlDevice implements AutoCloseable {
         this.limits=Objects.requireNonNull(limits);this.memory=memory;context=glfwGetCurrentContext();if(context==0)throw new GlFailure(GlFailure.Code.CONTEXT,"A current GLFW OpenGL context is required");
         try { capabilities=GL.getCapabilities(); }catch(IllegalStateException missing) { throw new GlFailure(GlFailure.Code.CONTEXT,"Initialize LWJGL capabilities for the current context first"); }
         if(!capabilities.OpenGL33||(glGetInteger(GL_CONTEXT_PROFILE_MASK)&GL_CONTEXT_CORE_PROFILE_BIT)==0)throw new GlFailure(GlFailure.Code.CAPABILITY,"The backend requires an OpenGL 3.3 core context");
-        maximumTexture=glGetInteger(GL_MAX_TEXTURE_SIZE);maximumRenderbuffer=glGetInteger(GL_MAX_RENDERBUFFER_SIZE);check("device capabilities");
+        maximumTexture=glGetInteger(GL_MAX_TEXTURE_SIZE);maximumRenderbuffer=glGetInteger(GL_MAX_RENDERBUFFER_SIZE);
+        var features=new ArrayList<String>();
+        if(indexedViewports())features.add("indexed-viewports");if(indexedBlend())features.add("indexed-blend");if(clipControl())features.add("clip-control");
+        if(depthBounds())features.add("depth-bounds");if(fixedRestart())features.add("fixed-restart");if(sampleShading())features.add("sample-shading");
+        String vendor=identity(GL_VENDOR),renderer=identity(GL_RENDERER),version=identity(GL_VERSION),shading=identity(GL_SHADING_LANGUAGE_VERSION);
+        int major=glGetInteger(GL_MAJOR_VERSION),minor=glGetInteger(GL_MINOR_VERSION),flags=glGetInteger(GL_CONTEXT_FLAGS),profile=glGetInteger(GL_CONTEXT_PROFILE_MASK),attributes=glGetInteger(GL_MAX_VERTEX_ATTRIBS),units=glGetInteger(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);check("device capabilities");
+        driver=new Driver(vendor,renderer,version,shading,major,minor,flags,profile,maximumTexture,maximumRenderbuffer,attributes,units,features);
         if(limits.stagingBytes()>limits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Staging exceeds the working budget");
         admission=memory==null?null:openAdmission(memory);
         try {
@@ -71,6 +87,9 @@ public final class GlDevice implements AutoCloseable {
     public Limits limits() { return limits; }
     public int maximumTextureSize() { return maximumTexture; }
     public int maximumRenderbufferSize() { return maximumRenderbuffer; }
+    /** Detached metadata remains readable off-thread and after device closure. */
+    public Driver driver() { return driver; }
+    private static String identity(int name) { var value=glGetString(name);if(value==null||value.isBlank()||value.length()>4096)throw new GlFailure(GlFailure.Code.CAPABILITY,"OpenGL driver identity is absent or exceeds its diagnostic bound");return value; }
     boolean indexedViewports() { return capabilities.OpenGL41||capabilities.GL_ARB_viewport_array; }
     boolean coreIndexedBlend() { return capabilities.OpenGL40; }
     boolean indexedBlend() { return coreIndexedBlend()||capabilities.GL_ARB_draw_buffers_blend; }
