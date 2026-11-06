@@ -5,6 +5,7 @@ import java.util.function.BooleanSupplier;
 
 /** Per-cell visual assignments supplied by the native path, including its position-dependent choices. */
 public final class WorldModels {
+    private final UUID id=UUID.randomUUID();
     public enum Kind { MESH, EMPTY, PLACEHOLDER }
     public record Entry(RenderBlockState state,Kind kind,Optional<AtlasMesh> mesh,List<ModelPlan.Problem> problems) {
         public Entry {
@@ -74,6 +75,8 @@ public final class WorldModels {
     }
     private static WorldModels placeholder(WorldSnapshot snapshot,AtlasLayout layout,List<WorldProblem> problems) { return new WorldModels(snapshot,WorldOffsets.none(snapshot),WorldTintInput.none(snapshot),layout,List.of(),new int[0],0,problems); }
     public WorldSnapshot snapshot() { return snapshot; }
+    /** Exact immutable assignment identity, distinct from the native snapshot and asset archive. */
+    public UUID id() { return id; }
     public WorldOffsets offsets() { return offsets; }
     public WorldTintInput tints() { return tints; }
     public AtlasLayout layout() { return layout; }
