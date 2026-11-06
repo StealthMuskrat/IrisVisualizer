@@ -317,6 +317,7 @@ public final class RendererCpuContracts {
     }
     private static void memoryOwnership() {
         accountRegistrationFailures();
+        coordinatorCloseFailures();
         try(var memory=new RenderMemory(new RenderMemory.Limits(100,4))) {
             var owner=memory.hold("source",60);var input=RenderInput.own("immutable",owner);var retained=input.retain();input.close();
             equal(60L,memory.stats().chargedBytes(),"retained input remains charged");equal("immutable",retained.value(),"independent input live");
@@ -324,6 +325,24 @@ public final class RendererCpuContracts {
             retained.admission().shrinkTo(20);equal(20L,memory.stats().chargedBytes(),"scratch shrinks");memory.close();
             throwsType(IllegalStateException.class,()->memory.hold("closed",1),"closed coordinator rejects growth");equal(20L,memory.stats().chargedBytes(),"close preserves live charge");retained.close();retained.close();equal(0L,memory.stats().chargedBytes(),"last input release");equal(0,memory.stats().accounts(),"all accounts released");
         }
+    }
+    private static void coordinatorCloseFailures() {
+        for(boolean oom:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(100,4));var empty=memory.open("empty");var zero=memory.hold("zero hold",0);var held=memory.hold("held",30);var shared=held.retain();var cache=memory.open("cache")) {
+            cache.set(20,40);var before=memory.stats();var owners=memory.owners();Error primary=oom?new OutOfMemoryError("injected close registry copy OOM"):new AssertionError("injected close registry copy error");var removal=new AssertionError("coordinator close must not mutate the old registry");
+            try(var fault=new OwnersFault(memory,primary,removal,true)) {
+                Throwable actual=null;try { memory.close(); }catch(RuntimeException|Error failure) { actual=failure; }
+                check(actual==primary&&primary.getSuppressed().length==0,"failed coordinator close preserves original preparation error");check(fault.readFired&&fault.removals==0,"close preparation never removes live owners");equal(before,memory.stats(),"failed close preserves gate and exact admission");equal(owners,memory.owners(),"failed close does not retire or release any owner");
+                cache.reserve(41);equal(71L,memory.stats().chargedBytes(),"failed preparation leaves ordinary account growth open");cache.reserve(40);equal(before,memory.stats(),"growth probe restores exact pre-close state");equal(30L,held.bytes(),"failed close preserves source hold");equal(30L,shared.bytes(),"failed close preserves independently retained owner");
+                memory.close();equal(0,fault.removals,"successful close commits a private registry without old-set cleanup callbacks");
+            }
+            var closed=memory.stats();check(closed.closed(),"successful retry seals coordinator");equal(70L,closed.chargedBytes(),"close preserves every live byte");equal(20L,closed.retainedBytes(),"close preserves retained cache payload");equal(70L,closed.reservedBytes(),"close preserves covering reservations");equal(2,closed.accounts(),"close removes ordinary and tracked zero-byte accounts");check(empty.stats().retiring()&&memory.owners().stream().allMatch(RenderMemory.Owner::retiring),"all surviving and empty owners are retiring");
+            memory.close();equal(closed,memory.stats(),"successful coordinator close is idempotent");throwsType(IllegalStateException.class,()->memory.open("closed"),"closed coordinator rejects new accounts");throwsType(IllegalStateException.class,()->cache.reserve(41),"closed coordinator rejects existing-account growth");throwsType(IllegalStateException.class,()->empty.reserve(1),"released empty account cannot be revived");
+            try(var retainedZero=zero.retain();var retained=shared.retain()) {
+                equal(0L,retainedZero.bytes(),"released zero-byte account retains uncharged compatibility lifetime");cache.set(35,40);equal(70L,memory.stats().chargedBytes(),"retiring owner permits retained moves within its covering reservation");cache.set(0,0);equal(30L,memory.stats().chargedBytes(),"cache release removes only its own charge");equal(1,memory.stats().accounts(),"cache release updates the committed remaining-owner registry");held.close();shared.close();equal(30L,retained.bytes(),"independent retained hold survives coordinator and original owners closing");equal(30L,memory.stats().chargedBytes(),"last retained owner stays charged");
+            }
+            equal(0L,memory.stats().chargedBytes(),"final retained release clears closed coordinator charge");equal(0,memory.stats().accounts(),"final retained release clears every account");zero.close();memory.close();equal(0,memory.stats().accounts(),"zero hold and repeated close cannot restore retired accounts");
+        }
+        try(var memory=new RenderMemory(new RenderMemory.Limits(0,1))) { memory.close();memory.close();check(memory.stats().closed()&&memory.stats().accounts()==0,"empty zero-byte coordinator closes idempotently"); }
     }
     private static void replacements() {
         mixedReplacements();

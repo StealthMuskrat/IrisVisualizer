@@ -122,5 +122,12 @@ public final class RenderMemory implements AutoCloseable {
     public synchronized Stats stats() { long retained=0,reserved=0;for(var owner:owners) { retained+=owner.retained;reserved+=owner.reserved; }return new Stats(closed,charged,retained,reserved,owners.size(),limits.bytes()); }
     public synchronized List<Owner> owners() { var result=new ArrayList<Owner>(owners.size());for(var owner:owners)result.add(new Owner(owner.label,owner.retained,owner.reserved,owner.retiring));result.sort(Comparator.comparing(Owner::label));return List.copyOf(result); }
     /** Stop new admission without pretending live work or failed cleanup has released its memory. */
-    @Override public synchronized void close() { if(closed)return;closed=true;var iterator=owners.iterator();while(iterator.hasNext()) { var owner=iterator.next();owner.retiring=true;if(owner.retained==0&&owner.reserved==0) { owner.released=true;iterator.remove(); } } }
+    @Override public synchronized void close() {
+        if(closed)return;
+        Account[] retiring=owners.toArray(Account[]::new);Set<Account> remaining=Collections.newSetFromMap(new IdentityHashMap<>(retiring.length));
+        for(int i=0;i<retiring.length;i++) { var owner=retiring[i];if(owner.retained!=0||owner.reserved!=0)remaining.add(owner); }
+        // Prepare the complete registry before sealing admission; failure leaves every live owner unchanged.
+        for(int i=0;i<retiring.length;i++) { var owner=retiring[i];owner.retiring=true;if(owner.retained==0&&owner.reserved==0)owner.released=true; }
+        owners=remaining;closed=true;
+    }
 }
