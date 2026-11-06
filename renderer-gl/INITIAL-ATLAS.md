@@ -1,6 +1,6 @@
 # Initial world atlas clock adoption
 
-Renderer source update, 2026-11-06. The execution environment is unavailable. These changes have source review only; they have not been compiled or executed. The last full 143-file compilation applies to commit 088aa5e. Renderer-stage runtime/GPU/native validation and final editor integration remain deferred; unsupported previews stay disabled.
+Renderer implementation, 2026-11-06. The previously unavailable environment has returned, and Java 25/LWJGL compilation now passes for the full 143-file renderer/validation set, including this initial-atlas change. No renderer contract or GPU operation has run. Renderer-stage runtime/GPU/native validation and final editor integration remain deferred; unsupported previews stay disabled.
 
 ## First-image correctness
 
@@ -16,10 +16,10 @@ Source release resets the initial-atlas flag for full replacement, material refr
 
 An animation coordinator that reports FAILED without throwing now makes the world view FAILED with its code/reason. Detailed model/atlas problems remain available through `animationStatus()`. A failed initial atlas never produces FRAME_READY for base pixels. Ordinary source/worker/GL exceptions keep their existing propagation and cleanup.
 
-A complete source remains available for the existing explicit view retry route. To retry a failed animation clock, call `clock` for the desired clock and `redraw` before advancing again. If admission remains insufficient, it rejects again under the same configured limits. Source-upload failures keep their separate `retryUpload` path.
+A complete source remains available for the existing explicit view retry route. The [explicit animation retry](WORLD-CONTROL-RECOVERY.md) now re-arms the current failed clock with `retryAnimation(expectedWorldRevision)`; the host may choose another clock first with `clock`. The earlier `clock` plus `redraw` route remains available. If admission remains insufficient, it rejects again under the same configured limits. Source-upload failures keep their separate `retryUpload` path.
 
 ## Prepared regression coverage
 
 One added GPU group prepares a nonzero first clock for scheduled and interpolated textures, material refresh at that clock, replacement at an unchanged scheduled sample or interpolated midpoint, saved-image immutability, and a zero animation-worker allowance. Required initial-plan rejection must preserve its diagnostic and expose no incorrect first image. Earlier no-clock/default-clock flows retain their source paths.
 
-There are now 99 prepared, unexecuted groups: 76 CPU/context-free and 23 GPU. The production/harness file counts remain 137 production, five harnesses and one fixture (143 total); the dependency-free set remains 105 files. The current change requires compilation when the environment becomes available, followed by renderer-stage execution when implementation is complete. No successful compilation, pixel result, native parity or GPU readiness is claimed for this update.
+There are now 100 prepared, unexecuted groups: 76 CPU/context-free and 24 GPU. The production/harness file counts remain 137 production, five harnesses and one fixture (143 total); the dependency-free set remains 105 files. The compilation gap is resolved; renderer-stage execution remains deferred until implementation is complete. No pixel result, native parity or GPU readiness is claimed.

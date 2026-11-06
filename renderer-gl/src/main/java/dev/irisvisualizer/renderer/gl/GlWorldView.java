@@ -2,6 +2,7 @@ package dev.irisvisualizer.renderer.gl;
 
 import dev.irisvisualizer.renderer.*;
 import java.util.*;
+import java.util.function.BooleanSupplier;
 
 /** Context-owned world upload, asynchronous camera ordering and immutable completed-frame endpoint. */
 public final class GlWorldView implements AutoCloseable {
@@ -103,10 +104,18 @@ public final class GlWorldView implements AutoCloseable {
     }
     /** Refresh exact-source tint/final lighting without native regeneration, CPU remeshing or CPU geometry upload. */
     public boolean materials(long revision,WorldTint tint,WorldLighting lighting) {
+        return refreshMaterials(revision,()->uploads.materials(revision,scene,tint,lighting));
+    }
+    /** Consume fresh lighting through destination admission; stale, closed and rejected requests also consume it. */
+    public boolean materialsLit(long revision,WorldTint tint,RenderInput<WorldLighting> input) {
+        Objects.requireNonNull(input);
+        try(input) { return refreshMaterials(revision,()->uploads.materialsLit(revision,scene,tint,input)); }
+    }
+    private boolean refreshMaterials(long revision,BooleanSupplier submit) {
         current();if(revision<1)throw new IllegalArgumentException("Invalid world revision");if(revision<=worldRevision)return false;
         if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current world scene is required for material refresh");
         long next=nextView();var queued=new Status(revision,next,Phase.UPLOADING,status.source(),List.of(),Optional.empty(),"");var previousUpload=uploads.status();
-        try { if(!uploads.materials(revision,scene,tint,lighting))throw new GlFailure(GlFailure.Code.STATE,"World upload did not accept its current materials"); }
+        try { if(!submit.getAsBoolean())throw new GlFailure(GlFailure.Code.STATE,"World upload did not accept its current materials"); }
         catch(RuntimeException|Error failure) { if(uploads.status()!=previousUpload)failed(failure);throw failure; }
         worldRevision=revision;viewRevision=next;sourceReady=false;dirty=false;sortRevision=0;status=queued;
         try { ordering.invalidate();frames.invalidate(viewRevision);releaseScene();return true; }
@@ -155,6 +164,16 @@ public final class GlWorldView implements AutoCloseable {
             if(!uploads.restart(worldRevision))throw new GlFailure(GlFailure.Code.STALE,"World upload queue no longer matches the retry revision");
             status=waiting;return true;
         }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
+    /** Re-arm only a failed current animation; keep the complete source, requested clock and native data. */
+    public boolean retryAnimation(long expectedWorldRevision) {
+        current();if(expectedWorldRevision<1)throw new IllegalArgumentException("Invalid world revision");
+        if(expectedWorldRevision!=worldRevision||!sourceReady||scene==null||animation==null||status.phase()!=Phase.FAILED)return false;
+        var atlasState=animation.status();if(atlasState.phase()!=GlWorldAnimation.Phase.FAILED)return false;
+        long next=nextView();var waiting=new Status(worldRevision,next,Phase.WAITING_VIEW,status.source(),List.of(),Optional.empty(),"");
+        animation.clock(atlasState.requestedTick(),atlasState.requestedPartialTick());viewRevision=next;dirty=true;status=waiting;
+        try { frames.invalidate(viewRevision);if(order==null)resetOrder();return true; }
+        catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     private void resetOrder() { ordering.invalidate();sortRevision=0;if(order!=null) { order.close();order=null; } }
     /** Upload steps are bounded; drawing a completed frame remains one synchronous context operation. */

@@ -64,4 +64,6 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 
 [World material refresh](../renderer-gl/WORLD-MATERIAL-REFRESH.md) adds two GPU groups. All 98 groups remain unexecuted: the unchanged 76 CPU/context-free groups plus 22 GPU groups. Full compilation remains 143 files; the dependency-free set is unchanged at 105.
 
-[Initial world atlas adoption](../renderer-gl/INITIAL-ATLAS.md) adds one source-inspected GPU group. All 99 groups remain unexecuted (76 unchanged CPU/context-free, 23 GPU). The latest GPU source changes have not been compiled because the execution environment is unavailable; the prior full compile baseline is 088aa5e.
+[Initial world atlas adoption](../renderer-gl/INITIAL-ATLAS.md) adds one source-inspected GPU group. All 99 groups remain unexecuted (76 unchanged CPU/context-free, 23 GPU). The initial source-only 2021328 compilation gap has now been resolved by a successful full 143-file compilation; current group totals appear in the following update.
+
+[Owned world controls](../renderer-gl/WORLD-CONTROL-RECOVERY.md) add one GPU group and extend initial-atlas retry coverage. All 143 renderer/validation files now compile, resolving the source-only 2021328 gap. All 100 groups remain unexecuted: 76 unchanged CPU/context-free and 24 GPU. The unchanged dependency-free set remains 105 files.

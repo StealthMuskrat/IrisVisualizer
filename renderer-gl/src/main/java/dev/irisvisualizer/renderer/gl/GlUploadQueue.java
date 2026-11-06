@@ -67,6 +67,18 @@ public final class GlUploadQueue implements AutoCloseable {
         catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
         finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
     }
+    /** Consume fresh lighting on every outcome; finish owned-input cleanup before queue replacement. */
+    public boolean materialsLit(long next,GlScene source,WorldTint tint,RenderInput<WorldLighting> input) {
+        Objects.requireNonNull(input);GlUpload fresh=null;Throwable rejection=null;
+        try {
+            try(input) {
+                Objects.requireNonNull(source);current();if(next<1)throw new IllegalArgumentException("Invalid request revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+                fresh=GlUpload.materialsLit(renderer,source,tint,input);
+            }
+            install(next,fresh);fresh=null;return true;
+        }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
+    }
     private void install(long next,GlUpload fresh) {
         var queued=new Status(next,Phase.UPLOADING,Optional.of(fresh.source()),Optional.of(fresh.progress()),Optional.empty(),"");
         try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
