@@ -232,6 +232,62 @@ public final class WorldCpuContracts {
             throwsType(CancellationException.class,()->WorldVisualReport.capture(scene,()->true),"cancelled report preflight");throwsType(IllegalArgumentException.class,()->reportLimits(1,0,0,17,1,0,0,0),"example count hard bound");
         }
     }
+    private static final class ReportEntriesFault implements AutoCloseable {
+        final WorldModels models;final List<WorldModels.Entry> original;final java.lang.reflect.Field field;boolean fired;
+        ReportEntriesFault(WorldModels models,Runnable before,Error failure) {
+            this.models=models;original=models.entries();
+            try { field=WorldModels.class.getDeclaredField("entries");field.setAccessible(true);field.set(models,new AbstractList<WorldModels.Entry>() {
+                @Override public int size() { return original.size(); }
+                @Override public WorldModels.Entry get(int index) { if(!fired) { fired=true;before.run();throw failure; }return original.get(index); }
+            }); }catch(ReflectiveOperationException error) { throw new AssertionError("controlled report traversal fault unavailable",error); }
+        }
+        @Override public void close() { try { field.set(models,original); }catch(ReflectiveOperationException error) { throw new AssertionError("report traversal restore failed",error); } }
+    }
+    private static void reportWorkers() {
+        var f=fixture(2,255,false);var limits=WorldVisualReport.Limits.DEFAULT;
+        try(var cache=new WorldSectionCache();var source=build(f,cache)) {
+            var scene=source.scene().orElseThrow();long peak=WorldVisualReport.workingBytes(scene,limits);var receipt=WorldVisualReport.receipt(scene);
+            for(boolean ready:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new DrainExecutor();var worker=new WorldVisualReportWorker(peak,memory,()->executor)) {
+                var first=source.retain();long firstRevision=worker.submit(first,limits);equal(peak,worker.reservedBytes(),"queued report reserves full source/output/scratch peak");equal(peak,memory.stats().chargedBytes(),"shared admission precedes traversal");var queued=worker.status();
+                throwsType(IllegalArgumentException.class,()->worker.submit(first,limits),"same worker-owned wrapper rejected");check(!first.closed(),"same-wrapper misuse preserves ownership");equal(queued,worker.status(),"same-wrapper rejection preserves status");
+                var rejected=source.retain();throwsType(NullPointerException.class,()->worker.submit(rejected,null),"invalid report limits");check(rejected.closed(),"fresh rejected report wrapper consumed");equal(queued,worker.status(),"invalid replacement preserves pending report");
+                if(ready) { executor.runNext();check(first.closed(),"READY report releases its source wrapper");check(worker.status().phase()==WorldVisualReportWorker.Phase.READY,"worker report READY"); }
+                var replacement=source.retain();long revision=worker.submit(replacement,limits);equal(firstRevision+1,revision,"pending/READY replacement advances one revision");check(first.closed(),"replacement consumes obsolete source");equal(peak,memory.stats().chargedBytes(),"idle pending/READY charge supplies atomic replacement credit");executor.runNext();check(replacement.closed(),"completed report has no source wrapper ownership");
+                check(worker.take(firstRevision).isEmpty(),"obsolete report revision withheld");var wrong=new WorldVisualReport.Receipt(receipt.source(),receipt.snapshotId(),UUID.randomUUID(),receipt.extent(),receipt.archiveSha256(),receipt.version(),receipt.expectedVersion());check(worker.take(revision,wrong).isEmpty(),"mismatched assignment receipt does not consume READY");
+                var completion=worker.take(revision,receipt).orElseThrow();check(completion.report().matches(scene),"delivered report retains exact source receipt");check(worker.take(revision).isEmpty(),"report transfers exactly once");equal(0L,worker.reservedBytes(),"delivered report is external to worker reservation");equal(completion.report().bytes(),memory.stats().chargedBytes(),"detached retained payload replaces preparation peak after unwind");
+                var blocked=source.retain();var delivered=worker.status();throwsType(RenderMemory.LimitException.class,()->worker.submit(blocked,limits),"delivered owner cannot provide replacement credit");check(blocked.closed(),"shared rejection consumes fresh source only");equal(delivered,worker.status(),"shared rejection preserves delivered status/revision");worker.invalidate();worker.close();check(!completion.closed(),"delivered report survives invalidation and shutdown");equal(2L,completion.report().usage().orElseThrow().capturedCells(),"detached report remains readable");completion.close();noWorkerCharge(memory);
+            }
+            for(int kind=0;kind<3;kind++)try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new StartExecutor(kind);var worker=new WorldVisualReportWorker(peak,memory,()->executor)) {
+                var rejected=source.retain();if(kind==2)check(caughtFailure(()->worker.submit(rejected,limits))==executor.failure,"startup Error identity preserved");else equal(1L,worker.submit(rejected,limits),"ordinary startup failure returns FAILED token");
+                check(rejected.closed(),"failed dispatch releases scene wrapper");equal(WorldVisualReportWorker.Phase.FAILED,worker.status().phase(),"failed report startup status");noWorkerCharge(memory);long revision=worker.submit(source.retain(),limits);equal(2L,revision,"report retry after startup failure");executor.queued.remove(0).run();worker.take(revision,receipt).orElseThrow().close();noWorkerCharge(memory);
+            }
+            for(boolean error:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new ShutdownExecutor(error);var worker=new WorldVisualReportWorker(peak,memory,()->executor)) {
+                var pending=source.retain();worker.submit(pending,limits);firstShutdownFails(worker,executor);check(pending.closed(),"failed shutdown still releases pending report source");noWorkerCharge(memory);var rejected=source.retain();throwsType(IllegalStateException.class,()->worker.submit(rejected,limits),"report shutdown seals input before retry");check(rejected.closed(),"closed-worker rejection consumes source");retryShutdown(worker,executor);executor.runAll();equal(WorldVisualReportWorker.Phase.CLOSED,worker.status().phase(),"report shutdown retry remains terminal");
+            }
+            for(boolean tracked:new boolean[]{false,true})for(int mode=0;mode<4;mode++)try(var memory=new RenderMemory(new RenderMemory.Limits(peak*2,2));var executor=new DrainExecutor();var worker=new WorldVisualReportWorker(mode==3?peak:peak*2,tracked?memory:null,()->executor)) {
+                int selected=mode;var failure=new AssertionError("report traversal failure");final long[] latest={0};var first=source.retain();worker.submit(first,limits);
+                try(var fault=new ReportEntriesFault(scene.plan().models(),()->{
+                    equal(peak,worker.reservedBytes(),"active report retains its full execution peak");
+                    if(selected==0)latest[0]=worker.invalidate();
+                    else if(selected==3) { var fresh=source.retain();var status=worker.status();throwsType(IllegalStateException.class,()->worker.submit(fresh,limits),"active peak blocks over-bound pending report");check(fresh.closed()&&!first.closed(),"local rejection preserves active scene ownership");equal(status,worker.status(),"active local rejection preserves status"); }
+                    else { latest[0]=worker.submit(source.retain(),limits);if(selected==2)executor.nextFailure=new AssertionError("report redispatch failure"); }
+                },failure)) {
+                    check(caughtFailure(executor::runNext)==failure,"active report traversal Error stays primary");check(fault.fired&&first.closed(),"active failure releases source before drain recovery");
+                    if(selected==1) { equal(WorldVisualReportWorker.Phase.QUEUED,worker.status().phase(),"accepted latest report survives older drain failure");equal(peak,worker.reservedBytes(),"only latest report peak remains after unwind");executor.runNext();worker.take(latest[0],receipt).orElseThrow().close(); }
+                    else { check(worker.take(worker.status().revision()).isEmpty(),"failed/cancelled report never publishes partial output");if(selected==0)equal(WorldVisualReportWorker.Phase.WAITING,worker.status().phase(),"older failure cannot replace invalidated status");else equal(WorldVisualReportWorker.Phase.FAILED,worker.status().phase(),"current/redispatch failure remains retryable");noWorkerCharge(memory);long retry=worker.submit(source.retain(),limits);executor.runNext();worker.take(retry,receipt).orElseThrow().close(); }
+                }
+                equal(0L,worker.reservedBytes(),"report recovery releases worker charge");noWorkerCharge(memory);
+            }
+            try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new DrainExecutor();var worker=new WorldVisualReportWorker(peak,memory,()->executor)) {
+                var failedLimits=reportLimits(2,0,0,0,0,4096,4096,512L*1024*1024);long revision=worker.submit(source.retain(),failedLimits);executor.runNext();equal(WorldProblem.Code.LIMIT,worker.status().problems().getFirst().code(),"structured report failure retains its diagnostic code");check(worker.take(revision).isEmpty(),"failed census has no completion");noWorkerCharge(memory);
+            }
+        }
+        try(var cache=new WorldSectionCache();var memory=new RenderMemory(new RenderMemory.Limits(32L*1024*1024,1));var executor=new DrainExecutor();var worker=new WorldVisualReportWorker(32L*1024*1024,memory,()->executor)) {
+            var original=build(f,cache);var failure=new AssertionError("report source release failure");long revision=worker.submit(original,limits);
+            try(var fault=new TicketFault(original,failure)) { check(caughtFailure(executor::runNext)==failure,"failed source release prevents READY publication");fault.allVisited();check(original.closed()&&worker.take(revision).isEmpty(),"unreturned report discarded after source cleanup failure");noWorkerCharge(memory); }
+            long retry=worker.submit(build(f,cache),limits);executor.runNext();var completion=worker.take(retry).orElseThrow();worker.close();cache.close();equal(2L,completion.report().usage().orElseThrow().meshCells(),"completion survives final source/cache/worker shutdown");completion.close();noWorkerCharge(memory);
+        }
+    }
     private static void nativeSnapshot() {
         var state=state(407);var source=snapshot(1).source();var states=new int[]{0,0};var biomes=new int[]{0,0};var world=WorldSnapshot.capture(source,new WorldSnapshot.Extent(4,-64,8,2,1,1),List.of(state),List.of(BIOME),states,biomes,LIVE);states[0]=99;biomes[1]=99;
         equal(state,world.state(0),"exact native state");equal(407,world.state(0).nativeStateId(),"native numeric state ID");equal(BIOME,world.biome(1),"exact native biome");equal(16L,world.indexBytes(),"two complete index arrays");
@@ -1095,6 +1151,7 @@ public final class WorldCpuContracts {
         group("bounded exact native biome blending",WorldCpuContracts::biomeBlending);
         group("blended fluid materials and native provenance",WorldCpuContracts::fluidBlendMaterials);
         group("detached bounded visual limitation reports",WorldCpuContracts::visualReports);
+        group("background visual report ownership and recovery",WorldCpuContracts::reportWorkers);
         group("model cube winding and provenance",WorldCpuContracts::geometry);
         group("atlas extrusion and exact binding",WorldCpuContracts::atlas);
         group("native visual assignment guards",WorldCpuContracts::assignments);

@@ -39,7 +39,8 @@ public final class WorldVisualReport {
         this.receipt=receipt;this.issues=List.copyOf(issues);this.usage=usage;this.problems=List.copyOf(problems);
         if(problems.isEmpty()!=usage.isPresent()||!problems.isEmpty()&&!issues.isEmpty())throw new IllegalArgumentException("Partial visual report escaped failure");
     }
-    private static Receipt receipt(WorldScene scene) {
+    /** Metadata-only receipt; does not traverse sections, assignments or diagnostics. */
+    public static Receipt receipt(WorldScene scene) {
         var assets=scene.layout().assets();return new Receipt(scene.snapshot().source(),scene.snapshot().id(),scene.plan().models().id(),scene.snapshot().extent(),assets.archiveSha256(),assets.version(),assets.expectedVersion());
     }
     public Receipt receipt() { return receipt; }
