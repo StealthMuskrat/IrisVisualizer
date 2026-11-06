@@ -753,13 +753,48 @@ public final class WorldCpuContracts {
             for(boolean culling:new boolean[]{false,true}) { var hit=index.query(ray,WorldPickIndex.Options.DEFAULT.withBatchCulling(culling),null,LIVE).hit().orElseThrow();near(2,hit.distance(),"shared-edge tie remains at the front plane");equal(origin,hit.position(),"padded leaf preserves lower original-section tie order");equal(0,hit.section(),"lower section wins equal-distance edge tie"); }
         }
     }
+    private static void boundedFaceSorting() {
+        record Pair(long key,double depth) {}
+        Comparator<Pair> reference=(a,b)->a.depth()>b.depth()?-1:a.depth()<b.depth()?1:Long.compare(a.key(),b.key());
+        var random=new Random(0x6115);
+        for(int count:new int[]{0,1,2,3,7,31,64,65,257,1025,4097})for(int mode=0;mode<7;mode++) {
+            long[] keys=new long[count];double[] depths=new double[count];var expected=new ArrayList<Pair>();boolean ordered=true;
+            for(int at=0;at<count;at++) {
+                keys[at]=(long)(at%7)<<32|count-at;
+                depths[at]=switch(mode) { case 0->count-at;case 1->at;case 2->3.0;case 3->random.nextInt(17)-8;case 4->(at&1)==0?0.0:-0.0;case 5->at%3==0?Double.MAX_VALUE:at%3==1?-Double.MAX_VALUE:Double.MIN_VALUE;default->random.nextDouble()*200-100; };
+                var pair=new Pair(keys[at],depths[at]);if(at>0&&reference.compare(expected.getLast(),pair)>0)ordered=false;expected.add(pair);
+            }
+            expected.sort(reference);var stats=WorldFaceSort.sort(keys,depths,LIVE);equal(count,stats.faces(),"sort statistics cover every supplied pair");equal(ordered,stats.alreadyOrdered(),"ordered fast path compares complete depth/key sequence");
+            if(ordered) { equal(0L,stats.movedPairs(),"ordered input is never moved");equal((long)Math.max(0,count-1),stats.comparisons(),"ordered input uses one adjacent comparison per pair"); }
+            for(int at=0;at<count;at++) { equal(expected.get(at).key(),keys[at],"bounded sort equals independent comparison order");equal(Double.doubleToLongBits(expected.get(at).depth()),Double.doubleToLongBits(depths[at]),"depth bits remain paired with original source key"); }
+        }
+        for(double invalid:new double[]{Double.NaN,Double.POSITIVE_INFINITY,Double.NEGATIVE_INFINITY})throwsType(IllegalArgumentException.class,()->WorldFaceSort.sort(new long[]{1},new double[]{invalid},LIVE),"nonfinite helper depths rejected");
+        throwsType(IllegalArgumentException.class,()->WorldFaceSort.sort(new long[1],new double[0],LIVE),"mismatched pair lengths rejected");
+        throwsType(CancellationException.class,()->WorldFaceSort.sort(new long[0],new double[0],()->true),"empty sort still honors cancellation");
+        // Cancel during scanning, heap construction and extraction; the private working arrays never escape.
+        for(int threshold:new int[]{1,12,25,60}) {
+            int count=8193;long[] keys=new long[count];double[] depths=new double[count];for(int at=0;at<count;at++) { keys[at]=at;depths[at]=at; }int[] polls={0};
+            throwsType(CancellationException.class,()->WorldFaceSort.sort(keys,depths,()->++polls[0]>=threshold),"bounded sort cancellation during scan/heap work");
+        }
+        var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+            var scene=owner.scene().orElseThrow();long source=scene.usage().knownPayloadBytes(),scratch=12L*16;var view=new WorldDrawOrder.View(scene.snapshot().extent().position(0),0.5,0.5,4,0.5,0.5,0);
+            var exact=WorldDrawOrder.prepare(scene,view,new WorldDrawOrder.Limits(12,scratch,source+scratch),LIVE);check(!exact.requiresPlaceholder(),"halved exact scratch allowance accepts the full scene");equal(12,exact.sortStats().orElseThrow().faces(),"completed order exposes actual sort coverage");equal(12L*8,exact.bytes(),"retained order remains one key per original face");
+            var shortBytes=WorldDrawOrder.prepare(scene,view,new WorldDrawOrder.Limits(12,scratch-1,source+scratch),LIVE);check(shortBytes.requiresPlaceholder()&&shortBytes.size()==0&&shortBytes.sortStats().isEmpty(),"insufficient scratch exposes no partial statistics/order");
+            var shortWorking=WorldDrawOrder.prepare(scene,view,new WorldDrawOrder.Limits(12,scratch,source+scratch-1),LIVE);check(shortWorking.requiresPlaceholder(),"combined source and scratch bound remains exact");
+            try(var memory=new RenderMemory(new RenderMemory.Limits(source+scratch,1));var executor=new DrainExecutor();var worker=new WorldOrderWorker(source+scratch,memory,()->executor)) {
+                long revision=worker.submit(owner.retain(),view,new WorldDrawOrder.Limits(12,scratch,source+scratch));equal(source+scratch,memory.stats().chargedBytes(),"worker admits only actual two-array scratch");executor.runNext();
+                try(var completion=worker.take(revision).orElseThrow()) { check(Arrays.equals(exact.copyOrder(),completion.order().copyOrder()),"worker preserves exact bounded-sort order");equal(source+12L*8,memory.stats().chargedBytes(),"worker unwind retains source plus output only"); }
+                noWorkerCharge(memory);
+            }
+        }
+    }
     private static void ordering() {
         var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
             var scene=owner.scene().orElseThrow();var view=new WorldDrawOrder.View(f.snapshot().extent().position(0),0.5,0.5,4,0.5,0.5,0);var order=WorldDrawOrder.prepare(scene,view,LIVE);check(!order.requiresPlaceholder(),"complete global order");
             record Depth(long key,double value) {}var expected=new ArrayList<Depth>();
             for(int section=0;section<scene.sections().size();section++) { var mesh=scene.sections().get(section);var vertices=mesh.vertexBuffer();for(int face=0;face<mesh.faces().size();face++) { double z=0;for(int corner=0;corner<4;corner++)z+=vertices.get((face*4+corner)*8+2);double depth=4-(mesh.origin().z()-view.anchor().z()+z/4);expected.add(new Depth(((long)section<<32)|face,depth)); } }
             expected.sort(Comparator.comparingDouble(Depth::value).reversed().thenComparingLong(Depth::key));equal(expected.size(),order.size(),"all translucent faces ordered");for(int at=0;at<order.size();at++)equal(expected.get(at).key(),((long)order.section(at)<<32)|order.face(at),"independent centroid stable order");
-            long source=scene.usage().knownPayloadBytes();equal(source+12*32,WorldDrawOrder.reservation(scene,WorldDrawOrder.Limits.DEFAULT),"verified count sizes scratch");var failed=WorldDrawOrder.prepare(scene,view,new WorldDrawOrder.Limits(12,383,source+384),LIVE);check(failed.requiresPlaceholder()&&failed.size()==0,"insufficient sort scratch is atomic");
+            long source=scene.usage().knownPayloadBytes();equal(source+12*16,WorldDrawOrder.reservation(scene,WorldDrawOrder.Limits.DEFAULT),"verified count sizes scratch");var failed=WorldDrawOrder.prepare(scene,view,new WorldDrawOrder.Limits(12,191,source+192),LIVE);check(failed.requiresPlaceholder()&&failed.size()==0,"insufficient sort scratch is atomic");
         }
     }
     /** Read only the private executor to gate scheduling; worker state and admission are never patched. */
@@ -781,8 +816,8 @@ public final class WorldCpuContracts {
     private static void pendingOrderAdmission() {
         var f=fixture(2,128,false);var bigger=fixture(3,128,false);
         try(var cache=new WorldSectionCache();var owner=build(f,cache);var other=build(bigger,cache)) {
-            long peak=owner.scene().orElseThrow().usage().knownPayloadBytes()+12*32;
-            check(other.scene().orElseThrow().usage().knownPayloadBytes()+18*32>peak,"larger fixture exceeds one shared reservation");
+            long peak=owner.scene().orElseThrow().usage().knownPayloadBytes()+12*16;
+            check(other.scene().orElseThrow().usage().knownPayloadBytes()+18*16>peak,"larger fixture exceeds one shared reservation");
             for(boolean overlap:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(peak*(overlap?2:1),overlap?2:1));var worker=new WorldOrderWorker(4*1024*1024,memory);var gate=new OrderGate(orderExecutor(worker))) {
                 var first=owner.retain();long firstRevision=worker.submit(first,orderView(f));var before=worker.status();var second=owner.retain();WorldScene.Result pending;
                 if(overlap) {
@@ -819,7 +854,7 @@ public final class WorldCpuContracts {
     }
     private static void readyOrderAdmission() {
         var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
-            long source=owner.scene().orElseThrow().usage().knownPayloadBytes(),peak=source+12*32,retained=source+12*8;
+            long source=owner.scene().orElseThrow().usage().knownPayloadBytes(),peak=source+12*16,retained=source+12*8;
             for(boolean overlap:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(overlap?retained+peak:peak,overlap?2:1));var worker=new WorldOrderWorker(4*1024*1024,memory)) {
                 var executor=orderExecutor(worker);var first=owner.retain();long revision=worker.submit(first,orderView(f));orderBarrier(executor);
                 equal(WorldOrderWorker.Phase.READY,worker.status().phase(),"complete order ready after worker unwind");equal(retained,worker.reservedBytes(),"ready output counts final keys without sort scratch");equal(retained,memory.stats().chargedBytes(),"ready shared hold shrinks to retained source and keys");
@@ -837,7 +872,7 @@ public final class WorldCpuContracts {
     }
     private static void transferredOrderAdmission() {
         var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
-            long source=owner.scene().orElseThrow().usage().knownPayloadBytes(),peak=source+12*32,retained=source+12*8;
+            long source=owner.scene().orElseThrow().usage().knownPayloadBytes(),peak=source+12*16,retained=source+12*8;
             try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var worker=new WorldOrderWorker(4*1024*1024,memory)) {
                 var executor=orderExecutor(worker);var first=owner.retain();long revision=worker.submit(first,orderView(f));orderBarrier(executor);
                 try(var completion=worker.take(revision).orElseThrow();var gate=new OrderGate(executor)) {
@@ -854,7 +889,7 @@ public final class WorldCpuContracts {
     }
     private static void activeOrderAdmission() {
         var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
-            long peak=owner.scene().orElseThrow().usage().knownPayloadBytes()+12*32;
+            long peak=owner.scene().orElseThrow().usage().knownPayloadBytes()+12*16;
             try(var memory=new RenderMemory(new RenderMemory.Limits(peak*2,2));var worker=new WorldOrderWorker(peak,memory)) {
                 var executor=orderExecutor(worker);var first=owner.retain();
                 // The worker can publish SORTING, then waits for this source monitor before reading it.
@@ -1359,6 +1394,7 @@ public final class WorldCpuContracts {
         group("world geometry picking and alpha",WorldCpuContracts::picking);
         group("conservative picking hierarchy boundaries",WorldCpuContracts::pickingTraversalEdges);
         group("independent translucent centroid ordering",WorldCpuContracts::ordering);
+        group("bounded two-array depth and source-key ordering",WorldCpuContracts::boundedFaceSorting);
         group("pending sort replacement admission",WorldCpuContracts::pendingOrderAdmission);
         group("translucent view preflight preservation",WorldCpuContracts::orderViewPreflight);
         group("ready sort replacement admission",WorldCpuContracts::readyOrderAdmission);

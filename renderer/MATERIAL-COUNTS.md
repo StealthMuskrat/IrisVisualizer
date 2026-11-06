@@ -28,9 +28,9 @@ Before GPU scene storage admission, upload verifies summed face, translucent, ti
 
 ## Camera-sort reservation
 
-`WorldDrawOrder.WORKING_BYTES_PER_FACE` is 32: two long key arrays and two double depth arrays. A complete scene now supplies its translucent count directly, removing the extra section-count pass before allocation. Depth preparation still checks every section's exact anchor/precision, visits the prepared translucent entries only, verifies their aggregate coverage, and uses the same stable global depth/key ordering.
+`WorldDrawOrder.WORKING_BYTES_PER_FACE` is now 16: one long key array and one double depth array, using [bounded in-place ordering](BOUNDED-FACE-SORT.md). A complete scene now supplies its translucent count directly, removing the extra section-count pass before allocation. Depth preparation still checks every section's exact anchor/precision, visits the prepared translucent entries only, verifies their aggregate coverage, and uses the same stable global depth/key ordering.
 
-For a valid request, `WorldOrderWorker` reserves complete source payload plus `translucentFaces * 32` primitive bytes. The configured sort-byte and combined working ceilings still cap the reservation; requests that cannot actually fit report their existing structured limit before arrays are allocated. Source-only overflow still rejects submission before changing worker state. No synchronous face scan is introduced during admission.
+For a valid request, `WorldOrderWorker` reserves complete source payload plus `translucentFaces * 16` primitive bytes. The configured sort-byte and combined working ceilings still cap the reservation; requests that cannot actually fit report their existing structured limit before arrays are allocated. Source-only overflow still rejects submission before changing worker state. No synchronous face scan is introduced during admission.
 
 At the default face limit of 262,144, actual scratch requires 8 MiB, so a valid scene at that count no longer reserves the whole configured 32 MiB scratch ceiling. A zero-translucent direct request reserves its source only. The 1,048,576-face hard maximum still needs the existing full 32 MiB. This reduces conservative reservation slack without increasing any ceiling or reducing array coverage.
 

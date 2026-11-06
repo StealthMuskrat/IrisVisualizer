@@ -12,7 +12,7 @@ Centers use the actual four section-relative float positions after model/fluid p
 
 ## Camera preparation
 
-`WorldDrawOrder` uses the [verified complete-scene translucent total](MATERIAL-COUNTS.md) before allocating its sorting arrays. Source-plus-scratch admission uses this actual count under existing ceilings; preparation still verifies section entry coverage. Depth preparation visits only those entries; it still checks every section's exact anchor subtraction and relative-coordinate precision, including sections without translucent geometry. It uses the same camera-forward depth expression and section/face key as before. Stable merge sorting and deterministic equal-depth ties remain unchanged.
+`WorldDrawOrder` uses the [verified complete-scene translucent total](MATERIAL-COUNTS.md) before allocating its sorting arrays. Source-plus-scratch admission uses this actual count under existing ceilings; preparation still verifies section entry coverage. Depth preparation visits only those entries; it still checks every section's exact anchor subtraction and relative-coordinate precision, including sections without translucent geometry. It uses the same camera-forward depth expression and section/face key as before. [Two-array in-place sorting](BOUNDED-FACE-SORT.md) preserves deterministic equal-depth ties.
 
 Repeated poses therefore avoid opaque/cutout face scans and vertex-buffer reads during depth preparation. This changes the work performed, without a measured timing claim. Sorting remains global back-to-front quad-centroid ordering; intersecting or cyclic transparent surfaces still require a different rendering solution. It introduces neither OIT nor per-pixel native parity.
 
@@ -20,7 +20,7 @@ Repeated poses therefore avoid opaque/cutout face scans and vertex-buffer reads 
 
 `WorldOrderWorker.submit` now checks the supplied eye-to-target direction before job/admission creation or cancellation of earlier work. A finite nonzero direction shorter than 1e-8 is rejected synchronously, preserving the exact previous revision/status, pending or READY order and local/shared reservation totals. Fresh rejected scene wrappers are still consumed; the already-owned-wrapper guard runs first and preserves that existing owner. A corrected submission can use the next ordinary revision without a rejected request spending a token.
 
-Direct `WorldDrawOrder.prepare` keeps its structured COORDINATE problem and empty failed order, but now checks direction before allocating the key/depth scratch arrays. Existing face-count/sort/combined-limit checks still precede that direct pose check, preserving their diagnostic precedence. Direction length uses nested `Math.hypot`, matching `GlCamera.basis`, with the existing inclusive 1e-8 minimum. The requested vector, source entries, merge algorithm, section/face tie rule and memory ceilings are unchanged; no face scan or source-sized scratch is added by worker preflight.
+Direct `WorldDrawOrder.prepare` keeps its structured COORDINATE problem and empty failed order, but now checks direction before allocating the key/depth scratch arrays. Existing face-count/sort/combined-limit checks still precede that direct pose check, preserving their diagnostic precedence. Direction length uses nested `Math.hypot`, matching `GlCamera.basis`, with the existing inclusive 1e-8 minimum. The requested vector, source entries, section/face tie rule and memory ceilings are unchanged; no face scan or source-sized scratch is added by worker preflight.
 
 A prepared world contract covers tiny, just-below-minimum and subnormal directions, fresh-wrapper consumption, already-owned protection, pending/READY preservation, corrected revision progression, exact-threshold acceptance, axial-order equivalence and final account release. It compiles but remains unexecuted. All 64 prepared groups and wider native/GPU/order comparisons remain deferred until renderer-stage validation.
 
@@ -31,7 +31,7 @@ A prepared world contract covers tiny, just-below-minimum and subnormal directio
 | Original packed quad vertices/indices | 152 per emitted face |
 | Retained translucent index and double XYZ center | 28 per translucent face |
 | [Prepared face bounds](../renderer-gl/WORLD-RANGES.md) | 24 per group of up to 128 emitted faces |
-| Camera order and merge scratch | 32 per translucent face during sorting |
+| Camera order and depth scratch | 16 per translucent face during sorting |
 | Retained completed camera order | 8 per translucent face |
 
 `WorldMesh.packedBytes()` continues to report only vertices/indices; `translucentBytes()` reports the new CPU metadata. `faceBatchBytes()` separately reports prepared face bounds. `Usage.outputBytes()` includes all three, and scene planning, cache reservations, source leases, picking/worker admission and GPU source journals inherit the complete retained CPU charge. Empty metadata arrays add no primitive payload; Java array/object overhead remains outside this accounting.
@@ -48,6 +48,6 @@ Replacement continues to admit the new request before releasing prior scene owne
 
 ## Deferred verification
 
-At renderer completion, compare every emitted index/center and resulting complete order against the former exhaustive calculation. Include mixed alpha classes, all/zero translucent faces, hidden directions, native offsets and fluid/model placement, reversed winding, distant positive/negative anchors, exact depth ties and changed cameras. Check identical provenance and vertex/index buffers, section checks for opaque-only scenes, cancellation through emission/depth/merge phases and absent partial results.
+At renderer completion, compare every emitted index/center and resulting complete order against the former exhaustive calculation. Include mixed alpha classes, all/zero translucent faces, hidden directions, native offsets and fluid/model placement, reversed winding, distant positive/negative anchors, exact depth ties and changed cameras. Check identical provenance and vertex/index buffers, section checks for opaque-only scenes, cancellation through emission/depth/heap phases and absent partial results.
 
 Exercise exact metadata-byte boundary admission in section/scene/cache/shared budgets, cached reuse and old pinned scenes. Confirm unlit/lit GPU transfer/storage totals exclude centers while source journals retain them. Inject preparation/status/hold/completion allocation failures, stale replacement, take/close before unwind and shutdown; verify later jobs progress and final charges/leases are correct. Profile opaque-heavy and translucent-heavy camera motion and compare real-driver/native pixels before integration or preview enablement.

@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 18 synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 75 prepared, unexecuted groups, making 93 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 18 synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 76 prepared, unexecuted groups, making 94 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 

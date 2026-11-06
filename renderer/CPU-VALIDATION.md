@@ -57,3 +57,5 @@ This is an initial suite, not renderer-stage completion. Broader world block/mod
 The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 prepared groups and its own explicit runner. It does not enter the dependency-free source set or change the four-suite CPU runner. Full compilation now covers 136 production files, five harnesses and one shared test fixture (142 files); the default CPU set contains 104 files, explicitly including the sixth context-free helper and CPU-only world fixture. All 92 groups across the five harnesses remain unexecuted.
 
 [Admitted histogram reuse](HISTOGRAM-REUSE.md) adds one world CPU group: 75 CPU/context-free plus 18 GPU groups, all 93 unexecuted. Both compile sets retain their 142/104 source counts.
+
+[Two-array face sorting](BOUNDED-FACE-SORT.md) reduces verified temporary sort payload and adds one world CPU group. All 94 groups remain unexecuted (76 CPU/context-free, 18 GPU); full/default compilation now covers 143/105 files, including 94 dependency-free CPU production sources.
