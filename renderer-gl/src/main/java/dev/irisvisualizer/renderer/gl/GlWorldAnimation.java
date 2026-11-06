@@ -20,6 +20,8 @@ public final class GlWorldAnimation implements AutoCloseable {
         catch(RuntimeException|Error failure) { if(frame!=null)try { frame.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public Status status() { return status; }
+    /** Latest requested pixels have been observed and adopted, including clocks with unchanged pixels. */
+    boolean settled() { current();return !clockDirty&&request==null&&cpuRevision==0&&status.phase()==Phase.CURRENT; }
     public GlAtlasQueue.Status uploadStatus() { return queue.status(); }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"World animation is closed"); }
     private void state(Phase phase,List<ModelPlan.Problem> problems,GlFailure.Code code,String reason) {

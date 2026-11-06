@@ -63,3 +63,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [GPU transfer replacement admission](../renderer-gl/REPLACEMENT-ADMISSION.md) adds two GPU groups. The four CPU/context-free suites remain at 76 groups; the total is now 96 with 20 GPU groups, all unexecuted.
 
 [World material refresh](../renderer-gl/WORLD-MATERIAL-REFRESH.md) adds two GPU groups. All 98 groups remain unexecuted: the unchanged 76 CPU/context-free groups plus 22 GPU groups. Full compilation remains 143 files; the dependency-free set is unchanged at 105.
+
+[Initial world atlas adoption](../renderer-gl/INITIAL-ATLAS.md) adds one source-inspected GPU group. All 99 groups remain unexecuted (76 unchanged CPU/context-free, 23 GPU). The latest GPU source changes have not been compiled because the execution environment is unavailable; the prior full compile baseline is 088aa5e.

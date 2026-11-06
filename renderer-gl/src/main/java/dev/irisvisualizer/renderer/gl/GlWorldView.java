@@ -10,7 +10,7 @@ public final class GlWorldView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlRenderer renderer;private final GlDevice device;private final GlUploadQueue uploads;private final GlFrameQueue frames;private final WorldOrderWorker ordering;private final AtlasFrameWorker animationWorker;
-    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean sourceReady,atlasClockSet,dirty,closed,disposed;
+    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean sourceReady,atlasClockSet,atlasPrimed,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlWorldView(GlRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlWorldView(GlRenderer renderer,long animationWorkingBytes) {
@@ -172,6 +172,13 @@ public final class GlWorldView implements AutoCloseable {
             if(sourceReady&&animation!=null&&!sceneUploadStepped&&animation.advance(budget)) {
                 viewRevision=nextView();dirty=true;frames.invalidate(viewRevision);state(Phase.WAITING_VIEW);
             }
+            if(sourceReady&&animation!=null) {
+                var atlasState=animation.status();
+                if(atlasState.phase()==GlWorldAnimation.Phase.FAILED) { status=new Status(worldRevision,viewRevision,Phase.FAILED,status.source(),List.of(),atlasState.code(),atlasState.reason());return status; }
+                // A new source must first adopt the requested atlas pixels. Later navigation can keep
+                // using its last complete atlas while normal animation work catches up.
+                if(!atlasPrimed) { if(!animation.settled())return status;atlasPrimed=true; }
+            }
             if(!sourceReady||scene==null||camera==null||!dirty)return status;
             if(scene.translucentFaces>0&&order==null) {
                 if(sortRevision==0)sortRevision=ordering.submit(scene.retainCpuScene(),camera.drawView());
@@ -193,7 +200,7 @@ public final class GlWorldView implements AutoCloseable {
         current();if(!sourceReady||expectedWorldRevision!=worldRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY)return Optional.empty();var delivered=new Status(worldRevision,viewRevision,Phase.DELIVERED,status.source(),List.of(),Optional.empty(),"");var frame=frames.take(viewRevision);if(frame.isPresent())status=delivered;return frame;
     }
     private void releaseScene() {
-        Throwable failure=null;
+        atlasPrimed=false;Throwable failure=null;
         if(animation!=null)try { animation.close();animation=null; }catch(RuntimeException|Error error) { failure=error; }
         else try { if(animationWorker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)animationWorker.invalidate(); }catch(RuntimeException|Error error) { failure=error; }
         if(order!=null)try { order.close();order=null; }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
