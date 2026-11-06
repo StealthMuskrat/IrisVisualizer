@@ -23,6 +23,15 @@ public final class GlNoiseFrame implements AutoCloseable {
             var source=new ScalarHistogram.Receipt(ScalarHistogram.Kind.NOISE_VOLUME,volumeId,context,grid.horizontal(),Optional.of(grid.vertical()));
             return histogram.matches(source,new ScalarHistogram.Range(colors.minimum(),colors.maximum()));
         }
+        /** Source-only matching permits an automatic-range suggestion across camera/clip changes. */
+        public boolean matchesSource(ScalarHistogramWorker.Completion completion) {
+            Objects.requireNonNull(completion);
+            var source=new ScalarHistogram.Receipt(ScalarHistogram.Kind.NOISE_VOLUME,volumeId,context,grid.horizontal(),Optional.of(grid.vertical()));
+            return !completion.closed()&&source.equals(completion.receipt());
+        }
+        public boolean matches(ScalarHistogramWorker.Completion completion) {
+            return matchesSource(completion)&&matches(completion.histogram());
+        }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final GlNoiseScene scene;final Info info;int references=1;boolean closing;
@@ -56,6 +65,18 @@ public final class GlNoiseFrame implements AutoCloseable {
     public NoiseSurface surface() { return live().scene.surface(); }
     /** Context-thread capture; the independently admitted CPU surface survives frame/device closure. */
     public RenderInput<NoiseSurface> retainSurfaceInput() { return live().scene.retainInput(); }
+    /** Capture CPU ownership on the context thread; histogram preparation never touches GL. */
+    public long submitHistogram(ScalarHistogramWorker worker,ScalarHistogram.Limits limits) {
+        var value=histogramSource(worker,limits);return worker.submitSurface(value.scene.retainInput(),limits);
+    }
+    /** Empty range requests observed extrema without changing the displayed surface. */
+    public long submitHistogram(ScalarHistogramWorker worker,Optional<ScalarHistogram.Range> range,ScalarHistogram.Limits limits) {
+        Objects.requireNonNull(range);var value=histogramSource(worker,limits);return worker.submitSurface(value.scene.retainInput(),range,limits);
+    }
+    private Shared histogramSource(ScalarHistogramWorker worker,ScalarHistogram.Limits limits) {
+        Objects.requireNonNull(worker);Objects.requireNonNull(limits);var value=live();worker.validate();
+        if(value.device.memory().orElse(null)!=worker.memory().orElse(null))throw new IllegalArgumentException("Scalar frame and histogram worker must share their memory coordinator");return value;
+    }
     /** Context-thread submission only; the admitted CPU request survives independent frame closure. */
     public long submitPick(NoisePickWorker worker,double x,double y,NoisePick.Options options) {
         Objects.requireNonNull(worker);Objects.requireNonNull(options);var value=live();

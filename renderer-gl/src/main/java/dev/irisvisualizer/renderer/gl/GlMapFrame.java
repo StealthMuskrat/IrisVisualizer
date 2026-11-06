@@ -30,6 +30,13 @@ public final class GlMapFrame implements AutoCloseable {
             var colors=style.orElseThrow() instanceof MapRaster.TerrainStyle terrain?terrain.colors():(MapRaster.ScalarStyle)style.orElseThrow();
             return histogram.matches(scalarSource.orElseThrow(),new ScalarHistogram.Range(colors.minimum(),colors.maximum()));
         }
+        /** Automatic-range suggestions attest the exact original source without claiming current display colors. */
+        public boolean matchesSource(ScalarHistogramWorker.Completion completion) {
+            Objects.requireNonNull(completion);return !completion.closed()&&scalarSource.filter(completion.receipt()::equals).isPresent();
+        }
+        public boolean matches(ScalarHistogramWorker.Completion completion) {
+            return matchesSource(completion)&&matches(completion.histogram());
+        }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final GlMap map;final Info info;int references=1;boolean closing;
@@ -66,6 +73,19 @@ public final class GlMapFrame implements AutoCloseable {
     public MapRaster raster() { return live().map.raster(); }
     /** Context-thread capture; independently admitted CPU data survives frame/device closure. */
     public RenderInput<MapRaster> retainRasterInput() { return live().map.retainInput(); }
+    /** Context-thread handoff only. Counting runs off-thread and retains no GL frame/device. */
+    public long submitHistogram(ScalarHistogramWorker worker,ScalarHistogram.Limits limits) {
+        var value=histogramSource(worker,limits);return worker.submitRaster(value.map.retainInput(),limits);
+    }
+    /** Empty range requests observed extrema for an explicit later recolor decision. */
+    public long submitHistogram(ScalarHistogramWorker worker,Optional<ScalarHistogram.Range> range,ScalarHistogram.Limits limits) {
+        Objects.requireNonNull(range);var value=histogramSource(worker,limits);return worker.submitRaster(value.map.retainInput(),range,limits);
+    }
+    private Shared histogramSource(ScalarHistogramWorker worker,ScalarHistogram.Limits limits) {
+        Objects.requireNonNull(worker);Objects.requireNonNull(limits);var value=live();worker.validate();
+        if(value.device.memory().orElse(null)!=worker.memory().orElse(null))throw new IllegalArgumentException("Map frame and histogram worker must share their memory coordinator");
+        if(info.kind()==MapSamples.Kind.BIOME)throw new IllegalArgumentException("Biome palettes are categorical, not scalar distributions");return value;
+    }
     public Optional<MapPick.Hit> hit(double x,double y) {
         var value=live();if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>=info.width()||y<0||y>=info.height())return Optional.empty();
         return MapPick.at(value.map.raster(),info.view(),x,y);

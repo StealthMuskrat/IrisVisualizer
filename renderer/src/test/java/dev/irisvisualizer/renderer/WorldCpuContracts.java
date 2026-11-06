@@ -288,6 +288,93 @@ public final class WorldCpuContracts {
             long retry=worker.submit(build(f,cache),limits);executor.runNext();var completion=worker.take(retry).orElseThrow();worker.close();cache.close();equal(2L,completion.report().usage().orElseThrow().meshCells(),"completion survives final source/cache/worker shutdown");completion.close();noWorkerCharge(memory);
         }
     }
+    private static void detachedHistogramWorkers() {
+        var context=new MapSamples.Context(snapshot(1).source(),"noise","detached","histogram ownership contract");var grid=new MapSamples.Grid(0,0,3,1,1);
+        var samples=MapSamples.noise(context,grid,new double[]{-2,7,999},new byte[]{1,1,0},LIVE);var colors=new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE);
+        var raster=MapRaster.render(samples,colors,LIVE);var volume=NoiseVolume.capture(context,new NoiseVolume.Grid(grid,new MapSamples.Vertical(-64,1)),new double[]{-2,7,999},new byte[]{1,1,0},NoiseVolume.Limits.DEFAULT,LIVE);
+        var surface=NoiseSurface.prepare(volume,new NoiseSurface.Style(-2,7,colors),new NoiseSurface.Limits(64,4096),LIVE);var limits=new ScalarHistogram.Limits(4,3,6,65536,65536);
+        for(int kind=0;kind<4;kind++)for(boolean automatic:new boolean[]{false,true})for(boolean ready:new boolean[]{false,true}) {
+            Object value=switch(kind) { case 0->samples;case 1->volume;case 2->raster;default->surface; };
+            long peak=(kind%2==0?ScalarHistogram.workingBytes(samples,limits):ScalarHistogram.workingBytes(volume,limits))+(kind==2?raster.payloadBytes()-samples.payloadBytes():kind==3?surface.payloadBytes()-volume.payloadBytes():0);
+            var range=automatic?Optional.<ScalarHistogram.Range>empty():Optional.of(new ScalarHistogram.Range(0,1));int selected=kind;
+            try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(peak,memory,()->executor)) {
+                java.util.function.Function<RenderInput<?>,Long> submit=input->submitHistogramFixture(worker,selected,input,range,limits);
+                var first=RenderInput.own(value,RenderMemory.Hold.none());long old=submit.apply(first);equal(peak,worker.reservedBytes(),"histogram destination reserves raw/display source plus output");equal(peak,memory.stats().chargedBytes(),"histogram admitted before counting");var status=worker.status();
+                throwsType(IllegalArgumentException.class,()->submit.apply(first),"same owned histogram wrapper cannot be resubmitted");check(!first.closed(),"same-wrapper rejection does not release pending source");equal(status,worker.status(),"same-wrapper rejection preserves queued token");worker.validate();equal(status,worker.status(),"host preflight changes no token or work");
+                var invalid=RenderInput.own(samples,RenderMemory.Hold.none());throwsType(NullPointerException.class,()->worker.submitMap(invalid,null,limits),"null range rejection");check(invalid.closed(),"invalid fresh wrapper consumed");equal(status,worker.status(),"invalid options preserve pending work");
+                if(ready) { executor.runNext();check(first.closed(),"READY histogram has released source wrapper");equal(ScalarHistogramWorker.Phase.READY,worker.status().phase(),"histogram READY after source release"); }
+                var replacement=RenderInput.own(value,RenderMemory.Hold.none());long revision=submit.apply(replacement);equal(old+1,revision,"histogram pending/READY replacement advances once");check(first.closed(),"replacement releases previous input");equal(peak,memory.stats().chargedBytes(),"idle histogram bundle provides exact replacement credit");executor.runNext();check(replacement.closed(),"completed histogram releases display/source wrapper");
+                check(worker.take(old).isEmpty(),"obsolete histogram token withheld");var receipt=kind%2==0?ScalarHistogram.receipt(samples):ScalarHistogram.receipt(volume);
+                var wrong=new ScalarHistogram.Receipt(receipt.kind(),UUID.randomUUID(),receipt.context(),receipt.horizontal(),receipt.vertical());check(worker.take(revision,wrong).isEmpty(),"wrong source receipt preserves READY output");
+                var completion=worker.take(revision,receipt).orElseThrow();var histogram=completion.histogram();equal(range,completion.requestedRange(),"automatic/explicit request mode retained");equal(automatic?Optional.of(new ScalarHistogram.Range(-2,7)):range,histogram.range(),"worker range comes from original values or explicit request");equal(2,histogram.summary().orElseThrow().present(),"worker retains absent-source coverage");equal(1,histogram.summary().orElseThrow().absent(),"absent storage is never counted as a value");equal(automatic?6L:3L,histogram.summary().orElseThrow().visits(),"automatic range counts two complete source passes");equal(automatic?List.of(1,0,0,1):List.of(0,0,0,0),Arrays.stream(histogram.copyCounts()).boxed().toList(),"exact worker distribution");
+                equal(histogram.bytes(),memory.stats().chargedBytes(),"histogram output charge excludes released source graph");equal(0L,worker.reservedBytes(),"delivered histogram is external");check(worker.take(revision).isEmpty(),"histogram completion transfers once");var blocked=RenderInput.own(value,RenderMemory.Hold.none());throwsType(RenderMemory.LimitException.class,()->submit.apply(blocked),"external histogram owner provides no idle replacement credit");check(blocked.closed(),"admission rejection consumes fresh wrapper");
+                var independent=completion.owner().retain();completion.close();worker.invalidate();worker.close();memory.close();equal(2,independent.value().summary().orElseThrow().present(),"detached histogram survives worker/source/coordinator closure");equal(histogram.bytes(),memory.stats().chargedBytes(),"retiring coordinator retains actual histogram charge");independent.close();noWorkerCharge(memory);
+            }
+        }
+        // Default display-range conveniences use no automatic fallback and retain full-volume coverage.
+        try(var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(65536,null,()->executor)) {
+            long revision=worker.submitRaster(RenderInput.own(raster,RenderMemory.Hold.none()),limits);executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().matches(raster),"raster convenience keeps displayed range"); }
+            revision=worker.submitSurface(RenderInput.own(surface,RenderMemory.Hold.none()),limits);executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().matches(surface),"surface convenience keeps displayed range"); }
+            var absent=MapSamples.noise(context,grid,new double[3],new byte[3],LIVE);var onePass=new ScalarHistogram.Limits(4,3,3,65536,65536);revision=worker.submitMap(RenderInput.own(absent,RenderMemory.Hold.none()),Optional.empty(),onePass);executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().range().isEmpty(),"all-absent automatic source invents no style");equal(3,completion.histogram().summary().orElseThrow().absent(),"all-absent source can complete within one pass"); }
+        }
+        try(var memory=new RenderMemory(new RenderMemory.Limits(65536,3));var other=new RenderMemory(new RenderMemory.Limits(65536,1));var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(65536,memory,()->executor)) {
+            var tracked=RenderInput.own(samples,memory.hold("Histogram raw source",samples.payloadBytes()));long revision=worker.submitMap(tracked,Optional.empty(),limits);executor.runNext();check(tracked.closed(),"tracked matching input released before READY");try(var completion=worker.take(revision).orElseThrow()) { equal(completion.histogram().bytes(),memory.stats().chargedBytes(),"tracked source charge fully released from detached completion"); }
+            var mismatched=RenderInput.own(samples,other.hold("Other histogram source",samples.payloadBytes()));var before=worker.status();throwsType(IllegalArgumentException.class,()->worker.submitMap(mismatched,Optional.empty(),limits),"cross-coordinator input rejected");check(mismatched.closed(),"mismatched fresh input consumed");equal(before,worker.status(),"mismatched input spends no revision");noWorkerCharge(other);
+        }
+        try(var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(65536,null,()->executor)) {
+            try { var field=ScalarHistogramWorker.class.getDeclaredField("revision");field.setAccessible(true);field.setLong(worker,Long.MAX_VALUE); }catch(ReflectiveOperationException failure) { throw new AssertionError("controlled histogram revision exhaustion unavailable",failure); }throwsType(IllegalStateException.class,worker::validate,"exhausted histogram worker preflight");var fresh=RenderInput.own(samples,RenderMemory.Hold.none());throwsType(IllegalStateException.class,()->worker.submitMap(fresh,Optional.empty(),limits),"exhausted histogram worker rejects new input");check(fresh.closed(),"exhausted histogram submission consumes fresh input");
+        }
+    }
+    @SuppressWarnings("unchecked") private static long submitHistogramFixture(ScalarHistogramWorker worker,int kind,RenderInput<?> input,Optional<ScalarHistogram.Range> range,ScalarHistogram.Limits limits) {
+        return switch(kind) { case 0->worker.submitMap((RenderInput<MapSamples>)input,range,limits);case 1->worker.submitVolume((RenderInput<NoiseVolume>)input,range,limits);case 2->worker.submitRaster((RenderInput<MapRaster>)input,range,limits);default->worker.submitSurface((RenderInput<NoiseSurface>)input,range,limits); };
+    }
+    /** One controlled metadata read fails during counting; preflight is already complete. */
+    private static final class HistogramReadFault implements AutoCloseable {
+        final MapSamples samples;final List<WorldProblem> original;final java.lang.reflect.Field field;boolean fired;
+        HistogramReadFault(MapSamples samples,Runnable before,Error failure) {
+            this.samples=samples;original=samples.problems();
+            try { field=MapSamples.class.getDeclaredField("problems");field.setAccessible(true);field.set(samples,new AbstractList<WorldProblem>() {
+                @Override public int size() { if(!fired) { fired=true;before.run();throw failure; }return original.size(); }
+                @Override public WorldProblem get(int index) { return original.get(index); }
+            }); }catch(ReflectiveOperationException error) { throw new AssertionError("controlled histogram read fault unavailable",error); }
+        }
+        @Override public void close() { try { field.set(samples,original); }catch(ReflectiveOperationException error) { throw new AssertionError("histogram source restore failed",error); } }
+    }
+    private static void histogramWorkerFailures() {
+        var context=new MapSamples.Context(snapshot(1).source(),"noise","failures","histogram failure contract");var grid=new MapSamples.Grid(0,0,2,1,1);var samples=MapSamples.noise(context,grid,new double[]{0,1},new byte[]{1,1},LIVE);
+        var limits=new ScalarHistogram.Limits(4,2,4,65536,65536);long peak=ScalarHistogram.workingBytes(samples,limits);var range=Optional.of(new ScalarHistogram.Range(0,1));
+        for(int kind=0;kind<3;kind++)try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new StartExecutor(kind);var worker=new ScalarHistogramWorker(peak,memory,()->executor)) {
+            var fresh=RenderInput.own(samples,RenderMemory.Hold.none());if(kind==2)check(caughtFailure(()->worker.submitMap(fresh,range,limits))==executor.failure,"histogram startup Error identity");else equal(1L,worker.submitMap(fresh,range,limits),"ordinary histogram dispatch failure returns failed token");check(fresh.closed(),"failed dispatch consumes histogram source");equal(ScalarHistogramWorker.Phase.FAILED,worker.status().phase(),"failed histogram startup status");noWorkerCharge(memory);long revision=worker.submitMap(RenderInput.own(samples,RenderMemory.Hold.none()),range,limits);executor.queued.remove(0).run();worker.take(revision).orElseThrow().close();noWorkerCharge(memory);
+        }
+        for(boolean error:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new ShutdownExecutor(error);var worker=new ScalarHistogramWorker(peak,memory,()->executor)) {
+            var pending=RenderInput.own(samples,RenderMemory.Hold.none());worker.submitMap(pending,range,limits);firstShutdownFails(worker,executor);check(pending.closed(),"failed histogram shutdown still consumes pending input");equal(ScalarHistogramWorker.Phase.CLOSED,worker.status().phase(),"failed shutdown still seals histogram worker");throwsType(IllegalStateException.class,worker::validate,"closed histogram host preflight");noWorkerCharge(memory);retryShutdown(worker,executor);
+        }
+        for(boolean ready:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(peak,memory,()->executor)) {
+            long revision=worker.submitMap(RenderInput.own(samples,RenderMemory.Hold.none()),range,limits);if(ready)executor.runNext();var primary=new AssertionError("histogram pending/READY release failure");try(var fault=new CaptureCloseFault(memory,primary)) { check(caughtFailure(worker::invalidate)==primary,"histogram release failure preserves exact identity");check(worker.take(revision).isEmpty(),"closed histogram completion cannot escape after cleanup error");equal(0L,worker.reservedBytes(),"histogram counters detach before fallible release");noWorkerCharge(memory); }
+            equal(revision,worker.status().revision(),"failed histogram invalidation spends no revision");long retry=worker.submitMap(RenderInput.own(samples,RenderMemory.Hold.none()),range,limits);executor.runNext();worker.take(retry).orElseThrow().close();noWorkerCharge(memory);
+        }
+        for(int mode=0;mode<4;mode++)try(var memory=new RenderMemory(new RenderMemory.Limits(peak*2,2));var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(mode==3?peak:peak*2,memory,()->executor)) {
+            var first=RenderInput.own(samples,RenderMemory.Hold.none());worker.submitMap(first,range,limits);var primary=new AssertionError("active histogram source failure");long[] latest={0};int selected=mode;
+            try(var fault=new HistogramReadFault(samples,()-> {
+                if(selected==0)latest[0]=worker.invalidate();
+                else { var fresh=RenderInput.own(samples,RenderMemory.Hold.none());if(selected==3) { throwsType(IllegalStateException.class,()->worker.submitMap(fresh,range,limits),"active plus pending histogram respects combined ceiling");check(fresh.closed(),"active admission rejection consumes only fresh input"); }else { latest[0]=worker.submitMap(fresh,range,limits);if(selected==2)executor.nextFailure=new RejectedExecutionException("histogram recovery dispatch rejected"); } }
+            },primary)) {
+                check(caughtFailure(executor::runNext)==primary&&fault.fired,"active histogram failure retains exact identity");check(first.closed(),"aborted counting releases consumed source");
+                if(selected==1) { equal(ScalarHistogramWorker.Phase.QUEUED,worker.status().phase(),"older histogram failure cannot overwrite accepted replacement");executor.runNext();worker.take(latest[0]).orElseThrow().close(); }
+                else { check(worker.take(worker.status().revision()).isEmpty(),"cancelled/failed histogram exposes no partial result");equal(selected==0?ScalarHistogramWorker.Phase.WAITING:ScalarHistogramWorker.Phase.FAILED,worker.status().phase(),"histogram failure respects latest revision");noWorkerCharge(memory);long retry=worker.submitMap(RenderInput.own(samples,RenderMemory.Hold.none()),range,limits);executor.runNext();worker.take(retry).orElseThrow().close(); }
+            }
+            equal(0L,worker.reservedBytes(),"histogram drain recovery releases all worker charge");noWorkerCharge(memory);
+        }
+        try(var memory=new RenderMemory(new RenderMemory.Limits(peak+samples.payloadBytes(),2));var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(peak,memory,()->executor)) {
+            var tracked=RenderInput.own(samples,memory.hold("Histogram source release",samples.payloadBytes()));long revision=worker.submitMap(tracked,range,limits);var primary=new AssertionError("histogram source close failed");try(var fault=new CaptureCloseFault(memory,primary)) { check(caughtFailure(executor::runNext)==primary,"source cleanup failure stays primary");check(tracked.closed()&&worker.take(revision).isEmpty(),"failed source release prevents histogram READY");noWorkerCharge(memory); }
+        }
+        try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new DrainExecutor();var worker=new ScalarHistogramWorker(peak,memory,()->executor)) {
+            var onePass=new ScalarHistogram.Limits(4,2,2,65536,65536);long revision=worker.submitMap(RenderInput.own(samples,RenderMemory.Hold.none()),Optional.empty(),onePass);executor.runNext();equal(WorldProblem.Code.LIMIT,worker.status().problems().getFirst().code(),"automatic histogram second-pass limit remains structured");check(worker.take(revision).isEmpty(),"histogram second-pass failure has no partial output");noWorkerCharge(memory);
+            var failed=MapSamples.failed(context,grid,MapSamples.Kind.NOISE,Optional.empty(),new WorldProblem(WorldProblem.Code.WORKER,Optional.empty(),"original histogram map failure"));revision=worker.submitMap(RenderInput.own(failed,RenderMemory.Hold.none()),range,limits);executor.runNext();equal(failed.problems(),worker.status().problems(),"native source diagnostic survives histogram worker");check(worker.take(revision).isEmpty(),"failed native map produces no histogram");noWorkerCharge(memory);
+            var categorical=MapSamples.biomes(context,grid,List.of(BIOME),new int[2],new byte[]{1,1},LIVE);var fresh=RenderInput.own(categorical,RenderMemory.Hold.none());throwsType(IllegalArgumentException.class,()->worker.submitMap(fresh,range,limits),"categorical histogram source rejected");check(fresh.closed(),"categorical rejection consumes fresh owner");
+            var tooFew=new ScalarHistogram.Limits(4,1,4,65536,65536);var invalid=RenderInput.own(samples,RenderMemory.Hold.none());throwsType(IllegalArgumentException.class,()->worker.submitMap(invalid,range,tooFew),"histogram sample preflight");check(invalid.closed(),"sample rejection consumes fresh owner");
+        }
+    }
     private static void histogramWorkerHandoffs() {
         var context=new MapSamples.Context(snapshot(1).source(),"noise","fixture","histogram worker contract");var grid=new MapSamples.Grid(0,0,2,1,1);byte[] present={1,1};
         var samples=MapSamples.noise(context,grid,new double[]{0,1},present,LIVE);var colors=new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE);var histLimits=new ScalarHistogram.Limits(4,2,2,65536,4L*1024*1024);var mapLimits=new MapRaster.Limits(8,4096);
@@ -1209,6 +1296,8 @@ public final class WorldCpuContracts {
         group("detached bounded visual limitation reports",WorldCpuContracts::visualReports);
         group("background visual report ownership and recovery",WorldCpuContracts::reportWorkers);
         group("map and scalar histogram worker handoffs",WorldCpuContracts::histogramWorkerHandoffs);
+        group("detached background histogram ownership and ranges",WorldCpuContracts::detachedHistogramWorkers);
+        group("background histogram failure and drain recovery",WorldCpuContracts::histogramWorkerFailures);
         group("model cube winding and provenance",WorldCpuContracts::geometry);
         group("atlas extrusion and exact binding",WorldCpuContracts::atlas);
         group("native visual assignment guards",WorldCpuContracts::assignments);
