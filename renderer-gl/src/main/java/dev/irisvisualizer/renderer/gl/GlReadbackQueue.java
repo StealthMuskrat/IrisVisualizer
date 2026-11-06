@@ -48,12 +48,15 @@ public final class GlReadbackQueue implements AutoCloseable {
     private boolean submit(long next,Supplier<GlTarget> source,Supplier<GlReadback> begin) {
         current();if(next<1)throw new IllegalArgumentException("Invalid readback revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
         var target=source.get();if(target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Readback image and queue must share one device");GlReadback.validate(target,limits);
-        if(next>revision)invalidate(next);
+        GlReadback fresh=null;Throwable rejection=null;
         try {
-            var job=begin.get();active=job;
-            if(job.device()!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Readback image and queue must share one device");
-            status=state(Phase.READING,null,"");return true;
-        }catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failed(error);throw error; }
+            fresh=begin.get();
+            if(fresh.device()!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Readback image and queue must share one device");
+            var reading=new Status(next,Phase.READING,Optional.of(fresh.progress()),Optional.empty(),"");
+            try { releaseOwned(); }catch(RuntimeException|Error error) { failed(error);throw error; }
+            active=fresh;fresh=null;revision=next;status=reading;return true;
+        }catch(RuntimeException|Error error) { rejection=error;throw error; }
+        finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
     }
     public Status advance(GlUploadBudget budget,long latestRevision) {
         Objects.requireNonNull(budget);current();if(latestRevision<1)throw new IllegalArgumentException("Invalid readback revision");if(latestRevision>revision) { invalidate(latestRevision);return status; }if(latestRevision<revision||status.phase()!=Phase.READING||active==null)return status;

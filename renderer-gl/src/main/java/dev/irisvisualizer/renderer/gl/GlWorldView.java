@@ -78,18 +78,23 @@ public final class GlWorldView implements AutoCloseable {
             throw failure;
         }
     }
-    /** Consumes fresh CPU scene owners on every outcome; optional native colors belong to this exact scene. */
+    /** Consumes fresh owners; upload admission precedes world/view replacement. Native colors match the exact scene. */
     public boolean submit(long revision,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {
         Objects.requireNonNull(owner);boolean handedOff=false;Throwable rejection=null;
         try {
             current();if(device.ownsCpu(owner)) { handedOff=true;return false; }
             if(revision<1)throw new IllegalArgumentException("Invalid world revision");if(revision<worldRevision||revision==worldRevision&&status.phase()!=Phase.WAITING_CPU)return false;
             tint=GlUpload.validate(renderer,owner,tint,lighting);
-            if(revision>worldRevision)invalidate(revision);
-            status=new Status(worldRevision,viewRevision,Phase.UPLOADING,Optional.of(owner.source()),List.of(),Optional.empty(),"");
+            boolean replacing=revision>worldRevision;long next=replacing?nextView():viewRevision;
+            var queued=new Status(revision,next,Phase.UPLOADING,Optional.of(owner.source()),List.of(),Optional.empty(),"");var previousUpload=uploads.status();
             handedOff=true;
-            try { boolean accepted=uploads.submit(revision,owner,tint,lighting);if(!accepted)throw new GlFailure(GlFailure.Code.STATE,"World upload did not accept its current CPU scene");return true; }
+            try {
+                if(!uploads.submit(revision,owner,tint,lighting))throw new GlFailure(GlFailure.Code.STATE,"World upload did not accept its current CPU scene");
+            }catch(RuntimeException|Error failure) { if(uploads.status()!=previousUpload)failed(failure);throw failure; }
+            worldRevision=revision;viewRevision=next;sourceReady=false;dirty=false;sortRevision=0;status=queued;
+            if(replacing)try { ordering.invalidate();frames.invalidate(viewRevision);releaseScene(); }
             catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+            return true;
         }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
         finally {
             if(!handedOff)try { owner.close(); }

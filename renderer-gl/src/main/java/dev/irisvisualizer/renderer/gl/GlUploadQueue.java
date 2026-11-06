@@ -35,26 +35,28 @@ public final class GlUploadQueue implements AutoCloseable {
         var waiting=new Status(revision,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");
         try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
-    /** Fresh nonnull leases are consumed; an already-device-owned lease is ignored without closing it. */
+    /** Fresh leases are consumed; initial admission rejection preserves accepted work. Device-owned leases remain intact. */
     public boolean submit(long next,WorldScene.Result owner) {
         return submit(next,owner,null);
     }
     public boolean submit(long next,WorldScene.Result owner,WorldTint tint) { return submit(next,owner,tint,null); }
     public boolean submit(long next,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) {
-        Objects.requireNonNull(owner);boolean handedOff=false;Throwable rejection=null;
+        Objects.requireNonNull(owner);boolean handedOff=false;Throwable rejection=null;GlUpload fresh=null;
         try {
             current();
             if(device.ownsCpu(owner)) { handedOff=true;return false; }
             if(next<1)throw new IllegalArgumentException("Invalid request revision");
             if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
             tint=GlUpload.validate(renderer,owner,tint,lighting);
-            if(next>revision)invalidate(next);
-            status=new Status(revision,Phase.UPLOADING,Optional.of(owner.source()),Optional.empty(),Optional.empty(),"");
-            handedOff=true;
-            try { active=GlUpload.begin(renderer,owner,tint,lighting);status=new Status(revision,Phase.UPLOADING,Optional.of(owner.source()),Optional.of(active.progress()),Optional.empty(),"");return true; }
-            catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error retirement) { if(retirement!=failure)failure.addSuppressed(retirement); }failed(failure);throw failure; }
+            // A fresh journal must fit alongside old work before any accepted token/source is changed.
+            handedOff=true;fresh=GlUpload.begin(renderer,owner,tint,lighting);
+            var queued=new Status(next,Phase.UPLOADING,Optional.of(owner.source()),Optional.of(fresh.progress()),Optional.empty(),"");
+            try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+            active=fresh;fresh=null;revision=next;status=queued;return true;
         }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
         finally {
+            if(fresh!=null)try { fresh.close(); }
+            catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); }
             if(!handedOff)try { owner.close(); }
             catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); }
         }

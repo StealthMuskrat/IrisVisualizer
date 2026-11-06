@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 18 synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 76 prepared, unexecuted groups, making 94 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 20 synthetic GPU groups. The source compiles with the renderer and LWJGL 3.4.1; **none of these groups has been executed**. The four earlier CPU/context-free suites contain 76 prepared, unexecuted groups, making 96 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -29,6 +29,8 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | Group | Contract scope |
 | --- | --- |
 | Context provenance and boundaries | Required driver metadata, immutable detached features, hardware limits, foreign-thread/capabilities guards and rejection before target allocation |
+| Transfer replacement admission | World/map/image ACTIVE and READY work, connected world/view tokens, deficient initial admission, fresh lease consumption and successful subsequent replacement |
+| Output replacement admission | Readback/animated-atlas ACTIVE and READY output, exact original pixels/receipts, fresh plan consumption, host state and subsequent replacement |
 | Shader programs | Real compilation/linking of map/image, scalar and world renderer programs |
 | Original image pixels | Tiny-step row upload, complete-only take, exact top-left RGBA readback, transparent RGB/alpha and original decode receipts |
 | Map pixels | Supplied scalar samples, exact raster RGBA/orientation, absent-value inspection, source UUID and completed-image readback receipt |

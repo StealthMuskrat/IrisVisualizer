@@ -31,13 +31,17 @@ public final class GlMapQueue implements AutoCloseable {
         var waiting=new Status(revision,Phase.WAITING,Optional.empty(),Optional.empty(),Optional.empty(),"");
         try { releaseOwned();status=waiting;return true; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
-    /** Immutable rasters are borrowed/retained, not consuming native generation leases. */
+    /** Borrowed immutable raster; initial admission precedes accepted-work replacement and token changes. */
     public boolean submit(long next,MapRaster raster) {
         Objects.requireNonNull(raster);current();if(next<1)throw new IllegalArgumentException("Invalid map revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
-        GlMapUpload.validate(device,raster);if(next>revision)invalidate(next);
-        status=new Status(revision,Phase.UPLOADING,Optional.of(raster.samples().context()),Optional.empty(),Optional.empty(),"");
-        try { active=GlMapUpload.begin(device,raster);status=new Status(revision,Phase.UPLOADING,status.context(),Optional.of(active.progress()),Optional.empty(),"");return true; }
-        catch(RuntimeException|Error failure) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }
+        GlMapUpload.validate(device,raster);GlMapUpload fresh=null;Throwable rejection=null;
+        try {
+            fresh=GlMapUpload.begin(device,raster);
+            var queued=new Status(next,Phase.UPLOADING,Optional.of(raster.samples().context()),Optional.of(fresh.progress()),Optional.empty(),"");
+            try { releaseOwned(); }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+            active=fresh;fresh=null;revision=next;status=queued;return true;
+        }catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
     }
     public Status advance(GlUploadBudget budget,long latestRevision) {
         Objects.requireNonNull(budget);current();if(latestRevision<1)throw new IllegalArgumentException("Invalid map revision");if(latestRevision>revision) { invalidate(latestRevision);return status; }if(latestRevision<revision||status.phase()!=Phase.UPLOADING||active==null)return status;

@@ -59,3 +59,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Admitted histogram reuse](HISTOGRAM-REUSE.md) adds one world CPU group: 75 CPU/context-free plus 18 GPU groups, all 93 unexecuted. Both compile sets retain their 142/104 source counts.
 
 [Two-array face sorting](BOUNDED-FACE-SORT.md) reduces verified temporary sort payload and adds one world CPU group. All 94 groups remain unexecuted (76 CPU/context-free, 18 GPU); full/default compilation now covers 143/105 files, including 94 dependency-free CPU production sources.
+
+[GPU transfer replacement admission](../renderer-gl/REPLACEMENT-ADMISSION.md) adds two GPU groups. The four CPU/context-free suites remain at 76 groups; the total is now 96 with 20 GPU groups, all unexecuted.

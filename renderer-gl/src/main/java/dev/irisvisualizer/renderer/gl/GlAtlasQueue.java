@@ -54,9 +54,14 @@ public final class GlAtlasQueue implements AutoCloseable {
         if(latestScene!=sceneRevision) { observe(latestScene,latestFrame);return false; }
         if(obsolete||latestFrame<frameRevision||latestFrame==frameRevision&&status.phase()!=Phase.WAITING)return false;
         displayed.requireScene(scene);GlAtlasUpload.validate(displayed,plan);
-        if(!observe(latestScene,latestFrame)||status.phase()!=Phase.WAITING)return false;
-        try { active=GlAtlasUpload.begin(displayed,plan);status=state(Phase.UPDATING,null,"");return true; }
-        catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failure(error);throw error; }
+        GlAtlasUpload fresh=null;Throwable rejection=null;
+        try {
+            fresh=GlAtlasUpload.begin(displayed,plan);
+            var updating=new Status(sceneRevision,latestFrame,Phase.UPDATING,Optional.of(fresh.progress()),Optional.empty(),"");
+            try { releaseOwned(); }catch(RuntimeException|Error error) { failure(error);throw error; }
+            active=fresh;fresh=null;frameRevision=latestFrame;status=updating;return true;
+        }catch(RuntimeException|Error error) { rejection=error;throw error; }
+        finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
     }
     /** Reopen only an exact failed scene/frame token after cleanup; the caller resubmits complete input. */
     public boolean retry(long expectedScene,long expectedFrame) {
