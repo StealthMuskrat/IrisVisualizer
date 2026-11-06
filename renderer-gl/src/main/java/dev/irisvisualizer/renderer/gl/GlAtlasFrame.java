@@ -18,7 +18,7 @@ public final class GlAtlasFrame implements AutoCloseable {
         this.scene=scene;device=scene.device;this.raster=raster;this.pages=List.copyOf(pages);this.journal=journal;textures=new int[pages.size()];for(int i=0;i<textures.length;i++)textures[i]=pages.get(i).allocation.textures[pages.get(i).slot];
     }
     public static GlAtlasFrame capture(GlScene scene) {
-        Objects.requireNonNull(scene);scene.live();var raster=scene.cpuScene().raster();var pages=new ArrayList<Page>(raster.pages().size());
+        Objects.requireNonNull(scene);scene.live();var raster=scene.raster();var pages=new ArrayList<Page>(raster.pages().size());
         for(int i=0;i<raster.pages().size();i++)pages.add(new Page(scene.allocation,i,raster.pages().get(i),false));
         GlAtlasFrame frame=null;Throwable failure=null;
         try { frame=create(scene,raster,pages); }catch(RuntimeException|Error error) { failure=error; }
@@ -54,6 +54,10 @@ public final class GlAtlasFrame implements AutoCloseable {
         if(scene!=expected)throw new GlFailure(GlFailure.Code.STALE,"Atlas frame belongs to a different GPU scene");
     }
     GlAtlasFrame retain() { requireScene(scene);return create(scene,raster,pages); }
+    /** Internal copy owner rebound only to another live wrapper of the same GPU allocation. */
+    GlAtlasFrame retain(GlScene source) {
+        requireScene(scene);source.live();if(source.allocation!=scene.allocation)throw new GlFailure(GlFailure.Code.STALE,"Atlas copy owner belongs to a different GPU scene");return create(source,raster,pages);
+    }
     Object token() { return token; }
     boolean closedOrReleased() { return closed||journal.released; }
     GlDevice.Allocation journal() { requireScene(scene);return journal; }

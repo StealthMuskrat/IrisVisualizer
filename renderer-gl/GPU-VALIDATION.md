@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 24 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including the previously pending initial-atlas change and current owned-lighting/retry changes. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 76 prepared, unexecuted groups, making 100 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 26 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including the previously pending initial-atlas change and current owned-lighting/retry changes. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 76 prepared, unexecuted groups, making 102 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -35,6 +35,8 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | World material recovery | Stale/owned inputs, deficient admission, cancellation across copy phases, queue preservation and connected-view material adoption |
 | Initial world atlas | Requested clock before first presentation, material refresh, scheduled/interpolated pixels, unchanged samples and failed initial animation admission and explicit retry gates/recovery |
 | Owned world lighting | Queue/view consuming handoffs, exact tracked overlap, stale/foreign/closed rejection, immutable frame delivery and shutdown |
+| Displayed atlas material copy | Exact animated snapshot pixels/clock, changed-page admission, caller source closure, repeated inheritance and independent GPU ownership |
+| Displayed atlas recovery | Wrong GPU frame with equal CPU identity, tracked overlap rejection, owned inputs, cancellation, queue adoption and connected no-rebuild behavior |
 | Shader programs | Real compilation/linking of map/image, scalar and world renderer programs |
 | Original image pixels | Tiny-step row upload, complete-only take, exact top-left RGBA readback, transparent RGB/alpha and original decode receipts |
 | Map pixels | Supplied scalar samples, exact raster RGBA/orientation, absent-value inspection, source UUID and completed-image readback receipt |

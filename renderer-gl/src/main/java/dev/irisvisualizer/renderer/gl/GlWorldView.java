@@ -104,12 +104,12 @@ public final class GlWorldView implements AutoCloseable {
     }
     /** Refresh exact-source tint/final lighting without native regeneration, CPU remeshing or CPU geometry upload. */
     public boolean materials(long revision,WorldTint tint,WorldLighting lighting) {
-        return refreshMaterials(revision,()->uploads.materials(revision,scene,tint,lighting));
+        return refreshMaterials(revision,()->uploads.materials(revision,scene,animation==null?null:animation.frame(),tint,lighting));
     }
     /** Consume fresh lighting through destination admission; stale, closed and rejected requests also consume it. */
     public boolean materialsLit(long revision,WorldTint tint,RenderInput<WorldLighting> input) {
         Objects.requireNonNull(input);
-        try(input) { return refreshMaterials(revision,()->uploads.materialsLit(revision,scene,tint,input)); }
+        try(input) { return refreshMaterials(revision,()->uploads.materialsLit(revision,scene,animation==null?null:animation.frame(),tint,input)); }
     }
     private boolean refreshMaterials(long revision,BooleanSupplier submit) {
         current();if(revision<1)throw new IllegalArgumentException("Invalid world revision");if(revision<=worldRevision)return false;
