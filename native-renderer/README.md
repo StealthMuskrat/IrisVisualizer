@@ -88,7 +88,7 @@ On the prepared Windows source environment, the compile-only command is:
 ./scripts/Compile-NativeRenderer.ps1
 ```
 
-It checks pinned clean upstream checkouts and the compatibility source hash, then applies the existing feasibility source overlays and the new renderer-native init script to the genuine offline native source set. The init script checks bridge manifest pins, exact source coverage and hashes. The only requested task is `:adapters:bukkit:nms:v26_3_R1:compileOfflineJava`; no test, JavaExec or capture/sampling task is invoked. Existing probe sources may compile as part of that source set. No native JAR is downloaded by this adapter or added to the editor package. This command has not been run in this workspace.
+It checks pinned clean upstream checkouts and the compatibility source hash, then applies the existing feasibility source overlays and the new renderer-native init script to the genuine offline native source set. The init script checks bridge manifest pins, exact source coverage and hashes. The only requested task is `:adapters:bukkit:nms:v26_3_R1:compileOfflineJava`; no test, JavaExec or capture/sampling task is invoked. Existing probe sources may compile as part of that source set. No native JAR is downloaded by this adapter or added to the editor package. The command now prepares [fresh-output compile evidence](COMPILE-EVIDENCE.md), with source/control/dependency/processor fingerprints, complete renderer class coverage and Java-25 bytecode checks; final evidence is published only after post-build checks. This command has not been run in this workspace.
 
 ## Deferred validation
 

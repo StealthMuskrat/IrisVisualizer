@@ -20,5 +20,148 @@ gradle.projectsEvaluated {
     def target = gradle.rootProject.project(':adapters:bukkit:nms:v26_3_R1')
     target.sourceSets.offline.java.srcDir(new File(root, 'renderer/src/main/java'))
     target.sourceSets.offline.java.srcDir(new File(root, 'native-renderer/src/main/java'))
-    // No JavaExec, test, run or workflow task is requested or attached here.
+    // No renderer test, native capture, run or workflow task is requested or attached here.
+    def reportDirectory = new File(root, 'build/native-renderer-compile')
+    def receiptFile = new File(reportDirectory, 'pending.json')
+    def temporaryReceipt = new File(reportDirectory, 'pending.json.tmp')
+    def shaStream = { stream ->
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        byte[] buffer = new byte[65536]
+        int count
+        while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
+        digest.digest().encodeHex().toString()
+    }
+    def shaFile = { file -> file.withInputStream { stream -> shaStream(stream) } }
+    def relative = { base, file -> base.canonicalFile.toPath().relativize(file.canonicalFile.toPath()).toString().replace('\\', '/') }
+    def projectDirectory = new File(root).canonicalFile
+    def irisDirectory = gradle.rootProject.projectDir.canonicalFile
+    def volmlibLocation = target.findProperty('localVolmLibDirectory')
+    if (!volmlibLocation) throw new GradleException('Native compilation requires the pinned local VolmLib checkout')
+    def volmlibDirectory = new File(volmlibLocation.toString()).canonicalFile
+    def label = { file ->
+        def path = file.canonicalFile.toPath()
+        if (path.startsWith(irisDirectory.toPath())) return 'iris/' + relative(irisDirectory, file)
+        if (path.startsWith(volmlibDirectory.toPath())) return 'volmlib/' + relative(volmlibDirectory, file)
+        if (path.startsWith(projectDirectory.toPath())) return 'project/' + relative(projectDirectory, file)
+        // External dependencies use content hashes plus basename, not a developer's absolute cache path.
+        return 'dependency/' + file.name
+    }
+    def filesSnapshot = { files ->
+        files.collect { file -> [path: label(file), bytes: file.length(), sha256: shaFile(file)] }.sort { it.path }
+    }
+    def controls = {
+        [new File(root, 'iris.lock.json'), new File(root, 'native-renderer/bridge-sources.json'),
+         new File(root, 'scripts/Compile-NativeRenderer.ps1'), new File(root, 'scripts/Runtime.ps1'),
+         new File(root, 'gradle/feasibility.init.gradle'), new File(root, 'gradle/renderer-native.init.gradle')] +
+            gradle.rootProject.fileTree(new File(root, 'compatibility')).files.findAll { it.isFile() }
+    }
+    def controlSnapshot = filesSnapshot(controls())
+    def bridgeSnapshot = filesSnapshot(sources)
+    def classpathSnapshot = { files ->
+        files.collect { file ->
+            if (file.isFile()) return [path: label(file), kind: 'file', bytes: file.length(), sha256: shaFile(file)]
+            if (!file.isDirectory()) throw new GradleException('Missing native compiler classpath entry: ' + label(file))
+            def entries = []
+            def base = file.canonicalFile.toPath()
+            def paths = java.nio.file.Files.walk(base, java.nio.file.FileVisitOption.FOLLOW_LINKS)
+            try {
+                def iterator = paths.iterator()
+                while (iterator.hasNext()) {
+                    def path = iterator.next()
+                    if (java.nio.file.Files.isRegularFile(path)) {
+                        def child = path.toFile()
+                        entries.add([path: base.relativize(path).toString().replace('\\', '/'), bytes: child.length(), sha256: shaFile(child)])
+                    }
+                }
+            } finally { paths.close() }
+            entries.sort { it.path }
+            def encoded = groovy.json.JsonOutput.toJson(entries).getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            [path: label(file), kind: 'directory', files: entries.size(), bytes: entries.sum { it.bytes } ?: 0,
+             sha256: java.security.MessageDigest.getInstance('SHA-256').digest(encoded).encodeHex().toString()]
+        }
+    }
+    target.tasks.named('compileOfflineJava', org.gradle.api.tasks.compile.JavaCompile).configure { compile ->
+        options.incremental = false
+        options.failOnError = true
+        outputs.upToDateWhen { false }
+        outputs.doNotCacheIf('Native renderer evidence requires a fresh compilation') { true }
+        def compilerSettings = {
+            [sourceCompatibility: compile.sourceCompatibility, targetCompatibility: compile.targetCompatibility,
+             release: compile.options.release.orNull, encoding: compile.options.encoding, debug: compile.options.debug,
+             debugLevel: compile.options.debugOptions.debugLevel, fork: compile.options.fork,
+             forkJvmArgs: (compile.options.forkOptions.jvmArgs ?: []).collect { it.toString() },
+             arguments: (compile.options.compilerArgs + compile.options.compilerArgumentProviders.collectMany { it.asArguments().toList() }).collect { it.toString() }]
+        }
+        def beforeSources, beforeClasspath, beforeProcessors, beforeSourcepath, beforeSettings, beforeProjectSources
+        doFirst {
+            java.nio.file.Files.deleteIfExists(receiptFile.toPath())
+            java.nio.file.Files.deleteIfExists(temporaryReceipt.toPath())
+            if (!System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).startsWith('windows') ||
+                !(System.getProperty('os.arch') in ['amd64', 'x86_64'])) throw new GradleException('Native renderer compilation requires Windows x64')
+            if (compile.javaCompiler.get().metadata.languageVersion.asInt() != 25) throw new GradleException('Native renderer compiler must be Java 25')
+            if (gradle.startParameter.taskNames != [':adapters:bukkit:nms:v26_3_R1:compileOfflineJava'])
+                throw new GradleException('Compile-only native renderer invocation requires its exact single task')
+            if (filesSnapshot(controls()) != controlSnapshot) throw new GradleException('Native compilation control files changed after configuration')
+            def bridgeNow = gradle.rootProject.fileTree(new File(root, 'native-renderer/src/main/java')).matching { include '**/*.java' }.files
+            if (filesSnapshot(bridgeNow) != bridgeSnapshot) throw new GradleException('Native bridge sources changed after manifest validation')
+            def rendererSources = gradle.rootProject.fileTree(new File(root, 'renderer/src/main/java')).matching { include '**/*.java' }.files
+            def requested = (rendererSources + sources).collect { it.canonicalFile }.toSet()
+            def compiled = compile.source.files.collect { it.canonicalFile }.toSet()
+            if (!compiled.containsAll(requested)) throw new GradleException('Native compilation omits renderer or bridge source files')
+            beforeProjectSources = requested.sort { label(it) }
+            beforeSources = filesSnapshot(compiled)
+            beforeClasspath = classpathSnapshot(compile.classpath.files)
+            beforeProcessors = classpathSnapshot(compile.options.annotationProcessorPath?.files ?: [])
+            beforeSourcepath = classpathSnapshot(compile.options.sourcepath?.files ?: [])
+            beforeSettings = compilerSettings()
+            def destination = compile.destinationDirectory.get().asFile.canonicalFile
+            if (!destination.toPath().startsWith(target.layout.buildDirectory.get().asFile.canonicalFile.toPath()))
+                throw new GradleException('Native compiler destination is outside the upstream build directory')
+            // Only this project's renderer package is cleared; original native/backend classes are untouched.
+            def ownedOutput = new File(destination, 'dev/irisvisualizer/renderer')
+            target.delete(ownedOutput)
+            if (ownedOutput.exists()) throw new GradleException('Unable to clear stale renderer compiler output')
+        }
+        doLast {
+            if (filesSnapshot(compile.source.files) != beforeSources || filesSnapshot(controls()) != controlSnapshot ||
+                classpathSnapshot(compile.classpath.files) != beforeClasspath ||
+                classpathSnapshot(compile.options.annotationProcessorPath?.files ?: []) != beforeProcessors ||
+                classpathSnapshot(compile.options.sourcepath?.files ?: []) != beforeSourcepath || compilerSettings() != beforeSettings)
+                throw new GradleException('Native compilation source/control/classpath inputs changed during compilation')
+            def destination = compile.destinationDirectory.get().asFile
+            def topClasses = beforeProjectSources.collect { source ->
+                def matcher = (source.getText('UTF-8') =~ /(?m)^\s*package\s+([\w.]+)\s*;/)
+                if (!matcher.find()) throw new GradleException('Renderer source has no package declaration: ' + label(source))
+                def path = matcher.group(1).replace('.', '/') + '/' + source.name.replaceFirst(/\.java$/, '.class')
+                if (!path.startsWith('dev/irisvisualizer/renderer/')) throw new GradleException('Renderer source is outside the owned output package: ' + label(source))
+                if (!new File(destination, path).isFile()) throw new GradleException('Missing freshly compiled renderer class: ' + path)
+                [source: label(source), path: path]
+            }
+            def classes = gradle.rootProject.fileTree(new File(destination, 'dev/irisvisualizer/renderer')).matching { include '**/*.class' }.files.collect { file ->
+                int major = file.withDataInputStream { input ->
+                    if (input.readInt() != (int)0xcafebabe) throw new GradleException('Invalid emitted renderer class: ' + file.name)
+                    input.readUnsignedShort()
+                    input.readUnsignedShort()
+                }
+                if (major != 69) throw new GradleException('Renderer class does not target Java 25: ' + file.name)
+                [path: relative(destination, file), bytes: file.length(), sha256: shaFile(file), major: major]
+            }.sort { it.path }
+            if (!classes.collect { it.path }.containsAll(topClasses.collect { it.path }))
+                throw new GradleException('Native compiler evidence omits a required top-level renderer class')
+            def compiler = compile.javaCompiler.get().metadata
+            def evidence = [format: 1, status: 'compiled-only', createdAt: java.time.Instant.now().toString(),
+                platform: 'windows-x64', compiler: [languageVersion: compiler.languageVersion.asInt(), vendor: compiler.vendor,
+                    runtimeVersion: compiler.javaRuntimeVersion, hostArchitecture: System.getProperty('os.arch')],
+                pins: [iris: lock.iris.revision, volmlib: lock.volmlib.revision, minecraft: lock.minecraft],
+                task: compile.path, destination: label(destination), controls: controlSnapshot, sources: beforeSources, classpath: beforeClasspath,
+                annotationProcessorPath: beforeProcessors, sourcepath: beforeSourcepath, compilerSettings: beforeSettings,
+                rendererSourceCount: beforeProjectSources.size() - sources.size(), bridgeSourceCount: sources.size(),
+                topClasses: topClasses, classes: classes, rendererContractsExecuted: false, nativeCaptureExecuted: false]
+            reportDirectory.mkdirs()
+            try {
+                temporaryReceipt.setText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(evidence)) + '\n', 'UTF-8')
+                java.nio.file.Files.move(temporaryReceipt.toPath(), receiptFile.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } finally { java.nio.file.Files.deleteIfExists(temporaryReceipt.toPath()) }
+        }
+    }
 }
