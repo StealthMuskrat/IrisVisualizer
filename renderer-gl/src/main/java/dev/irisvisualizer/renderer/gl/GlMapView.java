@@ -11,6 +11,7 @@ public final class GlMapView implements AutoCloseable {
     }
     private final GlMapRenderer renderer;private final GlDevice device;private final MapRasterWorker worker;private final GlMapQueue uploads;
     private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private UUID latestSamples;private MapRaster.Style latestStyle;private MapRaster.Limits latestLimits;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private RenderInput<ScalarHistogram> histogram;private Optional<ScalarHistogram.Limits> latestHistogram=Optional.empty();
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlMapView(GlMapRenderer renderer) { this(renderer,128L*1024*1024); }
     public GlMapView(GlMapRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);uploads=new GlMapQueue(device);worker=new MapRasterWorker(workerBytes,device.memory().orElse(null)); }
@@ -18,6 +19,12 @@ public final class GlMapView implements AutoCloseable {
     public MapRasterWorker.Status workerStatus() { return worker.status(); }
     public long reservedCpuBytes() { return worker.reservedBytes(); }
     public GlMapQueue.Status uploadStatus() { return uploads.status(); }
+    /** Independently retain only after the current source upload completes; verify against the displayed frame. */
+    public Optional<RenderInput<ScalarHistogram>> retainHistogram(long expectedRevision) {
+        current();if(expectedRevision!=mapRevision||!sourceReady||latestHistogram.isEmpty()||map==null||histogram==null)return Optional.empty();
+        if(histogram.value().bins()!=latestHistogram.orElseThrow().bins()||!histogram.value().matches(map.raster()))throw new GlFailure(GlFailure.Code.STALE,"View histogram differs from the current complete source");
+        return Optional.of(histogram.retain());
+    }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"Map view is closed"); }
     private long nextMap() { if(mapRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"Map revision counter exhausted");return mapRevision+1; }
     private long nextView() { if(viewRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"Map view revision counter exhausted");return viewRevision+1; }
@@ -36,13 +43,13 @@ public final class GlMapView implements AutoCloseable {
     /** Invalidate immediately when native/resource inputs change, before replacement samples arrive. */
     public long invalidate() {
         current();long next=nextMap(),nextView=nextView();var waiting=new Status(next,nextView,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");
-        worker.invalidate();mapRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;latestSamples=null;latestStyle=null;latestLimits=null;status=waiting;
+        worker.invalidate();mapRevision=next;viewRevision=nextView;cpuRevision=0;sourceReady=false;dirty=false;latestSamples=null;latestStyle=null;latestLimits=null;latestHistogram=Optional.empty();status=waiting;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Capability preflight and worker admission precede changes to the current view, tokens and work. */
     public long submit(MapRasterWorker.Request request) {
         Objects.requireNonNull(request);current();var requestedGrid=request.samples().grid();GlMapUpload.dimensions(device,requestedGrid.width(),requestedGrid.height());long next=nextMap(),nextView=nextView();var queued=new Status(next,nextView,request.source().isPresent()?Phase.RECOLORING:Phase.COLORIZING,Optional.of(request.samples().context()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;latestSamples=request.samples().id();latestStyle=request.style();latestLimits=request.limits();status=queued;grid=request.samples().grid();
+        long cpu=worker.submit(request);mapRevision=next;viewRevision=nextView;cpuRevision=cpu;sourceReady=false;dirty=false;latestSamples=request.samples().id();latestStyle=request.style();latestLimits=request.limits();latestHistogram=request.histogram();status=queued;grid=request.samples().grid();
         if(view!=null&&(view.width()!=grid.width()||view.height()!=grid.height()))view=null;
         try { uploads.invalidate(mapRevision);releaseDisplay();return mapRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -55,6 +62,14 @@ public final class GlMapView implements AutoCloseable {
             return submit(source.value());
         }
     }
+    public long submit(RenderInput<MapRasterWorker.Request> input,ScalarHistogram.Limits histogram) {
+        Objects.requireNonNull(input);
+        try(input;var source=input.retain()) {
+            current();var memory=device.memory().orElse(null);
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Tracked native map input requires the same device coordinator");
+            return submit(source.value().withHistogram(histogram));
+        }
+    }
     public long submit(MapSamples samples,MapRaster.Style style) { return submit(new MapRasterWorker.Request(samples,style)); }
     public long recolor(MapRaster.Style style) { return recolor(style,MapRaster.Limits.DEFAULT); }
     public long recolor(MapRaster.Style style,MapRaster.Limits limits) {
@@ -63,7 +78,7 @@ public final class GlMapView implements AutoCloseable {
     /** A caller-held raster can support rapid replacements; keep its owner live through CPU admission. */
     public long recolor(MapRaster source,MapRaster.Style style,MapRaster.Limits limits) {
         Objects.requireNonNull(source);current();if(!source.samples().id().equals(latestSamples))throw new GlFailure(GlFailure.Code.STALE,"Recolor source differs from the latest native map samples");
-        return submit(MapRasterWorker.Request.recolor(source,style,limits));
+        var request=MapRasterWorker.Request.recolor(source,style,limits);return submit(latestHistogram.isPresent()?request.withHistogram(latestHistogram.orElseThrow()):request);
     }
     /** Consumes independently owned CPU raster data after destination admission or rejection. */
     public long recolor(RenderInput<MapRaster> input,MapRaster.Style style,MapRaster.Limits limits) {
@@ -95,14 +110,19 @@ public final class GlMapView implements AutoCloseable {
         if(expectedMapRevision!=mapRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
         if(source.requiresPlaceholder()||!source.samples().id().equals(latestSamples)||!source.style().equals(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Retry requires the latest complete map capture and display style");
         if(source.image().orElseThrow().bytes()>latestLimits.imageBytes()||source.payloadBytes()>latestLimits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Retry raster exceeds the latest map output allowance");
+        if(latestHistogram.isPresent()&&(histogram==null||histogram.value().bins()!=latestHistogram.orElseThrow().bins()||!histogram.value().matches(source)))throw new GlFailure(GlFailure.Code.STATE,"Required histogram is unavailable; update the preview again");
         GlMapUpload.validate(device,source);
         long next=nextView();var queued=new Status(mapRevision,next,Phase.UPLOADING,status.context(),List.of(),Optional.empty(),"");
         worker.invalidate();cpuRevision=0;viewRevision=next;dirty=false;
+        RenderInput<ScalarHistogram> kept=null;
         try {
-            releaseDisplay();if(uploads.status().revision()<mapRevision)uploads.invalidate(mapRevision);
+            kept=latestHistogram.isEmpty()||histogram==null?null:histogram.retain();releaseDisplay();if(uploads.status().revision()<mapRevision)uploads.invalidate(mapRevision);
             if(!uploads.restart(mapRevision)||!uploads.submit(mapRevision,source))throw new GlFailure(GlFailure.Code.STALE,"Map upload queue no longer matches the retry revision");
-            status=queued;return true;
-        }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+            histogram=kept;kept=null;status=queued;return true;
+        }catch(RuntimeException|Error failure) {
+            if(kept!=null) { if(histogram==null)histogram=kept;else try { kept.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); } }
+            failed(failure);throw failure;
+        }
     }
     /** Consumes the supplied CPU owner through destination admission, including rejection/failure. */
     public boolean retryUpload(long expectedMapRevision,RenderInput<MapRaster> input) {
@@ -119,6 +139,8 @@ public final class GlMapView implements AutoCloseable {
             if(cpuRevision!=0) {
                 var result=worker.take(cpuRevision);
                 if(result.isPresent())try(var prepared=result.orElseThrow()) {
+                    if(histogram!=null)throw new GlFailure(GlFailure.Code.STATE,"A prior map histogram survived source invalidation");
+                    histogram=prepared.histogram().isPresent()?prepared.retainHistogram():null;
                     if(!uploads.submit(mapRevision,prepared.raster()))throw new GlFailure(GlFailure.Code.STALE,"Map upload rejected the current CPU raster");cpuRevision=0;state(Phase.UPLOADING);
                 } else {
                     var cpu=worker.status();if(cpu.revision()!=cpuRevision||cpu.phase()==MapRasterWorker.Phase.CLOSED)throw new GlFailure(GlFailure.Code.STALE,"Map worker revision changed before CPU adoption");
@@ -141,11 +163,12 @@ public final class GlMapView implements AutoCloseable {
     private void releaseDisplay() {
         Throwable failure=null;try { releaseFrame(); }catch(RuntimeException|Error error) { failure=error; }
         if(map!=null)try { map.close();map=null; }catch(RuntimeException|Error error) { if(map.closed())map=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        if(histogram!=null) { var old=histogram;histogram=null;try { old.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); } }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     /** Leaves the borrowed renderer/device and caller-transferred frames owned by their callers. */
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;sourceReady=false;latestSamples=null;latestStyle=null;latestLimits=null;Throwable failure=null;
+        if(disposed)return;device.current();closed=true;sourceReady=false;latestSamples=null;latestStyle=null;latestLimits=null;latestHistogram=Optional.empty();Throwable failure=null;
         try { worker.close(); }catch(RuntimeException|Error error) { failure=error; }
         try { uploads.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         try { releaseDisplay(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }

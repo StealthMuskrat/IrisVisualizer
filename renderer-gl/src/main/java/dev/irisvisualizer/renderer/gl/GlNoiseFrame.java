@@ -17,6 +17,12 @@ public final class GlNoiseFrame implements AutoCloseable {
             Objects.requireNonNull(completion);
             return completion.frame().filter(pickFrame()::equals).isPresent()&&volumeId.equals(completion.result().volumeId())&&clip.equals(completion.result().clip());
         }
+        /** Full original volume counts may be reused across camera/clip/inclusion changes. */
+        public boolean matches(ScalarHistogram histogram) {
+            Objects.requireNonNull(histogram);var colors=style.colors();
+            var source=new ScalarHistogram.Receipt(ScalarHistogram.Kind.NOISE_VOLUME,volumeId,context,grid.horizontal(),Optional.of(grid.vertical()));
+            return histogram.matches(source,new ScalarHistogram.Range(colors.minimum(),colors.maximum()));
+        }
     }
     private static final class Shared {
         final GlDevice device;final GlDevice.Allocation journal;final GlTarget target;final GlNoiseScene scene;final Info info;int references=1;boolean closing;

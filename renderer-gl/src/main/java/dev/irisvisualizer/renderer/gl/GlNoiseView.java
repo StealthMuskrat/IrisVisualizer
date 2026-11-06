@@ -11,6 +11,7 @@ public final class GlNoiseView implements AutoCloseable {
     }
     private final GlNoiseRenderer renderer;private final GlDevice device;private final NoiseSurfaceWorker worker;
     private GlNoiseUpload upload;private GlNoiseScene scene;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private NoiseSurface.Limits latestLimits;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private RenderInput<ScalarHistogram> histogram;private Optional<ScalarHistogram.Limits> latestHistogram=Optional.empty();
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlNoiseView(GlNoiseRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlNoiseView(GlNoiseRenderer renderer,long workerBytes) { this.renderer=Objects.requireNonNull(renderer);device=renderer.device;device.live(renderer.allocation);worker=new NoiseSurfaceWorker(workerBytes,device.memory().orElse(null)); }
@@ -18,6 +19,12 @@ public final class GlNoiseView implements AutoCloseable {
     public NoiseSurfaceWorker.Status workerStatus() { return worker.status(); }
     public long reservedCpuBytes() { return worker.reservedBytes(); }
     public Optional<GlNoiseUpload.Progress> uploadProgress() { current();return upload==null?Optional.empty():Optional.of(upload.progress()); }
+    /** Independently retain only after the current source upload completes; verify against the displayed frame. */
+    public Optional<RenderInput<ScalarHistogram>> retainHistogram(long expectedRevision) {
+        current();if(expectedRevision!=dataRevision||!sourceReady||latestHistogram.isEmpty()||scene==null||histogram==null)return Optional.empty();
+        if(histogram.value().bins()!=latestHistogram.orElseThrow().bins()||!histogram.value().matches(scene.surface()))throw new GlFailure(GlFailure.Code.STALE,"View histogram differs from the current complete source");
+        return Optional.of(histogram.retain());
+    }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"Scalar view is closed"); }
     private long nextData() { if(dataRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"Scalar data revision exhausted");return dataRevision+1; }
     private long nextView() { if(viewRevision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"Scalar view revision exhausted");return viewRevision+1; }
@@ -35,13 +42,13 @@ public final class GlNoiseView implements AutoCloseable {
     }
     /** Call when native inputs become obsolete, before replacement samples are ready. */
     public long invalidate() {
-        current();long next=nextData(),view=nextView();var waiting=new Status(next,view,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");worker.invalidate();dataRevision=next;viewRevision=view;cpuRevision=0;sourceReady=false;dirty=false;latestVolume=null;latestStyle=null;latestLimits=null;status=waiting;
+        current();long next=nextData(),view=nextView();var waiting=new Status(next,view,Phase.WAITING_CPU,Optional.empty(),List.of(),Optional.empty(),"");worker.invalidate();dataRevision=next;viewRevision=view;cpuRevision=0;sourceReady=false;dirty=false;latestVolume=null;latestStyle=null;latestLimits=null;latestHistogram=Optional.empty();status=waiting;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Grid precision preflight and CPU admission precede token changes and disposal of prior output. */
     public long submit(NoiseSurfaceWorker.Request request) {
         Objects.requireNonNull(request);current();GlNoiseUpload.precision(request.volume().grid());long next=nextData(),view=nextView();var queued=new Status(next,view,request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,Optional.of(request.volume().context()),List.of(),Optional.empty(),"");
-        long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;sourceReady=false;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();latestLimits=request.limits();status=queued;
+        long cpu=worker.submit(request);dataRevision=next;viewRevision=view;cpuRevision=cpu;sourceReady=false;dirty=false;latestVolume=request.volume().id();latestStyle=request.style();latestLimits=request.limits();latestHistogram=request.histogram();status=queued;
         try { releaseDisplay();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Consumes detached native samples after destination admission; retain another input for retries/style changes. */
@@ -52,6 +59,13 @@ public final class GlNoiseView implements AutoCloseable {
             return submit(new NoiseSurfaceWorker.Request(source.value(),style,limits));
         }
     }
+    public long submit(RenderInput<NoiseVolume> input,NoiseSurface.Style style,NoiseSurface.Limits limits,ScalarHistogram.Limits histogram) {
+        Objects.requireNonNull(input);
+        try(input;var source=input.retain()) {
+            current();var memory=device.memory().orElse(null);if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar view requires the same tracked input coordinator");
+            return submit(new NoiseSurfaceWorker.Request(source.value(),style,limits).withHistogram(histogram));
+        }
+    }
     public long recolor(MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
         current();if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"Complete current scalar geometry is required for recoloring");return recolor(scene.surface(),colors,limits);
     }
@@ -59,7 +73,7 @@ public final class GlNoiseView implements AutoCloseable {
     public long recolor(NoiseSurface source,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
         Objects.requireNonNull(source);current();
         if(latestStyle==null||!source.volume().id().equals(latestVolume)||!source.style().sameGeometry(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Recolor source differs from the latest scalar volume or geometry policy");
-        return submit(NoiseSurfaceWorker.Request.recolor(source,colors,limits));
+        var request=NoiseSurfaceWorker.Request.recolor(source,colors,limits);return submit(latestHistogram.isPresent()?request.withHistogram(latestHistogram.orElseThrow()):request);
     }
     /** Consumes an independently retained CPU surface after destination admission or rejection. */
     public long recolor(RenderInput<NoiseSurface> input,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
@@ -100,11 +114,17 @@ public final class GlNoiseView implements AutoCloseable {
         if(expectedDataRevision!=dataRevision||sourceReady||status.phase()!=Phase.FAILED)return false;
         if(source.requiresPlaceholder()||latestStyle==null||!source.volume().id().equals(latestVolume)||!source.style().equals(latestStyle))throw new GlFailure(GlFailure.Code.STALE,"Retry requires the exact latest scalar volume and complete display style");
         if(source.size()>latestLimits.faces()||source.payloadBytes()>latestLimits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Retry surface exceeds the latest scalar preparation allowance");
+        if(latestHistogram.isPresent()&&(histogram==null||histogram.value().bins()!=latestHistogram.orElseThrow().bins()||!histogram.value().matches(source)))throw new GlFailure(GlFailure.Code.STATE,"Required histogram is unavailable; update the preview again");
         GlNoiseUpload.validate(device,source);
         long next=nextView();var queued=new Status(dataRevision,next,Phase.UPLOADING,status.context(),List.of(),Optional.empty(),"");
         worker.invalidate();cpuRevision=0;viewRevision=next;dirty=false;
-        try { releaseDisplay();upload=GlNoiseUpload.begin(device,source);status=queued;return true; }
-        catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        RenderInput<ScalarHistogram> kept=null;
+        try {
+            kept=latestHistogram.isEmpty()||histogram==null?null:histogram.retain();releaseDisplay();upload=GlNoiseUpload.begin(device,source);histogram=kept;kept=null;status=queued;return true;
+        }catch(RuntimeException|Error failure) {
+            if(kept!=null) { if(histogram==null)histogram=kept;else try { kept.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); } }
+            failed(failure);throw failure;
+        }
     }
     /** Consumes retained CPU ownership through retry admission, including stale-token and failure outcomes. */
     public boolean retryUpload(long expectedDataRevision,RenderInput<NoiseSurface> input) {
@@ -117,7 +137,11 @@ public final class GlNoiseView implements AutoCloseable {
         try {
             if(cpuRevision!=0) {
                 var result=worker.take(cpuRevision);
-                if(result.isPresent())try(var prepared=result.orElseThrow()) { upload=GlNoiseUpload.begin(device,prepared.input());cpuRevision=0;state(Phase.UPLOADING); }
+                if(result.isPresent())try(var prepared=result.orElseThrow()) {
+                    if(histogram!=null)throw new GlFailure(GlFailure.Code.STATE,"A prior scalar histogram survived source invalidation");
+                    histogram=prepared.histogram().isPresent()?prepared.retainHistogram():null;
+                    upload=GlNoiseUpload.begin(device,prepared.input());cpuRevision=0;state(Phase.UPLOADING);
+                }
                 else {
                     var cpu=worker.status();if(cpu.revision()!=cpuRevision||cpu.phase()==NoiseSurfaceWorker.Phase.CLOSED)throw new GlFailure(GlFailure.Code.STALE,"Scalar worker changed before adoption");
                     if(cpu.phase()==NoiseSurfaceWorker.Phase.FAILED)status=new Status(dataRevision,viewRevision,Phase.FAILED,status.context(),cpu.problems(),Optional.empty(),"Scalar surface preparation failed");return status;
@@ -140,10 +164,11 @@ public final class GlNoiseView implements AutoCloseable {
         Throwable failure=null;try { releaseFrame(); }catch(RuntimeException|Error error) { failure=error; }
         if(upload!=null)try { upload.close();upload=null; }catch(RuntimeException|Error error) { if(!upload.ownsResources())upload=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(scene!=null)try { scene.close();scene=null; }catch(RuntimeException|Error error) { if(scene.closed())scene=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        if(histogram!=null) { var old=histogram;histogram=null;try { old.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); } }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;sourceReady=false;latestVolume=null;latestStyle=null;latestLimits=null;Throwable failure=null;
+        if(disposed)return;device.current();closed=true;sourceReady=false;latestVolume=null;latestStyle=null;latestLimits=null;latestHistogram=Optional.empty();Throwable failure=null;
         try { worker.close(); }catch(RuntimeException|Error error) { failure=error; }
         try { releaseDisplay(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         try { status=new Status(dataRevision,viewRevision,Phase.CLOSED,Optional.empty(),List.of(),Optional.empty(),""); }

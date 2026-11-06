@@ -288,6 +288,62 @@ public final class WorldCpuContracts {
             long retry=worker.submit(build(f,cache),limits);executor.runNext();var completion=worker.take(retry).orElseThrow();worker.close();cache.close();equal(2L,completion.report().usage().orElseThrow().meshCells(),"completion survives final source/cache/worker shutdown");completion.close();noWorkerCharge(memory);
         }
     }
+    private static void histogramWorkerHandoffs() {
+        var context=new MapSamples.Context(snapshot(1).source(),"noise","fixture","histogram worker contract");var grid=new MapSamples.Grid(0,0,2,1,1);byte[] present={1,1};
+        var samples=MapSamples.noise(context,grid,new double[]{0,1},present,LIVE);var colors=new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE);var histLimits=new ScalarHistogram.Limits(4,2,2,65536,4L*1024*1024);var mapLimits=new MapRaster.Limits(8,4096);
+        for(boolean enabled:new boolean[]{false,true}) {
+            var plain=new MapRasterWorker.Request(samples,colors,mapLimits);var request=enabled?plain.withHistogram(histLimits):plain;long peak=request.reservation();
+            try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new DrainExecutor();var worker=new MapRasterWorker(peak,memory,()->executor)) {
+                long obsolete=worker.submit(request);var queued=worker.status();equal(peak,memory.stats().chargedBytes(),"map destination includes optional histogram before work");
+                if(enabled) { throwsType(IllegalArgumentException.class,()->worker.submit(new MapRasterWorker.Request(samples,colors,new MapRaster.Limits(8,peak-1)).withHistogram(histLimits)),"map histogram cannot exceed original working ceiling");equal(queued,worker.status(),"invalid histogram preflight preserves earlier pending output"); }
+                long revision=worker.submit(request);equal(obsolete+1,revision,"histogram-aware pending replacement");equal(peak,memory.stats().chargedBytes(),"map pending replacement credits the complete idle bundle");executor.runNext();check(worker.take(obsolete).isEmpty(),"old map histogram revision withheld");var completion=worker.take(revision).orElseThrow();equal(enabled,completion.histogram().isPresent(),"legacy and enabled completion shapes");
+                long retained=completion.payloadBytes();equal(retained,memory.stats().chargedBytes(),"map shrinks to raster plus histogram after unwind");equal(0L,worker.reservedBytes(),"transferred map bundle is external");
+                if(enabled) { var histogram=completion.histogram().orElseThrow();check(histogram.matches(completion.raster()),"histogram and raster share exact source/range");equal(List.of(1,0,0,1),Arrays.stream(histogram.copyCounts()).boxed().toList(),"worker histogram original values");check(histogram.matches(ScalarHistogram.receipt(samples),new ScalarHistogram.Range(0,1)),"metadata-only frame receipt match");check(!histogram.matches(ScalarHistogram.receipt(samples),new ScalarHistogram.Range(0,2)),"same source but stale display range rejected"); }
+                else throwsType(IllegalStateException.class,completion::retainHistogram,"legacy map has no invented histogram");
+                var rasterOwner=completion.retainInput();var histogramOwner=enabled?completion.retainHistogram():null;completion.close();worker.close();equal(retained,memory.stats().chargedBytes(),"external map owners survive worker shutdown");rasterOwner.close();if(histogramOwner!=null) { equal(retained,memory.stats().chargedBytes(),"split histogram conservatively retains the full bundle charge");equal(2,histogramOwner.value().summary().orElseThrow().present(),"histogram survives raster wrapper release");histogramOwner.close(); }noWorkerCharge(memory);
+            }
+        }
+        var raster=MapRaster.render(samples,colors,LIVE);check(!raster.requiresPlaceholder(),"source recolor raster");var recolor=new MapRaster.ScalarStyle(0,1,new MapRamp(List.of(new MapRamp.Stop(0,0x112233ff),new MapRamp.Stop(1,0x112233ff))));var mapRequest=MapRasterWorker.Request.recolor(raster,recolor,mapLimits).withHistogram(histLimits);long mapPeak=mapRequest.reservation();
+        try(var memory=new RenderMemory(new RenderMemory.Limits(mapPeak,1));var executor=new DrainExecutor();var worker=new MapRasterWorker(mapPeak,memory,()->executor)) {
+            var source=RenderInput.own(raster,RenderMemory.Hold.none());long revision=worker.recolor(source,recolor,mapLimits,histLimits);check(source.closed(),"histogram recolor consumes supplied map wrapper");executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().orElseThrow().matches(completion.raster()),"recolored map/histogram ready atomically");equal(recolor,completion.raster().style(),"recolored map style"); }noWorkerCharge(memory);
+            var invalid=RenderInput.own(raster,RenderMemory.Hold.none());var status=worker.status();throwsType(NullPointerException.class,()->worker.recolor(invalid,recolor,mapLimits,null),"invalid owned map histogram option");check(invalid.closed(),"invalid map option still consumes source");equal(status,worker.status(),"invalid owned map request preserves revision");
+        }
+        var volume=NoiseVolume.capture(context,new NoiseVolume.Grid(grid,new MapSamples.Vertical(-64,1)),new double[]{0,1},present,NoiseVolume.Limits.DEFAULT,LIVE);var surfaceStyle=new NoiseSurface.Style(0,1,colors,NoiseSurface.Meshing.CELLS);var surfaceLimits=new NoiseSurface.Limits(64,4096);
+        for(boolean enabled:new boolean[]{false,true}) {
+            var plain=new NoiseSurfaceWorker.Request(volume,surfaceStyle,surfaceLimits);var request=enabled?plain.withHistogram(histLimits):plain;long peak=request.reservation();
+            try(var memory=new RenderMemory(new RenderMemory.Limits(peak,1));var executor=new DrainExecutor();var worker=new NoiseSurfaceWorker(peak,memory,()->executor)) {
+                var supplied=RenderInput.own(volume,RenderMemory.Hold.none());long revision=enabled?worker.submit(supplied,surfaceStyle,surfaceLimits,histLimits):worker.submit(supplied,surfaceStyle,surfaceLimits);check(supplied.closed(),"surface request consumes captured source wrapper");equal(peak,memory.stats().chargedBytes(),"scalar destination reserves geometry and optional bins");executor.runNext();var completion=worker.take(revision).orElseThrow();equal(enabled,completion.histogram().isPresent(),"legacy and enabled scalar completion shapes");long retained=completion.surface().payloadBytes()+completion.histogram().map(ScalarHistogram::bytes).orElse(0L);equal(retained,memory.stats().chargedBytes(),"scalar completion retains mesh and optional histogram only");
+                if(enabled) { check(completion.histogram().orElseThrow().matches(completion.surface()),"surface histogram complete before READY");equal(2,completion.histogram().orElseThrow().summary().orElseThrow().present(),"surface histogram uses original samples"); }
+                else throwsType(IllegalStateException.class,completion::retainHistogram,"legacy scalar completion has no histogram");
+                var surfaceOwner=completion.input().retain();var histogramOwner=enabled?completion.retainHistogram():null;completion.close();worker.invalidate();worker.close();surfaceOwner.close();if(histogramOwner!=null) { equal(retained,memory.stats().chargedBytes(),"scalar histogram split retains complete bundle admission");equal(1,histogramOwner.value().count(3),"detached histogram survives source wrapper shutdown");histogramOwner.close(); }noWorkerCharge(memory);
+            }
+        }
+        var surface=NoiseSurface.prepare(volume,surfaceStyle,surfaceLimits,LIVE);check(!surface.requiresPlaceholder(),"source scalar mesh");var recolorRequest=NoiseSurfaceWorker.Request.recolor(surface,recolor,surfaceLimits).withHistogram(histLimits);long recolorPeak=recolorRequest.reservation();
+        try(var memory=new RenderMemory(new RenderMemory.Limits(recolorPeak,1));var executor=new DrainExecutor();var worker=new NoiseSurfaceWorker(recolorPeak,memory,()->executor)) {
+            var supplied=RenderInput.own(surface,RenderMemory.Hold.none());long revision=worker.recolor(supplied,recolor,surfaceLimits,histLimits);check(supplied.closed(),"histogram recolor consumes scalar source");executor.runNext();try(var completion=worker.take(revision).orElseThrow()) { check(completion.histogram().orElseThrow().matches(completion.surface()),"scalar recolor includes exact histogram");equal(recolor,completion.surface().style().colors(),"scalar recolor style retained"); }noWorkerCharge(memory);
+            var invalid=RenderInput.own(surface,RenderMemory.Hold.none());throwsType(NullPointerException.class,()->worker.recolor(invalid,recolor,surfaceLimits,null),"invalid owned scalar histogram option");check(invalid.closed(),"invalid scalar histogram settings still consume input");
+            var invalidVolume=RenderInput.own(volume,RenderMemory.Hold.none());throwsType(NullPointerException.class,()->worker.submit(invalidVolume,surfaceStyle,surfaceLimits,null),"invalid histogram volume submission");check(invalidVolume.closed(),"invalid volume options consume input");
+        }
+        long histBytes=ScalarHistogram.requestedBytes(volume,histLimits);throwsType(IllegalArgumentException.class,()->new NoiseSurfaceWorker.Request(volume,surfaceStyle,new NoiseSurface.Limits(64,volume.payloadBytes()+histBytes-1)).withHistogram(histLimits),"scalar histogram cannot consume source allowance");
+        var tooFew=new ScalarHistogram.Limits(4,1,2,65536,4096);throwsType(IllegalArgumentException.class,()->new MapRasterWorker.Request(samples,colors,mapLimits).withHistogram(tooFew),"map histogram sample budget preflight");throwsType(IllegalArgumentException.class,()->new NoiseSurfaceWorker.Request(volume,surfaceStyle,surfaceLimits).withHistogram(tooFew),"scalar histogram sample budget preflight");
+        var failed=MapSamples.noise(context,new MapSamples.Grid(0,0,1,1,1),new double[]{Double.NaN},new byte[]{1},LIVE);
+        try(var memory=new RenderMemory(new RenderMemory.Limits(4096,1));var executor=new DrainExecutor();var worker=new MapRasterWorker(4096,memory,()->executor)) {
+            long revision=worker.submit(new MapRasterWorker.Request(failed,colors,mapLimits).withHistogram(histLimits));executor.runNext();check(worker.take(revision).isEmpty(),"failed native map has no partial histogram completion");equal(failed.problems(),worker.status().problems(),"original map failure preserved with histogram option");noWorkerCharge(memory);
+        }
+        for(boolean scalar:new boolean[]{false,true})for(boolean ready:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(4L*1024*1024,2));var executor=new DrainExecutor()) {
+            var cleanup=new AssertionError("histogram bundle release failure");
+            if(scalar)try(var worker=new NoiseSurfaceWorker(4L*1024*1024,memory,()->executor)) {
+                var request=new NoiseSurfaceWorker.Request(volume,surfaceStyle,surfaceLimits).withHistogram(histLimits);long revision=worker.submit(request);if(ready)executor.runNext();
+                try(var fault=new CaptureCloseFault(memory,cleanup)) { check(caughtFailure(worker::invalidate)==cleanup,"scalar bundle release preserves error identity");check(worker.take(revision).isEmpty(),"closed scalar/histogram completion cannot escape");equal(0L,worker.reservedBytes(),"failed scalar bundle release detaches local counters");noWorkerCharge(memory); }
+                long retry=worker.submit(request);equal(revision+1,retry,"failed scalar invalidation does not spend revision");executor.runNext();worker.take(retry).orElseThrow().close();noWorkerCharge(memory);
+            }else try(var worker=new MapRasterWorker(4L*1024*1024,memory,()->executor)) {
+                var request=new MapRasterWorker.Request(samples,colors,mapLimits).withHistogram(histLimits);long revision=worker.submit(request);if(ready)executor.runNext();
+                try(var fault=new CaptureCloseFault(memory,cleanup)) { check(caughtFailure(worker::invalidate)==cleanup,"map bundle release preserves error identity");check(worker.take(revision).isEmpty(),"closed map/histogram completion cannot escape");equal(0L,worker.reservedBytes(),"failed map bundle release detaches local counters");noWorkerCharge(memory); }
+                long retry=worker.submit(request);equal(revision+1,retry,"failed map invalidation does not spend revision");executor.runNext();worker.take(retry).orElseThrow().close();noWorkerCharge(memory);
+            }
+        }
+        var biome=MapSamples.biomes(context,new MapSamples.Grid(0,0,1,1,1),List.of(BIOME),new int[1],new byte[]{1},LIVE);throwsType(IllegalArgumentException.class,()->new MapRasterWorker.Request(biome,new MapRaster.BiomeStyle(List.of(0xffffffff)),mapLimits).withHistogram(histLimits),"categorical worker histogram rejected");
+    }
     private static void nativeSnapshot() {
         var state=state(407);var source=snapshot(1).source();var states=new int[]{0,0};var biomes=new int[]{0,0};var world=WorldSnapshot.capture(source,new WorldSnapshot.Extent(4,-64,8,2,1,1),List.of(state),List.of(BIOME),states,biomes,LIVE);states[0]=99;biomes[1]=99;
         equal(state,world.state(0),"exact native state");equal(407,world.state(0).nativeStateId(),"native numeric state ID");equal(BIOME,world.biome(1),"exact native biome");equal(16L,world.indexBytes(),"two complete index arrays");
@@ -1152,6 +1208,7 @@ public final class WorldCpuContracts {
         group("blended fluid materials and native provenance",WorldCpuContracts::fluidBlendMaterials);
         group("detached bounded visual limitation reports",WorldCpuContracts::visualReports);
         group("background visual report ownership and recovery",WorldCpuContracts::reportWorkers);
+        group("map and scalar histogram worker handoffs",WorldCpuContracts::histogramWorkerHandoffs);
         group("model cube winding and provenance",WorldCpuContracts::geometry);
         group("atlas extrusion and exact binding",WorldCpuContracts::atlas);
         group("native visual assignment guards",WorldCpuContracts::assignments);

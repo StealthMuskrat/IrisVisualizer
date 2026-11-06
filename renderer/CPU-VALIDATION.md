@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 25 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 69 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 26 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 70 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -52,4 +52,4 @@ Compilation succeeded for all 133 CPU/OpenGL production sources plus four contra
 
 This is an initial suite, not renderer-stage completion. Broader world block/model/fluid/material/atlas coverage beyond the prepared synthetic world suite, worker races/failure injection, full PNG/JPEG matrices, broader camera math beyond the prepared context-free suite, GPU state/upload/draw/retirement, real pixel comparisons and native source parity still require their planned verification. Sixteen native adapters still require genuine pinned Windows compilation/execution. Final UI integration and combined application memory/GPU QA remain pending. Do not infer readiness or enable supported previews from successful compilation or from a future synthetic CPU suite result alone.
 
-[Detached scalar histograms](SCALAR-HISTOGRAMS.md) add the twentieth CPU group, preparing original-value/missing coverage, automatic/explicit ranges, stable legends, map/volume identity, display-range matching, complete-source admission and owned cleanup. All 69 groups remain unexecuted.
+[Detached scalar histograms](SCALAR-HISTOGRAMS.md) add the twentieth CPU group, preparing original-value/missing coverage, automatic/explicit ranges, stable legends, map/volume identity, display-range matching, complete-source admission and owned cleanup. All 70 groups remain unexecuted.

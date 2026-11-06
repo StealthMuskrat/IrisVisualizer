@@ -52,6 +52,16 @@ public final class ScalarHistogram {
         });
     }
     public Receipt receipt() { return receipt; }
+    /** Metadata-only source identity for completed-frame handoff; no sample scan. */
+    public static Receipt receipt(MapSamples source) { return input(source).receipt(); }
+    public static Receipt receipt(NoiseVolume source) { return input(source).receipt(); }
+    static long requestedBytes(MapSamples source,Limits limits) { return requestedBytes(input(source),limits); }
+    static long requestedBytes(NoiseVolume source,Limits limits) { return requestedBytes(input(source),limits); }
+    private static long requestedBytes(Input input,Limits limits) {
+        Objects.requireNonNull(limits);if(!input.problems().isEmpty())return 0;long bytes=payload(input.receipt(),limits);
+        if(input.size()>limits.samples()||input.size()>limits.visits()||bytes>limits.payloadBytes())throw new IllegalArgumentException("Requested display histogram exceeds sample/visit/payload limits");
+        return bytes;
+    }
     public Optional<Range> range() { return range; }
     public Optional<Summary> summary() { return summary; }
     public List<WorldProblem> problems() { return problems; }
@@ -63,6 +73,9 @@ public final class ScalarHistogram {
     public long bytes() { return bytes; }
     public boolean matches(MapSamples source) { return !requiresPlaceholder()&&!source.requiresPlaceholder()&&source.kind()!=MapSamples.Kind.BIOME&&receipt.equals(input(source).receipt()); }
     public boolean matches(NoiseVolume source) { return !requiresPlaceholder()&&!source.requiresPlaceholder()&&receipt.equals(input(source).receipt()); }
+    public boolean matches(Receipt expected,Range expectedRange) {
+        Objects.requireNonNull(expected);Objects.requireNonNull(expectedRange);return !requiresPlaceholder()&&receipt.equals(expected)&&range.filter(expectedRange::equals).isPresent();
+    }
     /** Match both source identity and display range; changing only the gradient does not change bins. */
     public boolean matches(MapRaster raster) {
         Objects.requireNonNull(raster);if(raster.requiresPlaceholder()||raster.style() instanceof MapRaster.BiomeStyle)return false;

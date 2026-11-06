@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 25 synthetic contract groups alongside 20 map/scalar/image/ownership groups: 45 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 69 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 26 synthetic contract groups alongside 20 map/scalar/image/ownership groups: 46 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 13 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 70 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -22,6 +22,7 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Geometry picking | Analytic unit-cube plane distance and exact source identities, batch/exhaustive agreement, clipping, budget failure and alpha/geometry modes |
 | Conservative picking hierarchy | Analytic edge/corner hits survive node/range rejection; six exact source planes and tiny translated planes retain detached coordinates; section-local tiny inside/outside points, six marker entry planes, inside-box near distances, closed clip/ray endpoints, strict exclusions, shifted anchors, lower-section ties, atomic budget failure and unexpanded actual marker boxes |
 | Translucent ordering | An independent vertex-centroid reference sort checks complete global back-to-front keys and stable ties; scratch deficit withholds the entire order |
+| Histogram worker handoffs | Optional map/surface paired delivery, original-source/range identity, combined admission and replacement credit, split ownership, recoloring, invalid owned options and failure without partial companions |
 | Background visual reports | One active/latest pending capture, receipt/single-delivery guards, source release before READY, idle replacement credit, external ownership, scheduling/drain/shutdown recovery, active peak limits and structured failure cleanup |
 | Detached visual reports | Full assignment census, original-state/diagnostic merging without duplicate cell counts, canonical rows/exact examples, immutable detached ownership, stale assignment guards, and count/text/work/memory/cancellation limits without partial output |
 | Blended fluid materials | Native water palette averaging through forward/reverse/overlay geometry, packed/atlas color and policy preservation, whole-fluid alpha, independent JSON-base tint/placement, lava, missing dependencies, budgets and cancellation |

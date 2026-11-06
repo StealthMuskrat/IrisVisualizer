@@ -7,29 +7,41 @@ import java.util.function.Supplier;
 
 /** One active and one latest pending scalar display mesh, without native sampling on this executor. */
 public final class NoiseSurfaceWorker implements AutoCloseable {
-    public record Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry) {
+    public record Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry,Optional<ScalarHistogram.Limits> histogram) {
+        public Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits,Optional<NoiseSurface> geometry) { this(volume,style,limits,geometry,Optional.empty()); }
         public Request(NoiseVolume volume,NoiseSurface.Style style,NoiseSurface.Limits limits) { this(volume,style,limits,Optional.empty()); }
         public Request {
-            Objects.requireNonNull(volume);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(geometry);
-            if(volume.requiresPlaceholder()||volume.payloadBytes()>limits.workingBytes())throw new IllegalArgumentException("A complete scalar source within the working bound is required");
+            Objects.requireNonNull(volume);Objects.requireNonNull(style);Objects.requireNonNull(limits);Objects.requireNonNull(geometry);Objects.requireNonNull(histogram);
+            var bounded=bounded(volume,limits,histogram);
+            if(volume.requiresPlaceholder()||volume.payloadBytes()>bounded.workingBytes())throw new IllegalArgumentException("A complete scalar source within the working bound is required");
             if(geometry.isPresent()) {
                 var source=geometry.orElseThrow();
                 if(source.requiresPlaceholder()||source.volume()!=volume||!source.style().sameGeometry(style))throw new IllegalArgumentException("Scalar recoloring requires the exact complete volume and geometry policy");
-                if(source.size()>limits.faces()||NoiseSurface.recolorReservation(source,style.colors())>limits.workingBytes())throw new IllegalArgumentException("Scalar recolor source and replacement colors exceed their declared allowance");
+                if(source.size()>bounded.faces()||NoiseSurface.recolorReservation(source,style.colors())>bounded.workingBytes())throw new IllegalArgumentException("Scalar recolor source and replacement colors exceed their declared allowance");
             }
         }
         public static Request recolor(NoiseSurface source,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
             Objects.requireNonNull(source);var old=source.style();return new Request(source.volume(),new NoiseSurface.Style(old.includeMinimum(),old.includeMaximum(),colors,old.meshing()),limits,Optional.of(source));
         }
-        public long reservation() { return geometry.isPresent()?NoiseSurface.recolorReservation(geometry.orElseThrow(),style.colors()):NoiseSurface.reservation(volume,style,limits); }
+        private static NoiseSurface.Limits bounded(NoiseVolume volume,NoiseSurface.Limits limits,Optional<ScalarHistogram.Limits> histogram) {
+            if(histogram.isEmpty())return limits;var requested=histogram.orElseThrow();long bytes=ScalarHistogram.requestedBytes(volume,requested),working=Math.min(limits.workingBytes(),requested.workingBytes());
+            if(bytes>working)throw new IllegalArgumentException("Histogram metadata exceeds scalar working allowance");
+            return new NoiseSurface.Limits(limits.faces(),working-bytes);
+        }
+        public Request withHistogram(ScalarHistogram.Limits histogram) { return new Request(volume,style,limits,geometry,Optional.of(histogram)); }
+        NoiseSurface.Limits preparationLimits() { return bounded(volume,limits,histogram); }
+        long histogramBytes() { return histogram.map(value->ScalarHistogram.requestedBytes(volume,value)).orElse(0L); }
+        public long reservation() { return (geometry.isPresent()?NoiseSurface.recolorReservation(geometry.orElseThrow(),style.colors()):NoiseSurface.reservation(volume,style,preparationLimits()))+histogramBytes(); }
     }
     public enum Phase { IDLE, WAITING, QUEUED, MESHING, RECOLORING, READY, DELIVERED, FAILED, CLOSED }
     public record Status(long revision,Phase phase,Optional<UUID> volumeId,List<WorldProblem> problems) {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(volumeId);problems=List.copyOf(problems); }
     }
-    public record Completion(long revision,RenderInput<NoiseSurface> input) implements AutoCloseable {
-        public Completion { Objects.requireNonNull(input); }
+    public record Completion(long revision,RenderInput<NoiseSurface> input,Optional<ScalarHistogram> histogram) implements AutoCloseable {
+        public Completion { Objects.requireNonNull(input);Objects.requireNonNull(histogram);if(histogram.isPresent()&&!histogram.orElseThrow().matches(input.value()))throw new IllegalArgumentException("Scalar completion histogram belongs to another display"); }
+        public Completion(long revision,RenderInput<NoiseSurface> input) { this(revision,input,Optional.empty()); }
         public NoiseSurface surface() { return input.value(); }
+        public RenderInput<ScalarHistogram> retainHistogram() { return RenderInput.own(histogram.orElseThrow(()->new IllegalStateException("No histogram was requested")),input.admission().retain()); }
         @Override public void close() { input.close(); }
     }
     private static final class Job {
@@ -51,15 +63,20 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
     private boolean current(Job job) { return !closed&&job.revision==revision&&!job.cancelled.get(); }
     private static Status state(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.request.volume().id()),problems); }
     private static Status failed(Job job,Throwable failure) { return state(job,Phase.FAILED,List.of(new WorldProblem(failure instanceof OutOfMemoryError?WorldProblem.Code.MEMORY:WorldProblem.Code.WORKER,Optional.empty(),"Scalar surface preparation failed: "+failure.getClass().getSimpleName()))); }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedBytes=0; }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
+    private void dropCompleted() { var old=completed;completed=null;completedBytes=0;if(old!=null)old.close(); }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);Throwable failure=null;
+        if(pending!=null) { var old=pending;pending=null;old.cancelled.set(true);try { old.admission.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; } }
+        try { dropCompleted(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     /** Rejected admission preserves all prior work and revision. Active cancellation stays charged until unwind. */
     public long submit(Request request) {
         Objects.requireNonNull(request);synchronized(lock) {
             long next=next(),activeBytes=active==null?0:active.request.reservation();if(request.reservation()>workingBytes-activeBytes)throw new IllegalStateException("Active and pending scalar meshes exceed their combined working bound");
             var job=new Job(next,request);var queued=state(job,Phase.QUEUED,List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Scalar surface preparation",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.input().admission());
-            cancelOwned();pending=job;revision=next;status=queued;
+            try { cancelOwned(); }catch(RuntimeException|Error failure) { try { job.admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }pending=job;revision=next;status=queued;
             if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }return next;
         }
     }
@@ -71,12 +88,26 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
             return submit(new Request(source.value(),style,limits));
         }
     }
+    public long submit(RenderInput<NoiseVolume> input,NoiseSurface.Style style,NoiseSurface.Limits limits,ScalarHistogram.Limits histogram) {
+        Objects.requireNonNull(input);
+        try(input;var source=input.retain()) {
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar input requires the same managed coordinator");
+            return submit(new Request(source.value(),style,limits).withHistogram(histogram));
+        }
+    }
     /** Consumes complete surface ownership only after destination admission, including rejected submissions. */
     public long recolor(RenderInput<NoiseSurface> input,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits) {
         Objects.requireNonNull(input);
         try(input;var source=input.retain()) {
             if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar recoloring requires the same managed coordinator");
             return submit(Request.recolor(source.value(),colors,limits));
+        }
+    }
+    public long recolor(RenderInput<NoiseSurface> input,MapRaster.ScalarStyle colors,NoiseSurface.Limits limits,ScalarHistogram.Limits histogram) {
+        Objects.requireNonNull(input);
+        try(input;var source=input.retain()) {
+            if(source.admission().tracked()&&(memory==null||!source.admission().belongsTo(memory)))throw new IllegalArgumentException("Scalar recoloring requires the same managed coordinator");
+            return submit(Request.recolor(source.value(),colors,limits).withHistogram(histogram));
         }
     }
     public long invalidate() { synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; } }
@@ -91,14 +122,22 @@ public final class NoiseSurfaceWorker implements AutoCloseable {
         try {
             try {
                 synchronized(lock) { if(current(job))status=state(job,job.request.geometry().isPresent()?Phase.RECOLORING:Phase.MESHING,List.of()); }
-                var request=job.request;var result=request.geometry().isPresent()?NoiseSurface.recolor(request.geometry().orElseThrow(),request.style().colors(),request.limits(),job::cancelled):NoiseSurface.prepare(request.volume(),request.style(),request.limits(),job::cancelled);
+                var request=job.request;var result=request.geometry().isPresent()?NoiseSurface.recolor(request.geometry().orElseThrow(),request.style().colors(),request.preparationLimits(),job::cancelled):NoiseSurface.prepare(request.volume(),request.style(),request.preparationLimits(),job::cancelled);
+                Optional<ScalarHistogram> histogram=Optional.empty();
+                if(!result.requiresPlaceholder()&&request.histogram().isPresent()) {
+                    long extra=request.reservation()-request.histogramBytes()-result.payloadBytes();
+                    var captured=result.histogram(request.histogram().orElseThrow().reserve(Math.max(0,extra)),job::cancelled);
+                    if(captured.requiresPlaceholder()) { synchronized(lock) { if(current(job))status=state(job,Phase.FAILED,captured.problems()); }return; }
+                    histogram=Optional.of(captured);
+                }
+                long retained=result.payloadBytes()+histogram.map(ScalarHistogram::bytes).orElse(0L);
                 synchronized(lock) {
                     if(current(job)) {
                         if(result.requiresPlaceholder())status=state(job,Phase.FAILED,result.problems());
                         else {
-                            if(result.payloadBytes()>job.request.reservation())throw new IllegalStateException("Scalar output exceeds its admitted peak");
-                            output=RenderInput.own(result,job.admission.retain());var complete=new Completion(job.revision,output);var ready=state(job,Phase.READY,List.of());
-                            job.retainedBytes=result.payloadBytes();completed=complete;completedBytes=job.retainedBytes;status=ready;output=null;
+                            if(retained>job.request.reservation())throw new IllegalStateException("Scalar output exceeds its admitted peak");
+                            output=RenderInput.own(result,job.admission.retain());var complete=new Completion(job.revision,output,histogram);var ready=state(job,Phase.READY,List.of());
+                            job.retainedBytes=retained;completed=complete;completedBytes=job.retainedBytes;status=ready;output=null;
                         }
                     }
                 }
