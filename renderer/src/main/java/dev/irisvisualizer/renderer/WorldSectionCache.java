@@ -38,7 +38,7 @@ public final class WorldSectionCache implements AutoCloseable {
         }
         @Override public void close() { synchronized(owner) { if(slot==null)return;var entry=slot;slot=null;owner.release(entry); } }
     }
-    private final Limits limits;private final RenderMemory.Account admission;private final LinkedHashMap<Key,Slot> entries=new LinkedHashMap<>(16,0.75f,true);
+    private final Limits limits;private final RenderMemory.Account admission;private LinkedHashMap<Key,Slot> entries=new LinkedHashMap<>(16,0.75f,true);
     private List<Epoch> epochs=new ArrayList<>();private Epoch prepared;private Set<Key> preparedKeys=Set.of();private long sourceBytes,meshBytes,leases,preparedBytes;private int faces,cellRecords,markers;private boolean closed;
     public WorldSectionCache() { this(Limits.DEFAULT); }
     public WorldSectionCache(Limits limits) { this(limits,(RenderMemory.Account)null); }
@@ -122,23 +122,40 @@ public final class WorldSectionCache implements AutoCloseable {
     }
     private void remove(Slot slot) { entries.remove(slot.key);subtract(slot); }
     private void release(Slot slot) {
-        if(slot.pins<1||leases<1)throw new IllegalStateException("Invalid section lease accounting");slot.pins--;leases--;if(slot.pins==0&&(slot.mesh==null||closed))remove(slot);
-        if(closed&&leases==0)clearEntries();
+        if(slot.pins<1||leases<1)throw new IllegalStateException("Invalid section lease accounting");slot.pins--;leases--;Throwable failure=null;
+        if(slot.pins==0&&(slot.mesh==null||closed))try { remove(slot); }catch(RuntimeException|Error error) { failure=error; }
+        if(closed&&leases==0)try { clearEntries(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
-    private void clearEntries() { entries.clear();epochs.clear();prepared=null;preparedKeys=Set.of();sourceBytes=0;meshBytes=0;preparedBytes=0;faces=0;cellRecords=0;markers=0;updateAdmission();if(closed&&admission!=null)admission.close(); }
+    private void publishRetirement() {
+        Throwable failure=null;try { updateAdmission(); }catch(RuntimeException|Error error) { failure=error; }
+        if(closed&&admission!=null)try { admission.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
+    private void clearEntries() { entries.clear();epochs.clear();prepared=null;preparedKeys=Set.of();sourceBytes=0;meshBytes=0;preparedBytes=0;faces=0;cellRecords=0;markers=0;publishRetirement(); }
     /** Returns false while any output reservation or scene lease is still live. */
     public synchronized boolean clear() { if(leases!=0)return false;clearEntries();return true; }
     /** Worker-owned epoch transition: discard prior admission and only unleased data before decoding. */
     synchronized void retireUnleased() {
-        if(closed)throw new IllegalStateException("Section cache is closed");prepared=null;preparedKeys=Set.of();preparedBytes=0;var iterator=entries.values().iterator();
-        while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0) { subtract(slot);iterator.remove(); } }
-        var unused=epochs.iterator();while(unused.hasNext()) { var epoch=unused.next();if(epoch.slots==0) { sourceBytes-=epoch.sourceBytes;unused.remove(); } }updateAdmission();
+        if(closed)throw new IllegalStateException("Section cache is closed");retire(false);
     }
     /** Retires admissions immediately; still-leased entries stay charged until their last release. */
-    @Override public synchronized void close() {
-        closed=true;prepared=null;preparedKeys=Set.of();preparedBytes=0;var iterator=entries.values().iterator();while(iterator.hasNext()) { var slot=iterator.next();if(slot.pins==0) { subtract(slot);iterator.remove(); } }
-        var epochIterator=epochs.iterator();while(epochIterator.hasNext()) { var epoch=epochIterator.next();if(epoch.slots==0) { sourceBytes-=epoch.sourceBytes;epochIterator.remove(); } }
-        if(leases==0)clearEntries();else { updateAdmission();if(admission!=null)admission.close(); }
+    @Override public synchronized void close() { retire(true); }
+    private void retire(boolean seal) {
+        Epoch[] previous=epochs.toArray(Epoch[]::new);int[] counts=new int[previous.length];var positions=new IdentityHashMap<Epoch,Integer>();
+        for(int i=0;i<previous.length;i++)positions.put(previous[i],i);
+        var kept=new LinkedHashMap<Key,Slot>(16,0.75f,true);long nextMesh=0,pins=0;int nextFaces=0,nextCells=0,nextMarkers=0;
+        for(var slot:entries.values())if(slot.pins>0) {
+            var at=positions.get(slot.key.epoch());if(at==null)throw new IllegalStateException("Leased section epoch is absent");
+            var usage=slot.plan.usage().orElseThrow();kept.put(slot.key,slot);counts[at]++;pins+=slot.pins;nextMesh+=usage.outputBytes();nextFaces+=usage.faces();nextCells+=usage.nonEmptyCells();nextMarkers+=usage.markers();
+        }
+        if(pins!=leases)throw new IllegalStateException("Invalid section lease accounting");
+        var keptEpochs=new ArrayList<Epoch>(previous.length);long nextSource=0;
+        for(int i=0;i<previous.length;i++)if(counts[i]>0) { keptEpochs.add(previous[i]);nextSource+=previous[i].sourceBytes; }
+        // All metadata is ready. Commit only retained slots and their counters before publishing lower admission.
+        for(int i=0;i<previous.length;i++)previous[i].slots=counts[i];
+        entries=kept;epochs=keptEpochs;prepared=null;preparedKeys=Set.of();preparedBytes=0;sourceBytes=nextSource;meshBytes=nextMesh;faces=nextFaces;cellRecords=nextCells;markers=nextMarkers;
+        if(seal)closed=true;publishRetirement();
     }
     public synchronized Stats stats() {
         int pinned=0,reserved=0;for(var slot:entries.values()) { if(slot.pins>0)pinned++;if(slot.mesh==null)reserved++; }

@@ -24,6 +24,8 @@ Missing output stays admitted as sections are allocated. Moving bytes from the f
 
 Taking a completion does not release its section/source charge. Independent scene, picking and GPU leases keep their cache tickets pinned. Closing the worker/cache retires its admission and releases unleased entries, while still-leased data remains charged until the last ticket closes. A closed cache's account can therefore outlive the worker. `WorldRenderWorker.memoryUsage()` exposes that account's current metadata, including its covering job reservation. Existing `cacheStats()` continues to describe resident slots/epochs; it excludes not-yet-allocated prepared output held by shared admission.
 
+[Cache retirement](SCENES.md#prepared-cache-retirement) now prepares the pinned-entry registry and its exact counters before discarding old prepared admission or sealing the cache. Preparation failure preserves the entire prior cache/account state. After commit, idle/planned output is dropped before lower shared charge is published; closed-cache account closure is attempted even if publication fails. Pinned complete/incomplete tickets keep their exact slot identity and source charge through retry and final release. No native payload or configured ceiling is reduced.
+
 ## GPU device and retirement
 
 Construct `GlDevice(limits, memory)` on the real owning context. It admits native staging before `memAlloc`; construction failure rolls back its account. Every subsequent device reservation includes GPU storage, retained CPU source/material/page/image payload and staging. All scene, map, target, atlas-frame, draw-plan and readback journals on that device participate through the same existing allocation path.

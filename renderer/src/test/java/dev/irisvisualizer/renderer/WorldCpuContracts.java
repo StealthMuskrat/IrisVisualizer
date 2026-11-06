@@ -143,6 +143,7 @@ public final class WorldCpuContracts {
         }
     }
     private static void cacheOwners() {
+        cacheRetirementFailures();
         interruptedSceneBundles();
         var f=fixture(2,255,false);try(var cache=new WorldSectionCache()) {
             var first=build(f,cache);var retained=first.retain();var second=build(f,cache);var scene=first.scene().orElseThrow();check(scene.sections().getFirst()==second.scene().orElseThrow().sections().getFirst(),"same epoch shares cached mesh");equal(4L,cache.stats().leases(),"two builds own four section tickets");
@@ -181,6 +182,61 @@ public final class WorldCpuContracts {
                 }
                 try(var retry=cache.reserve(nextPlan,f.plan().limits().workingBytes())) { check(!retry.cached(),"failed journal leaves no incomplete reservation blocking retry");retry.complete(WorldMesher.assemble(nextPlan,LIVE));equal(f.snapshot().extent().position(1),retry.mesh().positionForFace(0),"retry retains exact original native position");equal(state(407),retry.mesh().stateForFace(0),"retry retains original native state");equal(2L,cache.stats().leases(),"successful retry commits exactly one new lease"); }
                 equal(1L,cache.stats().leases(),"retry close preserves independent pinned first ticket");
+            }
+            cache.close();noWorkerCharge(memory);
+        }
+    }
+    /** Single-shot enumeration fault; successful retirement may replace the private registry. */
+    private static final class CacheRetirementFault implements AutoCloseable {
+        final WorldSectionCache cache;final java.lang.reflect.Field field;final LinkedHashMap<Object,Object> original,installed;final Error failure;boolean fired;int removals;
+        @SuppressWarnings("unchecked") CacheRetirementFault(WorldSectionCache cache,Error failure) {
+            this.cache=cache;this.failure=failure;
+            try {
+                field=WorldSectionCache.class.getDeclaredField("entries");field.setAccessible(true);original=(LinkedHashMap<Object,Object>)field.get(cache);
+                installed=new LinkedHashMap<Object,Object>() {
+                    @Override public Object get(Object key) { return original.get(key); }
+                    @Override public Object put(Object key,Object value) { return original.put(key,value); }
+                    @Override public int size() { return original.size(); }
+                    @Override public Object remove(Object key) { removals++;return original.remove(key); }
+                    @Override public Collection<Object> values() { return new AbstractCollection<>() {
+                        @Override public int size() { return original.size(); }
+                        @Override public Iterator<Object> iterator() { var iterator=original.values().iterator();return new Iterator<>() {
+                            @Override public boolean hasNext() { return iterator.hasNext(); }
+                            @Override public Object next() { var value=iterator.next();if(!fired) { fired=true;throw CacheRetirementFault.this.failure; }return value; }
+                            @Override public void remove() { removals++;iterator.remove(); }
+                        }; }
+                    }; }
+                };field.set(cache,installed);
+            }catch(ReflectiveOperationException error) { throw new AssertionError("controlled cache retirement fault unavailable",error); }
+        }
+        @Override public void close() { try { if(field.get(cache)==installed)field.set(cache,original); }catch(ReflectiveOperationException error) { throw new AssertionError("cache retirement fault restore failed",error); } }
+    }
+    private static void cacheRetirementFailures() {
+        var f=fixture(4,128,false);
+        for(boolean seal:new boolean[]{false,true})for(boolean oom:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var account=memory.open("cache retirement fixture");var cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,account)) {
+            cache.prepare(f.plan());var firstPlan=f.plan().sections().get(0);var secondPlan=f.plan().sections().get(1);var idlePlan=f.plan().sections().get(2);
+            try(var first=cache.reserve(firstPlan,f.plan().limits().workingBytes());var second=cache.reserve(secondPlan,f.plan().limits().workingBytes())) {
+                first.complete(WorldMesher.assemble(firstPlan,LIVE));var mesh=first.mesh();try(var idle=cache.reserve(idlePlan,f.plan().limits().workingBytes())) { idle.complete(WorldMesher.assemble(idlePlan,LIVE)); }
+                var before=cache.stats();var shared=memory.stats();var admitted=account.stats();Error primary=oom?new OutOfMemoryError("injected retirement enumeration OOM"):new AssertionError("injected retirement enumeration error");Runnable retire=seal?cache::close:cache::retireUnleased;
+                try(var fault=new CacheRetirementFault(cache,primary)) {
+                    check(caughtFailure(retire)==primary,"retirement preparation preserves exact enumeration error");check(fault.fired&&fault.removals==0,"failed preparation never removes old entries");equal(before,cache.stats(),"retirement preparation leaves cache flags/counters intact");equal(shared,memory.stats(),"retirement preparation preserves actual and future shared charge");equal(admitted,account.stats(),"failed preparation preserves account state");
+                    try(var probe=cache.reserve(firstPlan,f.plan().limits().workingBytes())) { check(probe.cached()&&probe.mesh()==mesh,"failed preparation leaves prepared admission and pinned mesh usable"); }equal(before,cache.stats(),"temporary cached lease probe restores exact counters");
+                    retire.run();equal(0,fault.removals,"retirement commits a private registry without old-entry removal callbacks");
+                }
+                var kept=cache.stats();equal(seal,kept.closed(),"only shutdown seals cache admission");equal(2,kept.sections(),"retirement keeps only pinned complete/incomplete slots");equal(2,kept.leasedSections(),"both pinned slots remain live");equal(1,kept.reservations(),"incomplete ticket retains its admitted output");equal(2L,kept.leases(),"retirement preserves exact live ticket count");equal(1,kept.epochs(),"pinned source epoch survives");equal(before.sourcePayloadBytes(),kept.sourcePayloadBytes(),"shared native source remains charged once");
+                long expectedMesh=firstPlan.usage().orElseThrow().outputBytes()+secondPlan.usage().orElseThrow().outputBytes();equal(expectedMesh,kept.meshBytes(),"retained mesh counters follow actual pinned slots");equal(kept.knownPayloadBytes(),memory.stats().chargedBytes(),"idle mesh and unallocated future output release their charge");check(memory.stats().chargedBytes()<shared.chargedBytes(),"retirement removes old idle/planned demand");equal(seal,account.stats().retiring(),"shutdown seals account without releasing pinned payload");check(first.mesh()==mesh,"pinned mesh identity survives registry replacement");equal(state(407),first.mesh().stateForFace(0),"retirement preserves original native state");
+                second.complete(WorldMesher.assemble(secondPlan,LIVE));equal(f.snapshot().extent().position(1),second.mesh().positionForFace(0),"already-admitted incomplete ticket can finish after retirement");equal(0,cache.stats().reservations(),"completion updates the retained slot");
+                if(seal)throwsType(IllegalStateException.class,()->cache.reserve(firstPlan,f.plan().limits().workingBytes()),"closed cache rejects new leases");else throwsType(WorldProblem.Failure.class,()->cache.reserve(firstPlan,f.plan().limits().workingBytes()),"retired future admission cannot be reused without prepare");
+            }
+            cache.close();equal(0L,cache.stats().knownPayloadBytes(),"last ticket release and close clear retired payload");noWorkerCharge(memory);
+        }
+        for(boolean lastTicket:new boolean[]{false,true})for(boolean same:new boolean[]{false,true})try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var account=memory.open("retirement publication fixture");var cache=new WorldSectionCache(WorldSectionCache.Limits.DEFAULT,account)) {
+            WorldSectionCache.Ticket ticket;
+            if(lastTicket) { cache.prepare(f.plan());var plan=f.plan().sections().getFirst();ticket=cache.reserve(plan,f.plan().limits().workingBytes());ticket.complete(WorldMesher.assemble(plan,LIVE));cache.close(); }
+            else { ticket=null;try(var built=build(f,cache)) { check(built.scene().isPresent(),"publication fault fixture owns complete cached geometry"); }account.close(); }
+            var primary=new AssertionError("injected retirement publication error");var secondary=same?primary:new AssertionError("injected retirement account-close error");
+            try(ticket;var fault=new CaptureCloseFault(memory,primary,secondary)) {
+                check(caughtFailure(lastTicket?ticket::close:cache::close)==primary,"retirement publication error remains primary");equal(lastTicket?3:2,fault.removals,"final cleanup and account close still attempted after retained-byte publication failure");equal(same?0:1,primary.getSuppressed().length,"distinct account-close error suppressed without self-suppression");if(!same)check(primary.getSuppressed()[0]==secondary,"later account error attached to original publication error");check(cache.stats().closed()&&cache.stats().sections()==0&&cache.stats().epochs()==0,"committed retirement never leaves a removed slot with stale counters");equal(0L,cache.stats().knownPayloadBytes(),"committed retirement releases actual cache graph");noWorkerCharge(memory);
             }
             cache.close();noWorkerCharge(memory);
         }
@@ -772,16 +828,17 @@ public final class WorldCpuContracts {
     }
     /** Account release can fail after removal; producer/construction errors must remain primary. */
     private static final class CaptureCloseFault implements AutoCloseable {
-        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Error failure;int removals;
-        @SuppressWarnings("unchecked") CaptureCloseFault(RenderMemory memory,Error failure) {
-            this.memory=memory;this.failure=failure;
+        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Error failure,secondary;int removals;
+        CaptureCloseFault(RenderMemory memory,Error failure) { this(memory,failure,failure); }
+        @SuppressWarnings("unchecked") CaptureCloseFault(RenderMemory memory,Error failure,Error secondary) {
+            this.memory=memory;this.failure=failure;this.secondary=secondary;
             try {
                 field=RenderMemory.class.getDeclaredField("owners");field.setAccessible(true);original=(Set<RenderMemory.Account>)field.get(memory);
                 field.set(memory,new AbstractSet<RenderMemory.Account>() {
                     @Override public int size() { return original.size(); }
                     @Override public Iterator<RenderMemory.Account> iterator() { return original.iterator(); }
                     @Override public boolean add(RenderMemory.Account value) { return original.add(value); }
-                    @Override public boolean remove(Object value) { removals++;original.remove(value);throw CaptureCloseFault.this.failure; }
+                    @Override public boolean remove(Object value) { removals++;original.remove(value);throw removals==1?CaptureCloseFault.this.failure:CaptureCloseFault.this.secondary; }
                 });
             }catch(ReflectiveOperationException error) { throw new AssertionError("controlled capture-close fault unavailable",error); }
         }
