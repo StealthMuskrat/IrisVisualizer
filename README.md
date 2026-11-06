@@ -44,3 +44,5 @@ Style-fracture objects now have bounded recursive controls across existing style
 Dimension stacking now supports staged ordered layers, native host/mutual-exclusion checks, exact spacer/blend controls and shared recursive style editing. Upper-terrain references are authorable; target content and native layout/generation remain unvalidated. Unsupported previews remain disabled.
 
 Custom-biome definitions now have bounded climate, color, enum, tag, particle and spawn controls with lossless nested list editing. Registry/datapack/version compatibility remains unvalidated, and unsupported previews remain disabled.
+
+Renderer implementation now includes optional [captured-neighbor biome tint blending](renderer/BIOME-BLENDING.md), with explicit radius, complete native halo checks and bounded sample/memory costs. The four renderer harnesses contain 65 prepared groups and compile; execution and genuine native/GPU validation remain pending.

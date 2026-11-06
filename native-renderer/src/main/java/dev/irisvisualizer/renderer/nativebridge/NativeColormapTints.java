@@ -17,10 +17,13 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
-/** Unblended world-model tint sources using selected colormaps and actual native biome data. */
+/** World-model tint sources using selected colormaps and exact captured native biome data. */
 public final class NativeColormapTints {
     private NativeColormapTints() {}
-    private static final String POLICY="Vanilla 26.3 world-model tint sources; biome blend radius 0; selected archive colormaps";
+    /** Borrowed full-height same-generation halo, held/frozen by the caller through capture. */
+    public record Blend(WorldSnapshot neighbors,WorldBiomeBlend.Limits limits) {
+        public Blend { Objects.requireNonNull(neighbors);Objects.requireNonNull(limits);if(neighbors.requiresPlaceholder())throw new IllegalArgumentException("Biome blending requires a successful captured halo"); }
+    }
     private enum Rule { NONE, GRASS, DOUBLE_GRASS, SECOND_GRASS, FOLIAGE, DRY, WATER, SPRUCE, BIRCH, LILY, ATTACHED, REDSTONE, STEM }
     private static final class Tables {
         final int maximum;final Map<Long,WorldTintInput.Layers> values=new HashMap<>();
@@ -37,26 +40,33 @@ public final class NativeColormapTints {
         return maps.bytes()+ClientColormaps.PAYLOAD_BYTES+(long)biomes*4*Integer.BYTES;
     }
     public static NativeTintInputs.Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,ClientColormaps maps,WorldTintInput.Limits limits,BooleanSupplier cancelled) {
-        Objects.requireNonNull(context);Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(maps);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
+        return capture(context,assets,snapshot,maps,Optional.empty(),limits,cancelled);
+    }
+    public static NativeTintInputs.Result capture(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,ClientColormaps maps,Optional<Blend> blending,WorldTintInput.Limits limits,BooleanSupplier cancelled) {
+        Objects.requireNonNull(context);Objects.requireNonNull(assets);Objects.requireNonNull(snapshot);Objects.requireNonNull(maps);Objects.requireNonNull(blending);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);
         try {
             check(cancelled);context.check();if(snapshot.requiresPlaceholder())return failed(snapshot,snapshot.problems());
             if(maps.requiresPlaceholder())throw NativeIdentities.failure(WorldProblem.Code.ATLAS,"Selected-client colormap preparation failed");
             if(!maps.matchesAssets(assets.receipt()))throw NativeIdentities.failure(WorldProblem.Code.VERSION,"Vanilla tint colormaps belong to another client archive");
             if(!snapshot.source().equals(context.source()))throw NativeIdentities.failure(WorldProblem.Code.ASSIGNMENT,"Vanilla tints require the exact native generation context");
             var extent=snapshot.extent();if(extent.minY()!=context.engine().getMinHeight()||extent.height()!=context.engine().getHeight()||(long)context.engine().getMaxHeight()-context.engine().getMinHeight()!=extent.height())throw NativeIdentities.failure(WorldProblem.Code.EXTENT,"Vanilla tints require complete configured height");
-            long resources=resourceBytes(maps,snapshot.biomes().size()),target=(long)snapshot.cellCount()*2+(long)limits.tables()*8+(long)limits.layers()*8+(long)snapshot.states().size()*4;
+            var source=blending.map(Blend::neighbors).orElse(snapshot);var sourceExtent=source.extent();
+            if(sourceExtent.minX()<Integer.MIN_VALUE||sourceExtent.minZ()<Integer.MIN_VALUE||sourceExtent.maxX()-1>Integer.MAX_VALUE||sourceExtent.maxZ()-1>Integer.MAX_VALUE)throw NativeIdentities.failure(WorldProblem.Code.COORDINATE,"Biome blend halo exceeds signed native coordinates");
+            long resources=resourceBytes(maps,source.biomes().size())+(source==snapshot?0:source.indexBytes()),target=(long)snapshot.cellCount()*2+(long)limits.tables()*8+(long)limits.layers()*8+(long)snapshot.states().size()*4;
             if(target>limits.payloadBytes()||assets.receipt().capturedAssetBytes()+snapshot.indexBytes()+resources+target>limits.workingBytes())throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Vanilla tint maps, native copies and prospective tint payload exceed their allowance");
+            var blend=new WorldBiomeBlend(snapshot,source,blending.map(Blend::limits).orElse(WorldBiomeBlend.Limits.UNBLENDED),cancelled);
             int[][] copies=new int[ClientColormaps.Kind.values().length][];
             for(var kind:ClientColormaps.Kind.values()) { check(cancelled);copies[kind.ordinal()]=maps.copyArgb(kind); }
-            var biomes=new Biome[snapshot.biomes().size()];int[][] colors=new int[4][biomes.length];
+            var biomes=new Biome[source.biomes().size()];int[][] colors=new int[4][biomes.length];
             for(int at=0;at<biomes.length;at++) {
-                check(cancelled);context.checkSession();var expected=snapshot.biomes().get(at);var biome=context.biomes().byId(expected.nativeBiomeId());var key=biome==null?null:context.biomes().getKey(biome);
+                check(cancelled);context.checkSession();var expected=source.biomes().get(at);var biome=context.biomes().byId(expected.nativeBiomeId());var key=biome==null?null:context.biomes().getKey(biome);
                 if(key==null||context.biomes().getId(biome)!=expected.nativeBiomeId()||!key.toString().equals(expected.original())||!AssetId.parse(key.toString()).equals(expected.id()))throw NativeIdentities.failure(WorldProblem.Code.PALETTE,"Native tint biome identity differs from the captured palette");
                 biomes[at]=biome;
                 readColors(biome,copies,colors,at);
             }
             var rules=new IdentityHashMap<BlockState,Rule>();var tables=new Tables(limits.tables());
-            var sampler=new NativeTintInputs.Provider(assets.receipt(),POLICY,(state,biome,position)->layers(snapshot,biomes,colors,state,position,rules.computeIfAbsent(state,NativeColormapTints::rule),tables));
+            String policy="Vanilla 26.3 world-model tint sources; horizontal RGB blend radius "+blend.radius()+"; selected archive colormaps";
+            var sampler=new NativeTintInputs.Provider(assets.receipt(),policy,(state,biome,position)->layers(context,blend,biomes,colors,state,position,rules.computeIfAbsent(state,NativeColormapTints::rule),tables));
             var bounded=new WorldTintInput.Limits(limits.tables(),limits.layers(),limits.payloadBytes(),limits.workingBytes()-resources);
             var result=NativeTintInputs.capture(context,assets,snapshot,sampler,bounded,cancelled);check(cancelled);context.check();return result;
         }catch(WorldCapture.ReadFailure failure) { check(cancelled);return failed(snapshot,List.of(failure.problem())); }
@@ -80,13 +90,12 @@ public final class NativeColormapTints {
         // Vanilla clamps float climate values before converting to double for its colormap utility.
         float number=value.getAsFloat();if(!Float.isFinite(number))throw new IllegalArgumentException("Native climate is not finite");return Math.clamp(number,0,1);
     }
-    private static int biomeIndex(WorldSnapshot snapshot,BlockPos position,boolean below) {
+    private static int color(NativeRenderContext context,WorldBiomeBlend blend,Biome[] biomes,int[][] colors,BlockPos position,int channel,boolean below) {
         long y=(long)position.getY()-(below?1:0);if(y<Integer.MIN_VALUE||y>Integer.MAX_VALUE)throw NativeIdentities.failure(WorldProblem.Code.COORDINATE,"Tint source position exceeds native Y");
-        var extent=snapshot.extent();long x=(long)position.getX()-extent.minX(),z=(long)position.getZ()-extent.minZ(),dy=y-extent.minY();
-        if(x<0||x>=extent.width()||z<0||z>=extent.depth()||dy<0||dy>=extent.height())throw NativeIdentities.failure(WorldProblem.Code.EXTENT,"Tint source needs a biome outside the complete captured volume");return snapshot.biomeIndex(Math.toIntExact((dy*extent.depth()+z)*extent.width()+x));
-    }
-    private static int grass(WorldSnapshot snapshot,Biome[] biomes,int[][] colors,BlockPos position,boolean below) {
-        int at=biomeIndex(snapshot,position,below);return biomes[at].getSpecialEffects().grassColorModifier().modifyColor(position.getX(),position.getZ(),colors[0][at]);
+        return blend.rgb(new WorldSnapshot.Position(position.getX(),(int)y,position.getZ()),(at,x,sy,z)->{
+            context.checkSession();
+            return channel==0?biomes[at].getSpecialEffects().grassColorModifier().modifyColor((int)x,(int)z,colors[0][at]):colors[channel][at];
+        });
     }
     private static Rule rule(BlockState state) {
         var key=BuiltInRegistries.BLOCK.getKey(state.getBlock());if(key==null)return Rule.NONE;
@@ -107,15 +116,15 @@ public final class NativeColormapTints {
             default->Rule.NONE;
         };
     }
-    private static WorldTintInput.Layers layers(WorldSnapshot snapshot,Biome[] biomes,int[][] colors,BlockState state,BlockPos position,Rule rule,Tables tables) {
+    private static WorldTintInput.Layers layers(NativeRenderContext context,WorldBiomeBlend blend,Biome[] biomes,int[][] colors,BlockState state,BlockPos position,Rule rule,Tables tables) {
         if(rule==Rule.NONE)return WorldTintInput.Layers.EMPTY;
-        if(rule==Rule.SECOND_GRASS)return tables.get(grass(snapshot,biomes,colors,position,false),true);
+        if(rule==Rule.SECOND_GRASS)return tables.get(color(context,blend,biomes,colors,position,0,false),true);
         int rgb=switch(rule) {
-            case DOUBLE_GRASS->grass(snapshot,biomes,colors,position,state.getValue(DoublePlantBlock.HALF)==DoubleBlockHalf.UPPER);
-            case GRASS->grass(snapshot,biomes,colors,position,false);
-            case FOLIAGE->colors[1][biomeIndex(snapshot,position,false)];
-            case DRY->colors[2][biomeIndex(snapshot,position,false)];
-            case WATER->colors[3][biomeIndex(snapshot,position,false)];
+            case DOUBLE_GRASS->color(context,blend,biomes,colors,position,0,state.getValue(DoublePlantBlock.HALF)==DoubleBlockHalf.UPPER);
+            case GRASS->color(context,blend,biomes,colors,position,0,false);
+            case FOLIAGE->color(context,blend,biomes,colors,position,1,false);
+            case DRY->color(context,blend,biomes,colors,position,2,false);
+            case WATER->color(context,blend,biomes,colors,position,3,false);
             case SPRUCE->0x619961;case BIRCH->0x80a755;case LILY->0x208030;case ATTACHED->0xe0c71c;
             case REDSTONE->RedstoneWireBlock.getColorForPower(state.getValue(RedstoneWireBlock.POWER));
             case STEM->{ int age=state.getValue(StemBlock.AGE);yield ARGB.color(age*32,255-age*8,age*4); }

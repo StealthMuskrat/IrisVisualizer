@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-05. The `RendererCpuContracts` harness has 19 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 21 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 64 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 19 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 22 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 13 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 65 prepared groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -48,6 +48,6 @@ The exposure oracle enumerates occupied original cells and their six neighbors; 
 
 ## Current verification evidence and remaining work
 
-Compilation succeeded for all 129 CPU/OpenGL production sources plus four contract sources (133 total) with Java 25 and LWJGL 3.4.1. The default runner set also compiles without external dependencies: 88 CPU production sources, four display helpers and four harnesses (96 total). No contracts, worker/concurrency checks, native query, GL context, GPU upload/readback or workflow ran. The Windows PowerShell runner was inspected only.
+Compilation succeeded for all 130 CPU/OpenGL production sources plus four contract sources (134 total) with Java 25 and LWJGL 3.4.1. The default runner set also compiles without external dependencies: 89 CPU production sources, four display helpers and four harnesses (97 total). No contracts, worker/concurrency checks, native query, GL context, GPU upload/readback or workflow ran. The Windows PowerShell runner was inspected only.
 
 This is an initial suite, not renderer-stage completion. Broader world block/model/fluid/material/atlas coverage beyond the prepared synthetic world suite, worker races/failure injection, full PNG/JPEG matrices, broader camera math beyond the prepared context-free suite, GPU state/upload/draw/retirement, real pixel comparisons and native source parity still require their planned verification. Sixteen native adapters still require genuine pinned Windows compilation/execution. Final UI integration and combined application memory/GPU QA remain pending. Do not infer readiness or enable supported previews from successful compilation or from a future synthetic CPU suite result alone.

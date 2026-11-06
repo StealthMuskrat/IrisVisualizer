@@ -18,15 +18,21 @@ public final class NativeCapture {
         public static final WorldLimits DEFAULT=new WorldLimits(NativeWorldCapture.Limits.DEFAULT,NativeWeightedInputs.Limits.DEFAULT);
         public WorldLimits { Objects.requireNonNull(volume);Objects.requireNonNull(visuals); }
     }
-    public record WorldOptions(Optional<NativeTintInputs.Provider> tint,WorldTintInput.Limits tintLimits,Optional<ClientColormaps> colormaps) {
+    public record WorldOptions(Optional<NativeTintInputs.Provider> tint,WorldTintInput.Limits tintLimits,Optional<ClientColormaps> colormaps,Optional<NativeColormapTints.Blend> blending) {
         public static final WorldOptions NONE=new WorldOptions(Optional.empty(),WorldTintInput.Limits.DEFAULT);
         public WorldOptions(Optional<NativeTintInputs.Provider> tint,WorldTintInput.Limits tintLimits) { this(tint,tintLimits,Optional.empty()); }
+        public WorldOptions(Optional<NativeTintInputs.Provider> tint,WorldTintInput.Limits tintLimits,Optional<ClientColormaps> colormaps) { this(tint,tintLimits,colormaps,Optional.empty()); }
         public WorldOptions {
-            Objects.requireNonNull(tint);Objects.requireNonNull(tintLimits);Objects.requireNonNull(colormaps);
+            Objects.requireNonNull(tint);Objects.requireNonNull(tintLimits);Objects.requireNonNull(colormaps);Objects.requireNonNull(blending);
+            if(blending.isPresent()&&colormaps.isEmpty())throw new IllegalArgumentException("Biome blending requires selected-client colormaps");
             if(tint.isPresent()&&colormaps.isPresent()||colormaps.isPresent()&&colormaps.orElseThrow().requiresPlaceholder())throw new IllegalArgumentException("Choose one successful explicit or vanilla colormap tint source");
         }
         /** Explicit radius-zero profile; does not claim neighboring-biome blending. */
         public static WorldOptions vanillaUnblended(ClientColormaps maps) { return new WorldOptions(Optional.empty(),WorldTintInput.Limits.DEFAULT,Optional.of(maps)); }
+        /** Explicit bounded horizontal averaging; no native/client parity is implied. */
+        public static WorldOptions vanillaBlended(ClientColormaps maps,WorldSnapshot neighbors,WorldBiomeBlend.Limits limits) {
+            return new WorldOptions(Optional.empty(),WorldTintInput.Limits.DEFAULT,Optional.of(maps),Optional.of(new NativeColormapTints.Blend(neighbors,limits)));
+        }
     }
     /** Successful input owns only detached data and admission; no engine, reader, RNG or provider escapes. */
     public record Result<T>(Kind kind,WorldSnapshot.Source source,Optional<RenderInput<T>> input,List<WorldProblem> problems,List<ModelPlan.Problem> assetProblems) implements AutoCloseable {
@@ -84,7 +90,7 @@ public final class NativeCapture {
     private static WorldTintInput tint(NativeRenderContext context,ClientAssetSnapshot assets,WorldSnapshot snapshot,WorldOptions options,long working,BooleanSupplier cancelled) {
         if(options.tint().isEmpty()&&options.colormaps().isEmpty())return WorldTintInput.none(snapshot);
         var t=options.tintLimits();var limits=new WorldTintInput.Limits(t.tables(),t.layers(),t.payloadBytes(),Math.min(working,t.workingBytes()));
-        var result=options.colormaps().isPresent()?NativeColormapTints.capture(context,assets,snapshot,options.colormaps().orElseThrow(),limits,cancelled):NativeTintInputs.capture(context,assets,snapshot,options.tint().orElseThrow(),limits,cancelled);
+        var result=options.colormaps().isPresent()?NativeColormapTints.capture(context,assets,snapshot,options.colormaps().orElseThrow(),options.blending(),limits,cancelled):NativeTintInputs.capture(context,assets,snapshot,options.tint().orElseThrow(),limits,cancelled);
         if(result.requiresPlaceholder())throw new WorldCapture.ReadFailure(result.problems().getFirst());return result.input().orElseThrow();
     }
     private static void clock(long tick,double partialTick) { if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid native capture animation clock"); }
@@ -94,11 +100,11 @@ public final class NativeCapture {
     private static void client(ClientAssetSnapshot assets,WorldOptions options) {
         client(assets);if(options.colormaps().isPresent()&&!options.colormaps().orElseThrow().matchesAssets(assets.receipt()))throw NativeIdentities.failure(WorldProblem.Code.VERSION,"Vanilla tint colormaps belong to another client archive");
     }
-    private static long colorBytes(WorldOptions options) { return options.colormaps().map(ClientColormaps::bytes).orElse(0L); }
+    private static long colorBytes(WorldOptions options) { return options.colormaps().map(ClientColormaps::bytes).orElse(0L)+options.blending().map(b->b.neighbors().indexBytes()).orElse(0L); }
     private static long worldPeak(ClientAssetSnapshot assets,WorldLimits limits,WorldOptions options) { return Math.max(assets.receipt().capturedAssetBytes()+limits.volume().capture().workingBytes()+colorBytes(options),limits.visuals().scene().workingBytes()); }
-    /** Borrowed source tables remain live through scene capture and consume its existing ceiling. */
+    /** Borrowed source tables and tint halo remain live through scene capture within its ceiling. */
     private static NativeSceneInputs.Limits sceneLimits(NativeSceneInputs.Limits source,WorldOptions options) {
-        long working=source.workingBytes()-colorBytes(options);if(working<0)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Colormap tables exceed native scene working allowance");
+        long working=source.workingBytes()-colorBytes(options);if(working<0)throw NativeIdentities.failure(WorldProblem.Code.LIMIT,"Colormap tables and biome halo exceed native scene working allowance");
         return new NativeSceneInputs.Limits(source.models(),source.visibility(),source.offsets(),source.scene(),source.section(),working);
     }
     private static void catalogOwner(RenderInput<ClientAssetSnapshot> assets,RenderMemory memory) {

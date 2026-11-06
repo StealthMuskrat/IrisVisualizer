@@ -82,6 +82,76 @@ public final class WorldCpuContracts {
         var owner=WorldScene.build(fixture.plan(),fixture.raster(),cache,LIVE);check(!owner.requiresPlaceholder(),"complete scene: "+owner.problems());return owner;
     }
     private static WorldRay ray(WorldSnapshot snapshot) { return new WorldRay(snapshot.extent().position(0),0.5,0.5,3,0,0,-1,0,10); }
+    private static WorldSnapshot blendSnapshot(WorldSnapshot.Source source,WorldSnapshot.Extent extent,List<WorldSnapshot.Biome> biomes,int[] indices) {
+        var result=WorldSnapshot.capture(source,extent,List.of(state(407)),biomes,new int[indices.length],indices,LIVE);
+        check(!result.requiresPlaceholder(),"complete blend fixture");return result;
+    }
+    private static void blendFailure(WorldProblem.Code code,Runnable operation,String message) {
+        try { operation.run();throw new AssertionError(message+": failure missing"); }
+        catch(WorldCapture.ReadFailure failure) { equal(code,failure.problem().code(),message); }
+    }
+    private static void biomeBlending() {
+        var source=snapshot(1).source();var second=new WorldSnapshot.Biome(911,"fixture:second",new AssetId("fixture","second"));
+        var extent=new WorldSnapshot.Extent(-1,-64,-1,3,2,3);int[] indices=new int[18];
+        for(int y=0;y<2;y++)for(int z=0;z<3;z++)for(int x=0;x<3;x++)indices[(y*3+z)*3+x]=x==2?1:0;
+        var halo=blendSnapshot(source,extent,List.of(BIOME,second),indices);
+        var target=blendSnapshot(source,new WorldSnapshot.Extent(0,-64,0,1,2,1),List.of(second,BIOME),new int[]{1,1});
+        var blend=new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,18),LIVE);var seen=new HashSet<WorldSnapshot.Position>();
+        var center=new WorldSnapshot.Position(0,-63,0);
+        int result=blend.rgb(center,(biome,x,y,z)->{check(seen.add(new WorldSnapshot.Position(x,y,z)),"unique horizontal sample");equal(-63,y,"source Y is unchanged");return biome==0?0xff102030:0x00405060;});
+        equal(0x203040,result,"floor RGB channels independently, ignore alpha");equal(9,seen.size(),"entire radius-one square");equal(9L,blend.samples(),"exact sample reservation");equal(halo,blend.source(),"borrowed exact halo");
+        int positional=blend.rgb(center,(biome,x,y,z)->((int)(x+1)<<16)|((int)(z+1)<<8)|1);
+        equal(0x010101,positional,"each neighbor receives its own grass-modifier coordinates");
+        final int[] calls={0};blendFailure(WorldProblem.Code.LIMIT,()->blend.rgb(center,(biome,x,y,z)->{calls[0]++;return 0;}),"exhausted query allowance");equal(0,calls[0],"limit failure precedes callbacks");
+        var shortBudget=new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,8),LIVE);
+        blendFailure(WorldProblem.Code.LIMIT,()->shortBudget.rgb(center,(biome,x,y,z)->{calls[0]++;return 0;}),"whole footprint must fit");equal(0L,shortBudget.samples(),"rejected footprint consumes no samples");
+        var unblended=new WorldBiomeBlend(target,target,WorldBiomeBlend.Limits.UNBLENDED,LIVE);
+        equal(0xabcdef,unblended.rgb(center,(biome,x,y,z)->{equal(1,biome,"radius zero retains target palette ordering");return 0x80abcdef;}),"radius zero preserves RGB");equal(1L,unblended.samples(),"radius zero samples once");
+        blendFailure(WorldProblem.Code.EXTENT,()->new WorldBiomeBlend(target,target,new WorldBiomeBlend.Limits(1,9),LIVE),"uncaptured halo is rejected");
+        blendFailure(WorldProblem.Code.EXTENT,()->unblended.rgb(new WorldSnapshot.Position(0,-65,0),(biome,x,y,z)->{throw new AssertionError("missing height callback");}),"below-minimum plant biome is rejected");
+        blendFailure(WorldProblem.Code.EXTENT,()->blend.rgb(new WorldSnapshot.Position(1,-63,0),(biome,x,y,z)->{throw new AssertionError("missing neighbor callback");}),"outside halo is not clamped");
+        var otherSource=new WorldSnapshot.Source(UUID.randomUUID(),source.inputSha256(),source.backendBuild(),source.minecraftVersion(),source.dimension(),source.seed());
+        var other=blendSnapshot(otherSource,extent,List.of(BIOME,second),indices);
+        blendFailure(WorldProblem.Code.ASSIGNMENT,()->new WorldBiomeBlend(target,other,new WorldBiomeBlend.Limits(1,9),LIVE),"generation mismatch rejected");
+        var conflict=indices.clone();conflict[4]=1;var inconsistent=blendSnapshot(source,extent,List.of(BIOME,second),conflict);
+        blendFailure(WorldProblem.Code.PALETTE,()->new WorldBiomeBlend(target,inconsistent,new WorldBiomeBlend.Limits(1,9),LIVE),"overlapping biome disagreement rejected");
+        var altered=new WorldSnapshot.Biome(BIOME.nativeBiomeId(),"fixture:alias",new AssetId("fixture","alias"));
+        var wrongIdentity=blendSnapshot(source,extent,List.of(altered,second),indices);
+        blendFailure(WorldProblem.Code.PALETTE,()->new WorldBiomeBlend(target,wrongIdentity,new WorldBiomeBlend.Limits(1,9),LIVE),"same numeric ID cannot hide a different native key");
+        var wrongHeight=blendSnapshot(source,new WorldSnapshot.Extent(-1,-64,-1,3,1,3),List.of(BIOME),new int[9]);
+        blendFailure(WorldProblem.Code.ASSIGNMENT,()->new WorldBiomeBlend(target,wrongHeight,new WorldBiomeBlend.Limits(1,9),LIVE),"full-height agreement required");
+        var failed=WorldSnapshot.capture(source,extent,List.of(state(407)),List.of(BIOME),new int[0],new int[0],LIVE);
+        blendFailure(WorldProblem.Code.PALETTE,()->new WorldBiomeBlend(target,failed,new WorldBiomeBlend.Limits(1,9),LIVE),"placeholder halo rejected");
+        for(long origin:new long[]{Long.MIN_VALUE,Long.MAX_VALUE-3,9_007_199_254_740_993L}) {
+            var distantHalo=blendSnapshot(source,new WorldSnapshot.Extent(origin,-64,origin,3,2,3),List.of(BIOME),new int[18]);
+            var distantTarget=blendSnapshot(source,new WorldSnapshot.Extent(origin+1,-64,origin+1,1,2,1),List.of(BIOME),new int[2]);
+            var distant=new WorldBiomeBlend(distantTarget,distantHalo,new WorldBiomeBlend.Limits(1,9),LIVE);
+            equal(0x123456,distant.rgb(new WorldSnapshot.Position(origin+1,-63,origin+1),(biome,x,y,z)->0x123456),"large signed coordinates remain exact");
+        }
+        var edge=blendSnapshot(source,new WorldSnapshot.Extent(Long.MIN_VALUE,-64,0,1,2,1),List.of(BIOME),new int[2]);
+        blendFailure(WorldProblem.Code.COORDINATE,()->new WorldBiomeBlend(edge,edge,new WorldBiomeBlend.Limits(1,9),LIVE),"expanded coordinate underflow rejected");
+        var fresh=new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,9),LIVE);
+        blendFailure(WorldProblem.Code.COORDINATE,()->fresh.rgb(new WorldSnapshot.Position(Long.MAX_VALUE,-63,0),(biome,x,y,z)->0),"sample coordinate overflow rejected");
+        var boom=new AssertionError("sampler failure");try { fresh.rgb(center,(biome,x,y,z)->{throw boom;});throw new AssertionError("missing sampler failure"); }catch(AssertionError actual) { check(actual==boom,"sampler failure identity preserved"); }
+        equal(9L,fresh.samples(),"failed query retains its full sample reservation");
+        final boolean[] cancelled={false};var cancellable=new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,9),()->cancelled[0]);
+        throwsType(CancellationException.class,()->cancellable.rgb(center,(biome,x,y,z)->{cancelled[0]=true;return 0;}),"in-flight cancellation escapes without partial color");equal(9L,cancellable.samples(),"cancelled query retains reservation");
+        throwsType(CancellationException.class,()->new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,9),()->true),"cancelled setup exits before work");
+        var widestHalo=blendSnapshot(source,new WorldSnapshot.Extent(-7,-64,-7,15,2,15),List.of(BIOME),new int[450]);
+        var widest=new WorldBiomeBlend(target,widestHalo,new WorldBiomeBlend.Limits(7,225),LIVE);
+        equal(0xffffff,widest.rgb(center,(biome,x,y,z)->0xffffffff),"maximum radius and channel sums stay bounded");equal(225L,widest.samples(),"maximum radius visits 225 neighbors");
+        var budgeted=new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,9),LIVE);
+        var tint=WorldTintInput.read(assets(255),target,"synthetic bounded blend",new WorldTintInput.Reader() {
+            @Override public WorldTintInput.Layers colors(int cell) { return WorldTintInput.Layers.of(Map.of(0,budgeted.rgb(target.extent().position(cell),(biome,x,y,z)->0x123456))); }
+        },WorldTintInput.Limits.DEFAULT,LIVE);
+        check(tint.requiresPlaceholder()&&tint.problems().getFirst().code()==WorldProblem.Code.LIMIT,"later blend budget failure becomes structured tint diagnostic");equal(0,tint.tables(),"failed tint publishes no partial tables");equal(0L,tint.bytes(),"failed tint publishes no partial payload");
+        var completeBlend=new WorldBiomeBlend(target,halo,new WorldBiomeBlend.Limits(1,18),LIVE);
+        var completeTint=WorldTintInput.read(assets(255),target,"synthetic complete blend",new WorldTintInput.Reader() {
+            @Override public WorldTintInput.Layers colors(int cell) { return WorldTintInput.Layers.of(Map.of(0,completeBlend.rgb(target.extent().position(cell),(biome,x,y,z)->y==-64?0xff0000:0x00ff00))); }
+        },WorldTintInput.Limits.DEFAULT,LIVE);
+        check(!completeTint.requiresPlaceholder(),"complete blended tint detaches through ordinary pipeline");equal(0xff0000,completeTint.rgb(0,0),"lower captured biome Y");equal(0x00ff00,completeTint.rgb(1,0),"upper captured biome Y");equal(target.id(),completeTint.snapshot().id(),"original native snapshot identity retained");equal(407,completeTint.snapshot().state(0).nativeStateId(),"original native state ID retained");
+        throwsType(IllegalArgumentException.class,()->new WorldBiomeBlend.Limits(8,1),"radius hard bound");throwsType(IllegalArgumentException.class,()->new WorldBiomeBlend.Limits(1,0),"positive sample budget");
+    }
     private static void nativeSnapshot() {
         var state=state(407);var source=snapshot(1).source();var states=new int[]{0,0};var biomes=new int[]{0,0};var world=WorldSnapshot.capture(source,new WorldSnapshot.Extent(4,-64,8,2,1,1),List.of(state),List.of(BIOME),states,biomes,LIVE);states[0]=99;biomes[1]=99;
         equal(state,world.state(0),"exact native state");equal(407,world.state(0).nativeStateId(),"native numeric state ID");equal(BIOME,world.biome(1),"exact native biome");equal(16L,world.indexBytes(),"two complete index arrays");
@@ -942,6 +1012,7 @@ public final class WorldCpuContracts {
     public static void main(String[] arguments) {
         if(arguments.length!=0)throw new IllegalArgumentException("No arguments supported");
         group("native snapshot identity and atomic failure",WorldCpuContracts::nativeSnapshot);
+        group("bounded exact native biome blending",WorldCpuContracts::biomeBlending);
         group("model cube winding and provenance",WorldCpuContracts::geometry);
         group("atlas extrusion and exact binding",WorldCpuContracts::atlas);
         group("native visual assignment guards",WorldCpuContracts::assignments);
