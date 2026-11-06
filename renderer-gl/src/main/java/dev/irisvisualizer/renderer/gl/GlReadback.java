@@ -161,11 +161,17 @@ public final class GlReadback implements AutoCloseable {
     /** Owned CPU-only handoff. A managed device's shared charge survives device close until final owner close. */
     public RenderInput<Pixels> takeInput() {
         var result=retainReadyInput();
-        try { take();return result; }catch(RuntimeException|Error failure) { result.close();throw failure; }
+        try { take();return result; }
+        catch(RuntimeException|Error failure) { try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     /** Transfers immutable CPU data once. Its memory is caller-owned after this operation. */
     public Pixels take() {
-        var result=readyPixels();device.retire(output);output=null;completed=null;phase=Phase.TAKEN;return result;
+        var result=readyPixels();
+        try { device.retire(output);output=null;completed=null;phase=Phase.TAKEN;return result; }
+        catch(RuntimeException|Error failure) {
+            // Retirement may already have committed. Do not expose READY pixels without their live journal.
+            try { dispose(Phase.FAILED); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+        }
     }
     private void releaseWork() {
         Throwable failure=null;

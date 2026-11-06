@@ -62,8 +62,10 @@ public final class GlReadbackQueue implements AutoCloseable {
     }
     public Optional<Completion> take(long latestRevision) {
         current();if(latestRevision<1)throw new IllegalArgumentException("Invalid readback revision");if(latestRevision>revision) { invalidate(latestRevision);return Optional.empty(); }if(latestRevision!=revision||status.phase()!=Phase.READY||active==null||!active.ready())return Optional.empty();
+        // Metadata allocation has not consumed output; setup failure leaves READY pixels and their journal intact.
+        var result=Optional.of(new Completion(revision,active.readyPixels()));var delivered=new Status(revision,Phase.DELIVERED,status.progress(),Optional.empty(),"");
         try {
-            var result=Optional.of(new Completion(revision,active.readyPixels()));var delivered=new Status(revision,Phase.DELIVERED,status.progress(),Optional.empty(),"");active.take();active.close();active=null;status=delivered;return result;
+            active.take();active.close();active=null;status=delivered;return result;
         }catch(RuntimeException|Error error) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failed(error);throw error; }
     }
     /** Admission/setup rejection preserves READY output; successful transfer leaves no queue-owned CPU pixels. */
@@ -74,7 +76,7 @@ public final class GlReadbackQueue implements AutoCloseable {
             var result=Optional.of(new OwnedCompletion(revision,input));var delivered=new Status(revision,Phase.DELIVERED,status.progress(),Optional.empty(),"");
             transferring=true;active.take();active.close();active=null;status=delivered;return result;
         }catch(RuntimeException|Error error) {
-            input.close();
+            try { input.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }
             if(transferring) { try { releaseOwned(); }catch(RuntimeException|Error cleanup) { if(cleanup!=error)error.addSuppressed(cleanup); }failed(error); }
             throw error;
         }

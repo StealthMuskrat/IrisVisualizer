@@ -82,3 +82,7 @@ Original pack images now enter through `GlReadback.begin(GlImageFrame)` and the 
 ## Restoration failure diagnostics
 
 [Transfer failure aggregation](HOST-STATE.md#transfer-failures-remain-primary) now keeps the original readback or cancellation error primary if pack-state restoration also fails, then attempts ordinary disposal. A restoration-only error still fails the step before READY output publication. Pack bindings, row orientation, budgets, fence polling and independent taken pixels keep their existing contracts. Full and dependency-free compilation passed; all 64 prepared groups and Windows GL/failure-injection checks remain unexecuted.
+
+## Output transfer failures
+
+[Raw and owned handoffs](READBACK-OWNERS.md#rejected-handoff-and-cleanup) now distinguish setup from journal consumption. Raw queued completion metadata is allocated before transfer, so setup failure preserves READY output. A direct retirement failure instead marks the job FAILED and attempts disposal: the journal may already be released/quarantined and cannot support another READY take. Owned direct/queued input cleanup preserves the original transfer error, and queued cleanup/publication continues if CPU-input release also fails. Successful pixels/receipts, source-frame ownership, conservative admission overlap and device quarantine accounting are unchanged. All production/harness sources compile; no context, fault-injection, readback, native/GPU test or workflow was executed.
