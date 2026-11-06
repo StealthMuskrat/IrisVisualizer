@@ -28,7 +28,7 @@ public final class GlDevice implements AutoCloseable {
         }
     }
     private final Thread thread=Thread.currentThread();private final long context;private final GLCapabilities capabilities;private final Limits limits;private final RenderMemory memory;private final RenderMemory.Account admission;
-    private final int maximumTexture,maximumRenderbuffer;private final List<Allocation> allocations=new ArrayList<>();private ByteBuffer staging;
+    private final int maximumTexture,maximumRenderbuffer;private List<Allocation> allocations=new ArrayList<>();private ByteBuffer staging;
     private long gpuBytes,cpuBytes;private int names;private boolean closing,closed;
     public GlDevice() { this(Limits.DEFAULT); }
     public GlDevice(Limits limits) { this(limits,null); }
@@ -106,15 +106,10 @@ public final class GlDevice implements AutoCloseable {
         if(gpu<0||cpu<0||gpu>limits.gpuBytes()-gpuBytes||cpu>limits.workingBytes()-cpuBytes||gpuBytes+gpu+cpuBytes+cpu+limits.stagingBytes()>limits.workingBytes()||allocations.size()>=limits.allocations()||total>limits.names()-names)
             throw new GlFailure(GlFailure.Code.LIMIT,"GPU, retained CPU, staging or object budget exceeded; retired resources remain charged");
         var allocation=new Allocation(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,owner);
+        var nextAllocations=new ArrayList<Allocation>(allocations.size()+1);nextAllocations.addAll(allocations);nextAllocations.add(allocation);
+        // All registry allocation precedes shared admission. The context-thread commit below allocates nothing.
         admit(gpuBytes+gpu+cpuBytes+cpu+limits.stagingBytes());
-        try { allocations.add(allocation); }
-        catch(RuntimeException|Error failure) {
-            allocations.remove(allocation);
-            try { admit(gpuBytes+cpuBytes+limits.stagingBytes()); }
-            catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
-            throw failure;
-        }
-        gpuBytes+=gpu;cpuBytes+=cpu;names+=allocation.names;return allocation;
+        allocations=nextAllocations;gpuBytes+=gpu;cpuBytes+=cpu;names+=allocation.names;return allocation;
     }
     void live(Allocation allocation) { current();if(allocation.retired||allocation.released)throw new GlFailure(GlFailure.Code.STATE,"GPU resource is retired or released"); }
     /** Upgrade a CPU-only journal after incremental validation, before any scene GL name is made. */
@@ -172,7 +167,7 @@ public final class GlDevice implements AutoCloseable {
     }
     private void release(Allocation allocation) {
         if(allocation.owner!=null) { allocation.owner.close();allocation.owner=null; }
-        allocation.retained=null;for(var parent:allocation.dependencies)parent.dependents--;allocation.dependencies.clear();allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;admit(gpuBytes+cpuBytes+limits.stagingBytes());
+        allocation.retained=null;for(int i=0;i<allocation.dependencies.size();i++)allocation.dependencies.get(i).dependents--;allocation.dependencies.clear();allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;admit(gpuBytes+cpuBytes+limits.stagingBytes());
     }
     public Stats stats() { context();int retired=0,quarantined=0;for(var allocation:allocations)if(allocation.retired) { retired++;if(allocation.fence==0||allocation.quarantined)quarantined++; }return new Stats(gpuBytes,cpuBytes,limits.stagingBytes(),allocations.size(),names,retired,quarantined); }
     /** Explicit teardown may wait for the GPU. Call before destroying the original current context. */

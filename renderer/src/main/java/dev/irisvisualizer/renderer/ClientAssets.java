@@ -63,7 +63,7 @@ public final class ClientAssets {
             if(!retained)try {
                 // The file can be partially written; a non-null creation identity remains authoritative.
                 Stamp expected=created.key()!=null?created:Stamp.file(temporary);remove(temporary,expected);
-            }catch(IOException cleanup){if(failure!=null)failure.addSuppressed(cleanup);else throw cleanup;}
+            }catch(IOException|RuntimeException|Error cleanup){if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup);}
         }
     }
     private static void path(String name)throws IOException {
@@ -138,6 +138,6 @@ public final class ClientAssets {
                 check(cancelled);var result=new ClientAssetSnapshot(new ClientAssetSnapshot.Receipt(capture.source(),capture.sha256(),capture.bytes(),expectedVersion,actual,count,ignored,total),assets);check(cancelled);return result;
             }
         }catch(IOException|RuntimeException|Error error){failure=error;throw error;}
-        finally { try{remove(capture.temporary(),capture.temporaryStamp());}catch(IOException cleanup){if(failure!=null)failure.addSuppressed(cleanup);else throw cleanup;} }
+        finally { try{remove(capture.temporary(),capture.temporaryStamp());}catch(IOException|RuntimeException|Error cleanup){if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup);} }
     }
 }

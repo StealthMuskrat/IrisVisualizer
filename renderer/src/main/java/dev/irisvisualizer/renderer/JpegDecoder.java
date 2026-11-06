@@ -185,7 +185,7 @@ final class JpegDecoder {
     static RgbaImage decode(byte[] bytes,SourceImage.Limits limits,BooleanSupplier cancelled) {
         WorldProblem.check(cancelled);var header=inspect(bytes,limits,cancelled);WorldProblem.check(cancelled);
         try(var input=new Input(bytes,cancelled)) {
-            var reader=reader();
+            var reader=reader();Throwable failure=null;
             try {
                 var progress=new Progress(cancelled);var warning=new boolean[1];
                 reader.addIIOReadProgressListener(progress);
@@ -203,7 +203,11 @@ final class JpegDecoder {
                     for(int rgb:row) { rgba[at++]=(byte)(rgb>>>16);rgba[at++]=(byte)(rgb>>>8);rgba[at++]=(byte)rgb;rgba[at++]=(byte)255; }
                 }
                 WorldProblem.check(cancelled);return RgbaImage.owned(header.width(),header.height(),rgba);
-            }finally { reader.dispose(); }
+            }catch(IOException|RuntimeException|Error error) { failure=error;throw error; }
+            finally {
+                try { reader.dispose(); }
+                catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            }
         }catch(IOException failure) {
             WorldProblem.check(cancelled);throw format("JPEG codec rejected the encoded image; no partial pixels were published");
         }
