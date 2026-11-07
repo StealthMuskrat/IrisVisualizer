@@ -2,6 +2,7 @@
 
 - Keep the complete, current project on `main`.
 - Do ongoing work directly on `main`. Do not create branches for individual work batches, features, documentation updates or test runs.
+- The user has granted standing permission to commit and publish completed project changes to GitHub `main`. Publish each completed, checked batch without requesting per-batch confirmation; preserve history and the renderer-stage execution gates below.
 - A temporary branch may be used for an actual development stage when needed. Integrate its work into `main`, then delete that branch immediately. Do not leave completed stage branches behind.
 - Preserve existing project work and commit history when consolidating branches. Never replace `main` with an older or incomplete project tree.
 - UI implementation and automated stage validation are complete at 5d487ec49ce619439fa18962b83e15efd23a67eb: all 176 editor groups, pinned Overworld acceptance, Windows package/launcher checks and all five feasibility suites passed. See docs/UI-VALIDATION.md and docs/ui-validation-2026-11-02.json. Interactive Windows GUI/DPI/GPU QA remains explicitly unverified for final integration.
