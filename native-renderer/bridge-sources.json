@@ -12,7 +12,7 @@
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeColormapTints.java",
-      "sha256": "37fd95069e24a892347e742e988cb8a872dacdfefab7bd4103bfdc1484c46eb0"
+      "sha256": "ce0e6d5095ea29bf63da2871f9f2bb26966c1718d555bc1ad4f9be52ec48f030"
     },
     {
       "path": "native-renderer/src/main/java/dev/irisvisualizer/renderer/nativebridge/NativeFluidInputs.java",

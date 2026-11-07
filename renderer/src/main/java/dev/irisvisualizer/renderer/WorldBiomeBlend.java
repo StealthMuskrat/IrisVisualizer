@@ -15,6 +15,41 @@ public final class WorldBiomeBlend {
         /** Source palette index and exact neighbor position. Alpha, if present, is discarded. */
         int rgb(int biomeIndex,long x,int y,long z);
     }
+    public static final int MAX_CACHE_ENTRIES=65536;
+    public static long cacheBytes(int entries) {
+        if(entries<1||entries>MAX_CACHE_ENTRIES||(entries&(entries-1))!=0)throw new IllegalArgumentException("Biome sample cache requires a bounded power-of-two entry count");
+        return (long)entries*2*Integer.BYTES;
+    }
+    public record CacheStats(long lookups,long hits,long misses) {
+        public CacheStats { if(lookups<0||hits<0||hits>lookups||misses!=lookups-hits)throw new IllegalArgumentException("Invalid biome sample cache work"); }
+    }
+    /** Opt-in memoization: the bound sampler must be deterministic/frozen for this helper's lifetime. */
+    public final class MemoizedSampler implements Sampler {
+        private final Sampler stable;private final int[] keys,colors;private long lookups,hits,misses;
+        private MemoizedSampler(Sampler stable,int entries) { this.stable=stable;keys=new int[entries];colors=new int[entries]; }
+        private WorldBiomeBlend owner() { return WorldBiomeBlend.this; }
+        public int entries() { return keys.length; }
+        public long bytes() { return cacheBytes(keys.length); }
+        public CacheStats stats() { return new CacheStats(lookups,hits,misses); }
+        @Override public int rgb(int biomeIndex,long x,int y,long z) {
+            WorldProblem.check(cancelled);var extent=source.extent();
+            if(x<extent.minX()||x>=extent.maxX()||z<extent.minZ()||z>=extent.maxZ()||y<extent.minY()||(long)y>=extent.maxY())throw failure(WorldProblem.Code.EXTENT,"Memoized biome sample is outside its exact captured source");
+            int cell=index(x,y,z);if(biomeIndex!=source.biomeIndex(cell))throw failure(WorldProblem.Code.PALETTE,"Memoized biome sample differs from the captured palette identity");
+            if(lookups==Long.MAX_VALUE)throw failure(WorldProblem.Code.LIMIT,"Biome sample cache work counter exhausted");lookups++;
+            int key=cell+1,slot=Integer.rotateLeft(key*0x9e3779b9,13)&(keys.length-1);
+            if(keys[slot]==key) { hits++;return colors[slot]; }
+            misses++;int rgb=stable.rgb(biomeIndex,x,y,z);WorldProblem.check(cancelled);
+            // Commit only a successful, uncancelled callback. Black and alpha-bearing colors remain exact.
+            colors[slot]=rgb;keys[slot]=key;return rgb;
+        }
+    }
+    /** Admit both arrays before allocation; source ownership and fixed object bookkeeping remain external. */
+    public MemoizedSampler memoize(Sampler stable,int entries,long allowanceBytes) {
+        Objects.requireNonNull(stable);WorldProblem.check(cancelled);long bytes=cacheBytes(entries);
+        if(allowanceBytes<0||allowanceBytes>(long)MAX_CACHE_ENTRIES*2*Integer.BYTES)throw new IllegalArgumentException("Biome sample cache byte allowance exceeds its bound");
+        if(bytes>allowanceBytes)throw failure(WorldProblem.Code.LIMIT,"Biome sample cache arrays exceed their admitted byte allowance");
+        return new MemoizedSampler(stable,entries);
+    }
     private final WorldSnapshot source;private final Limits limits;private final BooleanSupplier cancelled;
     private long samples;
 
@@ -43,6 +78,7 @@ public final class WorldBiomeBlend {
     /** Floor each RGB channel independently. All footprint/allowance checks precede callbacks. */
     public int rgb(WorldSnapshot.Position center,Sampler sampler) {
         Objects.requireNonNull(center);Objects.requireNonNull(sampler);WorldProblem.check(cancelled);
+        if(sampler instanceof MemoizedSampler memo&&memo.owner()!=this)throw failure(WorldProblem.Code.ASSIGNMENT,"Memoized biome sampler belongs to another capture helper");
         int radius=limits.radius(),diameter=radius*2+1,count=diameter*diameter;long minX,minZ,maxX,maxZ;
         try { minX=Math.subtractExact(center.x(),radius);minZ=Math.subtractExact(center.z(),radius);maxX=Math.addExact(center.x(),radius);maxZ=Math.addExact(center.z(),radius); }
         catch(ArithmeticException overflow) { throw failure(WorldProblem.Code.COORDINATE,"Biome blend sample footprint exceeds signed world coordinates"); }

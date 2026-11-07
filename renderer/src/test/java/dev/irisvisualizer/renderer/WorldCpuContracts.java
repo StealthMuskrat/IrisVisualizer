@@ -91,6 +91,46 @@ public final class WorldCpuContracts {
         try { operation.run();throw new AssertionError(message+": failure missing"); }
         catch(WorldCapture.ReadFailure failure) { equal(code,failure.problem().code(),message); }
     }
+    private record BlendFixture(WorldSnapshot target,WorldSnapshot halo) {}
+    private static BlendFixture memoFixture(int radius,long x,long z) {
+        var generation=snapshot(1).source();var second=new WorldSnapshot.Biome(911,"fixture:memo_second",new AssetId("fixture","memo_second"));int edge=4+radius*2;
+        var extent=new WorldSnapshot.Extent(x,-64,z,edge,2,edge);int[] haloBiomes=new int[edge*edge*2];
+        for(int y=0;y<2;y++)for(int dz=0;dz<edge;dz++)for(int dx=0;dx<edge;dx++)haloBiomes[(y*edge+dz)*edge+dx]=(dx+3*dz+y)&1;
+        var halo=blendSnapshot(generation,extent,List.of(BIOME,second),haloBiomes);int[] targetBiomes=new int[32];for(int y=0;y<2;y++)for(int dz=0;dz<4;dz++)for(int dx=0;dx<4;dx++)targetBiomes[(y*4+dz)*4+dx]=1-((dx+radius+3*(dz+radius)+y)&1);
+        var target=blendSnapshot(generation,new WorldSnapshot.Extent(Math.addExact(x,radius),-64,Math.addExact(z,radius),4,2,4),List.of(second,BIOME),targetBiomes);return new BlendFixture(target,halo);
+    }
+    private static int memoColor(int biome,long x,int y,long z) { return 0x80000000|((biome*73+(int)(x^(x>>>32)))&255)<<16|((y+64)&255)<<8|((int)(z^(z>>>32))*7+biome*11)&255; }
+    private static void memoizedBiomeSamples() {
+        for(int radius:new int[]{0,1,3,7})for(int entries:new int[]{1,16,1024,65536}) {
+            var fixture=memoFixture(radius,9_007_199_254_740_993L,-9_007_199_254_740_993L);var target=fixture.target();int footprint=(2*radius+1)*(2*radius+1);long samples=(long)target.cellCount()*footprint*2;
+            var plain=new WorldBiomeBlend(target,fixture.halo(),new WorldBiomeBlend.Limits(radius,samples),LIVE);var cached=new WorldBiomeBlend(target,fixture.halo(),new WorldBiomeBlend.Limits(radius,samples),LIVE);long[] calls={0},gates={0};var memo=cached.memoize((biome,x,y,z)->{ calls[0]++;return memoColor(biome,x,y,z); },entries,WorldBiomeBlend.cacheBytes(entries));
+            WorldBiomeBlend.Sampler gated=(biome,x,y,z)->{ gates[0]++;return memo.rgb(biome,x,y,z); };
+            for(int cell=0;cell<target.cellCount();cell++)for(int repeat=0;repeat<2;repeat++) { var center=target.extent().position(cell);equal(plain.rgb(center,WorldCpuContracts::memoColor),cached.rgb(center,gated),"memoized complete footprint equals independent uncached RGB averaging"); }
+            equal(samples,cached.samples(),"cache hits never discount logical footprint admission");equal(plain.samples(),cached.samples(),"cached and uncached work allowances agree");equal(samples,gates[0],"external session gate still runs for every logical neighbor");equal(samples,memo.stats().lookups(),"every logical neighbor performs one bounded cache lookup");equal(calls[0],memo.stats().misses(),"miss receipt counts actual stable-color callback attempts");equal(samples-calls[0],memo.stats().hits(),"hit receipt counts only avoided stable-color computations");equal(entries*8L,memo.bytes(),"exact primitive cache payload");
+            if(entries>=1024)check(memo.stats().hits()>0&&calls[0]<samples,"overlapping neighborhoods reuse stable coordinate colors");
+            long before=memo.stats().lookups();blendFailure(WorldProblem.Code.LIMIT,()->cached.rgb(target.extent().position(0),gated),"cached footprint still exhausts complete sample budget");equal(before,memo.stats().lookups(),"budget rejection precedes all cache lookups");
+        }
+        for(long x:new long[]{Long.MIN_VALUE,Long.MAX_VALUE-6}) { var fixture=memoFixture(1,x,Long.MAX_VALUE-6);var blend=new WorldBiomeBlend(fixture.target(),fixture.halo(),new WorldBiomeBlend.Limits(1,9),LIVE);var memo=blend.memoize(WorldCpuContracts::memoColor,16,128);var center=fixture.target().extent().position(0);var reference=new WorldBiomeBlend(fixture.target(),fixture.halo(),new WorldBiomeBlend.Limits(1,9),LIVE);equal(reference.rgb(center,WorldCpuContracts::memoColor),blend.rgb(center,memo),"cache keys use exact source cells at signed world-coordinate endpoints"); }
+    }
+    private static void memoCacheFailureAndAdmission() {
+        var fixture=memoFixture(0,0,0);var blend=new WorldBiomeBlend(fixture.target(),fixture.halo(),WorldBiomeBlend.Limits.UNBLENDED,LIVE);long[] calls={0};WorldBiomeBlend.Sampler stable=(biome,x,y,z)->{ calls[0]++;return 0; };
+        for(int invalid:new int[]{0,3,65537,131072,-1})throwsType(IllegalArgumentException.class,()->blend.memoize(stable,invalid,8192),"invalid cache entry ceiling or power-of-two shape");
+        blendFailure(WorldProblem.Code.LIMIT,()->blend.memoize(stable,1024,8191),"one-byte cache allowance deficit precedes arrays/callbacks");equal(0L,calls[0],"cache admission reads no native color");throwsType(IllegalArgumentException.class,()->blend.memoize(stable,1,-1),"negative cache allowance");throwsType(IllegalArgumentException.class,()->blend.memoize(stable,1,524289),"cache allowance hard ceiling");throwsType(NullPointerException.class,()->blend.memoize(null,1,8),"null stable sampler");
+        var fail=new java.util.concurrent.atomic.AtomicBoolean(true);var fault=new IllegalStateException("injected stable color failure");var attempts=new java.util.concurrent.atomic.AtomicInteger();var memo=blend.memoize((biome,x,y,z)->{ attempts.incrementAndGet();if(x==1&&fail.getAndSet(false))throw fault;return x==0?0:0x8f123456; },1,8);
+        equal(0,memo.rgb(0,0,-64,0),"black is a valid cached value");check(caughtFailure(()->memo.rgb(1,1,-64,0))==fault,"callback failure remains primary");equal(0,memo.rgb(0,0,-64,0),"failed colliding lookup preserves prior successful entry");equal(0x8f123456,memo.rgb(1,1,-64,0),"failed key is retried successfully");equal(0x8f123456,memo.rgb(1,1,-64,0),"alpha-bearing callback value remains exact on hits");equal(3,attempts.get(),"only successful matching keys skip callbacks");equal(new WorldBiomeBlend.CacheStats(5,2,3),memo.stats(),"failed callback attempts remain visible in work receipts");
+        var before=memo.stats();blendFailure(WorldProblem.Code.PALETTE,()->memo.rgb(0,1,-64,0),"wrong source palette identity cannot acquire another cell's cached value");blendFailure(WorldProblem.Code.EXTENT,()->memo.rgb(0,-1,-64,0),"uncaptured cache coordinates");equal(before,memo.stats(),"invalid source identity/coordinates precede cache work");
+        var other=blend.memoize((biome,x,y,z)->0xffabcdef,1,8);equal(0xffabcdef,other.rgb(1,1,-64,0),"separate stable sampler never inherits another callback's entries");
+        var foreign=new WorldBiomeBlend(fixture.target(),fixture.halo(),WorldBiomeBlend.Limits.UNBLENDED,LIVE);blendFailure(WorldProblem.Code.ASSIGNMENT,()->foreign.rgb(fixture.target().extent().position(0),memo),"direct cached sampler cannot cross capture-helper identity");equal(0L,foreign.samples(),"foreign cache rejection precedes logical footprint admission");
+        var cancelled=new java.util.concurrent.atomic.AtomicBoolean();var interruptOnce=new java.util.concurrent.atomic.AtomicBoolean(true);var guarded=new WorldBiomeBlend(fixture.target(),fixture.halo(),WorldBiomeBlend.Limits.UNBLENDED,cancelled::get);var interrupted=guarded.memoize((biome,x,y,z)->{ if(x==1&&interruptOnce.getAndSet(false))cancelled.set(true);return x==0?0:0x102030; },1,8);
+        equal(0,interrupted.rgb(0,0,-64,0),"warm successful entry before cancellation");throwsType(CancellationException.class,()->interrupted.rgb(1,1,-64,0),"cancellation during callback prevents cache commit");cancelled.set(false);equal(0,interrupted.rgb(0,0,-64,0),"cancelled colliding callback preserves prior entry");equal(0x102030,interrupted.rgb(1,1,-64,0),"cancelled key is recomputed after caller recovery");cancelled.set(true);var stats=interrupted.stats();throwsType(CancellationException.class,()->interrupted.rgb(1,1,-64,0),"cache hit still checks cancellation");equal(stats,interrupted.stats(),"cancelled entry attempt performs no cache work");throwsType(CancellationException.class,()->guarded.memoize(stable,1,8),"cancelled cache creation allocates no arrays");
+    }
+    private static void memoizedBiomeSessionGuards() {
+        var fixture=memoFixture(1,0,0);var blend=new WorldBiomeBlend(fixture.target(),fixture.halo(),new WorldBiomeBlend.Limits(1,18),LIVE);var cache=blend.memoize(WorldCpuContracts::memoColor,1024,8192);var center=fixture.target().extent().position(0);var failed=new java.util.concurrent.atomic.AtomicBoolean();long[] gates={0};
+        WorldBiomeBlend.Sampler gated=(biome,x,y,z)->{ gates[0]++;if(failed.get())throw new WorldCapture.ReadFailure(new WorldProblem(WorldProblem.Code.ASSIGNMENT,Optional.empty(),"injected obsolete native session"));return cache.rgb(biome,x,y,z); };
+        blend.rgb(center,gated);var before=cache.stats();failed.set(true);blendFailure(WorldProblem.Code.ASSIGNMENT,()->blend.rgb(center,gated),"external native gate rejects even a previously cached complete footprint");equal(before,cache.stats(),"native gate rejection happens before cache hit/value access");equal(18L,blend.samples(),"failed guarded footprint still reserves every logical neighbor");equal(10L,gates[0],"session failure is observed on first callback of the second footprint");
+        failed.set(false);blendFailure(WorldProblem.Code.LIMIT,()->blend.rgb(center,gated),"cache cannot bypass exhausted sample budget after session failure");equal(10L,gates[0],"sample deficit precedes session callback and cache lookup");
+        var layered=new WorldBiomeBlend(fixture.target(),fixture.halo(),new WorldBiomeBlend.Limits(1,18),LIVE);var second=layered.memoize(WorldCpuContracts::memoColor,1024,8192);var lower=fixture.target().extent().position(0);var upper=new WorldSnapshot.Position(lower.x(),lower.y()+1,lower.z());check(layered.rgb(lower,second)!=layered.rgb(upper,second),"same horizontal center at distinct native heights never aliases in the cache");
+    }
     private static void biomeBlending() {
         var source=snapshot(1).source();var second=new WorldSnapshot.Biome(911,"fixture:second",new AssetId("fixture","second"));
         var extent=new WorldSnapshot.Extent(-1,-64,-1,3,2,3);int[] indices=new int[18];
@@ -1699,6 +1739,9 @@ public final class WorldCpuContracts {
     public static void main(String[] arguments) {
         if(arguments.length!=0)throw new IllegalArgumentException("No arguments supported");
         group("native snapshot identity and atomic failure",WorldCpuContracts::nativeSnapshot);
+        group("memoized biome colors and complete footprint equality",WorldCpuContracts::memoizedBiomeSamples);
+        group("biome sample cache admission and failure atomicity",WorldCpuContracts::memoCacheFailureAndAdmission);
+        group("memoized biome session gates and full height",WorldCpuContracts::memoizedBiomeSessionGuards);
         group("bounded exact native biome blending",WorldCpuContracts::biomeBlending);
         group("blended fluid materials and native provenance",WorldCpuContracts::fluidBlendMaterials);
         group("detached bounded visual limitation reports",WorldCpuContracts::visualReports);
