@@ -1,4 +1,4 @@
-param([string]$WorkDirectory = (Join-Path $PSScriptRoot '../.work'))
+param([string]$WorkDirectory = (Join-Path $PSScriptRoot '../.work'), [switch]$NativeRenderer)
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 $null = Get-Java25
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -6,7 +6,8 @@ $lock = Get-Content -Raw -LiteralPath (Join-Path $root 'iris.lock.json') | Conve
 $null = New-Item -ItemType Directory -Force -Path $WorkDirectory
 $work = (Resolve-Path -LiteralPath $WorkDirectory).Path
 
-foreach ($name in @('iris', 'volmlib', 'pack')) {
+$repositories = if ($NativeRenderer) { @('iris', 'volmlib') } else { @('iris', 'volmlib', 'pack') }
+foreach ($name in $repositories) {
     $source = $lock.$name
     $directory = Join-Path $work $name
     if (-not (Test-Path -LiteralPath $directory)) {
@@ -36,4 +37,4 @@ foreach ($name in @('iris', 'volmlib', 'pack')) {
     $actual = & git -C $directory rev-parse HEAD
     if ($LASTEXITCODE -ne 0 -or $actual -ne $source.revision) { throw "Revision mismatch in $directory" }
 }
-Write-Host 'Pinned source checkouts are ready. No generation or parity result has been established.'
+Write-Host "Pinned source checkouts are ready: $($repositories -join ', '). No generation or parity result has been established."

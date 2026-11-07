@@ -1,0 +1,53 @@
+name: Windows native renderer compilation
+on:
+  workflow_dispatch:
+    inputs:
+      expected_revision:
+        description: Optional full project commit SHA; must match the selected workflow revision
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: renderer-native-compile-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  compile-native-bridge:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      EXPECTED_REVISION: ${{ inputs.expected_revision || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check selected project revision before source preparation
+        shell: pwsh
+        run: |
+          $actual = & git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $env:EXPECTED_REVISION -notmatch '^[0-9a-f]{40}$' -or $actual -ne $env:EXPECTED_REVISION) {
+            throw 'Select the workflow revision matching the requested full project commit SHA.'
+          }
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          architecture: x64
+      - name: Prepare only pinned native compiler sources
+        shell: pwsh
+        run: ./scripts/Prepare-Sources.ps1 -NativeRenderer
+      - name: Compile bridge against the genuine pinned backend
+        id: native_compile
+        shell: pwsh
+        run: ./scripts/Compile-NativeRenderer.ps1 -ExpectedRevision $env:EXPECTED_REVISION
+      - name: Preserve successful source-bound compiler evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-renderer-compile-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/native-renderer-compile/receipt.json
+            build/native-renderer-compile/classes/
+          if-no-files-found: error
+          retention-days: 14

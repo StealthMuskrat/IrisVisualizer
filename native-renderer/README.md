@@ -85,7 +85,7 @@ The adapter targets `iris.lock.json`: Iris `c3359e0a16438b1bb8468901c6171dcefdf6
 On the prepared Windows source environment, the compile-only command is:
 
 ```powershell
-./scripts/Compile-NativeRenderer.ps1
+./scripts/Compile-NativeRenderer.ps1 -ExpectedRevision (& git rev-parse HEAD)
 ```
 
 It checks pinned clean upstream checkouts and the compatibility source hash, then applies the existing feasibility source overlays and the new renderer-native init script to the genuine offline native source set. The init script checks bridge manifest pins, exact source coverage and hashes. The only requested task is `:adapters:bukkit:nms:v26_3_R1:compileOfflineJava`; no test, JavaExec or capture/sampling task is invoked. Existing probe sources may compile as part of that source set. No native JAR is downloaded by this adapter or added to the editor package. The command now prepares [fresh-output compile evidence](COMPILE-EVIDENCE.md), with source/control/dependency/processor fingerprints, complete renderer class coverage and Java-25 bytecode checks; final evidence is published only after post-build checks. This command has not been run in this workspace.
@@ -141,3 +141,7 @@ Default `weighted`/`fluidScene` catalog overloads and low-level weighted capture
 [Captured-neighbor biome blending](../renderer/BIOME-BLENDING.md) now connects an explicit bounded radius and same-generation full-height halo to selected-colormap deterministic, weighted and combined fluid-scene capture. Halo coverage, original biome identities, native registry palettes, sample costs and borrowed memory are checked; missing neighbors fail explicitly. Existing radius-zero options remain available. All sixteen native adapters syntax-parse and their manifest hashes match; genuine Windows native type checking and selected-client/native/GPU averaging comparisons remain pending. No readiness flag or test workflow is enabled.
 
 [Optional captured-neighbor water blending](../renderer/FLUID-COLORS.md) now uses actual native biome water colors in both existing fluid capture routes. An enabled option validates complete same-generation/full-height halo coverage, overlapping original biome identities and genuine registry palette keys; palette/sample work is bounded and palette bytes are deducted before native reads. Water/base colors remain independent, lava remains white, and detached geometry records the actual selected color policy. All sixteen native adapters syntax-parse with matching manifest hashes; genuine pinned Windows type checking and native/client/GPU comparisons remain pending. Unsupported previews stay disabled.
+
+## Manual Windows compilation lane
+
+The [source-bound compiler workflow](COMPILE-EVIDENCE.md) now provides manual-only Windows compilation at an exact project commit. Format-2 evidence includes the project SHA/tree and root compile-only task graph, and successful artifacts contain only this project's owned class outputs and receipt. Existing native pins, classpath fingerprints and fresh-output checks remain. Workflow lint, Gradle syntax parsing and native manifest hashes were checked; PowerShell remains source-reviewed only. No workflow/native compilation was run, and no native compatibility or readiness capability has been established.

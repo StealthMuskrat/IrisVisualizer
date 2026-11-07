@@ -1,4 +1,17 @@
 // Compile-only source wiring for the pinned official Windows native offline module.
+// This guard also applies to included builds; compiler/code-generation tasks remain ordinary build work.
+// The pinned Iris buildSrc jar otherwise depends on its tests. Use its existing lane opt-out,
+// scoped to build logic; keep root runtime/cache selection and all source checkouts unchanged.
+gradle.beforeProject { project ->
+    if (project == project.rootProject && project.projectDir.name == 'buildSrc')
+        project.gradle.extensions.extraProperties.set('irisBuildLane', 'native-renderer-compile-only')
+}
+def compileOnlyTasks = []
+gradle.taskGraph.whenReady { graph ->
+    def forbidden = graph.allTasks.findAll { it instanceof org.gradle.api.tasks.testing.Test || it instanceof org.gradle.api.tasks.JavaExec }
+    if (!forbidden.isEmpty()) throw new GradleException('Native renderer compilation cannot execute Test or JavaExec tasks: ' + forbidden.collect { it.path }.join(', '))
+    compileOnlyTasks = graph.allTasks.collect { [path: it.path, type: it.class.name] }.sort { it.path }
+}
 gradle.projectsEvaluated {
     if (gradle.rootProject.name != 'Iris') return
     def root = System.getenv('IRIS_VISUALIZER_ROOT')
@@ -52,8 +65,21 @@ gradle.projectsEvaluated {
     def controls = {
         [new File(root, 'iris.lock.json'), new File(root, 'native-renderer/bridge-sources.json'),
          new File(root, 'scripts/Compile-NativeRenderer.ps1'), new File(root, 'scripts/Runtime.ps1'),
+         new File(root, 'scripts/Prepare-Sources.ps1'), new File(root, '.github/workflows/renderer-native-compile.yml'),
          new File(root, 'gradle/feasibility.init.gradle'), new File(root, 'gradle/renderer-native.init.gradle')] +
             gradle.rootProject.fileTree(new File(root, 'compatibility')).files.findAll { it.isFile() }
+    }
+    def gitRead = { arguments ->
+        def process = new ProcessBuilder(['git', '-C', projectDirectory.path] + arguments).redirectErrorStream(true).start()
+        def output = process.inputStream.getText('UTF-8').trim()
+        if (process.waitFor() != 0) throw new GradleException('Cannot inspect project Git source state')
+        output
+    }
+    def projectSnapshot = {
+        def revision = gitRead(['rev-parse', 'HEAD']), tree = gitRead(['rev-parse', 'HEAD^{tree}'])
+        if (!(revision ==~ /[0-9a-f]{40}/) || !(tree ==~ /[0-9a-f]{40}/) || gitRead(['status', '--porcelain', '--untracked-files=normal']))
+            throw new GradleException('Native renderer evidence requires a clean committed project source tree')
+        [revision: revision, tree: tree]
     }
     def controlSnapshot = filesSnapshot(controls())
     def bridgeSnapshot = filesSnapshot(sources)
@@ -92,7 +118,7 @@ gradle.projectsEvaluated {
              forkJvmArgs: (compile.options.forkOptions.jvmArgs ?: []).collect { it.toString() },
              arguments: (compile.options.compilerArgs + compile.options.compilerArgumentProviders.collectMany { it.asArguments().toList() }).collect { it.toString() }]
         }
-        def beforeSources, beforeClasspath, beforeProcessors, beforeSourcepath, beforeSettings, beforeProjectSources
+        def beforeSources, beforeClasspath, beforeProcessors, beforeSourcepath, beforeSettings, beforeProjectSources, beforeProject
         doFirst {
             java.nio.file.Files.deleteIfExists(receiptFile.toPath())
             java.nio.file.Files.deleteIfExists(temporaryReceipt.toPath())
@@ -108,6 +134,13 @@ gradle.projectsEvaluated {
             def requested = (rendererSources + sources).collect { it.canonicalFile }.toSet()
             def compiled = compile.source.files.collect { it.canonicalFile }.toSet()
             if (!compiled.containsAll(requested)) throw new GradleException('Native compilation omits renderer or bridge source files')
+            def trackedSources = gitRead(['ls-files', '-z', '--', 'renderer/src/main/java', 'native-renderer/src/main/java']).split(String.valueOf((char)0)).findAll { it.endsWith('.java') }.collect { new File(projectDirectory, it).canonicalFile }.toSet()
+            if (trackedSources != requested) throw new GradleException('Native renderer source set contains files outside the committed project tree')
+            def trackedProjectFiles = gitRead(['ls-files', '-z']).split(String.valueOf((char)0)).collect { new File(projectDirectory, it).canonicalFile }.toSet()
+            def projectInputs = (compiled.findAll { label(it).startsWith('project/') } + controls()).collect { it.canonicalFile }.toSet()
+            if (!trackedProjectFiles.containsAll(projectInputs)) throw new GradleException('Native compiler project inputs include uncommitted or ignored files')
+            beforeProject = projectSnapshot()
+            if (compileOnlyTasks.isEmpty() || !compileOnlyTasks.any { it.path == compile.path }) throw new GradleException('Missing compile-only task graph evidence')
             beforeProjectSources = requested.sort { label(it) }
             beforeSources = filesSnapshot(compiled)
             beforeClasspath = classpathSnapshot(compile.classpath.files)
@@ -123,7 +156,7 @@ gradle.projectsEvaluated {
             if (ownedOutput.exists()) throw new GradleException('Unable to clear stale renderer compiler output')
         }
         doLast {
-            if (filesSnapshot(compile.source.files) != beforeSources || filesSnapshot(controls()) != controlSnapshot ||
+            if (projectSnapshot() != beforeProject || filesSnapshot(compile.source.files) != beforeSources || filesSnapshot(controls()) != controlSnapshot ||
                 classpathSnapshot(compile.classpath.files) != beforeClasspath ||
                 classpathSnapshot(compile.options.annotationProcessorPath?.files ?: []) != beforeProcessors ||
                 classpathSnapshot(compile.options.sourcepath?.files ?: []) != beforeSourcepath || compilerSettings() != beforeSettings)
@@ -149,10 +182,11 @@ gradle.projectsEvaluated {
             if (!classes.collect { it.path }.containsAll(topClasses.collect { it.path }))
                 throw new GradleException('Native compiler evidence omits a required top-level renderer class')
             def compiler = compile.javaCompiler.get().metadata
-            def evidence = [format: 1, status: 'compiled-only', createdAt: java.time.Instant.now().toString(),
+            def evidence = [format: 2, status: 'compiled-only', createdAt: java.time.Instant.now().toString(),
                 platform: 'windows-x64', compiler: [languageVersion: compiler.languageVersion.asInt(), vendor: compiler.vendor,
                     runtimeVersion: compiler.javaRuntimeVersion, hostArchitecture: System.getProperty('os.arch')],
                 pins: [iris: lock.iris.revision, volmlib: lock.volmlib.revision, minecraft: lock.minecraft],
+                project: beforeProject, taskGraph: [policy: 'no-test-or-javaexec-tasks', tasks: compileOnlyTasks],
                 task: compile.path, destination: label(destination), controls: controlSnapshot, sources: beforeSources, classpath: beforeClasspath,
                 annotationProcessorPath: beforeProcessors, sourcepath: beforeSourcepath, compilerSettings: beforeSettings,
                 rendererSourceCount: beforeProjectSources.size() - sources.size(), bridgeSourceCount: sources.size(),
