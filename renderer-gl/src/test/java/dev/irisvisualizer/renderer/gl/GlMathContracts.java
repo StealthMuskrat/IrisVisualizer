@@ -53,6 +53,21 @@ public final class GlMathContracts {
         var before=values.clone();throwsType(GlFailure.class,()->camera.offset(new WorldSnapshot.Position(ANCHOR.x()+1_048_577,ANCHOR.y(),ANCHOR.z()),values,1),"precision bound rejection");check(Arrays.equals(before,values),"failed offset writes no partial data");
         throwsType(GlFailure.class,()->camera.offset(new WorldSnapshot.Position(Long.MIN_VALUE,ANCHOR.y(),ANCHOR.z()),values,1),"anchor overflow rejection");
     }
+    private static GlCamera atAnchor(GlCamera camera,WorldSnapshot.Position anchor) { return new GlCamera(anchor,camera.eyeX(),camera.eyeY(),camera.eyeZ(),camera.targetX(),camera.targetY(),camera.targetZ(),camera.fieldOfView(),camera.near(),camera.far()); }
+    private static void precisionPreflight() {
+        int bound=WorldScene.MAX_RELATIVE_ORIGIN_OFFSET;var camera=axial();
+        for(int value:new int[]{-bound,bound})equal((float)value,GlCamera.relativeCoordinate(ANCHOR.x()+value,ANCHOR.x()),"exact inclusive anchor subtraction beyond double integer precision");
+        for(var origin:List.of(new WorldSnapshot.Position(ANCHOR.x()+bound+1,ANCHOR.y(),ANCHOR.z()),new WorldSnapshot.Position(ANCHOR.x(),ANCHOR.y()-bound-1,ANCHOR.z()),new WorldSnapshot.Position(ANCHOR.x(),ANCHOR.y(),ANCHOR.z()+bound+1),new WorldSnapshot.Position(Long.MIN_VALUE,ANCHOR.y(),ANCHOR.z()))) { float[] values={11,12,13,14,15};var before=values.clone();throwsType(GlFailure.class,()->camera.offset(origin,values,1),"unsupported coordinate preflight");check(Arrays.equals(before,values),"failed axis validation writes no partial offset"); }
+        float[] destination={1,2,3};throwsType(IndexOutOfBoundsException.class,()->camera.offset(ANCHOR,destination,1),"offset destination range checked before writes");check(Arrays.equals(new float[]{1,2,3},destination),"invalid destination stays untouched");throwsType(GlFailure.class,()->GlCamera.relativeCoordinate(Long.MAX_VALUE,Long.MIN_VALUE),"signed subtraction overflow rejects");
+        for(boolean empty:new boolean[]{false,true})try(var fixture=empty?WorldGpuFixture.empty():WorldGpuFixture.solid(0xffffffff,false)) { var scene=fixture.scene();var origin=scene.snapshot().extent().position(0);var valid=atAnchor(camera,origin);valid.requireSceneRange(scene);atAnchor(camera,new WorldSnapshot.Position(origin.x()+bound,origin.y(),origin.z())).requireSceneRange(scene);var bad=atAnchor(camera,new WorldSnapshot.Position(origin.x()+bound+1,origin.y(),origin.z()));throwsType(GlFailure.class,()->bad.requireSceneRange(scene),"complete scene range includes empty sections");for(var mode:GlCullingMode.values())throwsType(GlFailure.class,()->new GlWorldCulling(scene,bad,1,WorldClip.NONE,mode),"all world culling modes share preflight"); }
+        var context=surface(true).volume().context();
+        for(double scale:new double[]{0.125,0.25,0.5}) {
+            var grid=new NoiseVolume.Grid(new MapSamples.Grid(-37,91,1,1,scale),new MapSamples.Vertical(-16,1));var volume=NoiseVolume.capture(context,grid,new double[]{0.5},new byte[]{1},NoiseVolume.Limits.DEFAULT,()->false);var bins=NoiseSurface.prepare(volume,new NoiseSurface.Style(0,1,new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE)),NoiseSurface.Limits.DEFAULT,()->false);check(!bins.requiresPlaceholder(),"complete spacing fixture");var origin=new WorldSnapshot.Position(-37,-16,91);var local=atAnchor(camera,origin);GlNoiseCulling.validateView(bins,local);
+            int boundary=scale==0.125?bound/2:bound;
+            for(int sign:new int[]{-1,1})for(boolean x:new boolean[]{false,true}) { var accepted=atAnchor(local,new WorldSnapshot.Position(origin.x()+(x?sign*(long)(boundary-1):0),origin.y(),origin.z()+(x?0:sign*(long)(boundary-1))));GlNoiseCulling.validateView(bins,accepted);var edge=atAnchor(local,new WorldSnapshot.Position(origin.x()+(x?sign*(long)boundary:0),origin.y(),origin.z()+(x?0:sign*(long)boundary)));if(scale<0.5) { throwsType(GlFailure.class,()->GlNoiseCulling.validateView(bins,edge),"one ULP exponent crossing rejects underspaced bins");for(var mode:GlCullingMode.values())throwsType(GlFailure.class,()->new GlNoiseCulling(bins,edge,1,WorldClip.NONE,mode),"scalar culling and preflight share spacing decisions"); }else GlNoiseCulling.validateView(bins,edge); }
+            GlNoiseCulling.validateView(bins,atAnchor(local,new WorldSnapshot.Position(origin.x(),origin.y()+bound,origin.z())));throwsType(GlFailure.class,()->GlNoiseCulling.validateView(bins,atAnchor(local,new WorldSnapshot.Position(origin.x(),origin.y()+bound+1,origin.z()))),"vertical relative origin is checked independently of horizontal spacing");throwsType(GlFailure.class,()->GlNoiseCulling.validateView(bins,atAnchor(local,new WorldSnapshot.Position(Long.MAX_VALUE,origin.y(),origin.z()))),"scalar origin subtraction overflow rejects");
+        }
+    }
     private static void scalarFocus() {
         for(var origin:new int[][]{{Integer.MAX_VALUE-8,Integer.MIN_VALUE+8},{Integer.MIN_VALUE+8,Integer.MAX_VALUE-8}})for(var meshing:NoiseSurface.Meshing.values())for(double scale:new double[]{0.1,1e-8}) {
             var grid=new NoiseVolume.Grid(new MapSamples.Grid(origin[0],origin[1],2,2,scale),new MapSamples.Vertical(-64,2));var flags=new byte[]{1,1,1,1,1,1,1,1};
@@ -239,6 +254,7 @@ public final class GlMathContracts {
         group("analytic center and corner rays",GlMathContracts::analyticRays);
         group("pointer projection round trips",GlMathContracts::rayProjection);
         group("exact anchor-relative float offsets",GlMathContracts::offsets);
+        group("world and scalar precision preflight boundaries",GlMathContracts::precisionPreflight);
         group("orbit pan and dolly navigation",GlMathContracts::navigation);
         group("exact anchor rebasing",GlMathContracts::rebase);
         group("camera pointer and frustum guards",GlMathContracts::guards);

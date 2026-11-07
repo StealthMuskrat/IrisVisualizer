@@ -83,7 +83,7 @@ public final class GlNoiseRenderer implements AutoCloseable {
     public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode) {
         Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);Objects.requireNonNull(mode);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar draw inputs must share their original device");device.live(target.allocation);var surface=scene.surface();
-        var scratch=device.reserve(0,GlNoiseCulling.workingBytes(surface,mode),0,0,0,0,0,0,0,null);Throwable escaping=null;Stats result;
+        GlNoiseCulling.validateView(surface,camera);var scratch=device.reserve(0,GlNoiseCulling.workingBytes(surface,mode),0,0,0,0,0,0,0,null);Throwable escaping=null;Stats result;
         try { result=drawAdmitted(scene,target,camera,clip,mode,surface); }
         catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
         finally { try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }

@@ -22,7 +22,7 @@ final class GlWorldCulling {
         this(scene,camera,aspect,scope,GlCullingMode.from(ranges));
     }
     GlWorldCulling(WorldScene scene,GlCamera camera,double aspect,WorldClip scope,GlCullingMode mode) {
-        Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(scope);Objects.requireNonNull(mode);boolean ranges=mode.enabled();this.ranges=ranges;clipped=scope.enabled();meshes=scene.sections();
+        Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(scope);Objects.requireNonNull(mode);camera.requireSceneRange(scene);boolean ranges=mode.enabled();this.ranges=ranges;clipped=scope.enabled();meshes=scene.sections();
         matrix=camera.matrix(aspect);frustum=new GlFrustum(matrix);clip=scope.relative(camera.anchor());offsets=new float[meshes.size()*3];sections=new boolean[meshes.size()];starts=new int[ranges?meshes.size()+1:0];batches=new byte[ranges?scene.usage().faceBatches():0];
         boolean markerRanges=ranges&&scene.usage().markerBatches()>0;markerStarts=new int[markerRanges?meshes.size()+1:0];markerBatches=new byte[markerRanges?scene.usage().markerBatches():0];
         int empty=0,visible=0,culled=0,batch=0,markerBatch=0;

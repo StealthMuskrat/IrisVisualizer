@@ -60,3 +60,5 @@ The [initial CPU validation scope](CPU-VALIDATION.md) remains explicit. Broader 
 [Worker abandonment](WORKER-ABANDONMENT.md) adds the thirty-first world group. Full and dependency-free compilation pass (143/105 files); all 103 prepared groups remain unexecuted. The synthetic asset ZIP exists only during eventual explicit contract execution.
 
 [Original-range hierarchies](PICKING-RANGE-HIERARCHY.md) bring this harness to 34 groups. The overall total is 115 (83 CPU/context-free, 32 GPU). Both compilation sets pass (143/105 files); all groups remain unexecuted. No native/GPU/integration result is claimed.
+
+[Complete section-origin precision](../renderer-gl/PRECISION-PREFLIGHT.md) adds the 48th world CPU group. Irregular XYZ partitions, empty/marker/mesh scenes, exact-integer scans, boundary and overflowing anchors, no-payload metadata checks and transparent-order agreement are prepared. All 152 renderer groups remain unexecuted; full/default compilation passes (144/106 files).

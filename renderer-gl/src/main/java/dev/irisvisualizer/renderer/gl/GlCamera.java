@@ -3,6 +3,7 @@ package dev.irisvisualizer.renderer.gl;
 import dev.irisvisualizer.renderer.WorldSnapshot;
 import dev.irisvisualizer.renderer.WorldDrawOrder;
 import dev.irisvisualizer.renderer.WorldRay;
+import dev.irisvisualizer.renderer.WorldScene;
 import java.util.Objects;
 
 /** Camera coordinates are relative to an exact world anchor, never absolute world floats. */
@@ -34,10 +35,15 @@ public record GlCamera(WorldSnapshot.Position anchor,double eyeX,double eyeY,dou
         double dx=basis[0]+basis[3]*sx+basis[6]*sy,dy=basis[1]+basis[4]*sx+basis[7]*sy,dz=basis[2]+basis[5]*sx+basis[8]*sy,length=Math.hypot(Math.hypot(dx,dy),dz),forward=(dx*basis[0]+dy*basis[1]+dz*basis[2])/length;
         return new WorldRay(anchor,eyeX,eyeY,eyeZ,dx,dy,dz,near/forward,far/forward);
     }
-    void offset(WorldSnapshot.Position origin,float[] offsets,int at) {
+    static float relativeCoordinate(long origin,long anchor) {
         try {
-            long x=Math.subtractExact(origin.x(),anchor.x()),z=Math.subtractExact(origin.z(),anchor.z()),y=(long)origin.y()-anchor.y();
-            if(Math.abs((double)x)>1048576||Math.abs((double)y)>1048576||Math.abs((double)z)>1048576)throw new GlFailure(GlFailure.Code.LIMIT,"Section is too far from the camera anchor for supported float precision");offsets[at]=x;offsets[at+1]=y;offsets[at+2]=z;
+            long value=Math.subtractExact(origin,anchor);if(value<-WorldScene.MAX_RELATIVE_ORIGIN_OFFSET||value>WorldScene.MAX_RELATIVE_ORIGIN_OFFSET)throw new GlFailure(GlFailure.Code.LIMIT,"Section is too far from the camera anchor for supported float precision");return value;
         }catch(ArithmeticException overflow) { throw new GlFailure(GlFailure.Code.LIMIT,"World/camera anchor difference overflows its exact coordinate range"); }
+    }
+    void requireSceneRange(WorldScene scene) {
+        if(!Objects.requireNonNull(scene).sectionOriginsWithin(anchor))throw new GlFailure(GlFailure.Code.LIMIT,"Complete scene exceeds the camera anchor's supported float precision");
+    }
+    void offset(WorldSnapshot.Position origin,float[] offsets,int at) {
+        Objects.requireNonNull(origin);Objects.checkFromIndexSize(at,3,offsets.length);float x=relativeCoordinate(origin.x(),anchor.x()),y=relativeCoordinate(origin.y(),anchor.y()),z=relativeCoordinate(origin.z(),anchor.z());offsets[at]=x;offsets[at+1]=y;offsets[at+2]=z;
     }
 }

@@ -5,6 +5,7 @@ import java.util.function.BooleanSupplier;
 
 /** Complete immutable CPU scene. Its owner must keep the Result lease open while using its meshes. */
 public final class WorldScene {
+    public static final int MAX_RELATIVE_ORIGIN_OFFSET=1048576;
     public static final class Result implements AutoCloseable {
         private static final class Shared {
             final WorldScene scene;final List<WorldSectionCache.Ticket> tickets;int references=1;
@@ -54,6 +55,16 @@ public final class WorldScene {
     public AtlasLayout layout() { return plan.layout(); }
     public List<WorldMesh> sections() { return sections; }
     public WorldScenePlan.Usage usage() { return plan.usage().orElseThrow(); }
+    /** Complete regular partition metadata proves every section origin, including empty sections, in constant work. */
+    public boolean sectionOriginsWithin(WorldSnapshot.Position anchor) {
+        Objects.requireNonNull(anchor);var extent=snapshot().extent();int edge=plan.limits().sectionEdge();
+        long lastX=Math.addExact(extent.minX(),(long)((extent.width()-1)/edge)*edge),lastY=(long)extent.minY()+(long)((extent.height()-1)/edge)*edge,lastZ=Math.addExact(extent.minZ(),(long)((extent.depth()-1)/edge)*edge);
+        return originRange(extent.minX(),lastX,anchor.x())&&originRange(extent.minY(),lastY,anchor.y())&&originRange(extent.minZ(),lastZ,anchor.z());
+    }
+    private static boolean originRange(long first,long last,long anchor) {
+        try { long a=Math.subtractExact(first,anchor),b=Math.subtractExact(last,anchor);return a>=-MAX_RELATIVE_ORIGIN_OFFSET&&a<=MAX_RELATIVE_ORIGIN_OFFSET&&b>=-MAX_RELATIVE_ORIGIN_OFFSET&&b<=MAX_RELATIVE_ORIGIN_OFFSET; }
+        catch(ArithmeticException overflow) { return false; }
+    }
     /** Failed/cancelled builds release every ticket; valid completed cache entries may remain unleased. */
     public static Result build(WorldScenePlan plan,AtlasRaster raster,WorldSectionCache cache,BooleanSupplier cancelled) {
         Objects.requireNonNull(plan);Objects.requireNonNull(raster);Objects.requireNonNull(cache);Objects.requireNonNull(cancelled);WorldProblem.check(cancelled);

@@ -19,16 +19,21 @@ final class GlNoiseCulling {
         Objects.requireNonNull(grid);float value=(float)grid.horizontal().blocksPerSample();
         if(!Float.isFinite(value)||value<Float.MIN_NORMAL||Math.max((double)grid.width()*value,(double)grid.depth()*value)>1048576)throw new GlFailure(GlFailure.Code.LIMIT,"Scalar bins exceed supported float scale/relative-span bounds; data was not reduced");return value;
     }
+    /** Original scale, all relative axes and horizontal spacing checks, without arrays or source scans. */
+    static void validateView(NoiseSurface surface,GlCamera camera) {
+        Objects.requireNonNull(surface);Objects.requireNonNull(camera);if(surface.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"Complete scalar geometry is required for drawing");
+        var grid=surface.volume().grid();float scale=displayScale(grid),x=GlCamera.relativeCoordinate(grid.horizontal().originX(),camera.anchor().x()),z=GlCamera.relativeCoordinate(grid.horizontal().originZ(),camera.anchor().z());GlCamera.relativeCoordinate(grid.vertical().minY(),camera.anchor().y());
+        double magnitude=Math.max(Math.abs((double)x)+grid.width()*(double)scale,Math.abs((double)z)+grid.depth()*(double)scale);
+        if(scale<4*Math.ulp((float)magnitude))throw new GlFailure(GlFailure.Code.LIMIT,"Scalar sample spacing is too small for this camera anchor's float precision");
+    }
     GlNoiseCulling(NoiseSurface surface,GlCamera camera,double aspect,WorldClip scope,boolean ranges) {
         this(surface,camera,aspect,scope,GlCullingMode.from(ranges));
     }
     GlNoiseCulling(NoiseSurface surface,GlCamera camera,double aspect,WorldClip scope,GlCullingMode mode) {
         Objects.requireNonNull(surface);Objects.requireNonNull(camera);Objects.requireNonNull(scope);Objects.requireNonNull(mode);
-        if(surface.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"Complete scalar geometry is required for drawing");
+        validateView(surface,camera);
         var grid=surface.volume().grid();scale=displayScale(grid);
         matrix=camera.matrix(aspect);relative=new float[3];camera.offset(new WorldSnapshot.Position(grid.horizontal().originX(),grid.vertical().minY(),grid.horizontal().originZ()),relative,0);
-        double magnitude=Math.max(Math.abs((double)relative[0])+grid.width()*(double)scale,Math.abs((double)relative[2])+grid.depth()*(double)scale);
-        if(scale<4*Math.ulp((float)magnitude))throw new GlFailure(GlFailure.Code.LIMIT,"Scalar sample spacing is too small for this camera anchor's float precision");
         clip=scope.relative(camera.anchor());ranges=mode.enabled();count=surface.batchCount();groups=new byte[ranges?count:0];var counts=new Counts();
         if(ranges) {
             var frustum=new GlFrustum(matrix);

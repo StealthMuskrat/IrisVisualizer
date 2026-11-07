@@ -37,7 +37,7 @@ public final class GlFrame implements AutoCloseable {
         device.live(renderer.allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame inputs must share one renderer device");scene.live();
         if(scene.translucentFaces>0&&order==null)throw new GlFailure(GlFailure.Code.MATERIAL,"A complete camera-bound translucent order is required");
         if(order!=null) { if(order.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame order belongs to another device");order.order(scene,camera); }
-        var raster=scene.raster();if(atlas!=null) { atlas.textures(scene);raster=atlas.raster(); }camera.matrix((double)width/height);GlTarget.validate(device,width,height);return raster;
+        var raster=scene.raster();if(atlas!=null) { atlas.textures(scene);raster=atlas.raster(); }camera.matrix((double)width/height);camera.requireSceneRange(scene.cpuScene());GlTarget.validate(device,width,height);return raster;
     }
     /** Inputs are borrowed for this call. The returned frame owns a fresh target and retained CPU scene. */
     public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,BooleanSupplier obsolete) { return render(renderer,revision,scene,atlas,order,camera,width,height,WorldClip.NONE,obsolete); }

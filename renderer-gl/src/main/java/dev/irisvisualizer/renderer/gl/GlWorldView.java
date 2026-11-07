@@ -149,7 +149,7 @@ public final class GlWorldView implements AutoCloseable {
     public long view(GlCamera camera,int width,int height) {
         Objects.requireNonNull(camera);current();
         dimensions(width,height);
-        camera.matrix((double)width/height);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
+        camera.matrix((double)width/height);if(sourceReady&&scene!=null)camera.requireSceneRange(scene.cpuScene());if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
         long next=nextView();var changed=displayStatus(next);boolean poseChanged=!keepsOrder(camera);this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
         try { frames.invalidate(viewRevision);if(poseChanged)resetOrder();return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }

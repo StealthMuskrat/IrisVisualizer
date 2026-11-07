@@ -1,6 +1,6 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04; updated 2026-11-07. `GlMathContracts` contains 18 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 47 world CPU and 17 animation groups, the context-free suites contain 105 prepared groups. The separate GPU harness adds 43 for 148 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
+Prepared 2026-11-04; updated 2026-11-07. `GlMathContracts` contains 19 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 48 world CPU and 17 animation groups, the context-free suites contain 107 prepared groups. The separate GPU harness adds 45 for 152 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
 
 ## No context or driver required
 
@@ -43,3 +43,5 @@ The existing navigation group now also prepares end-to-end [grid-aware scalar fo
 [Scalar draw admission](SCALAR-DRAW-ADMISSION.md) adds the fifteenth group, preparing fixed/mask sizing, complete original-group coverage, disabled culling and coordinate/scale/spacing failures. All 142 renderer/test sources and the 104-file dependency-free set compile; all 92 current groups remain unexecuted.
 
 [Hierarchical scalar draw classification](HIERARCHICAL-SCALAR-CULLING.md) adds the sixteenth group, preparing strict parent containment, root/subtree rejection, independent leaf and homogeneous-corner comparison, rebased poses, multiple scales, full coverage and unchanged scratch. The CPU runner includes the new context-free strategy enum. Full/default compilation covers 144/106 files; all 119 prepared groups remain unexecuted.
+
+[Source precision preflight](PRECISION-PREFLIGHT.md) adds a context-free group for inclusive and overflowing anchor differences, atomic offset failure, complete empty/nonempty source guards and scalar four-ULP spacing boundaries across culling modes. The shared metadata checks now guard view/frame admission and actual drawing. All 152 prepared groups remain unexecuted.

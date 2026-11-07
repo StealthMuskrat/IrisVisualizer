@@ -85,3 +85,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Bounded GPU retirement](../renderer-gl/BOUNDED-RETIREMENT.md) adds two GPU groups. The CPU/context-free suites remain at 105 groups; GPU groups now total 38 for 143 overall, all unexecuted. Both compilation sets pass (144/106 files).
 
 [Complete transfer storage admission](../renderer-gl/FULL-STORAGE-ADMISSION.md) adds five GPU groups. CPU/context-free suites remain at 105; GPU groups now total 43 for 148 overall, all unexecuted. Both compilation sets pass (144/106 files).
+
+[Source precision preflight](../renderer-gl/PRECISION-PREFLIGHT.md) adds one world CPU, one context-free math and two GPU groups. Current totals are 107 CPU/context-free and 45 GPU groups (152 overall), all unexecuted. Both compilation sets pass (144/106 files).

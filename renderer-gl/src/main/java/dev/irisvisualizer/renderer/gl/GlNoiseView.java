@@ -96,7 +96,7 @@ public final class GlNoiseView implements AutoCloseable {
     }
     private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
     public long view(GlCamera camera,int width,int height) {
-        Objects.requireNonNull(camera);current();dimensions(width,height);camera.matrix((double)width/height);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
+        Objects.requireNonNull(camera);current();dimensions(width,height);camera.matrix((double)width/height);if(sourceReady&&scene!=null)GlNoiseCulling.validateView(scene.surface(),camera);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
         long next=nextView();var changed=displayStatus(next);this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
         try { releaseFrame();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }

@@ -1076,6 +1076,28 @@ public final class WorldCpuContracts {
             }
         }
     }
+    private static void sceneOriginPrecision() {
+        var base=fixture(1,128,false);var initial=base.snapshot().extent();int bound=WorldScene.MAX_RELATIVE_ORIGIN_OFFSET;
+        for(int kind=0;kind<3;kind++) {
+            var extent=new WorldSnapshot.Extent(initial.minX(),-64,initial.minZ(),9,5,7);int count=(int)extent.cells();var world=WorldSnapshot.capture(base.snapshot().source(),extent,List.of(state(407)),List.of(BIOME),new int[count],new int[count],LIVE);
+            var problem=new ModelPlan.Problem(ModelPlan.Code.BUILTIN_MODEL,ClientAssetSnapshot.Kind.MODEL,MODEL,"","synthetic precision marker");var entry=kind==0?WorldModels.Entry.from(base.prototype()):kind==1?WorldModels.Entry.placeholder(state(407),List.of(problem)):WorldModels.Entry.empty(state(407));var models=WorldModels.capture(world,base.layout(),List.of(entry),new int[count],LIVE);var plan=WorldScenePlan.plan(models,WorldVisibility.keepAll(world,base.layout()),new WorldScenePlan.Limits(4,64,8192,1024,1024,4*1024*1024,8*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);
+            try(var cache=new WorldSectionCache();var owner=WorldScene.build(plan,base.raster(),cache,LIVE)) {
+                check(!owner.requiresPlaceholder(),"complete irregular XYZ precision fixture");var scene=owner.scene().orElseThrow();equal(12,scene.sections().size(),"all irregular XYZ partitions are present");var origin=extent.position(0);var first=new WorldDrawOrder.View(origin,0,0,3,0,0,0);var anchors=new ArrayList<WorldSnapshot.Position>();anchors.add(origin);
+                for(int delta:new int[]{-1,0,1}) { anchors.add(new WorldSnapshot.Position(origin.x()+8-bound+delta,origin.y(),origin.z()));anchors.add(new WorldSnapshot.Position(origin.x()+bound+delta,origin.y(),origin.z()));anchors.add(new WorldSnapshot.Position(origin.x(),origin.y()+4-bound+delta,origin.z()));anchors.add(new WorldSnapshot.Position(origin.x(),origin.y()+bound+delta,origin.z()));anchors.add(new WorldSnapshot.Position(origin.x(),origin.y(),origin.z()+4-bound+delta));anchors.add(new WorldSnapshot.Position(origin.x(),origin.y(),origin.z()+bound+delta)); }
+                anchors.add(new WorldSnapshot.Position(Long.MIN_VALUE,origin.y(),origin.z()));anchors.add(new WorldSnapshot.Position(Long.MAX_VALUE,origin.y(),origin.z()));anchors.add(new WorldSnapshot.Position(origin.x(),origin.y(),Long.MAX_VALUE));anchors.add(new WorldSnapshot.Position(origin.x(),Integer.MIN_VALUE,origin.z()));var random=new Random(731);
+                for(int i=0;i<64;i++)anchors.add(new WorldSnapshot.Position(origin.x()+random.nextInt(2*bound+3)-bound-1,origin.y()+random.nextInt(2*bound+3)-bound-1,origin.z()+random.nextInt(2*bound+3)-bound-1));
+                var maximum=java.math.BigInteger.valueOf(bound);
+                for(var anchor:anchors) {
+                    boolean scanned=true;for(var mesh:scene.sections()) { var p=mesh.origin();if(java.math.BigInteger.valueOf(p.x()).subtract(java.math.BigInteger.valueOf(anchor.x())).abs().compareTo(maximum)>0||java.math.BigInteger.valueOf(p.y()).subtract(java.math.BigInteger.valueOf(anchor.y())).abs().compareTo(maximum)>0||java.math.BigInteger.valueOf(p.z()).subtract(java.math.BigInteger.valueOf(anchor.z())).abs().compareTo(maximum)>0)scanned=false; }
+                    equal(scanned,scene.sectionOriginsWithin(anchor),"metadata-only proof equals independent exact-integer origin scan");var view=new WorldDrawOrder.View(anchor,0,0,3,0,0,0);equal(scanned,WorldDrawOrder.compatibleViews(scene,first,view),"transparent reuse shares the complete scene proof");var order=WorldDrawOrder.prepare(scene,view,LIVE);equal(!scanned,order.requiresPlaceholder(),"direct sorting follows the same precision boundary");if(!scanned) { equal(0,order.size(),"unsupported anchor publishes no partial order");equal(WorldProblem.Code.COORDINATE,order.problems().getFirst().code(),"unsupported sort anchor reports coordinate failure"); }
+                }
+                var original=scene.sections();var inaccessible=new AbstractList<WorldMesh>() { public int size() { return original.size(); }public WorldMesh get(int at) { throw new AssertionError("metadata precision proof must not walk sections"); } };
+                try { replaceSections(scene,inaccessible);check(scene.sectionOriginsWithin(origin),"metadata preflight never reads section payload");var invalid=new WorldSnapshot.Position(origin.x()+bound+1,origin.y(),origin.z());check(!scene.sectionOriginsWithin(invalid),"metadata rejection needs no section payload");check(WorldDrawOrder.prepare(scene,new WorldDrawOrder.View(invalid,0,0,3,0,0,0),LIVE).requiresPlaceholder(),"unsupported sort rejects before arrays or section traversal"); }
+                finally { replaceSections(scene,original); }
+                throwsType(NullPointerException.class,()->scene.sectionOriginsWithin(null),"null anchor is rejected");
+            }
+        }
+    }
     private static void orderDirectionGuards() {
         var f=sectionedRangeFixture(0,true,128);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
             var scene=owner.scene().orElseThrow();var anchor=scene.snapshot().extent().position(0);var original=new WorldDrawOrder.View(anchor,16,8,64,16,8,16);var order=WorldDrawOrder.prepare(scene,original,LIVE);
@@ -1739,6 +1761,7 @@ public final class WorldCpuContracts {
     public static void main(String[] arguments) {
         if(arguments.length!=0)throw new IllegalArgumentException("No arguments supported");
         group("native snapshot identity and atomic failure",WorldCpuContracts::nativeSnapshot);
+        group("complete metadata-only section origin precision",WorldCpuContracts::sceneOriginPrecision);
         group("memoized biome colors and complete footprint equality",WorldCpuContracts::memoizedBiomeSamples);
         group("biome sample cache admission and failure atomicity",WorldCpuContracts::memoCacheFailureAndAdmission);
         group("memoized biome session gates and full height",WorldCpuContracts::memoizedBiomeSessionGuards);
