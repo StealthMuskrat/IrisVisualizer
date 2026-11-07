@@ -7,6 +7,7 @@ import dev.irisvisualizer.renderer.WorldMesh;
 
 /** Conservative section AABB rejection using the exact float matrix submitted to the GPU. */
 final class GlFrustum {
+    enum Visibility { OUTSIDE, INTERSECT, INSIDE }
     private final double[][] planes=new double[6][4];
     GlFrustum(float[] matrix) {
         if(matrix.length!=16)throw new IllegalArgumentException("Expected a 4x4 matrix");
@@ -34,13 +35,27 @@ final class GlFrustum {
     boolean visible(NoiseSurface surface,int batch,float scale,float[] offset) { return visible(surface,batch,scale,offset,null); }
     /** Null clip retains the original unbounded frustum test. */
     boolean visible(NoiseSurface surface,int batch,float scale,float[] offset,WorldClip.Bounds clip) {
-        float minX=offset[0]+surface.batchMinimum(batch,0)*scale,minY=offset[1]+surface.batchMinimum(batch,1),minZ=offset[2]+surface.batchMinimum(batch,2)*scale;
-        float maxX=offset[0]+surface.batchMaximum(batch,0)*scale,maxY=offset[1]+surface.batchMaximum(batch,1),maxZ=offset[2]+surface.batchMaximum(batch,2)*scale;
+        return scalar(surface,batch,false,scale,offset,clip,false)!=Visibility.OUTSIDE;
+    }
+    /** Integer parent unions use the identical monotone float transform and conservative leaf policy. */
+    Visibility classifyHierarchy(NoiseSurface surface,int node,float scale,float[] offset,WorldClip.Bounds clip) { return scalar(surface,node,true,scale,offset,clip,true); }
+    private Visibility scalar(NoiseSurface surface,int index,boolean hierarchy,float scale,float[] offset,WorldClip.Bounds clip,boolean classify) {
+        int lowX=hierarchy?surface.batchHierarchyMinimum(index,0):surface.batchMinimum(index,0),lowY=hierarchy?surface.batchHierarchyMinimum(index,1):surface.batchMinimum(index,1),lowZ=hierarchy?surface.batchHierarchyMinimum(index,2):surface.batchMinimum(index,2);
+        int highX=hierarchy?surface.batchHierarchyMaximum(index,0):surface.batchMaximum(index,0),highY=hierarchy?surface.batchHierarchyMaximum(index,1):surface.batchMaximum(index,1),highZ=hierarchy?surface.batchHierarchyMaximum(index,2):surface.batchMaximum(index,2);
+        float minX=offset[0]+lowX*scale,minY=offset[1]+lowY,minZ=offset[2]+lowZ*scale;
+        float maxX=offset[0]+highX*scale,maxY=offset[1]+highY,maxZ=offset[2]+highZ*scale;
         if(clip!=null) {
             double magnitude=Math.max(Math.max(Math.abs(minX),Math.abs(maxX)),Math.max(Math.max(Math.abs(minY),Math.abs(maxY)),Math.max(Math.abs(minZ),Math.abs(maxZ)))),margin=8*(double)Math.ulp((float)magnitude);
-            if(!clip.intersects(minX-margin,minY-margin,minZ-margin,maxX+margin,maxY+margin,maxZ+margin))return false;
+            if(!clip.intersects(minX-margin,minY-margin,minZ-margin,maxX+margin,maxY+margin,maxZ+margin))return Visibility.OUTSIDE;
         }
-        return visible(minX,minY,minZ,maxX,maxY,maxZ);
+        if(!visible(minX,minY,minZ,maxX,maxY,maxZ))return Visibility.OUTSIDE;
+        if(!classify||clip!=null&&(!clip.contains(minX,minY,minZ)||!clip.contains(maxX,maxY,maxZ)))return Visibility.INTERSECT;
+        // Strict unexpanded containment is sufficient for every enclosed leaf's conservative test.
+        for(var p:planes) {
+            double x=p[0]>=0?minX:maxX,y=p[1]>=0?minY:maxY,z=p[2]>=0?minZ:maxZ;
+            if(p[0]*x+p[1]*y+p[2]*z+p[3]<0)return Visibility.INTERSECT;
+        }
+        return Visibility.INSIDE;
     }
     private boolean visible(double minX,double minY,double minZ,double maxX,double maxY,double maxZ) {
         for(var p:planes) {

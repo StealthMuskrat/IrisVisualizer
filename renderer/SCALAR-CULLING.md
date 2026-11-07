@@ -4,7 +4,7 @@ Renderer implementation, 2026-11-04. All 126 CPU/OpenGL main sources compile wit
 
 ## Original-order batch bounds
 
-`NoiseSurface` now indexes consecutive ranges of at most 1,024 emitted faces in both CELLS and GREEDY modes. No face is reordered, subdivided or removed. These original ranges retain their spatial bounds; a group spanning distant faces can have loose bounds and remain visible. [Balanced internal unions](SCALAR-RANGE-HIERARCHY.md) now accelerate CPU inspection while GPU drawing keeps its original group culling. Existing greedy rectangle coverage, original scalar bits, selection thresholds, colors and source sample/direction tie policy remain intact.
+`NoiseSurface` now indexes consecutive ranges of at most 1,024 emitted faces in both CELLS and GREEDY modes. No face is reordered, subdivided or removed. These original ranges retain their spatial bounds; a group spanning distant faces can have loose bounds and remain visible. [Balanced internal unions](SCALAR-RANGE-HIERARCHY.md) support CPU inspection and [hierarchical draw preparation](../renderer-gl/HIERARCHICAL-SCALAR-CULLING.md); the original leaf scan remains an explicit reference. Existing greedy rectangle coverage, original scalar bits, selection thresholds, colors and source sample/direction tie policy remain intact.
 
 Each range stores six integer grid-space extrema in a private primitive array. Bounds enclose the actual emitted face planes and all tangent extents, including full greedy U/V spans. Positive-side faces use their upper grid plane. A single planar batch can therefore have zero thickness on its normal axis. First face and count derive from range index and complete mesh size; no separate index/permutation array is created.
 

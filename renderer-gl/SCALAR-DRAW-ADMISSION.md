@@ -31,3 +31,7 @@ One new GPU group prepares exact enabled/disabled pixel equality for separately 
 All 136 CPU/OpenGL production sources, five harnesses and one fixture compile with Java 25/LWJGL (142 files). The dependency-free set contains 104 files, explicitly adding the sixth context-free helper. There are 92 prepared, unexecuted groups: 74 CPU/context-free and 18 GPU. The PowerShell runner remains compile-only by default and source-inspected only here.
 
 Actual shader/culling/pixel equivalence, low custom limits, failure/restoration/retirement fault injection, worker/transfer races, native comparisons, performance/total-memory measurement and final editor adoption still require their planned renderer/integration validation. No readiness flag or unsupported preview is enabled by this preparation.
+
+## Hierarchical and independent linear strategies
+
+[Scalar parent classification](HIERARCHICAL-SCALAR-CULLING.md) now reuses source hierarchy arrays to reject or strictly accept entire original group intervals. Typed `GlCullingMode` overloads select HIERARCHY, LINEAR or NONE, with earlier true/default/false calls preserved. Both enabled strategies keep the same scratch footprint; actual bound/leaf tests are separate from logical visible/culled totals. Separate immutable frames prepare three-mode pixels, coverage and admission/state comparison. Full/default compilation passes (144/106 files); all 119 prepared groups remain unexecuted.

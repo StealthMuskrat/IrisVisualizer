@@ -1,6 +1,6 @@
 # Prepared world rendering GPU contracts
 
-Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 32 GPU groups alongside 86 CPU/context-free groups: 118 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 32 GPU groups alongside 87 CPU/context-free groups: 119 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
 
 ## Synthetic fixture boundary
 

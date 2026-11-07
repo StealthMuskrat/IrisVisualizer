@@ -49,9 +49,10 @@ public final class GlNoiseRenderer implements AutoCloseable {
             color=vec4(faceColor,1.0);
         }
         """;
-    public record Stats(int drawCalls,int submittedFaces,long triangles,int totalBatches,int visibleBatches,int culledBatches,int culledFaces) {
+    public record Stats(int drawCalls,int submittedFaces,long triangles,int totalBatches,int visibleBatches,int culledBatches,int culledFaces,int boundsTests,int testedBatches) {
         public Stats(int drawCalls,int submittedFaces,long triangles) { this(drawCalls,submittedFaces,triangles,(submittedFaces+NoiseSurface.BATCH_FACES-1)/NoiseSurface.BATCH_FACES,(submittedFaces+NoiseSurface.BATCH_FACES-1)/NoiseSurface.BATCH_FACES,0,0); }
-        public Stats { if(drawCalls<0||submittedFaces<0||submittedFaces>1048576||culledFaces>1048576-submittedFaces||triangles!=2L*submittedFaces||totalBatches>1024||totalBatches<0||visibleBatches<0||culledBatches<0||culledFaces<0||(long)visibleBatches+culledBatches!=totalBatches||drawCalls>visibleBatches)throw new IllegalArgumentException("Invalid scalar submission counts"); }
+        public Stats(int drawCalls,int submittedFaces,long triangles,int totalBatches,int visibleBatches,int culledBatches,int culledFaces) { this(drawCalls,submittedFaces,triangles,totalBatches,visibleBatches,culledBatches,culledFaces,0,0); }
+        public Stats { if(drawCalls<0||submittedFaces<0||submittedFaces>1048576||culledFaces>1048576-submittedFaces||triangles!=2L*submittedFaces||totalBatches>1024||totalBatches<0||visibleBatches<0||culledBatches<0||culledFaces<0||(long)visibleBatches+culledBatches!=totalBatches||drawCalls>visibleBatches||boundsTests<0||boundsTests>Math.max(0,2*totalBatches-1)||testedBatches<0||testedBatches>totalBatches||testedBatches>boundsTests)throw new IllegalArgumentException("Invalid scalar submission counts"); }
     }
     final GlDevice device;final GlDevice.Allocation allocation;private final int matrix,offset,size,scale,clipEnabled,clipMin,clipMax;
     private GlNoiseRenderer(GlDevice device,GlDevice.Allocation allocation) { this.device=device;this.allocation=allocation;matrix=uniform("viewProjection");offset=uniform("gridOffset");size=uniform("gridSize");scale=uniform("horizontalScale");clipEnabled=uniform("clipEnabled");clipMin=uniform("clipMin");clipMax=uniform("clipMax"); }
@@ -70,22 +71,27 @@ public final class GlNoiseRenderer implements AutoCloseable {
     private static float plane(double value) { return (float)Math.clamp(value,-4194304,4194304); }
     /** Constant metadata sizing before source/target drawing; excludes retained payload and host state. */
     public long drawScratchBytes(GlNoiseScene scene,boolean rangeCulling) {
-        Objects.requireNonNull(scene);device.live(allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar scratch source belongs to another device");return GlNoiseCulling.workingBytes(scene.surface(),rangeCulling);
+        return drawScratchBytes(scene,GlCullingMode.from(rangeCulling));
     }
+    public long drawScratchBytes(GlNoiseScene scene,GlCullingMode mode) { Objects.requireNonNull(scene);Objects.requireNonNull(mode);device.live(allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar scratch source belongs to another device");return GlNoiseCulling.workingBytes(scene.surface(),mode); }
     public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip) { return render(scene,target,camera,clip,true); }
     /** Disable group rejection for separately rendered differential images; fragment clipping stays active. */
     public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) {
-        Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
+        return render(scene,target,camera,clip,GlCullingMode.from(rangeCulling));
+    }
+    /** Explicit linear reference shares source geometry, clipping and the same admitted mask size. */
+    public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode) {
+        Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);Objects.requireNonNull(mode);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar draw inputs must share their original device");device.live(target.allocation);var surface=scene.surface();
-        var scratch=device.reserve(0,GlNoiseCulling.workingBytes(surface,rangeCulling),0,0,0,0,0,0,0,null);Throwable escaping=null;Stats result;
-        try { result=drawAdmitted(scene,target,camera,clip,rangeCulling,surface); }
+        var scratch=device.reserve(0,GlNoiseCulling.workingBytes(surface,mode),0,0,0,0,0,0,0,null);Throwable escaping=null;Stats result;
+        try { result=drawAdmitted(scene,target,camera,clip,mode,surface); }
         catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
         finally { try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }
         target.complete=true;return result;
     }
     /** Array/math owners unwind before the outer draw releases their covering CPU journal. */
-    private Stats drawAdmitted(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling,NoiseSurface surface) {
-        var culling=new GlNoiseCulling(surface,camera,(double)target.width()/target.height(),clip,rangeCulling);var grid=surface.volume().grid();var transform=culling.matrix;var relative=culling.relative;var clipBounds=culling.clip;float step=culling.scale;int calls=0,submitted=0;
+    private Stats drawAdmitted(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode,NoiseSurface surface) {
+        var culling=new GlNoiseCulling(surface,camera,(double)target.width()/target.height(),clip,mode);var grid=surface.volume().grid();var transform=culling.matrix;var relative=culling.relative;var clipBounds=culling.clip;float step=culling.scale;int calls=0,submitted=0;
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
             if(surface.size()>0) { glUseProgram(allocation.programs[0]);glUniformMatrix4fv(matrix,false,transform);glUniform3f(offset,relative[0],relative[1],relative[2]);glUniform2ui(size,grid.width(),grid.depth());glUniform1f(scale,step);glUniform1i(clipEnabled,clip.enabled()?1:0);
@@ -101,7 +107,7 @@ public final class GlNoiseRenderer implements AutoCloseable {
                 }
             }device.check("complete scalar draw");
         }
-        return new Stats(calls,submitted,(long)submitted*2,surface.batchCount(),culling.visible,culling.culled,culling.culledFaces);
+        return new Stats(calls,submitted,(long)submitted*2,surface.batchCount(),culling.visible,culling.culled,culling.culledFaces,culling.boundsTests,culling.testedBatches);
     }
     @Override public void close() { device.retire(allocation); }
 }

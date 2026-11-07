@@ -1,6 +1,6 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04; updated 2026-11-06. `GlMathContracts` contains 15 groups for projection, pointer rays, navigation, clipping and conservative scalar/world culling. Together with 23 CPU renderer groups, 34 world-pipeline groups and 14 animation groups, the four context-free suites contain 86 prepared groups. The separate GPU harness adds 32 for 118 total. All 143 renderer/validation sources compile, including the previously pending initial-atlas update; no group has executed. Renderer-stage completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
+Prepared 2026-11-04; updated 2026-11-06. `GlMathContracts` contains 16 groups for projection, pointer rays, navigation, clipping and conservative scalar/world culling. Together with 23 CPU renderer groups, 34 world-pipeline groups and 14 animation groups, the four context-free suites contain 87 prepared groups. The separate GPU harness adds 32 for 119 total. All 144 renderer/validation sources compile, including the previously pending initial-atlas update; no group has executed. Renderer-stage completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
 
 ## No context or driver required
 
@@ -41,3 +41,5 @@ The existing navigation group now also prepares end-to-end [grid-aware scalar fo
 [Shared world group culling](TRANSLUCENT-CULLING.md) adds the fourteenth group, preparing exact scratch sizing, original bounds, lazy/cached decisions under reverse access, analytic clip rejection and disabled/empty behavior. Full Java compilation now covers 135 production sources, five harnesses and one fixture (141 files); the dependency-free runner set contains 103 files. All 90 groups remain unexecuted.
 
 [Scalar draw admission](SCALAR-DRAW-ADMISSION.md) adds the fifteenth group, preparing fixed/mask sizing, complete original-group coverage, disabled culling and coordinate/scale/spacing failures. All 142 renderer/test sources and the 104-file dependency-free set compile; all 92 current groups remain unexecuted.
+
+[Hierarchical scalar draw classification](HIERARCHICAL-SCALAR-CULLING.md) adds the sixteenth group, preparing strict parent containment, root/subtree rejection, independent leaf and homogeneous-corner comparison, rebased poses, multiple scales, full coverage and unchanged scratch. The CPU runner includes the new context-free strategy enum. Full/default compilation covers 144/106 files; all 119 prepared groups remain unexecuted.

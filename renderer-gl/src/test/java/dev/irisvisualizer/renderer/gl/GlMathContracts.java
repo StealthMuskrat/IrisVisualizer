@@ -142,6 +142,39 @@ public final class GlMathContracts {
         for(double scale:new double[]{Double.MIN_NORMAL,0.000001}) { var tinyVolume=NoiseVolume.capture(context,new NoiseVolume.Grid(new MapSamples.Grid(-37,91,1,1,scale),new MapSamples.Vertical(-64,1)),new double[]{0.5},new byte[]{1},NoiseVolume.Limits.DEFAULT,()->false);var tiny=NoiseSurface.prepare(tinyVolume,style,NoiseSurface.Limits.DEFAULT,()->false);check(!tiny.requiresPlaceholder(),"tiny source is valid detached data");var anchor=scale==Double.MIN_NORMAL?origin:new WorldSnapshot.Position(origin.x()+1_048_576,origin.y(),origin.z());var pose=new GlCamera(anchor,0.5,0.5,3,0.5,0.5,0.5,60,0.1,20);throwsType(GlFailure.class,()->new GlNoiseCulling(tiny,pose,1,WorldClip.NONE,true),"unsupported scalar float scale/spacing remains explicit"); }
         var emptyVolume=NoiseVolume.capture(context,grid,new double[1024],new byte[1024],NoiseVolume.Limits.DEFAULT,()->false);var empty=NoiseSurface.prepare(emptyVolume,style,NoiseSurface.Limits.DEFAULT,()->false);var prepared=new GlNoiseCulling(empty,camera,1,WorldClip.NONE,true);equal(1024L,GlNoiseCulling.workingBytes(empty,true),"empty scalar draw needs only fixed math allowance");equal(0,prepared.visible+prepared.culled,"empty scalar draw invents no groups");var failed=NoiseSurface.prepare(volume,style,new NoiseSurface.Limits(0,8192),()->false);throwsType(GlFailure.class,()->new GlNoiseCulling(failed,camera,1,WorldClip.NONE,true),"failed scalar source cannot prepare drawing");
     }
+    private static void scalarHierarchicalDraw() {
+        var context=surface(true).volume().context();var random=new Random(0x5343414c4152L);int cornerChecks=0;
+        for(double scale:new double[]{0.1,0.5,1.5}) {
+            var grid=new NoiseVolume.Grid(new MapSamples.Grid(-37,91,64,64,scale),new MapSamples.Vertical(-64,16));double[] values=new double[65536];byte[] flags=new byte[values.length];Arrays.fill(flags,(byte)1);
+            for(int y=0;y<16;y++)for(int z=0;z<64;z++)for(int x=0;x<64;x++)values[(y*64+z)*64+x]=(x+y+z)&1;
+            var volume=NoiseVolume.capture(context,grid,values,flags,NoiseVolume.Limits.DEFAULT,()->false);var origin=new WorldSnapshot.Position(-37,-64,91);double span=64*scale;
+            for(var meshing:NoiseSurface.Meshing.values()) {
+                var source=NoiseSurface.prepare(volume,new NoiseSurface.Style(0,1,new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE),meshing),NoiseSurface.Limits.DEFAULT,()->false);check(!source.requiresPlaceholder()&&source.batchCount()>8,"complete multi-group scalar culling source");
+                var base=new GlCamera(origin,span/2,32,span+32,span/2,8,span/2,60,0.1,512);var outside=new WorldClip(new WorldSnapshot.Extent(2000,-64,2000,1,16,1));
+                var rejected=new GlNoiseCulling(source,base,1,outside,GlCullingMode.HIERARCHY);var reference=new GlNoiseCulling(source,base,1,outside,GlCullingMode.LINEAR);equal(1,rejected.boundsTests,"known disjoint clip rejects entire hierarchy at root");equal(0,rejected.testedBatches,"root rejection tests no leaf bounds");equal(source.batchCount(),reference.boundsTests,"linear reference still tests all original leaves");equal(source.size(),rejected.culledFaces,"root rejection accounts for every original face");for(int batch=0;batch<source.batchCount();batch++)check(!rejected.batch(batch),"root rejection fills each group decision");
+                var whole=new GlCamera(origin,span/2,32,span+256,span/2,8,span/2,90,0.1,1024);var accepted=new GlNoiseCulling(source,whole,1,WorldClip.NONE,GlCullingMode.HIERARCHY);equal(1,accepted.boundsTests,"fully contained scene accepts at the root");equal(0,accepted.testedBatches,"fully contained parent needs no leaf tests");equal(source.batchCount(),accepted.visible,"whole-parent acceptance preserves all original groups");var leafOracle=new GlFrustum(accepted.matrix);for(int batch=0;batch<source.batchCount();batch++)check(accepted.batch(batch)&&leafOracle.visible(source,batch,accepted.scale,accepted.relative),"bulk acceptance agrees with every independent leaf");
+                equal(1024L+source.batchCount(),GlNoiseCulling.workingBytes(source,GlCullingMode.HIERARCHY),"hierarchy reuses admitted one-byte mask");equal(GlNoiseCulling.workingBytes(source,GlCullingMode.HIERARCHY),GlNoiseCulling.workingBytes(source,GlCullingMode.LINEAR),"linear/hierarchy preparation needs identical primitive scratch");equal(1024L,GlNoiseCulling.workingBytes(source,GlCullingMode.NONE),"disabled mode omits mask");
+                for(int sample=0;sample<24;sample++) {
+                    double angle=random.nextDouble()*Math.PI*2,radius=span+32+random.nextDouble()*32,aspect=0.5+random.nextDouble()*1.5;double eyeX=span/2+Math.sin(angle)*radius,eyeY=8+(random.nextDouble()-0.5)*radius,eyeZ=span/2+Math.cos(angle)*radius;
+                    var anchor=sample%3==0?new WorldSnapshot.Position(origin.x()+4096,origin.y(),origin.z()-4096):origin;double dx=origin.x()-anchor.x(),dz=origin.z()-anchor.z();var camera=new GlCamera(anchor,eyeX+dx,eyeY,eyeZ+dz,span/2+dx,8,span/2+dz,35+random.nextDouble()*75,0.1,512);
+                    var clip=sample%3==0?WorldClip.NONE:sample%3==1?new WorldClip(new WorldSnapshot.Extent(origin.x(),origin.y()+16,origin.z(),(int)Math.ceil(span),1,(int)Math.ceil(span))):new WorldClip(new WorldSnapshot.Extent(origin.x()+random.nextInt(32)-8,origin.y()+random.nextInt(24)-4,origin.z()+random.nextInt(32)-8,16,16,16));
+                    var tree=new GlNoiseCulling(source,camera,aspect,clip,GlCullingMode.HIERARCHY);var linear=new GlNoiseCulling(source,camera,aspect,clip,GlCullingMode.LINEAR);var none=new GlNoiseCulling(source,camera,aspect,clip,GlCullingMode.NONE);var frustum=new GlFrustum(tree.matrix);var scope=clip.enabled()?clip.relative(camera.anchor()):null;int visibleFaces=0;
+                    for(int batch=0;batch<source.batchCount();batch++) {
+                        boolean leaf=frustum.visible(source,batch,tree.scale,tree.relative,scope);equal(leaf,tree.batch(batch),"parent rejection cannot hide a surviving independent leaf");equal(linear.batch(batch),tree.batch(batch),"hierarchy and linear decisions match for every original group");check(none.batch(batch),"disabled mode keeps every group for fragment clipping");if(tree.batch(batch))visibleFaces+=source.batchSize(batch);
+                        if(!clip.enabled()) {
+                            double[] maximum={-Double.MAX_VALUE,-Double.MAX_VALUE,-Double.MAX_VALUE,-Double.MAX_VALUE,-Double.MAX_VALUE,-Double.MAX_VALUE};
+                            for(int corner=0;corner<8;corner++) { float x=tree.relative[0]+((corner&1)==0?source.batchMinimum(batch,0):source.batchMaximum(batch,0))*tree.scale,y=tree.relative[1]+((corner&2)==0?source.batchMinimum(batch,1):source.batchMaximum(batch,1)),z=tree.relative[2]+((corner&4)==0?source.batchMinimum(batch,2):source.batchMaximum(batch,2))*tree.scale;var point=clip(tree.matrix,x,y,z);for(int axis=0;axis<3;axis++) { maximum[axis*2]=Math.max(maximum[axis*2],point[3]+point[axis]);maximum[axis*2+1]=Math.max(maximum[axis*2+1],point[3]-point[axis]); } }
+                            boolean interior=true;for(double value:maximum)interior&=value>1e-3;if(interior) { check(tree.batch(batch),"direct homogeneous corner oracle retains potentially visible group");cornerChecks++; }
+                        }
+                    }
+                    equal(source.size(),visibleFaces+tree.culledFaces,"classified subtree coverage preserves complete source face count");equal(linear.visible,tree.visible,"linear/hierarchy visible totals agree");equal(linear.culledFaces,tree.culledFaces,"linear/hierarchy rejected face totals agree");check(tree.boundsTests<=2*source.batchCount()-1&&tree.testedBatches<=source.batchCount(),"hierarchical preparation obeys fixed source-node bound");equal(source.batchCount(),linear.testedBatches,"linear mode visits every leaf");equal(0,none.boundsTests,"disabled mode tests no bounds");equal(0,none.testedBatches,"disabled mode visits no rejection leaves");
+                    for(int batch=source.batchCount()-1;batch>=0;batch--)equal(linear.batch(batch),tree.batch(batch),"reverse lookup reuses immutable classified mask");
+                }
+                throwsType(NullPointerException.class,()->GlNoiseCulling.workingBytes(source,(GlCullingMode)null),"null strategy cannot select an implicit fallback");throwsType(NullPointerException.class,()->new GlNoiseCulling(source,base,1,WorldClip.NONE,(GlCullingMode)null),"null strategy fails before preparation");
+            }
+        }
+        check(cornerChecks>100,"independent corner oracle covers broad source/pose fixtures");
+    }
     public static void main(String[] arguments) {
         if(arguments.length!=0)throw new IllegalArgumentException("No arguments supported");
         group("orthonormal and vertical camera bases",GlMathContracts::basis);
@@ -159,6 +192,7 @@ public final class GlMathContracts {
         group("clipped scalar fitting",GlMathContracts::clippedFit);
         group("shared conservative world face-group decisions",GlMathContracts::worldGroups);
         group("bounded scalar draw preparation and differential groups",GlMathContracts::scalarDrawPreparation);
+        group("hierarchical scalar draw rejection and linear agreement",GlMathContracts::scalarHierarchicalDraw);
         System.out.println("PASS "+groups+" context-free display math groups; no OpenGL/native parity is claimed.");
     }
 }

@@ -41,7 +41,7 @@ Both traversal modes and all budget controls survive `withClip`, other option-co
 
 The hierarchy lives inside the same admitted immutable surface. Pointer requests charge its complete source payload, keep one active/latest pending job and retain charges until cancellation/unwind. Successful detached results contain original scalar/sample/grid receipts rather than source arrays or GL owners. Surface worker output shrinks from preparation peak to the exact retained surface after its stack unwinds. No executor, retained request history, sampling algorithm, native engine call or readiness override is added.
 
-GPU geometry/color buffers and GPU-copy behavior are unchanged. They retain the larger accounted CPU surface; recolor still proves shared geometry in constant time. GPU drawing continues using its original leaf-group culling. This batch applies the new hierarchy to CPU inspection and prepares displayed-frame comparison, without claiming driver/pixel equivalence.
+GPU geometry/color buffers and GPU-copy behavior are unchanged. They retain the larger accounted CPU surface; recolor still proves shared geometry in constant time. The initial hierarchy implementation applied these bounds to CPU inspection. The [draw-preparation path](../renderer-gl/HIERARCHICAL-SCALAR-CULLING.md) now also consumes them, with separate linear and disabled reference modes. Neither path establishes driver/pixel equivalence.
 
 ## Prepared deferred coverage
 

@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 23 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 34 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 15 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 14, for 86 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 23 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 34 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 16 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 14, for 87 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -77,3 +77,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Hierarchical original-range picking](PICKING-RANGE-HIERARCHY.md) adds three world groups for differential traversal, markers/alpha/ties and exact admission/ownership. There are now 83 CPU/context-free and 32 GPU groups (115 total), all unexecuted. Full/default compilation covers 143/105 files.
 
 [Scalar inspection hierarchy and visited-face budgets](SCALAR-RANGE-HIERARCHY.md) add three groups, bringing this harness to 23. Current totals are 118 prepared, unexecuted groups: 86 CPU/context-free and 32 GPU. Full/default compilation covers 143/105 files; no renderer/worker/GPU assertions have executed.
+
+[Scalar draw hierarchies](../renderer-gl/HIERARCHICAL-SCALAR-CULLING.md) add the sixteenth context-free math group and the seventh context-free GL type/helper in the compile-only runner. Full/default compilation covers 144/106 files; all 119 groups remain unexecuted (87 CPU/context-free, 32 GPU). The PowerShell runner change was source-inspected only.
