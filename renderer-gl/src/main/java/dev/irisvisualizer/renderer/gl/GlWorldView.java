@@ -150,9 +150,17 @@ public final class GlWorldView implements AutoCloseable {
         Objects.requireNonNull(camera);current();
         dimensions(width,height);
         camera.matrix((double)width/height);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
-        long next=nextView();var changed=displayStatus(next);boolean poseChanged=this.camera==null||!camera.drawView().equals(this.camera.drawView());this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
+        long next=nextView();var changed=displayStatus(next);boolean poseChanged=!keepsOrder(camera);this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
         try { frames.invalidate(viewRevision);if(poseChanged)resetOrder();return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+    }
+    /** Complete/rebinding plans carry their own CPU proof, including while the public scene is absent. */
+    private boolean keepsOrder(GlCamera candidate) {
+        if(order!=null)return !order.closedOrReleased()&&order.matchesView(candidate);
+        if(materialOrder!=null)return !materialOrder.closedOrReleased()&&materialOrder.matchesView(candidate);
+        if(camera==null||ordering.status().phase()==WorldOrderWorker.Phase.FAILED)return false;
+        if(!sourceReady||scene==null)return camera.drawView().equals(candidate.drawView());
+        return WorldDrawOrder.compatibleViews(scene.cpuScene(),camera.drawView(),candidate.drawView());
     }
     /** Fit complete emitted world/marker bounds; geometric clipping remains independently configured. */
     public long fit(int width,int height) { return fit(width,height,WorldClip.NONE); }
@@ -243,7 +251,7 @@ public final class GlWorldView implements AutoCloseable {
                 if(sortRevision==0)sortRevision=ordering.submit(scene.retainCpuScene(),camera.drawView());
                 var completion=ordering.take(sortRevision);
                 if(completion.isPresent())try(var sorted=completion.orElseThrow()) {
-                    if(sorted.order().scene()!=scene.cpuScene()||!sorted.order().view().equals(camera.drawView()))throw new GlFailure(GlFailure.Code.STALE,"Camera sort no longer belongs to the current world/view");order=GlDrawPlan.create(scene,sorted.order());
+                    if(sorted.order().scene()!=scene.cpuScene()||!sorted.order().matches(camera.drawView()))throw new GlFailure(GlFailure.Code.STALE,"Camera sort no longer belongs to the current world/view");order=GlDrawPlan.create(scene,sorted.order());
                 }
                 else {
                     var sorting=ordering.status();if(sorting.phase()==WorldOrderWorker.Phase.FAILED) { status=new Status(worldRevision,viewRevision,Phase.FAILED,status.source(),sorting.problems(),Optional.empty(),"Translucent face ordering failed");return status; }

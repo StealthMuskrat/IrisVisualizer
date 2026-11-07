@@ -2,7 +2,7 @@
 
 Renderer implementation. Full Java 25/LWJGL compilation covers 143 renderer/validation sources; the dependency-free set contains 105 files. Three added GPU groups bring the prepared total to 108: 77 CPU/context-free and 31 GPU. All remain unexecuted. Native/GPU validation, application memory confirmation and final editor integration remain pending; unsupported previews stay disabled.
 
-## Exact geometry and pose
+## Exact geometry and compatible direction
 
 World material refresh copies the existing geometry, indices, markers and displayed atlas into independent GPU storage, changing tint/final lighting only. It preserves the exact immutable CPU scene and its translucent centroids. Previously the connected view discarded its completed transparent-face order and ran the full background depth/sort pass again after each refresh.
 
@@ -22,18 +22,18 @@ If initial destination admission fails, rebinding preserves the source plan and 
 
 Both `GlWorldView.materials` and `materialsLit` first admit the fresh upload. Initial upload rejection leaves the existing view, frame and order untouched. Once admitted, the view invalidates the old worker token and moves its completed plan into one pending-material owner slot. Incomplete or missing worker results are never treated as complete reusable orders.
 
-After source/initial-atlas readiness, the view verifies the retained pose and admits the destination plan before closing the old plan. Only then does it render. The old journal continues charging/pinning its source during upload and admission, including through an explicit failure retry. A successful destination plan is installed before old cleanup, so fallible retirement cannot strand it in a local variable. A consumed retirement owner is cleared; an owner still requiring cleanup stays reachable.
+After source/initial-atlas readiness, the view verifies the retained direction/range proof and admits the destination plan before closing the old plan. Only then does it render. The old journal continues charging/pinning its source during upload and admission, including through an explicit failure retry. A successful destination plan is installed before old cleanup, so fallible retirement cannot strand it in a local variable. A consumed retirement owner is cleared; an owner still requiring cleanup stays reachable.
 
 | Change | Order behavior |
 | --- | --- |
 | Tint/final RGB material refresh | Rebind completed order for the exact CPU scene |
-| Viewport size, field of view, near/far planes | Keep order when the exact camera pose stays equal |
+| Viewport size, field of view, near/far planes | Keep order when its exact direction/range proof stays valid |
 | Geometric clip or atlas clock | Keep order; geometry/centroids stay unchanged |
-| Camera eye, target or anchor | Discard retained order and prepare the new exact pose |
+| Camera eye, target or anchor | Keep a direction/range-compatible order; otherwise discard and prepare a new order |
 | Full world submission, invalidation or source-upload retry | Release retained material order and use ordinary source sorting |
 | No prior complete order | Use the ordinary asynchronous ordering worker |
 
-Pose validation also runs before reuse after cleanup retries, preventing a retained obsolete-pose cleanup owner from becoming usable again. Reset/release attempts visit both current and pending-material plans even after an earlier close error, preserving the primary failure and suppressing later errors. Another material refresh cannot overwrite an outstanding prior cleanup owner.
+Direction/range validation also runs before reuse after cleanup retries, preventing a retained obsolete-pose cleanup owner from becoming usable again. Reset/release attempts visit both current and pending-material plans even after an earlier close error, preserving the primary failure and suppressing later errors. Another material refresh cannot overwrite an outstanding prior cleanup owner.
 
 ## Recovery and bounded lifetime
 
@@ -46,3 +46,5 @@ Camera/world invalidation, retry and shutdown release the pending-material slot.
 Three GPU groups prepare direct rebinding, connected reuse and recovery. Scope includes exact immutable object/key reuse, independent order-byte admission, host state, closed public source wrappers, original GPU ancestor release, repeated rebinding, fresh full-upload pixel comparison, closed/foreign/wrong-epoch rejection, deficient shared memory, empty orders, raw/owned lighting refresh, projection/resize/clip preservation, pose and full-world invalidation, pending-refresh shutdown, saved-frame lifetime, explicit redraw after admission failure and fallback when a camera/order was not available before refresh.
 
 These are compiled assertions only. No GL context, renderer contract, native producer, workflow or runtime pixel comparison was executed for this implementation batch.
+
+[Translation-stable ordering](DIRECTION-ORDER-REUSE.md) now extends the retained plan to exact-direction camera translations/dollies/rebases, including pending sorts and the period when a material copy has no public scene wrapper. The original preparation view remains a receipt; current frames carry their actual current camera. See that contract for canonical-depth rounding changes and current deferred coverage.

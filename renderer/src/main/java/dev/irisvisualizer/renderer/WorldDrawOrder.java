@@ -36,19 +36,39 @@ public final class WorldDrawOrder {
     }
     /** Constant-size pose preflight, matching the camera's overflow/underflow-safe length calculation. */
     static double directionLength(View view) { return Math.hypot(Math.hypot(view.targetX()-view.eyeX(),view.targetY()-view.eyeY()),view.targetZ()-view.eyeZ()); }
+    /** Exact normalized-forward equality; translation/projection changes do not change canonical depth keys. */
+    public static boolean compatibleViews(WorldScene scene,View first,View second) {
+        Objects.requireNonNull(scene);Objects.requireNonNull(first);Objects.requireNonNull(second);
+        double a=directionLength(first),b=directionLength(second);if(a<1e-8||b<1e-8)return false;
+        if((first.targetX()-first.eyeX())/a!=(second.targetX()-second.eyeX())/b||(first.targetY()-first.eyeY())/a!=(second.targetY()-second.eyeY())/b||(first.targetZ()-first.eyeZ())/a!=(second.targetZ()-second.eyeZ())/b)return false;
+        return withinRange(scene,first)&&withinRange(scene,second);
+    }
+    /** Complete scene partition metadata proves every section-origin offset without a synchronous scan. */
+    private static boolean withinRange(WorldScene scene,View view) {
+        var extent=scene.snapshot().extent();int edge=scene.plan().limits().sectionEdge();
+        long lastX=Math.addExact(extent.minX(),(long)((extent.width()-1)/edge)*edge),lastY=(long)extent.minY()+(extent.height()-1)/edge*edge,lastZ=Math.addExact(extent.minZ(),(long)((extent.depth()-1)/edge)*edge);
+        return bounded(extent.minX(),lastX,view.anchor().x())&&bounded(extent.minY(),lastY,view.anchor().y())&&bounded(extent.minZ(),lastZ,view.anchor().z());
+    }
+    private static boolean bounded(long first,long last,long anchor) {
+        try { return Math.abs((double)Math.subtractExact(first,anchor))<=1048576&&Math.abs((double)Math.subtractExact(last,anchor))<=1048576; }
+        catch(ArithmeticException overflow) { return false; }
+    }
+    /** The preparation view remains the original receipt; a compatible view reuses the same immutable keys. */
+    public boolean matches(View candidate) { Objects.requireNonNull(candidate);return !requiresPlaceholder()&&compatibleViews(scene,view,candidate); }
     private static WorldDrawOrder execute(WorldScene scene,View view,Limits limits,BooleanSupplier cancelled) {
         int count=scene.usage().translucentFaces();
         if(count>limits.faces())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent face count exceeds the global sorting budget");
         long bytes=(long)count*WORKING_BYTES_PER_FACE;if(bytes>limits.sortBytes()||scene.usage().knownPayloadBytes()+bytes>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Translucent order/scratch or combined CPU payload budget exceeded");
         double fx=view.targetX()-view.eyeX(),fy=view.targetY()-view.eyeY(),fz=view.targetZ()-view.eyeZ(),length=directionLength(view);if(length<1e-8)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"View direction is too small for stable sorting");fx/=length;fy/=length;fz/=length;
-        long[] keys=new long[count];double[] depths=new double[count];int at=0;
+        long[] keys=new long[count];double[] depths=new double[count];int at=0;var extent=scene.snapshot().extent();
         for(int section=0;section<scene.sections().size();section++) {
             WorldProblem.check(cancelled);var mesh=scene.sections().get(section);long dx=Math.subtractExact(mesh.origin().x(),view.anchor().x()),dz=Math.subtractExact(mesh.origin().z(),view.anchor().z()),dy=(long)mesh.origin().y()-view.anchor().y();
             if(Math.abs((double)dx)>1048576||Math.abs((double)dy)>1048576||Math.abs((double)dz)>1048576)throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Section lies outside view-relative precision bounds");
+            long sx=Math.subtractExact(mesh.origin().x(),extent.minX()),sy=(long)mesh.origin().y()-extent.minY(),sz=Math.subtractExact(mesh.origin().z(),extent.minZ());
             if(mesh.translucentCount()>count-at)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Section translucent count exceeds the complete scene receipt");
             for(int index=0;index<mesh.translucentCount();index++) {
                 if((index&1023)==0)WorldProblem.check(cancelled);int face=mesh.translucentFace(index);
-                keys[at]=(long)section<<32|face&0xffffffffL;depths[at]=(dx+mesh.translucentCenter(index,0)-view.eyeX())*fx+(dy+mesh.translucentCenter(index,1)-view.eyeY())*fy+(dz+mesh.translucentCenter(index,2)-view.eyeZ())*fz;if(!Double.isFinite(depths[at]))throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Translucent depth is not finite");at++;
+                keys[at]=(long)section<<32|face&0xffffffffL;depths[at]=(sx+mesh.translucentCenter(index,0))*fx+(sy+mesh.translucentCenter(index,1))*fy+(sz+mesh.translucentCenter(index,2))*fz;if(!Double.isFinite(depths[at]))throw WorldProblem.fail(WorldProblem.Code.COORDINATE,"Translucent depth is not finite");at++;
             }
         }
         if(at!=count)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Translucent metadata count changed during ordering");

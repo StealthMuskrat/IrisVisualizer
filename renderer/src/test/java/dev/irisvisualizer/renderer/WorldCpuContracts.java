@@ -1006,6 +1006,62 @@ public final class WorldCpuContracts {
             long source=scene.usage().knownPayloadBytes();equal(source+12*16,WorldDrawOrder.reservation(scene,WorldDrawOrder.Limits.DEFAULT),"verified count sizes scratch");var failed=WorldDrawOrder.prepare(scene,view,new WorldDrawOrder.Limits(12,191,source+192),LIVE);check(failed.requiresPlaceholder()&&failed.size()==0,"insufficient sort scratch is atomic");
         }
     }
+    private static WorldDrawOrder.View translatedView(WorldDrawOrder.View view,double x,double y,double z,int rebaseX,int rebaseY,int rebaseZ,double distanceScale) {
+        var anchor=new WorldSnapshot.Position(Math.addExact(view.anchor().x(),rebaseX),Math.addExact(view.anchor().y(),rebaseY),Math.addExact(view.anchor().z(),rebaseZ));
+        double tx=view.targetX()+x-rebaseX,ty=view.targetY()+y-rebaseY,tz=view.targetZ()+z-rebaseZ;
+        return new WorldDrawOrder.View(anchor,tx+(view.eyeX()-view.targetX())*distanceScale,ty+(view.eyeY()-view.targetY())*distanceScale,tz+(view.eyeZ()-view.targetZ())*distanceScale,tx,ty,tz);
+    }
+    /** Direct emitted-vertex centroid oracle; never reads the compact prepared centroid metadata. */
+    private static long[] canonicalOrderOracle(WorldScene scene,WorldDrawOrder.View view) {
+        record Pair(long key,double depth) {}var pairs=new ArrayList<Pair>();var extent=scene.snapshot().extent();double x=view.targetX()-view.eyeX(),y=view.targetY()-view.eyeY(),z=view.targetZ()-view.eyeZ(),length=Math.hypot(Math.hypot(x,y),z);x/=length;y/=length;z/=length;
+        for(int section=0;section<scene.sections().size();section++) { var mesh=scene.sections().get(section);var vertices=mesh.vertexBuffer();
+            for(int face=0;face<mesh.faces().size();face++)if(mesh.faces().get(face).source().alpha()==TexturePreparation.AlphaClass.TRANSLUCENT) {
+                double cx=0,cy=0,cz=0;for(int vertex=0;vertex<4;vertex++) { int at=(face*4+vertex)*MeshPacket.STRIDE_FLOATS;cx+=vertices.get(at);cy+=vertices.get(at+1);cz+=vertices.get(at+2); }
+                double depth=(Math.subtractExact(mesh.origin().x(),extent.minX())+cx/4)*x+((long)mesh.origin().y()-extent.minY()+cy/4)*y+(Math.subtractExact(mesh.origin().z(),extent.minZ())+cz/4)*z;pairs.add(new Pair((long)section<<32|face&0xffffffffL,depth));
+            }
+        }
+        pairs.sort((a,b)->a.depth()>b.depth()?-1:a.depth()<b.depth()?1:Long.compare(a.key(),b.key()));long[] result=new long[pairs.size()];for(int at=0;at<result.length;at++)result[at]=pairs.get(at).key();return result;
+    }
+    private static void translationStableOrdering() {
+        for(boolean shifted:new boolean[]{false,true}) {
+            var f=sectionedRangeFixture(0,shifted,128);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+                var scene=owner.scene().orElseThrow();var anchor=scene.snapshot().extent().position(0);
+                for(double[] direction:new double[][]{{0,0,-1},{0,-1,0},{1,0,0},{3,-4,-12},{1,1,1},{-6,8,24}}) {
+                    var original=new WorldDrawOrder.View(anchor,16-direction[0]*8,8-direction[1]*8,16-direction[2]*8,16,8,16);var order=WorldDrawOrder.prepare(scene,original,LIVE);check(!order.requiresPlaceholder(),"canonical world order prepares complete source");check(Arrays.equals(canonicalOrderOracle(scene,original),order.copyOrder()),"canonical order matches independent emitted-vertex oracle");
+                    for(int step=0;step<12;step++) {
+                        var moved=translatedView(original,step*0.25,-step*0.5,step*0.125,step*32,-step*16,step*64,step%2==0?1:2);check(WorldDrawOrder.compatibleViews(scene,original,moved)&&order.matches(moved),"exact-direction pan/dolly/rebase preserves order compatibility");
+                        var fresh=WorldDrawOrder.prepare(scene,moved,LIVE);check(!fresh.requiresPlaceholder(),"compatible translated view still passes ordinary preparation");check(Arrays.equals(order.copyOrder(),fresh.copyOrder()),"translation-stable canonical depths preserve every original face key");check(Arrays.equals(canonicalOrderOracle(scene,moved),fresh.copyOrder()),"translated preparation matches independent vertex oracle");equal(order.sortStats(),fresh.sortStats(),"identical canonical key/depth inputs preserve actual sort-work receipt");equal(original,order.view(),"reuse retains immutable original preparation view receipt");equal(scene.usage().translucentFaces(),fresh.size(),"canonical reuse preserves complete transparent source coverage");
+                    }
+                }
+            }
+        }
+    }
+    private static void orderDirectionGuards() {
+        var f=sectionedRangeFixture(0,true,128);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+            var scene=owner.scene().orElseThrow();var anchor=scene.snapshot().extent().position(0);var original=new WorldDrawOrder.View(anchor,16,8,64,16,8,16);var order=WorldDrawOrder.prepare(scene,original,LIVE);
+            for(var changed:List.of(new WorldDrawOrder.View(anchor,16,8,64,Math.nextUp(16.0),8,16),new WorldDrawOrder.View(anchor,16,8,64,16,8,112),new WorldDrawOrder.View(anchor,0,0,0,0,0,1e-9)))check(!order.matches(changed),"any normalized direction difference/reversal or invalid tiny direction rejects reuse");
+            var distantEye=new WorldDrawOrder.View(anchor,16,8,1000000,16,8,999936);check(order.matches(distantEye),"large finite common eye translation preserves exact normalized forward");check(Arrays.equals(order.copyOrder(),WorldDrawOrder.prepare(scene,distantEye,LIVE).copyOrder()),"canonical keys avoid eye-translation rounding in repeated coplanar depths");
+            var edge=new WorldDrawOrder.View(new WorldSnapshot.Position(anchor.x()-1048560,anchor.y(),anchor.z()),16,8,64,16,8,16);check(order.matches(edge),"actual final section origin at exact supported offset remains compatible");
+            var tooFar=new WorldDrawOrder.View(new WorldSnapshot.Position(anchor.x()-1048561,anchor.y(),anchor.z()),16,8,64,16,8,16);check(!order.matches(tooFar),"metadata guard rejects any section beyond supported offset");check(WorldDrawOrder.prepare(scene,tooFar,LIVE).requiresPlaceholder(),"ordinary preparation independently agrees with section-range rejection");
+            var overflow=new WorldDrawOrder.View(new WorldSnapshot.Position(Long.MIN_VALUE,anchor.y(),anchor.z()),16,8,64,16,8,16);check(!order.matches(overflow),"anchor subtraction overflow rejects reuse without wrapping");
+            var valid=translatedView(original,1,2,3,1024,-256,-2048,2);for(var view:List.of(original,valid,edge,tooFar,overflow)) {
+                boolean scanned=true;for(var mesh:scene.sections())try { long dx=Math.subtractExact(mesh.origin().x(),view.anchor().x()),dz=Math.subtractExact(mesh.origin().z(),view.anchor().z()),dy=(long)mesh.origin().y()-view.anchor().y();if(Math.abs((double)dx)>1048576||Math.abs((double)dy)>1048576||Math.abs((double)dz)>1048576)scanned=false; }catch(ArithmeticException failure) { scanned=false; }
+                equal(scanned,WorldDrawOrder.compatibleViews(scene,original,view),"metadata-only section range proof equals independent full section scan");
+            }
+            long scratch=(long)order.size()*WorldDrawOrder.WORKING_BYTES_PER_FACE,source=scene.usage().knownPayloadBytes();var exact=WorldDrawOrder.prepare(scene,valid,new WorldDrawOrder.Limits(order.size(),scratch,source+scratch),LIVE);check(!exact.requiresPlaceholder(),"stable projection uses unchanged exact two-array sort budget");var failed=WorldDrawOrder.prepare(scene,valid,new WorldDrawOrder.Limits(order.size(),scratch-1,source+scratch),LIVE);check(failed.requiresPlaceholder()&&!failed.matches(valid)&&failed.size()==0,"deficient canonical sort publishes no order or reuse proof");throwsType(NullPointerException.class,()->order.matches(null),"null candidate cannot acquire reuse proof");
+        }
+        var f2=fixture(2,255,false);try(var cache=new WorldSectionCache();var owner=build(f2,cache)) { var scene=owner.scene().orElseThrow();var view=orderView(f2);var empty=WorldDrawOrder.prepare(scene,view,LIVE);check(empty.matches(translatedView(view,0.25,0,0,0,0,0,2)),"complete empty order follows the same finite-direction contract");equal(0L,empty.bytes(),"empty canonical order allocates no dummy face payload"); }
+    }
+    private static void translationOrderWorker() {
+        var f=fixture(2,128,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+            var scene=owner.scene().orElseThrow();var original=orderView(f);var moved=translatedView(original,0.25,-0.5,1,256,-128,-512,2);long source=scene.usage().knownPayloadBytes(),peak=source+scene.usage().translucentFaces()*16L;
+            try(var memory=new RenderMemory(new RenderMemory.Limits(peak,8));var executor=new DrainExecutor();var worker=new WorldOrderWorker(peak,memory,()->executor)) {
+                long revision=worker.submit(owner.retain(),original);var queued=worker.status();check(WorldDrawOrder.compatibleViews(scene,original,moved),"pending worker direction proof needs no new sort job");equal(queued,worker.status(),"pending compatible view proof changes no worker revision");equal(peak,memory.stats().chargedBytes(),"pending proof allocates no additional sort arrays or source hold");executor.runNext();
+                try(var completion=worker.take(revision).orElseThrow()) { check(completion.order().matches(moved),"completion from original view can serve translated view");var fresh=WorldDrawOrder.prepare(scene,moved,LIVE);check(Arrays.equals(fresh.copyOrder(),completion.order().copyOrder()),"worker original keys equal translated fresh preparation");equal(original,completion.order().view(),"worker receipt remains its actual admitted preparation view");equal(source+completion.order().bytes(),memory.stats().chargedBytes(),"proof reuse retains unchanged source/key admission");worker.close();owner.close();cache.close();check(completion.order().matches(moved),"completion keeps canonical source metadata alive after caller/cache/worker closure"); }
+                noWorkerCharge(memory);
+            }
+        }
+    }
     /** Read only the private executor to gate scheduling; worker state and admission are never patched. */
     private static ExecutorService orderExecutor(WorldOrderWorker worker) {
         try { var field=WorldOrderWorker.class.getDeclaredField("executor");field.setAccessible(true);return (ExecutorService)field.get(worker); }
@@ -1672,6 +1728,9 @@ public final class WorldCpuContracts {
         group("source-backed index worker ownership and rejection",WorldCpuContracts::sourceRangeWorkerOwnership);
         group("range hierarchy admission and ownership",WorldCpuContracts::pickingRangeAdmission);
         group("independent translucent centroid ordering",WorldCpuContracts::ordering);
+        group("translation-stable canonical transparent ordering",WorldCpuContracts::translationStableOrdering);
+        group("transparent direction and coordinate reuse guards",WorldCpuContracts::orderDirectionGuards);
+        group("translated pending sort completion ownership",WorldCpuContracts::translationOrderWorker);
         group("bounded two-array depth and source-key ordering",WorldCpuContracts::boundedFaceSorting);
         group("pending sort replacement admission",WorldCpuContracts::pendingOrderAdmission);
         group("translucent view preflight preservation",WorldCpuContracts::orderViewPreflight);

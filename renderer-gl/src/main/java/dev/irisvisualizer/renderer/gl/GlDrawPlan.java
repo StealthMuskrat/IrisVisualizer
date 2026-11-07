@@ -27,12 +27,12 @@ public final class GlDrawPlan implements AutoCloseable {
         // The new journal depends only on destination, and independently admits the shared order bytes.
         return create(destination,(WorldDrawOrder)allocation.retained);
     }
-    boolean matchesView(GlCamera camera) { device.live(allocation);return ((WorldDrawOrder)allocation.retained).view().equals(camera.drawView()); }
+    boolean matchesView(GlCamera camera) { device.live(allocation);return ((WorldDrawOrder)allocation.retained).matches(camera.drawView()); }
     WorldDrawOrder order(GlScene expected,GlCamera camera) {
         device.live(allocation);scene.live();
         if(scene!=expected)throw new GlFailure(GlFailure.Code.STALE,"Face order belongs to a different GPU scene");
         var order=(WorldDrawOrder)allocation.retained;
-        if(!order.view().equals(camera.drawView()))throw new GlFailure(GlFailure.Code.STALE,"Translucent face order does not match the current camera pose");return order;
+        if(!order.matches(camera.drawView()))throw new GlFailure(GlFailure.Code.STALE,"Translucent face order does not match the current camera direction/relative range");return order;
     }
     boolean closedOrReleased() { return allocation.retired||allocation.released; }
     @Override public void close() { device.retire(allocation); }
