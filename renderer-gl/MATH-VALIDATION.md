@@ -1,12 +1,12 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04; updated 2026-11-06. `GlMathContracts` contains 16 groups for projection, pointer rays, navigation, clipping and conservative scalar/world culling. Together with 23 CPU renderer groups, 34 world-pipeline groups and 14 animation groups, the four context-free suites contain 87 prepared groups. The separate GPU harness adds 32 for 119 total. All 144 renderer/validation sources compile, including the previously pending initial-atlas update; no group has executed. Renderer-stage completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
+Prepared 2026-11-04; updated 2026-11-07. `GlMathContracts` contains 18 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 47 world CPU and 17 animation groups, the context-free suites contain 105 prepared groups. The separate GPU harness adds 38 for 143 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
 
 ## No context or driver required
 
-The suite uses six backend production helpers: `GlFailure`, `GlCamera`, `GlOrbitCamera`, `GlFrustum`, `GlWorldCulling` and `GlNoiseCulling`. They depend only on the CPU module and Java standard library. The harness invokes no LWJGL class, window/context creation, native library loading, shader, upload, draw or readback. Synthetic scalar fixtures supply original detached samples rather than evaluating a generator.
+The suite uses seven backend production helpers: `GlFailure`, `GlCamera`, `GlOrbitCamera`, `GlFrustum`, `GlWorldCulling`, `GlNoiseCulling` and `GlCullingMode`. They depend only on the CPU module and Java standard library. The harness invokes no LWJGL class, window/context creation, native library loading, shader, upload, draw or readback. Synthetic scalar fixtures supply original detached samples rather than evaluating a generator.
 
-`Validate-RendererCpu.ps1` includes these six helpers, this harness and the shared CPU-only `WorldGpuFixture` by explicit path, alongside CPU production/tests. It deliberately does not sweep all backend/test sources, so future driver-dependent suites cannot silently enter this context-free runner. The default still compiles only. After renderer implementation is complete, explicit `-Execute` runs the four suite classes in separate JVM processes, stopping on the first failure.
+`Validate-RendererCpu.ps1` includes these seven helpers, this harness and the shared CPU-only `WorldGpuFixture` by explicit path, alongside CPU production/tests. It deliberately does not sweep all backend/test sources, so future driver-dependent suites cannot silently enter this context-free runner. The default still compiles only. After renderer implementation is complete, explicit `-Execute` runs the four suite classes in separate JVM processes, stopping on the first failure.
 
 ## Prepared checks
 

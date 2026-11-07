@@ -20,6 +20,19 @@ public final class GlDevice implements AutoCloseable {
     public record Stats(long gpuBytes,long cpuPayloadBytes,int stagingBytes,int allocations,int names,int retired,int quarantined) {
         public long knownWorkingBytes() { return gpuBytes+cpuPayloadBytes+stagingBytes; }
     }
+    /** Hard operation/work limits and a cooperative elapsed-time target for automatic retirement. */
+    public record CollectionBudget(int actions,int workUnits,long nanoseconds) {
+        public static final CollectionBudget DEFAULT=new CollectionBudget(64,512,1_000_000);
+        public static final CollectionBudget MAXIMUM=new CollectionBudget(1024,262144,50_000_000);
+        public CollectionBudget { if(actions<1||actions>1024||workUnits<1||workUnits>262144||nanoseconds<1||nanoseconds>50_000_000)throw new IllegalArgumentException("Retirement collection budget exceeds backend bounds"); }
+    }
+    /** One work unit visits an allocation and performs at most one poll, slot check, sync deletion or release. */
+    public record CollectionStep(int workUnits,int fencePolls,int namesChecked,int namesDeleted,int syncsDeleted,int allocationsReleased,long elapsedNanoseconds) {
+        public CollectionStep {
+            if(workUnits<0||fencePolls<0||namesChecked<0||namesDeleted<0||namesDeleted>namesChecked||syncsDeleted<0||allocationsReleased<0||(long)fencePolls+namesChecked+syncsDeleted+allocationsReleased>workUnits||elapsedNanoseconds<0)throw new IllegalArgumentException("Invalid retirement work receipt");
+        }
+        public int actions() { return fencePolls+namesDeleted+syncsDeleted; }
+    }
     /** Immutable context provenance for diagnostics; contains no native/context handle or readiness claim. */
     public record Driver(String vendor,String renderer,String version,String shadingLanguage,int major,int minor,int contextFlags,int profileMask,
                          int maximumTexture,int maximumRenderbuffer,int maximumVertexAttributes,int maximumTextureUnits,List<String> optionalFeatures) {
@@ -32,14 +45,14 @@ public final class GlDevice implements AutoCloseable {
     }
     static final class Allocation {
         int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;long gpu,cpu;int names;WorldScene.Result owner;Object retained;
-        boolean retired,released,quarantined;long fence,transferFence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
+        boolean retired,released,quarantined,retirementReady;int deleteGroup,deleteIndex;long fence,transferFence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
         Allocation(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
             this.gpu=gpu;this.cpu=cpu;this.owner=owner;this.buffers=new int[buffers];this.textures=new int[textures];this.vaos=new int[vaos];this.framebuffers=new int[framebuffers];this.renderbuffers=new int[renderbuffers];this.programs=new int[programs];this.shaders=new int[shaders];names=buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders;
         }
     }
     private final Thread thread=Thread.currentThread();private final long context;private final GLCapabilities capabilities;private final Limits limits;private final RenderMemory memory;private final RenderMemory.Account admission;
     private final int maximumTexture,maximumRenderbuffer;private final Driver driver;private List<Allocation> allocations=new ArrayList<>();private ByteBuffer staging;
-    private long gpuBytes,cpuBytes;private int names;private boolean closing,closed;
+    private long gpuBytes,cpuBytes;private int names,collectionCursor;private boolean closing,closed;
     public GlDevice() { this(Limits.DEFAULT); }
     public GlDevice(Limits limits) { this(limits,null); }
     public GlDevice(Limits limits,RenderMemory memory) {
@@ -121,7 +134,7 @@ public final class GlDevice implements AutoCloseable {
     ByteBuffer staging() { current();staging.clear();return staging; }
     boolean ownsCpu(WorldScene.Result owner) { current();for(var allocation:allocations)if(allocation.owner==owner)return true;return false; }
     Allocation reserve(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
-        current();collect();int[] counts={buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders};long total=0;for(int count:counts) { if(count<0||count>limits.names())throw new GlFailure(GlFailure.Code.LIMIT,"GPU object count budget exceeded");total+=count; }
+        current();collect(CollectionBudget.DEFAULT);int[] counts={buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders};long total=0;for(int count:counts) { if(count<0||count>limits.names())throw new GlFailure(GlFailure.Code.LIMIT,"GPU object count budget exceeded");total+=count; }
         if(gpu<0||cpu<0||gpu>limits.gpuBytes()-gpuBytes||cpu>limits.workingBytes()-cpuBytes||gpuBytes+gpu+cpuBytes+cpu+limits.stagingBytes()>limits.workingBytes()||allocations.size()>=limits.allocations()||total>limits.names()-names)
             throw new GlFailure(GlFailure.Code.LIMIT,"GPU, retained CPU, staging or object budget exceeded; retired resources remain charged");
         var allocation=new Allocation(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,owner);
@@ -133,7 +146,7 @@ public final class GlDevice implements AutoCloseable {
     void live(Allocation allocation) { current();if(allocation.retired||allocation.released)throw new GlFailure(GlFailure.Code.STATE,"GPU resource is retired or released"); }
     /** Upgrade a CPU-only journal after incremental validation, before any scene GL name is made. */
     void expand(Allocation allocation,long gpu,int buffers,int textures,int vaos) {
-        live(allocation);collect();if(allocation.gpu!=0||allocation.names!=0)throw new GlFailure(GlFailure.Code.STATE,"Upload reservation was already expanded");
+        live(allocation);collect(CollectionBudget.DEFAULT);if(allocation.gpu!=0||allocation.names!=0)throw new GlFailure(GlFailure.Code.STATE,"Upload reservation was already expanded");
         long added=(long)buffers+textures+vaos;
         if(gpu<0||buffers<0||textures<0||vaos<0||added>limits.names()-names||gpu>limits.gpuBytes()-gpuBytes||gpuBytes+gpu+cpuBytes+limits.stagingBytes()>limits.workingBytes())throw new GlFailure(GlFailure.Code.LIMIT,"Validated GPU scene exceeds active/retired resource admission limits");
         int[] nextBuffers=new int[buffers],nextTextures=new int[textures],nextVaos=new int[vaos];
@@ -159,20 +172,68 @@ public final class GlDevice implements AutoCloseable {
         // Every allocation has a journal, including CPU-only preflight and failed uploads.
         // Failed release/fencing stays quarantined until explicit synchronized device teardown.
         try {
-            if(allocation.names==0&&allocation.gpu==0&&allocation.dependents==0) { release(allocation);allocations.remove(allocation);return; }
+            if(allocation.names==0&&allocation.gpu==0&&allocation.dependents==0) { release(allocation);removeAllocation(allocation);return; }
             allocation.retired=true;allocation.fence=glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE,0);check("resource retirement fence");if(allocation.fence==0)throw new GlFailure(GlFailure.Code.GL_ERROR,"Could not create resource retirement fence");glFlush();check("resource retirement flush");
         }catch(RuntimeException|Error failure) { allocation.retired=true;allocation.quarantined=true;throw failure; }
     }
-    public void collect() {
-        current();var iterator=allocations.iterator();
-        while(iterator.hasNext()) {
-            var allocation=iterator.next();if(!allocation.retired||allocation.fence==0||allocation.quarantined||allocation.dependents!=0)continue;
+    private void removeAllocation(Allocation allocation) {
+        int at=allocations.indexOf(allocation);if(at<0)return;allocations.remove(at);if(at<collectionCursor)collectionCursor--;if(collectionCursor>=allocations.size())collectionCursor=0;
+    }
+    private static boolean collectible(Allocation allocation) {
+        return allocation.retired&&!allocation.released&&!allocation.quarantined&&allocation.dependents==0&&(allocation.retirementReady||allocation.fence!=0);
+    }
+    /** Round-robin, zero-timeout retirement; each visited allocation costs one work unit, including skips. */
+    public CollectionStep collect(CollectionBudget budget) {
+        Objects.requireNonNull(budget);current();long start=System.nanoTime();int units=0,polls=0,checked=0,deleted=0,syncs=0,released=0,actions=0,idle=0;
+        while(!allocations.isEmpty()&&units<budget.workUnits()&&actions<budget.actions()&&(units==0||System.nanoTime()-start<budget.nanoseconds())) {
+            if(collectionCursor>=allocations.size())collectionCursor=0;var allocation=allocations.get(collectionCursor);collectionCursor=(collectionCursor+1)%allocations.size();units++;
+            if(allocation.released) { removeAllocation(allocation);released++;idle=0;continue; }
+            if(!collectible(allocation)) { if(++idle>=allocations.size())break;continue; }
             try {
-                int status=glClientWaitSync(allocation.fence,GL_SYNC_FLUSH_COMMANDS_BIT,0);check("nonblocking resource retirement");
-                if(status==GL_TIMEOUT_EXPIRED)continue;if(status!=GL_ALREADY_SIGNALED&&status!=GL_CONDITION_SATISFIED)throw new GlFailure(GlFailure.Code.GL_ERROR,"GPU retirement fence could not be observed");
-                delete(allocation);glDeleteSync(allocation.fence);check("retirement fence deletion");allocation.fence=0;release(allocation);iterator.remove();
+                if(!allocation.retirementReady) {
+                    int status=glClientWaitSync(allocation.fence,0,0L);polls++;actions++;check("bounded retirement fence poll");
+                    if(status==GL_TIMEOUT_EXPIRED) { if(++idle>=allocations.size())break;continue; }
+                    if(status!=GL_ALREADY_SIGNALED&&status!=GL_CONDITION_SATISFIED)throw new GlFailure(GlFailure.Code.GL_ERROR,"GPU retirement fence could not be observed");allocation.retirementReady=true;
+                }else if(allocation.transferFence!=0) {
+                    glDeleteSync(allocation.transferFence);syncs++;actions++;check("bounded transfer fence deletion");allocation.transferFence=0;
+                }else if(nextName(allocation)) {
+                    checked++;var array=nameArray(allocation,allocation.deleteGroup);int at=allocation.deleteIndex;
+                    if(array[at]!=0) { deleteName(allocation.deleteGroup,array[at]);deleted++;actions++;check("bounded GPU object deletion");array[at]=0; }
+                    allocation.deleteIndex++;
+                }else if(allocation.fence!=0) {
+                    glDeleteSync(allocation.fence);syncs++;actions++;check("bounded retirement fence deletion");allocation.fence=0;
+                }else { release(allocation);removeAllocation(allocation);released++; }
+                idle=0;
             }catch(RuntimeException|Error failure) { allocation.quarantined=true;throw failure; }
         }
+        return new CollectionStep(units,polls,checked,deleted,syncs,released,System.nanoTime()-start);
+    }
+    private static int[] nameArray(Allocation allocation,int group) {
+        return switch(group) { case 0->allocation.vaos;case 1->allocation.framebuffers;case 2->allocation.renderbuffers;case 3->allocation.buffers;case 4->allocation.textures;case 5->allocation.programs;case 6->allocation.shaders;default->throw new IllegalArgumentException("Unknown GPU object group"); };
+    }
+    /** Advances over at most seven array boundaries; every actual slot requires its own work unit. */
+    private static boolean nextName(Allocation allocation) {
+        while(allocation.deleteGroup<7&&allocation.deleteIndex>=nameArray(allocation,allocation.deleteGroup).length) { allocation.deleteGroup++;allocation.deleteIndex=0; }
+        return allocation.deleteGroup<7;
+    }
+    private static void deleteName(int group,int name) {
+        switch(group) { case 0->glDeleteVertexArrays(name);case 1->glDeleteFramebuffers(name);case 2->glDeleteRenderbuffers(name);case 3->glDeleteBuffers(name);case 4->glDeleteTextures(name);case 5->glDeleteProgram(name);case 6->glDeleteShader(name);default->throw new IllegalArgumentException("Unknown GPU object group"); }
+    }
+    /** Compatibility full pass; automatic work uses the bounded overload instead. */
+    public void collect() {
+        current();var iterator=allocations.iterator();
+        try {
+            while(iterator.hasNext()) {
+                var allocation=iterator.next();if(allocation.released) { iterator.remove();continue; }if(!collectible(allocation))continue;
+                try {
+                    if(!allocation.retirementReady) {
+                        int status=glClientWaitSync(allocation.fence,GL_SYNC_FLUSH_COMMANDS_BIT,0);check("nonblocking resource retirement");
+                        if(status==GL_TIMEOUT_EXPIRED)continue;if(status!=GL_ALREADY_SIGNALED&&status!=GL_CONDITION_SATISFIED)throw new GlFailure(GlFailure.Code.GL_ERROR,"GPU retirement fence could not be observed");allocation.retirementReady=true;
+                    }
+                    delete(allocation);if(allocation.fence!=0) { glDeleteSync(allocation.fence);check("retirement fence deletion");allocation.fence=0; }release(allocation);iterator.remove();
+                }catch(RuntimeException|Error failure) { allocation.quarantined=true;throw failure; }
+            }
+        }finally { collectionCursor=0; }
     }
     private void delete(Allocation allocation) {
         if(allocation.transferFence!=0) { glDeleteSync(allocation.transferFence);check("transfer fence deletion");allocation.transferFence=0; }
@@ -188,7 +249,7 @@ public final class GlDevice implements AutoCloseable {
         if(allocation.owner!=null) { allocation.owner.close();allocation.owner=null; }
         allocation.retained=null;for(int i=0;i<allocation.dependencies.size();i++)allocation.dependencies.get(i).dependents--;allocation.dependencies.clear();allocation.released=true;gpuBytes-=allocation.gpu;cpuBytes-=allocation.cpu;names-=allocation.names;admit(gpuBytes+cpuBytes+limits.stagingBytes());
     }
-    public Stats stats() { context();int retired=0,quarantined=0;for(var allocation:allocations)if(allocation.retired) { retired++;if(allocation.fence==0||allocation.quarantined)quarantined++; }return new Stats(gpuBytes,cpuBytes,limits.stagingBytes(),allocations.size(),names,retired,quarantined); }
+    public Stats stats() { context();int retired=0,quarantined=0;for(var allocation:allocations)if(allocation.retired) { retired++;if(allocation.quarantined||allocation.fence==0&&!allocation.retirementReady)quarantined++; }return new Stats(gpuBytes,cpuBytes,limits.stagingBytes(),allocations.size(),names,retired,quarantined); }
     /** Explicit teardown may wait for the GPU. Call before destroying the original current context. */
     @Override public void close() {
         if(closed)return;context();
