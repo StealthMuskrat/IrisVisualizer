@@ -42,6 +42,14 @@ public final class WorldGpuFixture implements AutoCloseable {
     public static WorldGpuFixture animated(boolean interpolate,int frameTicks) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,frameTicks)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture animatedRectangle(int pattern,boolean interpolate) { if(pattern<1||pattern>3)throw new IllegalArgumentException("Invalid synthetic pattern");return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,2,pattern)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture empty() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.EMPTY); }
+    /** Irregular full XYZ coverage: 3 by 2 by 3 sections, with original mesh/marker/empty identities. */
+    public static WorldGpuFixture sectionCulling(boolean markers,boolean emptyFirst) { return sectionCulling(markers,emptyFirst,false); }
+    public static WorldGpuFixture sectionCulling(boolean markers,boolean emptyFirst,boolean translucent) {
+        var materials=List.of(new Material(0xd04020ff,false,false,false,false),new Material(translucent?0x60a0e080:0x60a0e0ff,false,false,false,false));int[] assignments=new int[9*5*9];
+        for(int y=0;y<5;y++)for(int z=0;z<9;z++)for(int x=0;x<9;x++)assignments[(y*9+z)*9+x]=x<4&&z<4?0:1;
+        return build(materials,assignments,9,5,9,WorldModels.Kind.MESH,markers,emptyFirst,4);
+    }
+    public static WorldGpuFixture emptySections() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[9*5*9],9,5,9,WorldModels.Kind.EMPTY,false,false,4); }
     public static WorldGpuFixture placeholder() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.PLACEHOLDER); }
     private static String hash(byte[] bytes) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
@@ -67,6 +75,9 @@ public final class WorldGpuFixture implements AutoCloseable {
         return build(materials,assignments,width,depth,kind,false);
     }
     private static WorldGpuFixture build(List<Material> materials,int[] assignments,int width,int depth,WorldModels.Kind kind,boolean markerMix) {
+        return build(materials,assignments,width,1,depth,kind,markerMix,false,width>2||depth>2?32:2);
+    }
+    private static WorldGpuFixture build(List<Material> materials,int[] assignments,int width,int height,int depth,WorldModels.Kind kind,boolean markerMix,boolean emptyFirst,int edge) {
         var assets=new TreeMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset>();var states=new ArrayList<RenderBlockState>();
         for(int i=0;i<materials.size();i++) {
             var block=new AssetId("fixture","gpu_cube_"+i);var model=new AssetId("fixture","block/gpu_cube_"+i);var sprite=new AssetId("fixture","block/gpu_pixel_"+i);var material=materials.get(i);
@@ -78,19 +89,19 @@ public final class WorldGpuFixture implements AutoCloseable {
         }
         long bytes=assets.values().stream().mapToLong(ClientAssetSnapshot.Asset::bytes).sum();var receipt=new ClientAssetSnapshot.Receipt(Path.of("synthetic-world-gpu-fixture"),hash(materials.toString().getBytes(StandardCharsets.UTF_8)),bytes,BlockModels.PROFILE,BlockModels.PROFILE,assets.size(),0,bytes);var catalog=new ClientAssetSnapshot(receipt,assets);
         var biome=new WorldSnapshot.Biome(731,"fixture:original_gpu_biome",new AssetId("fixture","original_gpu_biome"));var generation=new WorldSnapshot.Source(UUID.randomUUID(),"0".repeat(64),"synthetic world GPU fixture",BlockModels.PROFILE,AssetId.minecraft("overworld"),Long.MAX_VALUE);
-        var snapshot=WorldSnapshot.capture(generation,new WorldSnapshot.Extent(9_007_199_254_740_993L,-64,-9_007_199_254_740_993L,width,1,depth),states,List.of(biome),assignments,new int[assignments.length],LIVE);check(!snapshot.requiresPlaceholder(),"complete synthetic original state/biome capture");
+        var snapshot=WorldSnapshot.capture(generation,new WorldSnapshot.Extent(9_007_199_254_740_993L,-64,-9_007_199_254_740_993L,width,height,depth),states,List.of(biome),assignments,new int[assignments.length],LIVE);check(!snapshot.requiresPlaceholder(),"complete synthetic original state/biome capture");
         AtlasLayout layout;var entries=new ArrayList<WorldModels.Entry>();
         if(kind==WorldModels.Kind.MESH) {
             var textures=new ArrayList<TexturePreparation>();for(var state:states) { var model=BlockModels.resolve(catalog,state,LIVE);check(!model.requiresPlaceholder(),"synthetic world JSON model resolved: "+model.problems());var mesh=GeometryBaker.bake(model,new int[]{0},LIVE);check(!mesh.requiresPlaceholder(),"synthetic world model baked");var prepared=TextureMaterials.prepare(catalog,mesh,LIVE);check(!prepared.requiresPlaceholder(),"synthetic world texture prepared: "+prepared.problems());textures.add(prepared); }
             layout=AtlasBuilder.plan(textures,new AtlasBuilder.Limits(8,8,64,64,8,4,1,4096,16384,4096,16384,4096,1024*1024,4096),LIVE);check(!layout.requiresPlaceholder(),"synthetic world shared atlas planned: "+layout.problems());
-            for(var texture:textures) { var bound=AtlasMeshes.bind(layout,texture,LIVE);check(!bound.requiresPlaceholder(),"synthetic world mesh bound");entries.add(markerMix&&entries.isEmpty()?WorldModels.Entry.placeholder(states.getFirst(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,states.getFirst().block(),"/mixed-marker","Synthetic marker group; original cell preserved"))):WorldModels.Entry.from(bound)); }
+            for(var texture:textures) { var bound=AtlasMeshes.bind(layout,texture,LIVE);check(!bound.requiresPlaceholder(),"synthetic world mesh bound");entries.add(emptyFirst&&entries.isEmpty()?WorldModels.Entry.empty(states.getFirst()):markerMix&&entries.isEmpty()?WorldModels.Entry.placeholder(states.getFirst(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,states.getFirst().block(),"/mixed-marker","Synthetic marker group; original cell preserved"))):WorldModels.Entry.from(bound)); }
         }else {
             layout=AtlasBuilder.empty(catalog,states.getFirst().block(),LIVE);
             entries.add(kind==WorldModels.Kind.EMPTY?WorldModels.Entry.empty(states.getFirst()):WorldModels.Entry.placeholder(states.getFirst(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,states.getFirst().block(),"/synthetic","Synthetic unsupported visual; original state retained"))));
         }
         var models=WorldModels.capture(snapshot,layout,entries,assignments,LIVE);check(!models.requiresPlaceholder(),"complete synthetic world assignments: "+models.problems());var masks=new byte[assignments.length];
-        if(width==2&&depth==1) { masks[0]=(byte)(1<<ModelPlan.Direction.EAST.ordinal());masks[1]=(byte)(1<<ModelPlan.Direction.WEST.ordinal()); }
-        var visibility=WorldVisibility.capture(snapshot,layout,"explicit synthetic neighbor masks",masks,LIVE);var plan=WorldScenePlan.plan(models,visibility,new WorldScenePlan.Limits(width>2||depth>2?32:2,32,8192,2048,2048,2*1024*1024,8*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);check(!plan.requiresPlaceholder(),"complete synthetic world plan: "+plan.problems());var raster=AtlasImages.capture(layout,0,0,LIVE);check(!raster.requiresPlaceholder(),"complete synthetic atlas raster");
+        if(width==2&&height==1&&depth==1) { masks[0]=(byte)(1<<ModelPlan.Direction.EAST.ordinal());masks[1]=(byte)(1<<ModelPlan.Direction.WEST.ordinal()); }
+        var visibility=WorldVisibility.capture(snapshot,layout,"explicit synthetic neighbor masks",masks,LIVE);var plan=WorldScenePlan.plan(models,visibility,new WorldScenePlan.Limits(edge,32,8192,2048,2048,2*1024*1024,8*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);check(!plan.requiresPlaceholder(),"complete synthetic world plan: "+plan.problems());var raster=AtlasImages.capture(layout,0,0,LIVE);check(!raster.requiresPlaceholder(),"complete synthetic atlas raster");
         var cache=new WorldSectionCache();try { var owner=WorldScene.build(plan,raster,cache,LIVE);if(owner.requiresPlaceholder()) { var problems=owner.problems();owner.close();throw new AssertionError("synthetic CPU world build failed: "+problems); }return new WorldGpuFixture(cache,owner); }catch(RuntimeException|Error failure) { try { cache.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public WorldLighting lighting(float red,float green,float blue) {

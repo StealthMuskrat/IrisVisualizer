@@ -205,6 +205,48 @@ public final class GlMathContracts {
             var disjoint=new GlWorldCulling(scene,whole,1,new WorldClip(new WorldSnapshot.Extent(Math.addExact(origin.x(),64),origin.y(),origin.z(),1,1,1)),true);equal(0,disjoint.markerBoundsTests(),"whole-section rejection precedes marker tree work");check(!disjoint.marker(0,0),"outside section retains no marker candidate");
         }
     }
+    private static void sectionEnvelopes() {
+        equal(128,WorldMesher.MAX_LOCAL_COORDINATE,"existing mesher coordinate limit remains unchanged");
+        for(int variant=0;variant<4;variant++)try(var fixture=variant==3?WorldGpuFixture.emptySections():WorldGpuFixture.sectionCulling(variant==1,variant==2)) {
+            var scene=fixture.scene();equal(18,scene.sections().size(),"irregular three by two by three section grid");var origin=scene.snapshot().extent().position(0);
+            for(int shift:new int[]{0,4096,1_048_568,-1_048_568}) {
+                var anchor=new WorldSnapshot.Position(origin.x()+shift,origin.y()+shift,origin.z()+shift);var camera=new GlCamera(anchor,4,8,32,4,2,4,60,0.1,512);var culling=new GlWorldCulling(scene,camera,1,WorldClip.NONE,GlCullingMode.HIERARCHY);
+                for(int first=0;first<18;first++)for(int end=first+1;end<=18;end++)for(int axis=0;axis<3;axis++) {
+                    float low=culling.sectionMinimum(first,end,axis),high=culling.sectionMaximum(first,end,axis);
+                    for(int section=first;section<end;section++) {
+                        float offset=culling.offsets[section*3+axis];check(low<=(double)offset-128&&high>=(double)offset+128,"interval encloses exact local-coordinate envelope");
+                        for(float local:new float[]{-128,-0.25f,0,4,128})check(low<=offset+local&&high>=offset+local,"interval encloses shader float addition");
+                        var bounds=scene.sections().get(section).bounds();if(bounds.isPresent()) { var b=bounds.orElseThrow();float min=switch(axis) { case 0->b.min().x();case 1->b.min().y();default->b.min().z(); },max=switch(axis) { case 0->b.max().x();case 1->b.max().y();default->b.max().z(); };check(low<=(double)offset+min&&high>=(double)offset+max,"interval encloses original double leaf bounds"); }
+                    }
+                }
+                throwsType(IllegalArgumentException.class,()->culling.sectionMinimum(0,0,0),"empty interval rejected");throwsType(IndexOutOfBoundsException.class,()->culling.sectionMaximum(0,19,0),"source interval upper bound");throwsType(IndexOutOfBoundsException.class,()->culling.sectionMinimum(-1,1,0),"negative interval");throwsType(IndexOutOfBoundsException.class,()->culling.sectionMinimum(0,1,3),"axis upper bound");
+            }
+            long expected=1024+18*13L+19*4L+scene.usage().faceBatches()+(scene.usage().markerBatches()>0?19*4L+scene.usage().markerBatches():0);equal(expected,GlWorldCulling.workingBytes(scene,GlCullingMode.HIERARCHY),"implicit hierarchy adds no primitive payload");equal(expected,GlWorldCulling.workingBytes(scene,GlCullingMode.LINEAR),"reference mode uses identical admitted scratch");
+            var bad=new GlCamera(new WorldSnapshot.Position(origin.x()+1_048_577,origin.y(),origin.z()),4,8,32,4,2,4,60,0.1,512);throwsType(GlFailure.class,()->new GlWorldCulling(scene,bad,1,WorldClip.NONE,true),"precision admission includes hidden and empty source sections");
+        }
+    }
+    private static void sectionHierarchicalDraw() {
+        var random=new Random(0x53454354494f4eL);int outside=0,inside=0;
+        for(int variant=0;variant<4;variant++)try(var fixture=variant==3?WorldGpuFixture.emptySections():WorldGpuFixture.sectionCulling(variant==1,variant==2)) {
+            var scene=fixture.scene();var origin=scene.snapshot().extent().position(0);int drawable=(int)scene.sections().stream().filter(m->m.bounds().isPresent()).count();
+            var whole=new GlCamera(origin,4,8,512,4,2,4,90,0.1,2048);var contained=new GlWorldCulling(scene,whole,1,WorldClip.NONE,true);equal(drawable,contained.visible,"whole source acceptance preserves drawable sections");equal(drawable==0?0:1,contained.sectionBoundsTests(),"contained source needs at most root classification");equal(0,contained.sectionLeafTests(),"contained parent avoids leaf bounds");
+            var away=new GlCamera(origin,4,8,1024,4,8,1536,60,0.1,2048);var behind=new GlWorldCulling(scene,away,1,WorldClip.NONE,true);equal(0,behind.visible,"whole grid behind eye is rejected");equal(drawable==0?0:1,behind.sectionBoundsTests(),"frustum rejection needs at most root classification");equal(0,behind.sectionLeafTests(),"frustum rejection avoids original leaves");
+            var far=new WorldClip(new WorldSnapshot.Extent(origin.x()+4096,origin.y(),origin.z(),1,1,1));var rejected=new GlWorldCulling(scene,whole,1,far,true);equal(0,rejected.visible,"disjoint clip rejects entire grid");equal(drawable==0?0:1,rejected.sectionBoundsTests(),"disjoint source needs at most root classification");equal(0,rejected.sectionLeafTests(),"disjoint parent avoids leaf bounds");
+            for(int trial=0;trial<48;trial++) {
+                int shift=trial%3==0?4096:0;var anchor=new WorldSnapshot.Position(origin.x()+shift,origin.y()-shift,origin.z()+shift);double angle=random.nextDouble()*Math.PI*2,radius=16+random.nextDouble()*32;
+                var camera=trial==0?whole:new GlCamera(anchor,4+Math.sin(angle)*radius-shift,2+(random.nextDouble()-0.5)*radius+shift,4+Math.cos(angle)*radius-shift,4-shift,2+shift,4-shift,35+random.nextDouble()*70,0.1,2048);double aspect=0.5+random.nextDouble()*2;
+                var scope=trial==0?WorldClip.NONE:trial%4==0?far:trial%4==1?WorldClip.NONE:new WorldClip(new WorldSnapshot.Extent(origin.x()+random.nextInt(12)-2,origin.y()+random.nextInt(8)-2,origin.z()+random.nextInt(12)-2,4,3,4));
+                var tree=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.HIERARCHY);var linear=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.LINEAR);var none=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.NONE);check(Arrays.equals(linear.sections,tree.sections)&&Arrays.equals(none.sections,tree.sections),"all strategies preserve exact original section decisions");equal(drawable,linear.sectionLeafTests(),"linear reference tests every drawable section");equal(drawable,none.sectionBoundsTests(),"disabled groups retain original section test");check(tree.sectionBoundsTests()<=35&&tree.sectionLeafTests()<=drawable,"implicit work is bounded by binary interval tree");var frustum=new GlFrustum(tree.matrix);
+                for(int first=0;first<18;first++)for(int end=first+1;end<=18;end++) {
+                    var classification=frustum.classifySections(tree.sectionMinimum(first,end,0),tree.sectionMinimum(first,end,1),tree.sectionMinimum(first,end,2),tree.sectionMaximum(first,end,0),tree.sectionMaximum(first,end,1),tree.sectionMaximum(first,end,2),scope.enabled()?tree.clip:null);
+                    if(classification==GlFrustum.Visibility.OUTSIDE)outside++;if(classification==GlFrustum.Visibility.INSIDE)inside++;
+                    for(int section=first;section<end;section++)if(scene.sections().get(section).bounds().isPresent()) { if(classification==GlFrustum.Visibility.OUTSIDE)check(!linear.sections[section],"parent rejection agrees with independent original leaves");if(classification==GlFrustum.Visibility.INSIDE)check(linear.sections[section],"parent acceptance agrees with independent original leaves"); }
+                }
+                for(int section=0;section<18;section++) { var mesh=scene.sections().get(section);for(int face=0;face<mesh.faces().size();face+=WorldMesh.BATCH_FACES)equal(linear.face(section,face),tree.face(section,face),"face decisions preserve source section identity");for(int marker=0;marker<mesh.markers().size();marker+=WorldMesh.BATCH_FACES)equal(linear.marker(section,marker),tree.marker(section,marker),"marker decisions preserve source section identity"); }
+            }
+        }
+        check(outside>100&&inside>100,"interval oracle covers both bulk rejection and acceptance");
+    }
     private static void scalarDrawPreparation() {
         var context=surface(true).volume().context();var grid=new NoiseVolume.Grid(new MapSamples.Grid(-37,91,32,32,1),new MapSamples.Vertical(-64,1));var values=new double[1024];Arrays.fill(values,0.5);var present=new byte[1024];Arrays.fill(present,(byte)1);var volume=NoiseVolume.capture(context,grid,values,present,NoiseVolume.Limits.DEFAULT,()->false);var style=new NoiseSurface.Style(0,1,new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE),NoiseSurface.Meshing.CELLS);var source=NoiseSurface.prepare(volume,style,NoiseSurface.Limits.DEFAULT,()->false);
         check(!source.requiresPlaceholder(),"complete scalar draw fixture");equal(2176,source.size(),"complete slab outer surface without height/sample omission");equal(3,source.batchCount(),"three original scalar groups");equal(1027L,GlNoiseCulling.workingBytes(source,true),"fixed math plus exact scalar mask allowance");equal(1024L,GlNoiseCulling.workingBytes(source,false),"no group mask in disabled mode");
@@ -266,6 +308,8 @@ public final class GlMathContracts {
         group("shared conservative world face-group decisions",GlMathContracts::worldGroups);
         group("hierarchical world draw bounds and linear agreement",GlMathContracts::worldHierarchicalDraw);
         group("hierarchical diagnostic marker groups and masks",GlMathContracts::markerHierarchicalDraw);
+        group("implicit section envelopes and exact grid coverage",GlMathContracts::sectionEnvelopes);
+        group("implicit section hierarchy and original leaf agreement",GlMathContracts::sectionHierarchicalDraw);
         group("bounded scalar draw preparation and differential groups",GlMathContracts::scalarDrawPreparation);
         group("hierarchical scalar draw rejection and linear agreement",GlMathContracts::scalarHierarchicalDraw);
         System.out.println("PASS "+groups+" context-free display math groups; no OpenGL/native parity is claimed.");

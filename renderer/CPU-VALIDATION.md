@@ -91,3 +91,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Complete world-frame admission](../renderer-gl/FRAME-ADMISSION.md) adds three GPU groups. CPU/context-free suites remain at 107; GPU groups now total 48 for 155 overall, all unexecuted. Both compilation sets pass (144/106 files).
 
 [Scalar, map and image frame admission](../renderer-gl/DIRECT-FRAME-ADMISSION.md) adds two GPU groups. CPU/context-free suites remain at 107; GPU groups now total 50 for 157 overall, all unexecuted. Both compilation sets pass (144/106 files).
+
+[Implicit world section culling](../renderer-gl/SECTION-CULLING.md) adds two context-free groups and one GPU group. The five harnesses now prepare 160 groups: 23 renderer CPU, 48 world CPU, 17 animation, 21 display math and 51 GPU. Both compilation sets pass (144/106 files); none has executed.

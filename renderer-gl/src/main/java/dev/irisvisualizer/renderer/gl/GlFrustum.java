@@ -21,6 +21,14 @@ final class GlFrustum {
         double maxX=(double)offsets[at]+bounds.max().x(),maxY=(double)offsets[at+1]+bounds.max().y(),maxZ=(double)offsets[at+2]+bounds.max().z();
         return visible(minX,minY,minZ,maxX,maxY,maxZ);
     }
+    /** Outward section envelopes enclose the old double leaf bounds and shader float addition. */
+    Visibility classifySections(float minX,float minY,float minZ,float maxX,float maxY,float maxZ,WorldClip.Bounds clip) {
+        if(clip!=null) {
+            double magnitude=Math.max(Math.max(Math.abs(minX),Math.abs(maxX)),Math.max(Math.max(Math.abs(minY),Math.abs(maxY)),Math.max(Math.abs(minZ),Math.abs(maxZ)))),margin=4*(double)Math.ulp((float)magnitude)+1e-6;
+            if(!clip.intersects(minX-margin,minY-margin,minZ-margin,maxX+margin,maxY+margin,maxZ+margin))return Visibility.OUTSIDE;
+        }
+        return classify(minX,minY,minZ,maxX,maxY,maxZ,clip,true);
+    }
     /** Original-order world face bounds, using the geometry shader's float anchor addition. */
     boolean visible(WorldMesh mesh,int batch,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,batch,false,false,offsets,at,clip,false)!=Visibility.OUTSIDE; }
     Visibility classifyHierarchy(WorldMesh mesh,int node,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,node,true,false,offsets,at,clip,true); }

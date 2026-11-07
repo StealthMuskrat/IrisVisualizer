@@ -9,7 +9,8 @@ final class GlWorldCulling {
     private static final long MATH_BYTES=1024;
     final float[] matrix,offsets;final boolean[] sections;final WorldClip.Bounds clip;
     private final List<WorldMesh> meshes;private final GlFrustum frustum;private final boolean ranges,clipped;private final int[] starts,markerStarts;private final byte[] batches,markerBatches;
-    final int empty,visible,culled;private int tests,rejected,boundsTests,markerTests,markerRejected,markerBoundsTests;
+    private final int columns,slab;
+    final int empty,visible,culled;private int tests,rejected,boundsTests,markerTests,markerRejected,markerBoundsTests,sectionBoundsTests,sectionLeafTests;
     /** Exact variable primitive payload plus a conservative fixed math allowance; metadata-only sizing. */
     static long workingBytes(WorldScene scene,boolean ranges) {
         return workingBytes(scene,GlCullingMode.from(ranges));
@@ -23,24 +24,50 @@ final class GlWorldCulling {
     }
     GlWorldCulling(WorldScene scene,GlCamera camera,double aspect,WorldClip scope,GlCullingMode mode) {
         Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(scope);Objects.requireNonNull(mode);camera.requireSceneRange(scene);boolean ranges=mode.enabled();this.ranges=ranges;clipped=scope.enabled();meshes=scene.sections();
+        var extent=scene.snapshot().extent();int edge=scene.plan().limits().sectionEdge();columns=(extent.width()-1)/edge+1;slab=Math.multiplyExact(columns,(extent.depth()-1)/edge+1);
         matrix=camera.matrix(aspect);frustum=new GlFrustum(matrix);clip=scope.relative(camera.anchor());offsets=new float[meshes.size()*3];sections=new boolean[meshes.size()];starts=new int[ranges?meshes.size()+1:0];batches=new byte[ranges?scene.usage().faceBatches():0];
         boolean markerRanges=ranges&&scene.usage().markerBatches()>0;markerStarts=new int[markerRanges?meshes.size()+1:0];markerBatches=new byte[markerRanges?scene.usage().markerBatches():0];
-        int empty=0,visible=0,culled=0,batch=0,markerBatch=0;
+        int empty=0,visible=0,batch=0,markerBatch=0;
         for(int i=0;i<meshes.size();i++) {
             var mesh=meshes.get(i);camera.offset(mesh.origin(),offsets,i*3);
             if(ranges) { starts[i]=batch;batch+=mesh.faceBatchCount(); }
             if(markerRanges) { markerStarts[i]=markerBatch;markerBatch+=mesh.markerBatchCount(); }
             if(mesh.bounds().isEmpty()) { empty++;continue; }
-            sections[i]=frustum.visible(mesh.bounds().orElseThrow(),offsets,i*3)&&(!clipped||clipVisible(mesh.bounds().orElseThrow(),i*3));
-            if(sections[i])visible++;else culled++;
+            if(mode!=GlCullingMode.HIERARCHY)sections[i]=sectionVisible(i);
         }
         if(ranges) { starts[meshes.size()]=batch;if(batch!=batches.length)throw new GlFailure(GlFailure.Code.STATE,"Prepared world face groups differ from their complete scene receipt"); }
         if(markerRanges) { markerStarts[meshes.size()]=markerBatch;if(markerBatch!=markerBatches.length)throw new GlFailure(GlFailure.Code.STATE,"Prepared marker groups differ from complete source receipt"); }
-        this.empty=empty;this.visible=visible;this.culled=culled;
+        if(mode==GlCullingMode.HIERARCHY)classifySections(0,meshes.size());for(boolean show:sections)if(show)visible++;
+        this.empty=empty;this.visible=visible;this.culled=meshes.size()-empty-visible;
         if(mode==GlCullingMode.HIERARCHY)for(int section=0;section<meshes.size();section++) {
             var mesh=meshes.get(section);if(sections[section]) { if(mesh.faceBatchCount()>0)classify(mesh,section,0,mesh.faceBatchCount(),0,false);if(mesh.markerBatchCount()>0)classify(mesh,section,0,mesh.markerBatchCount(),0,true); }
         }
     }
+    /** A leaf uses exactly the original section predicate, independent of face/marker group classification. */
+    private boolean sectionVisible(int section) {
+        sectionBoundsTests++;sectionLeafTests++;var bounds=meshes.get(section).bounds().orElseThrow();return frustum.visible(bounds,offsets,section*3)&&(!clipped||clipVisible(bounds,section*3));
+    }
+    private boolean populated(int first,int end) { return starts[first]!=starts[end]||markerStarts.length>0&&markerStarts[first]!=markerStarts[end]; }
+    private void classifySections(int first,int end) {
+        if(!populated(first,end))return;
+        if(end-first==1) { sections[first]=sectionVisible(first);return; }
+        sectionBoundsTests++;var result=frustum.classifySections(sectionMinimum(first,end,0),sectionMinimum(first,end,1),sectionMinimum(first,end,2),sectionMaximum(first,end,0),sectionMaximum(first,end,1),sectionMaximum(first,end,2),clipped?clip:null);
+        if(result==GlFrustum.Visibility.OUTSIDE)return;
+        if(result==GlFrustum.Visibility.INSIDE) { for(int i=first;i<end;i++)if(populated(i,i+1))sections[i]=true;return; }
+        int middle=(first+end)>>>1;classifySections(first,middle);classifySections(middle,end);
+    }
+    private void interval(int first,int end,int axis) { Objects.checkFromToIndex(first,end,meshes.size());Objects.checkIndex(axis,3);if(first==end)throw new IllegalArgumentException("Section interval must be nonempty"); }
+    /** Constant-work regular-grid envelope; no per-interval bounds array or source walk. */
+    float sectionMinimum(int first,int end,int axis) {
+        interval(first,end,axis);int last=end-1,at=switch(axis) { case 0->first/columns==last/columns?first:0;case 1->first;default->first/slab==last/slab?first:0; };
+        return Math.nextDown(offsets[at*3+axis]-WorldMesher.MAX_LOCAL_COORDINATE);
+    }
+    float sectionMaximum(int first,int end,int axis) {
+        interval(first,end,axis);int last=end-1,at=switch(axis) { case 0->first/columns==last/columns?last:columns-1;case 1->last;default->first/slab==last/slab?last:slab-1; };
+        return Math.nextUp(offsets[at*3+axis]+WorldMesher.MAX_LOCAL_COORDINATE);
+    }
+    int sectionBoundsTests() { return sectionBoundsTests; }
+    int sectionLeafTests() { return sectionLeafTests; }
     /** Read a prepared hierarchy mask, or lazily cache each independent leaf in LINEAR mode. */
     boolean face(int section,int face) {
         Objects.checkIndex(section,meshes.size());var mesh=meshes.get(section);Objects.checkIndex(face,mesh.faces().size());

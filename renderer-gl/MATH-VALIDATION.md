@@ -1,6 +1,6 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04; updated 2026-11-07. `GlMathContracts` contains 19 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 48 world CPU and 17 animation groups, the context-free suites contain 107 prepared groups. The separate GPU harness adds 50 for 157 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
+Prepared 2026-11-04; updated 2026-11-07. `GlMathContracts` contains 21 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 48 world CPU and 17 animation groups, the context-free suites contain 109 prepared groups. The separate GPU harness adds 51 for 160 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
 
 ## No context or driver required
 
@@ -45,3 +45,5 @@ The existing navigation group now also prepares end-to-end [grid-aware scalar fo
 [Hierarchical scalar draw classification](HIERARCHICAL-SCALAR-CULLING.md) adds the sixteenth group, preparing strict parent containment, root/subtree rejection, independent leaf and homogeneous-corner comparison, rebased poses, multiple scales, full coverage and unchanged scratch. The CPU runner includes the new context-free strategy enum. Full/default compilation covers 144/106 files; all 119 prepared groups remain unexecuted.
 
 [Source precision preflight](PRECISION-PREFLIGHT.md) adds a context-free group for inclusive and overflowing anchor differences, atomic offset failure, complete empty/nonempty source guards and scalar four-ULP spacing boundaries across culling modes. The shared metadata checks now guard view/frame admission and actual drawing. All 152 prepared groups remain unexecuted.
+
+[Implicit world section culling](SECTION-CULLING.md) adds exhaustive interval-envelope checks and deterministic original-leaf comparisons on irregular full XYZ grids, including empty and marker sources. There are now 21 math groups, 109 context-free groups and 51 GPU groups (160 total), all unexecuted. Both source sets compile (144/106 files).

@@ -7,6 +7,7 @@ import java.util.function.BooleanSupplier;
 
 /** Two-pass bounded assembly; no generated state rewriting, native choice RNG, or opacity inference. */
 public final class WorldMesher {
+    public static final int MAX_LOCAL_COORDINATE=128;
     private WorldMesher() {}
     public record Limits(int axis,int cells,int faces,int markers,long meshBytes,long prototypeBytes,long sourceIndexBytes,long workingBytes) {
         public static final Limits DEFAULT=new Limits(32,32768,1048576,32768,64L*1024*1024,64L*1024*1024,256L*1024*1024,512L*1024*1024);
@@ -24,7 +25,7 @@ public final class WorldMesher {
         }
         boolean hidden(int cell,AtlasMesh.Face face) { var direction=face.source().cullface();return direction.isPresent()&&visibility.hidden(cell,direction.get()); }
         void bounds(float x,float y,float z,int cell) {
-            if(!Float.isFinite(x)||!Float.isFinite(y)||!Float.isFinite(z)||Math.abs(x)>128||Math.abs(y)>128||Math.abs(z)>128)throw WorldProblem.at(WorldProblem.Code.COORDINATE,world.extent().position(cell),"Section-relative vertex is outside the supported finite precision range");
+            if(!Float.isFinite(x)||!Float.isFinite(y)||!Float.isFinite(z)||Math.abs(x)>MAX_LOCAL_COORDINATE||Math.abs(y)>MAX_LOCAL_COORDINATE||Math.abs(z)>MAX_LOCAL_COORDINATE)throw WorldProblem.at(WorldProblem.Code.COORDINATE,world.extent().position(cell),"Section-relative vertex is outside the supported finite precision range");
             minX=Math.min(minX,x);minY=Math.min(minY,y);minZ=Math.min(minZ,z);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);maxZ=Math.max(maxZ,z);
         }
         Optional<BlockMesh.Bounds> bounds() { return minX==Float.POSITIVE_INFINITY?Optional.empty():Optional.of(new BlockMesh.Bounds(new ModelPlan.Vec3(minX,minY,minZ),new ModelPlan.Vec3(maxX,maxY,maxZ))); }
