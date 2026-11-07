@@ -33,3 +33,5 @@ Two new GPU groups prepare ACTIVE/READY admission rejection across all five tran
 All 137 production sources, five harnesses and one fixture compile with Java 25/LWJGL (143 files). The unchanged dependency-free set contains 105 files. All 96 prepared groups remain unexecuted: 76 CPU/context-free and 20 GPU. No renderer-stage completion or GPU/native correctness is claimed.
 
 Complete transfer admission now includes raster textures, scalar geometry/color buffers and VAO, and readback pixel-pack buffers. A known GPU/object deficit rejects before map/image/readback queue replacement; unused storage refunds without fencing. All 148 prepared groups remain unexecuted.
+
+[Complete world-frame admission](FRAME-ADMISSION.md) now extends admission-before-replacement to the completed world-image queue, including its target and draw scratch. A candidate that cannot overlap earlier READY ownership rejects without spending its token; accepted native drawing follows ordinary cancellation/failure cleanup. All 155 prepared groups remain unexecuted.

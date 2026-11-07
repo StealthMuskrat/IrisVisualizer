@@ -53,16 +53,39 @@ public final class GlFrame implements AutoCloseable {
         Objects.requireNonNull(mode);
         Objects.requireNonNull(clip);Objects.requireNonNull(renderer);Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid frame revision or dimensions");
         var device=renderer.device;device.live(renderer.allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame inputs must share one renderer device");scene.live();current(obsolete);
-        var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();
+        try(var prepared=prepare(renderer,revision,scene,atlas,order,camera,width,height,clip,mode)) { return prepared.render(obsolete); }
+    }
+    /** Internal one-shot owner; all known frame payload is admitted before storage or obsolete callbacks. */
+    static final class Prepared implements AutoCloseable {
+        private final GlRenderer renderer;private final long revision;private final GlCamera camera;private final int width,height;private final WorldClip clip;private final GlCullingMode mode;
+        private GlScene scene;private GlAtlasFrame atlas;private GlDrawPlan order;private GlDevice.Allocation journal,scratch;private GlTarget target;private boolean used,closed;
+        private Prepared(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,GlCullingMode mode,GlDevice.Allocation journal,GlDevice.Allocation scratch,GlTarget target) {
+            this.renderer=renderer;this.revision=revision;this.scene=scene;this.atlas=atlas;this.order=order;this.camera=camera;this.width=width;this.height=height;this.clip=clip;this.mode=mode;this.journal=journal;this.scratch=scratch;this.target=target;
+        }
+        GlFrame render(BooleanSupplier obsolete) {
+            Objects.requireNonNull(obsolete);if(used||closed)throw new GlFailure(GlFailure.Code.STATE,"Frame preparation is already used or closed");used=true;var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();
+            current(obsolete);target.initialize();current(obsolete);var stats=renderer.renderAdmittedFrame(scene,atlas,order,target,camera,clip,mode,scratch);scratch=null;current(obsolete);
+            var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats,clip,scene.lightingInfo(),Optional.of(WorldVisualReport.receipt(cpu)));var result=new GlFrame(new Shared(renderer.device,journal,target,info));journal=null;target=null;return result;
+        }
+        @Override public void close() {
+            closed=true;var device=renderer.device;Throwable failure=null;
+            if(journal!=null)try { device.retire(journal);journal=null; }catch(RuntimeException|Error error) { if(journal.retired||journal.released)journal=null;failure=error; }
+            if(scratch!=null)try { device.retire(scratch);scratch=null; }catch(RuntimeException|Error error) { if(scratch.retired||scratch.released)scratch=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+            if(target!=null)try { target.close();target=null; }catch(RuntimeException|Error error) { if(target.allocation.retired||target.allocation.released)target=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+            scene=null;atlas=null;order=null;if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+        }
+    }
+    static Prepared prepare(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,GlCullingMode mode) {
+        Objects.requireNonNull(clip);Objects.requireNonNull(mode);if(revision<1)throw new IllegalArgumentException("Invalid frame revision");var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();var device=renderer.device;
         long extraCpu=0;for(int page=0;page<raster.pages().size();page++)if(raster.pages().get(page)!=cpu.raster().pages().get(page))extraCpu+=raster.pages().get(page).bytes();
-        WorldScene.Result owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
+        WorldScene.Result owner=null;GlDevice.Allocation journal=null,scratch=null;GlTarget target=null;
         try {
             owner=scene.retainCpuScene();journal=device.reserve(0,extraCpu,0,0,0,0,0,0,0,owner);owner=null;journal.retained=raster;device.depend(journal,scene.allocation);
-            current(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);current(obsolete);
-            var stats=renderer.renderFrame(scene,atlas,order,target,camera,clip,mode);current(obsolete);
-            var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats,clip,scene.lightingInfo(),Optional.of(WorldVisualReport.receipt(cpu)));return new GlFrame(new Shared(device,journal,target,info));
+            scratch=device.reserve(0,GlWorldCulling.workingBytes(cpu,mode),0,0,0,0,0,0,0,null);target=GlTarget.admit(device,width,height);device.depend(journal,target.allocation);
+            return new Prepared(renderer,revision,scene,atlas,order,camera,width,height,clip,mode,journal,scratch,target);
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(scratch!=null)try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(target!=null)try { target.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(owner!=null)try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }

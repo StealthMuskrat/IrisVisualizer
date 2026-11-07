@@ -160,14 +160,23 @@ public final class GlRenderer implements AutoCloseable {
         return draw(scene,atlas,plan,target,camera,clip,GlCullingMode.from(rangeCulling));
     }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode) {
+        return draw(scene,atlas,plan,target,camera,clip,mode,null);
+    }
+    FrameStats renderAdmittedFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode,GlDevice.Allocation scratch) {
+        return draw(scene,atlas,plan,target,camera,clip,mode,Objects.requireNonNull(scratch));
+    }
+    private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode,GlDevice.Allocation admitted) {
         Objects.requireNonNull(mode);Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");scene.live();device.live(target.allocation);camera.requireSceneRange(scene.cpuScene());device.collect(GlDevice.CollectionBudget.DEFAULT);
         if(plan!=null&&plan.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Face order and renderer must share one device");
         if(scene.translucentFaces>0&&plan==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Prepare a complete global translucent order for this scene and camera before drawing");
         var order=plan==null?null:plan.order(scene,camera);
         int[] textures=atlas==null?scene.allocation.textures:atlas.textures(scene);
-        var scratch=device.reserve(0,GlWorldCulling.workingBytes(scene.cpuScene(),mode),0,0,0,0,0,0,0,null);Throwable escaping=null;FrameStats result;
-        try { result=drawAdmitted(scene,target,camera,clip,mode,order,textures); }
+        long bytes=GlWorldCulling.workingBytes(scene.cpuScene(),mode);var scratch=admitted==null?device.reserve(0,bytes,0,0,0,0,0,0,0,null):admitted;Throwable escaping=null;FrameStats result;
+        try {
+            device.live(scratch);if(scratch.cpu!=bytes||scratch.gpu!=0||scratch.names!=0||scratch.owner!=null||scratch.retained!=null||scratch.dependents!=0||!scratch.dependencies.isEmpty())throw new GlFailure(GlFailure.Code.STATE,"Draw scratch differs from its exact admitted source/mode footprint");
+            result=drawAdmitted(scene,target,camera,clip,mode,order,textures);
+        }
         catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
         finally { try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }
         target.complete=true;return result;

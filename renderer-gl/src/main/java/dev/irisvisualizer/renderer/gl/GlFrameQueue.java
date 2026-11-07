@@ -35,14 +35,14 @@ public final class GlFrameQueue implements AutoCloseable {
     /** The obsolete supplier must be side-effect free; it can observe an externally advanced edit/view token. */
     public boolean render(long next,Request request,BooleanSupplier obsolete) {
         Objects.requireNonNull(request);Objects.requireNonNull(obsolete);current();if(next<1)throw new IllegalArgumentException("Invalid frame revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
-        GlFrame.validate(renderer,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height());if(next>revision)invalidate(next);
-        rendering=true;GlFrame result=null;
-        try {
-            status=new Status(revision,Phase.RENDERING,Optional.of(request.scene().cpuScene().snapshot().source()),Optional.empty(),Optional.empty(),"");
-            result=GlFrame.render(renderer,next,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height(),request.clip(),obsolete);
+        GlFrame.validate(renderer,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height());var changed=new Status(next,Phase.RENDERING,Optional.of(request.scene().cpuScene().snapshot().source()),Optional.empty(),Optional.empty(),"");
+        boolean accepted=false;GlFrame result=null;
+        try(var prepared=GlFrame.prepare(renderer,next,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height(),request.clip(),GlCullingMode.HIERARCHY)) {
+            accepted=true;revision=next;rendering=true;status=changed;releaseOwned();if(obsolete.getAsBoolean())throw new CancellationException("Completed frame request is obsolete");
+            result=prepared.render(obsolete);
             if(obsolete.getAsBoolean())throw new CancellationException("Completed frame became obsolete before queue adoption");var ready=new Status(revision,Phase.READY,status.source(),Optional.of(result.info()),Optional.empty(),"");completed=result;result=null;status=ready;return true;
-        }catch(RuntimeException|Error failure) { if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }
-        finally { rendering=false; }
+        }catch(RuntimeException|Error failure) { if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }if(accepted)failed(failure);throw failure; }
+        finally { if(accepted)rendering=false; }
     }
     public Optional<GlFrame> take(long latestRevision) {
         current();if(latestRevision<1)throw new IllegalArgumentException("Invalid frame revision");if(latestRevision>revision) { invalidate(latestRevision);return Optional.empty(); }
