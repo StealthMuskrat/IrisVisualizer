@@ -25,7 +25,7 @@ public final class GlImageFrame implements AutoCloseable {
         GlImage owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);journal.retained=raster;
-            check(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);check(obsolete);renderer.render(owner,target,view);check(obsolete);
+            target=GlTarget.admit(device,width,height);device.depend(journal,target.allocation);check(obsolete);target.initialize();check(obsolete);renderer.render(owner,target,view);check(obsolete);
             var info=new Info(UUID.randomUUID(),revision,raster.receipt().orElseThrow(),view,width,height);return new GlImageFrame(new Shared(device,journal,target,owner,info));
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }

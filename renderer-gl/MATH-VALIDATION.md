@@ -1,6 +1,6 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04; updated 2026-11-07. `GlMathContracts` contains 19 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 48 world CPU and 17 animation groups, the context-free suites contain 107 prepared groups. The separate GPU harness adds 48 for 155 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
+Prepared 2026-11-04; updated 2026-11-07. `GlMathContracts` contains 19 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 48 world CPU and 17 animation groups, the context-free suites contain 107 prepared groups. The separate GPU harness adds 50 for 157 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
 
 ## No context or driver required
 

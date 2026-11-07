@@ -53,7 +53,7 @@ public final class GlMapFrame implements AutoCloseable {
         GlMap owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);journal.retained=raster;
-            check(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);check(obsolete);renderer.render(owner,target,view);check(obsolete);
+            target=GlTarget.admit(device,width,height);device.depend(journal,target.allocation);check(obsolete);target.initialize();check(obsolete);renderer.render(owner,target,view);check(obsolete);
             var identity=raster.samples().kind()==MapSamples.Kind.BIOME?Optional.<ScalarHistogram.Receipt>empty():Optional.of(ScalarHistogram.receipt(raster.samples()));
             var info=new Info(UUID.randomUUID(),revision,raster.samples().context(),raster.samples().kind(),raster.samples().grid(),view,width,height,Optional.of(raster.style()),raster.summary(),identity);return new GlMapFrame(new Shared(device,journal,target,owner,info));
         }catch(RuntimeException|Error failure) {

@@ -81,10 +81,20 @@ public final class GlNoiseRenderer implements AutoCloseable {
     }
     /** Explicit linear reference shares source geometry, clipping and the same admitted mask size. */
     public Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode) {
+        return render(scene,target,camera,clip,mode,null);
+    }
+    /** Immutable frame assembly reserves this exact scratch before starting private target storage. */
+    Stats renderAdmittedFrame(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode,GlDevice.Allocation scratch) {
+        return render(scene,target,camera,clip,mode,Objects.requireNonNull(scratch));
+    }
+    private Stats render(GlNoiseScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode,GlDevice.Allocation admitted) {
         Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);Objects.requireNonNull(mode);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scalar draw inputs must share their original device");device.live(target.allocation);var surface=scene.surface();
-        GlNoiseCulling.validateView(surface,camera);var scratch=device.reserve(0,GlNoiseCulling.workingBytes(surface,mode),0,0,0,0,0,0,0,null);Throwable escaping=null;Stats result;
-        try { result=drawAdmitted(scene,target,camera,clip,mode,surface); }
+        GlNoiseCulling.validateView(surface,camera);long bytes=GlNoiseCulling.workingBytes(surface,mode);var scratch=admitted==null?device.reserve(0,bytes,0,0,0,0,0,0,0,null):admitted;Throwable escaping=null;Stats result;
+        try {
+            device.live(scratch);if(scratch.cpu!=bytes||scratch.gpu!=0||scratch.names!=0||scratch.owner!=null||scratch.retained!=null||scratch.dependents!=0||!scratch.dependencies.isEmpty())throw new GlFailure(GlFailure.Code.STATE,"Scalar draw scratch differs from its exact admitted source/mode footprint");
+            result=drawAdmitted(scene,target,camera,clip,mode,surface);
+        }
         catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
         finally { try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }
         target.complete=true;return result;
