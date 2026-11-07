@@ -39,7 +39,7 @@ public final class WorldVisualWorker implements AutoCloseable {
             if(reservation>workingBytes)throw new IllegalArgumentException("Active and pending visual working reservations exceed the worker budget");
             long next=nextRevision();var job=new Job(next,request);var queued=status(next,Phase.QUEUED,request,List.of(),List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Standalone visual preparation",request.limits().workingBytes(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.admission());
-            cancelOwned();pending=job;revision=next;status=queued;
+            try { cancelOwned(); }catch(RuntimeException|Error failure) { try { job.admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }pending=job;revision=next;status=queued;
             if(!scheduled) {
                 scheduled=true;
                 try { executor.execute(this::drain); }
@@ -52,8 +52,13 @@ public final class WorldVisualWorker implements AutoCloseable {
     public long invalidate() {
         synchronized(lock) { requireOpen();long next=nextRevision();var waiting=new Status(next,Phase.IDLE,Optional.empty(),Optional.empty(),List.of(),List.of());cancelOwned();revision=next;status=waiting;return next; }
     }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
+    private void dropCompleted() { var old=completed;completed=null;if(old!=null)old.close(); }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);Throwable failure=null;
+        if(pending!=null) { var old=pending;pending=null;old.cancelled.set(true);try { old.admission.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; } }
+        try { dropCompleted(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     public Status status() { synchronized(lock) { return status; } }
     /** Exactly-once transfer of output and its tracked memory hold for the current revision. */
     public Optional<Completion> take(long expectedRevision) {

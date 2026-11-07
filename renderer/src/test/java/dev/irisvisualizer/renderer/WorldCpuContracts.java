@@ -14,10 +14,11 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.LongConsumer;
+import java.util.function.LongPredicate;
 import java.util.function.Supplier;
 import java.util.zip.*;
 
-/** Synthetic world pipeline contracts. No client archive is opened and no native parity is claimed. */
+/** Synthetic world contracts; only fixture-owned tiny ZIPs are opened, never user client archives. No native parity is claimed. */
 public final class WorldCpuContracts {
     private static final BooleanSupplier LIVE=()->false;
     private static int groups;
@@ -1261,9 +1262,9 @@ public final class WorldCpuContracts {
     }
     /** Account release can fail after removal; producer/construction errors must remain primary. */
     private static final class CaptureCloseFault implements AutoCloseable {
-        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Error failure,secondary;int removals;
-        CaptureCloseFault(RenderMemory memory,Error failure) { this(memory,failure,failure); }
-        @SuppressWarnings("unchecked") CaptureCloseFault(RenderMemory memory,Error failure,Error secondary) {
+        final RenderMemory memory;final java.lang.reflect.Field field;final Set<RenderMemory.Account> original;final Throwable failure,secondary;int removals;
+        CaptureCloseFault(RenderMemory memory,Throwable failure) { this(memory,failure,failure); }
+        @SuppressWarnings("unchecked") CaptureCloseFault(RenderMemory memory,Throwable failure,Throwable secondary) {
             this.memory=memory;this.failure=failure;this.secondary=secondary;
             try {
                 field=RenderMemory.class.getDeclaredField("owners");field.setAccessible(true);original=(Set<RenderMemory.Account>)field.get(memory);
@@ -1271,11 +1272,70 @@ public final class WorldCpuContracts {
                     @Override public int size() { return original.size(); }
                     @Override public Iterator<RenderMemory.Account> iterator() { return original.iterator(); }
                     @Override public boolean add(RenderMemory.Account value) { return original.add(value); }
-                    @Override public boolean remove(Object value) { removals++;original.remove(value);throw removals==1?CaptureCloseFault.this.failure:CaptureCloseFault.this.secondary; }
+                    @Override public boolean remove(Object value) { removals++;original.remove(value);var problem=removals==1?CaptureCloseFault.this.failure:CaptureCloseFault.this.secondary;if(problem instanceof RuntimeException runtime)throw runtime;throw (Error)problem; }
                 });
             }catch(ReflectiveOperationException error) { throw new AssertionError("controlled capture-close fault unavailable",error); }
         }
         @Override public void close() { try { field.set(memory,original); }catch(ReflectiveOperationException error) { throw new AssertionError("capture-close fault restore failed",error); } }
+    }
+    private record CleanupArchive(Path path) implements AutoCloseable {
+        @Override public void close() throws IOException { java.nio.file.Files.deleteIfExists(path); }
+    }
+    private static CleanupArchive cleanupArchive() throws IOException {
+        Path path=java.nio.file.Files.createTempFile("iris-worker-cleanup-fixture-",".jar");
+        try {
+            try(var zip=new ZipOutputStream(java.nio.file.Files.newOutputStream(path))) {
+                zip.putNextEntry(new ZipEntry("version.json"));zip.write(("{\"id\":\""+BlockModels.PROFILE+"\"}").getBytes(StandardCharsets.UTF_8));zip.closeEntry();
+                zip.putNextEntry(new ZipEntry("assets/minecraft/models/block/cleanup_fixture.json"));zip.write("{}".getBytes(StandardCharsets.UTF_8));zip.closeEntry();
+            }
+            return new CleanupArchive(path);
+        }catch(IOException|RuntimeException|Error failure) { try { java.nio.file.Files.deleteIfExists(path); }catch(IOException cleanup) { failure.addSuppressed(cleanup); }throw failure; }
+    }
+    private static void cleanupClose(AutoCloseable worker) {
+        try { worker.close(); }catch(RuntimeException failure) { throw failure; }catch(Exception failure) { throw new AssertionError("worker close failed",failure); }
+    }
+    private static void abandonedWorker(Object worker,LongSupplier submit,Runnable invalidate,LongPredicate empty,LongConsumer deliver,LongSupplier reserved,String retainedField,DrainExecutor executor,RenderMemory memory,boolean ready,boolean shutdown,Throwable failure) {
+        long revision=submit.getAsLong();if(ready)executor.runNext();check(workerField(worker,ready?"completed":"pending")!=null,"cleanup fixture reaches requested owned state");check(memory.stats().accounts()>0,"worker owns an admitted bundle before release fault");
+        try(var fault=new CaptureCloseFault(memory,failure)) {
+            Throwable actual=caughtFailure(shutdown?()->cleanupClose((AutoCloseable)worker):invalidate);check(actual==failure,"worker abandonment preserves exact release failure identity");equal(1,fault.removals,"failed release visits its account once");
+            check(workerField(worker,"pending")==null&&workerField(worker,"completed")==null,"abandoned request/completion detached before fallible release");if(reserved!=null)equal(0L,reserved.getAsLong(),"abandoned local reservation cleared");if(retainedField!=null)equal(0L,workerField(worker,retainedField),"abandoned retained counter cleared");check(empty.test(revision),"closed completion cannot escape after release failure");noWorkerCharge(memory);
+        }
+        if(shutdown) { cleanupClose((AutoCloseable)worker);throwsType(IllegalStateException.class,submit::getAsLong,"closed worker rejects replacement after cleanup retry");check(executor.isShutdown(),"failed cleanup still attempts executor shutdown"); }
+        else { long next=submit.getAsLong();equal(revision+1,next,"failed invalidation spends no replacement revision");executor.runNext();deliver.accept(next);noWorkerCharge(memory);cleanupClose((AutoCloseable)worker); }
+        noWorkerCharge(memory);
+    }
+    private static void workerAbandonmentFailures() {
+        var f=fixture(2,128,false);var visualLimits=new WorldVisuals.Limits(4,4,4,16,16,1024*1024,4*1024*1024);var visuals=WorldVisuals.Request.capture(f.assets(),f.snapshot(),List.of(new WorldVisuals.EmptyChoice(0)),new int[2],0,0,visualLimits,LIVE);
+        var encoded=SourceImage.Encoded.capture(new SourceImage.Identity("fixtures/cleanup.png",1),pixel(128));var imageLimits=new SourceImage.Limits(8,64,1024,256,1024*1024);
+        var context=new MapSamples.Context(f.snapshot().source(),"test","cleanup","supplied scalar values");var volume=NoiseVolume.capture(context,new NoiseVolume.Grid(new MapSamples.Grid(0,0,1,1,1),new MapSamples.Vertical(-64,1)),new double[]{1},new byte[]{1},NoiseVolume.Limits.DEFAULT,LIVE);var surface=NoiseSurface.prepare(volume,new NoiseSurface.Style(1,1,new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE)),NoiseSurface.Limits.DEFAULT,LIVE);
+        try(var archive=cleanupArchive();var cache=new WorldSectionCache();var owner=build(f,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+            var assetRequest=new ClientAssetWorker.Request(archive.path(),BlockModels.PROFILE,new ClientAssets.Limits(16384,4096,1024,16,4096));
+            for(boolean shutdown:new boolean[]{false,true})for(boolean ready:new boolean[]{false,true})for(int kind=0;kind<3;kind++) {
+                Throwable failure=switch(kind) { case 0->new IllegalStateException("worker account release failed");case 1->new AssertionError("worker account release error");default->new OutOfMemoryError("worker account release OOM"); };
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new ClientAssetWorker(4*1024*1024,memory,()->executor)) {
+                    abandonedWorker(worker,()->worker.submit(assetRequest),worker::invalidate,v->worker.take(v).isEmpty(),v->worker.take(v).orElseThrow().close(),worker::reservedBytes,"completedBytes",executor,memory,ready,shutdown,failure);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new ImageDecodeWorker(4*1024*1024,memory,()->executor)) {
+                    abandonedWorker(worker,()->worker.submit(new ImageDecodeWorker.Request(encoded,imageLimits)),worker::invalidate,v->worker.take(v).isEmpty(),v->worker.take(v).orElseThrow().close(),worker::reservedBytes,null,executor,memory,ready,shutdown,failure);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new AtlasFrameWorker(4*1024*1024,memory,()->executor)) {
+                    abandonedWorker(worker,()->worker.submit(AtlasFrameWorker.Request.capture(f.raster(),1,0)),worker::invalidate,v->worker.take(v).isEmpty(),v->worker.take(v).orElseThrow().close(),worker::reservedBytes,"completedReservation",executor,memory,ready,shutdown,failure);
+                }
+                try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new WorldVisualWorker(4*1024*1024,memory,()->executor)) {
+                    abandonedWorker(worker,()->worker.submit(visuals),worker::invalidate,v->worker.take(v).isEmpty(),v->worker.take(v).orElseThrow().close(),null,null,executor,memory,ready,shutdown,failure);
+                }
+                // Pointer completions are detached values; only pending requests hold admission to fault.
+                if(!ready) {
+                    try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new WorldPickWorker(4*1024*1024,memory,()->executor)) {
+                        abandonedWorker(worker,()->worker.submit(new WorldPickWorker.Request(index,ray(f.snapshot()))),worker::invalidate,v->worker.take(v).isEmpty(),v->check(worker.take(v).isPresent(),"retried world pointer is deliverable"),worker::reservedBytes,null,executor,memory,false,shutdown,failure);check(!index.released(),"pointer cleanup preserves borrowed original index");
+                    }
+                    try(var memory=new RenderMemory(new RenderMemory.Limits(8*1024*1024,4));var executor=new DrainExecutor();var worker=new NoisePickWorker(4*1024*1024,memory,()->executor)) {
+                        abandonedWorker(worker,()->worker.submit(new NoisePickWorker.Request(surface,new WorldRay(new WorldSnapshot.Position(0,-64,0),0.5,0.5,3,0,0,-1,0,10),new NoisePick.Options(64))),worker::invalidate,v->worker.take(v).isEmpty(),v->check(worker.take(v).isPresent(),"retried scalar pointer is deliverable"),worker::reservedBytes,null,executor,memory,false,shutdown,failure);
+                    }
+                }
+            }
+            check(!owner.closed()&&!index.released(),"all abandonment paths preserve independently owned native scene/index");
+        }catch(IOException failure) { throw new AssertionError("fixture-owned cleanup archive failure",failure); }
     }
     private static void workerConstructionFailures() {
         for(boolean integrated:new boolean[]{false,true})for(boolean tracked:new boolean[]{false,true})for(int kind=0;kind<5;kind++)for(int cleanup=0;cleanup<3;cleanup++) {
@@ -1402,6 +1462,7 @@ public final class WorldCpuContracts {
         group("active sort cancellation and admission",WorldCpuContracts::activeOrderAdmission);
         group("scene-worker shutdown recovery",WorldCpuContracts::workerShutdownRecovery);
         group("worker startup drain and remaining shutdown recovery",WorldCpuContracts::remainingWorkerShutdownRecovery);
+        group("worker abandonment and release-failure recovery",WorldCpuContracts::workerAbandonmentFailures);
         group("explicit empty and unsupported markers",WorldCpuContracts::emptyAndMarkers);
         group("picking-index admission and source release",WorldCpuContracts::indexOwnership);
         System.out.println("PASS "+groups+" synthetic world contract groups; native/GPU parity is outside this harness.");

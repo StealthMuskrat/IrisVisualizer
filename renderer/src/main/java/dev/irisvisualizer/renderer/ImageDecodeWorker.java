@@ -46,7 +46,7 @@ public final class ImageDecodeWorker implements AutoCloseable {
             if(request.reservation()>workingBytes-reserved)throw new IllegalStateException("Active and latest pending image source/output reservations exceed the worker budget");
             var job=new Job(next,request);var queued=new Status(next,Phase.QUEUED,Optional.of(request.source().identity()),List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Original image decoding",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.admission());
-            cancelOwned();pending=job;revision=next;status=queued;
+            try { cancelOwned(); }catch(RuntimeException|Error failure) { try { job.admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }pending=job;revision=next;status=queued;
             if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }return next;
         }
     }
@@ -58,8 +58,13 @@ public final class ImageDecodeWorker implements AutoCloseable {
             return submit(source.value());
         }
     }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; } }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
+    private void dropCompleted() { var old=completed;completed=null;if(old!=null)old.close(); }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);Throwable failure=null;
+        if(pending!=null) { var old=pending;pending=null;old.cancelled.set(true);try { old.admission.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; } }
+        try { dropCompleted(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     public Status status() { synchronized(lock) { return status; } }
     /** Cancelled active stacks remain charged; transferred images are external owners. */
     public long reservedBytes() {

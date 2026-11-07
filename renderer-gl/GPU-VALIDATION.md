@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 26 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including the previously pending initial-atlas change and current owned-lighting/retry changes. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 76 prepared, unexecuted groups, making 102 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 26 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including the previously pending initial-atlas change and current owned-lighting/retry changes. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 77 prepared, unexecuted groups, making 103 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 

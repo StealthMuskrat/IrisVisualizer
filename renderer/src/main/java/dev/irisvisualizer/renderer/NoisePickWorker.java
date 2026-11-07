@@ -80,9 +80,8 @@ public final class NoisePickWorker implements AutoCloseable {
                 Optional.empty(),"Scalar picking request failed: "+failure.getClass().getSimpleName())));
     }
     private void cancelOwned() {
-        if(active!=null)active.cancelled.set(true);
-        if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }
-        completed=null;
+        if(active!=null)active.cancelled.set(true);var old=pending;pending=null;completed=null;
+        if(old!=null) { old.cancelled.set(true);old.admission.close(); }
     }
     /** Admission rejection leaves earlier work, completion and revision intact. Active work cannot supply credit. */
     public long submit(Request request) {
@@ -95,7 +94,7 @@ public final class NoisePickWorker implements AutoCloseable {
             var queued=state(job,Phase.QUEUED,List.of());
             if(memory!=null)job.admission=memory.holdReplacing("Scalar pointer query",request.reservation(),
                     pending==null?RenderMemory.Hold.none():pending.admission);
-            cancelOwned();pending=job;revision=next;status=queued;
+            try { cancelOwned(); }catch(RuntimeException|Error failure) { try { job.admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }pending=job;revision=next;status=queued;
             if(!scheduled) {
                 scheduled=true;
                 try { executor.execute(this::drain); }

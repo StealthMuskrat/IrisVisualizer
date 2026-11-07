@@ -64,11 +64,12 @@ public final class ClientAssetWorker implements AutoCloseable {
         if(reason.length()>2048)reason=reason.substring(0,2048);
         return state(job,Phase.FAILED,Optional.empty(),List.of(new Problem(failure instanceof OutOfMemoryError?Code.MEMORY:failure instanceof IOException?Code.READ:Code.WORKER,reason)));
     }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedBytes=0; }
+    private void dropCompleted() { var old=completed;completed=null;completedBytes=0;if(old!=null)old.close(); }
     private void cancelOwned() {
-        if(active!=null)active.cancelled.set(true);
-        if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }
-        dropCompleted();
+        if(active!=null)active.cancelled.set(true);Throwable failure=null;
+        if(pending!=null) { var old=pending;pending=null;old.cancelled.set(true);try { old.admission.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; } }
+        try { dropCompleted(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     /** Metadata/admission only. Rejection preserves prior revision/work/completion and starts no file I/O. */
     public long submit(Request request) {
@@ -77,7 +78,7 @@ public final class ClientAssetWorker implements AutoCloseable {
             if(request.reservation()>workingBytes-activeBytes)throw new IllegalStateException("Active and pending asset captures exceed their combined allowance");
             var job=new Job(next,request);var queued=state(job,Phase.QUEUED,Optional.empty(),List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Client asset capture",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.input().admission());
-            cancelOwned();pending=job;revision=next;status=queued;
+            try { cancelOwned(); }catch(RuntimeException|Error failure) { try { job.admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }pending=job;revision=next;status=queued;
             if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }
             return next;
         }

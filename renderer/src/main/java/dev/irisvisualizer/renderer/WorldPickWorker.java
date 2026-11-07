@@ -42,7 +42,10 @@ public final class WorldPickWorker implements AutoCloseable {
     public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
     private static Status state(Job job,Phase phase,List<WorldProblem> problems) { return new Status(job.revision,phase,Optional.of(job.request.index().id()),problems,job.request.frame()); }
     private long next() { if(closed)throw new IllegalStateException("Picking worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Picking revision counter exhausted");return revision+1; }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }completed=null; }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);var old=pending;pending=null;completed=null;
+        if(old!=null) { old.cancelled.set(true);old.admission.close(); }
+    }
     public long invalidate() { synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),List.of());cancelOwned();revision=next;status=waiting;return next; } }
     public long submit(Request request) {
         Objects.requireNonNull(request);synchronized(lock) {
@@ -50,7 +53,7 @@ public final class WorldPickWorker implements AutoCloseable {
             if(reservation>workingBytes-(active==null?0:active.reservation))throw new IllegalStateException("Active and pending pointer queries exceed their combined allowance");
             var job=new Job(next,reservation,request);var queued=state(job,Phase.QUEUED,List.of());
             if(memory!=null)job.admission=memory.holdReplacing("Pointer picking request",reservation,pending==null?RenderMemory.Hold.none():pending.admission);
-            cancelOwned();pending=job;revision=next;status=queued;
+            try { cancelOwned(); }catch(RuntimeException|Error failure) { try { job.admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }pending=job;revision=next;status=queued;
             if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }return next;
         }
     }

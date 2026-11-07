@@ -1,16 +1,17 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 30 synthetic contract groups alongside 20 map/scalar/image/ownership groups: 50 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 15 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 76 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 31 synthetic contract groups alongside 20 map/scalar/image/ownership groups: 51 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 15 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 77 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
-The fixture creates a small detached test-only asset catalog containing a JSON blockstate, a six-face unit-cube JSON model and a standard-library-generated one-pixel RGBA PNG. It resolves, bakes, classifies, packs and binds these through the production CPU model/texture/atlas pipeline. Explicitly supplied native state/property-domain and biome identities remain original inputs. Synthetic source receipts and archive paths identify a fixture, never a verified selected client archive or real engine capture. No filesystem asset or native session is opened.
+The fixture creates a small detached test-only asset catalog containing a JSON blockstate, a six-face unit-cube JSON model and a standard-library-generated one-pixel RGBA PNG. It resolves, bakes, classifies, packs and binds these through the production CPU model/texture/atlas pipeline. Explicitly supplied native state/property-domain and biome identities remain original inputs. Synthetic source receipts and archive paths identify a fixture, never a verified selected client archive or real engine capture. The abandonment group also prepares a privately created tiny version/model ZIP for real worker I/O; no user-selected client archive or native session is opened.
 
 The one-cell section grid includes exact long world anchors beyond double's integer precision. Visibility is either explicit KEEP_ALL or a supplied six-bit neighbor mask. Alpha fixtures include opaque, intermediate and fully transparent values. Tight fixture-local atlas budgets prevent oversized page allocations. Existing production readiness and asset-selection rules are unchanged.
 
 | Group | Prepared expectation |
 | --- | --- |
 | Native snapshot identity | Copied index arrays preserve state/property/biome identities; invalid indices and duplicate IDs withhold the entire capture |
+| Worker abandonment | Pending/READY detach before account-release errors across six families; retained counters, exact primary errors, invalidation/shutdown retry, unspent tokens and source/index survival |
 | Model cube winding | Independently computed triangle cross products agree with outward normals, with all vertices on unit-cube boundaries |
 | Atlas extrusion and binding | Known RGBA extends into edge/corner gutters; faces retain classification and exact admitted preparation identity |
 | Visual assignments | Wrong native state and foreign-snapshot offsets fail atomically; caller assignment mutation cannot alter captured choices |
@@ -52,3 +53,5 @@ The [initial CPU validation scope](CPU-VALIDATION.md) remains explicit. Broader 
 [Histogram reuse](HISTOGRAM-REUSE.md) adds the twenty-ninth world group, preparing exact immutable reuse, complete admission, independent owner lifetimes and fallback capture. All 93 prepared groups remain unexecuted.
 
 [Bounded face sorting](BOUNDED-FACE-SORT.md) adds the thirtieth world group: independent reference pairs, exact signed-zero/key order, ordered fast paths, cancellation and halved scratch admission. All 94 prepared groups remain unexecuted.
+
+[Worker abandonment](WORKER-ABANDONMENT.md) adds the thirty-first world group. Full and dependency-free compilation pass (143/105 files); all 103 prepared groups remain unexecuted. The synthetic asset ZIP exists only during eventual explicit contract execution.

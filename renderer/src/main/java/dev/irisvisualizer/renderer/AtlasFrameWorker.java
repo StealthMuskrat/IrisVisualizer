@@ -75,8 +75,13 @@ public final class AtlasFrameWorker implements AutoCloseable {
         }
     }
     private long next() { if(closed)throw new IllegalStateException("Atlas worker is closed");if(revision==Long.MAX_VALUE)throw new IllegalStateException("Atlas revision counter exhausted");return revision+1; }
-    private void dropCompleted() { if(completed!=null) { completed.close();completed=null; }completedReservation=0; }
-    private void cancelOwned() { if(active!=null)active.cancelled.set(true);if(pending!=null) { pending.cancelled.set(true);pending.admission.close();pending=null; }dropCompleted(); }
+    private void dropCompleted() { var old=completed;completed=null;completedReservation=0;if(old!=null)old.close(); }
+    private void cancelOwned() {
+        if(active!=null)active.cancelled.set(true);Throwable failure=null;
+        if(pending!=null) { var old=pending;pending=null;old.cancelled.set(true);try { old.admission.close(); }catch(RuntimeException|Error cleanup) { failure=cleanup; } }
+        try { dropCompleted(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     public long invalidate() {
         synchronized(lock) { long next=next();var waiting=new Status(next,Phase.WAITING,Optional.empty(),0,0,List.of());cancelOwned();revision=next;status=waiting;return next; }
     }
@@ -87,7 +92,7 @@ public final class AtlasFrameWorker implements AutoCloseable {
             if(request.reservation()>workingBytes-reserved)throw new IllegalStateException("Active and pending atlas preparation reservations exceed the worker budget");
             var job=new Job(next,request);var queued=state(job,Phase.QUEUED,List.of());
             job.admission=memory==null?RenderMemory.Hold.none():memory.holdReplacing("Atlas preparation",request.reservation(),pending==null?RenderMemory.Hold.none():pending.admission,completed==null?RenderMemory.Hold.none():completed.admission());
-            cancelOwned();pending=job;revision=next;status=queued;
+            try { cancelOwned(); }catch(RuntimeException|Error failure) { try { job.admission.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }pending=job;revision=next;status=queued;
             if(!scheduled) { scheduled=true;try { executor.execute(this::drain); }catch(RuntimeException|Error failure) { startFailed(job,failure); } }
             return next;
         }
