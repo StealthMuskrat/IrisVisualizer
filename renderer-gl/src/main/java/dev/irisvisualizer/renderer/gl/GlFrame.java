@@ -46,6 +46,11 @@ public final class GlFrame implements AutoCloseable {
     }
     /** Explicit differential mode; each call still owns a fresh immutable target and normal source receipts. */
     public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,boolean rangeCulling,BooleanSupplier obsolete) {
+        return render(renderer,revision,scene,atlas,order,camera,width,height,clip,GlCullingMode.from(rangeCulling),obsolete);
+    }
+    /** Each strategy still creates an independent immutable target and exact-source receipt. */
+    public static GlFrame render(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,GlCullingMode mode,BooleanSupplier obsolete) {
+        Objects.requireNonNull(mode);
         Objects.requireNonNull(clip);Objects.requireNonNull(renderer);Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(obsolete);if(revision<1||width<1||height<1)throw new IllegalArgumentException("Invalid frame revision or dimensions");
         var device=renderer.device;device.live(renderer.allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame inputs must share one renderer device");scene.live();current(obsolete);
         var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();
@@ -54,7 +59,7 @@ public final class GlFrame implements AutoCloseable {
         try {
             owner=scene.retainCpuScene();journal=device.reserve(0,extraCpu,0,0,0,0,0,0,0,owner);owner=null;journal.retained=raster;device.depend(journal,scene.allocation);
             current(obsolete);target=GlTarget.create(device,width,height);device.depend(journal,target.allocation);current(obsolete);
-            var stats=renderer.renderFrame(scene,atlas,order,target,camera,clip,rangeCulling);current(obsolete);
+            var stats=renderer.renderFrame(scene,atlas,order,target,camera,clip,mode);current(obsolete);
             var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats,clip,scene.lightingInfo(),Optional.of(WorldVisualReport.receipt(cpu)));return new GlFrame(new Shared(device,journal,target,info));
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }

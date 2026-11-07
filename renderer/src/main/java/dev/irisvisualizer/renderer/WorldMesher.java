@@ -43,11 +43,11 @@ public final class WorldMesher {
                 if(faceCount>before)cellCount++;
             }
         }
-        long outputBytes() { return (long)faceCount*MeshPacket.PACKED_BYTES_PER_QUAD+(long)translucentCount*WorldMesh.TRANSLUCENT_BYTES_PER_FACE+WorldMesh.batchBytes(faceCount); }
+        long outputBytes() { return (long)faceCount*MeshPacket.PACKED_BYTES_PER_QUAD+(long)translucentCount*WorldMesh.TRANSLUCENT_BYTES_PER_FACE+WorldMesh.batchBytes(faceCount)+WorldMesh.hierarchyBytes(faceCount); }
         WorldMesh build(WorldMesh.Usage usage) {
             float[] vertices=new float[faceCount*4*MeshPacket.STRIDE_FLOATS];int[] indices=new int[faceCount*6];
             int[] translucentFaces=new int[translucentCount];double[] translucentCenters=new double[translucentCount*3];
-            float[] faceBatches=new float[(int)(WorldMesh.batchBytes(faceCount)/Float.BYTES)];
+            float[] faceBatches=new float[(int)(WorldMesh.batchBytes(faceCount)/Float.BYTES)],faceHierarchy=new float[(int)(WorldMesh.hierarchyBytes(faceCount)/Float.BYTES)];
             var cells=new ArrayList<WorldMesh.Cell>(cellCount);var faces=new ArrayList<WorldMesh.Face>(faceCount);var markers=new ArrayList<WorldMesh.Marker>(markerCount);var ranges=new ArrayList<AtlasMesh.DrawRange>();
             int rangeStart=0,rangePage=-1,translucentAt=0,tintedAt=0;TexturePreparation.AlphaClass rangeAlpha=null;
             for(int y=0;y<extent.height();y++)for(int z=0;z<extent.depth();z++)for(int x=0;x<extent.width();x++) {
@@ -84,8 +84,16 @@ public final class WorldMesher {
             }
             if(rangePage>=0)ranges.add(new AtlasMesh.DrawRange(rangeStart,indices.length-rangeStart,rangePage,rangeAlpha));
             if(faces.size()!=faceCount||markers.size()!=markerCount||cells.size()!=cellCount||translucentAt!=translucentCount||tintedAt!=tintedCount)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Section count and emit passes disagree");
-            WorldProblem.check(cancelled);return WorldMesh.success(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,faceBatches,cells,faces,markers,ranges,bounds(),usage);
+            buildHierarchy(faceBatches,faceHierarchy,0,WorldMesh.batchCount(faceCount),0,cancelled);
+            WorldProblem.check(cancelled);return WorldMesh.success(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,faceBatches,faceHierarchy,cells,faces,markers,ranges,bounds(),usage);
         }
+    }
+    private static void buildHierarchy(float[] leaves,float[] tree,int first,int end,int node,BooleanSupplier cancelled) {
+        if(end-first<2)return;WorldProblem.check(cancelled);int middle=(first+end)>>>1,left=node+1,right=node+middle-first;
+        buildHierarchy(leaves,tree,first,middle,left,cancelled);buildHierarchy(leaves,tree,middle,end,right,cancelled);
+        float[] a=middle-first==1?leaves:tree,b=end-middle==1?leaves:tree;
+        int ai=(middle-first==1?first:left)*6,bi=(end-middle==1?middle:right)*6,at=node*6;
+        for(int axis=0;axis<3;axis++) { tree[at+axis]=Math.min(a[ai+axis],b[bi+axis]);tree[at+axis+3]=Math.max(a[ai+axis+3],b[bi+axis+3]); }
     }
     public static WorldMesh assemble(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,BooleanSupplier cancelled) { return assemble(models,visibility,extent,Limits.DEFAULT,cancelled); }
     public static WorldMesh assemble(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,Limits limits,BooleanSupplier cancelled) {

@@ -124,7 +124,7 @@ public final class GlMathContracts {
         for(boolean mixed:new boolean[]{false,true})try(var fixture=WorldGpuFixture.culling(mixed)) {
             var scene=fixture.scene();var origin=scene.snapshot().extent().position(0);var camera=new GlCamera(origin,16,18,48,16,0.5,28,60,0.1,128);var clip=new WorldClip(new WorldSnapshot.Extent(origin.x(),origin.y(),Math.addExact(origin.z(),24),32,1,8));
             equal(1,scene.sections().size(),"one complete 32x32 synthetic section");equal(6144,scene.usage().faces(),"six faces for every explicitly uncullled fixture cell");equal(48,scene.usage().faceBatches(),"complete 128-face group coverage");equal(1093L,GlWorldCulling.workingBytes(scene,true),"admitted matrix/section/index/cache payload");equal(1037L,GlWorldCulling.workingBytes(scene,false),"no range cache in disabled mode");
-            var culling=new GlWorldCulling(scene,camera,1,clip,true);equal(1,culling.visible,"clipped section remains drawable");equal(0,culling.tests(),"face decisions are lazy");var mesh=scene.sections().getFirst();boolean[] visible=new boolean[mesh.faces().size()];int guaranteedOutside=0;
+            var culling=new GlWorldCulling(scene,camera,1,clip,GlCullingMode.LINEAR);equal(1,culling.visible,"clipped section remains drawable");equal(0,culling.tests(),"face decisions are lazy");var mesh=scene.sections().getFirst();boolean[] visible=new boolean[mesh.faces().size()];int guaranteedOutside=0;
             for(int face=0;face<visible.length;face++) { visible[face]=culling.face(0,face);if(mesh.faceBatchMaximum(face/WorldMesh.BATCH_FACES,2)<24) { check(!visible[face],"group strictly below the clip's Z plane must be rejected");guaranteedOutside++; } }
             check(guaranteedOutside>0&&culling.rejected()>0,"analytic outside groups were rejected");equal(48,culling.tests(),"one test per source group across a complete face walk");for(int face=visible.length-1;face>=0;face--)equal(visible[face],culling.face(0,face),"nonmonotonic material/sort traversal reuses the same decision");equal(48,culling.tests(),"reverse traversal introduces no repeated group tests");
             int inside=(28*32+16)*6+ModelPlan.Direction.UP.ordinal();check(culling.face(0,inside),"group containing the central visible top face survives");throwsType(IndexOutOfBoundsException.class,()->culling.face(-1,0),"invalid source section");throwsType(IndexOutOfBoundsException.class,()->culling.face(0,visible.length),"invalid source face");equal(48,culling.tests(),"invalid queries do not touch cache counters");
@@ -132,6 +132,37 @@ public final class GlMathContracts {
             var disjoint=new GlWorldCulling(scene,camera,1,new WorldClip(new WorldSnapshot.Extent(Math.addExact(origin.x(),64),origin.y(),origin.z(),1,1,1)),true);check(!disjoint.sections[0]&&!disjoint.face(0,0),"whole-section clip rejection precedes group work");equal(0,disjoint.tests(),"invisible section needs no face tests");throwsType(IllegalArgumentException.class,()->new GlWorldCulling(scene,camera,Double.NaN,clip,true),"invalid aspect preflight");
         }
         try(var fixture=WorldGpuFixture.empty()) { var camera=new GlCamera(fixture.scene().snapshot().extent().position(0),0.5,0.5,3,0.5,0.5,0.5,60,0.1,20);var empty=new GlWorldCulling(fixture.scene(),camera,1,WorldClip.NONE,true);equal(1,empty.empty,"empty section retains no dummy face group");equal(0,empty.visible,"empty section is not drawable");equal(0,empty.tests(),"empty scene needs no face test"); }
+    }
+    private static void worldHierarchicalDraw() {
+        var random=new Random(0x574f524c44L);int interior=0;
+        for(boolean mixed:new boolean[]{false,true})try(var fixture=WorldGpuFixture.culling(mixed)) {
+            var scene=fixture.scene();var mesh=scene.sections().getFirst();var origin=mesh.origin();int count=mesh.faceBatchCount();
+            for(int trial=0;trial<64;trial++) {
+                int shiftX=random.nextInt(513)-256,shiftY=random.nextInt(513)-256,shiftZ=random.nextInt(513)-256;
+                var anchor=new WorldSnapshot.Position(Math.addExact(origin.x(),shiftX),origin.y()+shiftY,Math.addExact(origin.z(),shiftZ));
+                var camera=new GlCamera(anchor,16-shiftX+(random.nextDouble()-0.5)*64,16-shiftY+random.nextDouble()*32,64-shiftZ+random.nextDouble()*96,16-shiftX,0.5-shiftY,16-shiftZ,35+random.nextDouble()*70,0.1,512);double aspect=0.5+random.nextDouble()*2;
+                var scope=trial%3==0?WorldClip.NONE:new WorldClip(new WorldSnapshot.Extent(Math.addExact(origin.x(),random.nextInt(24)),origin.y(),Math.addExact(origin.z(),random.nextInt(24)),8,1,8));
+                var tree=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.HIERARCHY);var linear=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.LINEAR);var none=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.NONE);var frustum=new GlFrustum(tree.matrix);
+                equal(linear.visible,tree.visible,"section preflight is unchanged");equal(GlWorldCulling.workingBytes(scene,GlCullingMode.LINEAR),GlWorldCulling.workingBytes(scene,GlCullingMode.HIERARCHY),"hierarchy needs no additional draw scratch");
+                for(int batch=count-1;batch>=0;batch--) {
+                    int face=batch*WorldMesh.BATCH_FACES;boolean expected=tree.sections[0]&&frustum.visible(mesh,batch,tree.offsets,0,scope.enabled()?tree.clip:null);
+                    equal(expected,tree.face(0,face),"hierarchy equals independent leaf predicate");equal(linear.face(0,face),tree.face(0,face),"reverse original group walk agrees with linear mode");equal(tree.sections[0],none.face(0,face),"none retains all faces after shared section culling");
+                    if(!scope.enabled()&&tree.sections[0]) {
+                        boolean inside=true;for(int corner=0;corner<8;corner++) {
+                            float x=tree.offsets[0]+((corner&1)==0?mesh.faceBatchMinimum(batch,0):mesh.faceBatchMaximum(batch,0)),y=tree.offsets[1]+((corner&2)==0?mesh.faceBatchMinimum(batch,1):mesh.faceBatchMaximum(batch,1)),z=tree.offsets[2]+((corner&4)==0?mesh.faceBatchMinimum(batch,2):mesh.faceBatchMaximum(batch,2));var p=clip(tree.matrix,x,y,z);
+                            if(p[3]<=0)inside=false;for(int axis=0;axis<3;axis++)if(Math.abs(p[axis])>p[3]-1e-3)inside=false;
+                        }
+                        if(inside) { interior++;check(tree.face(0,face),"independent homogeneous interior oracle survives hierarchy"); }
+                    }
+                }
+                equal(linear.rejected(),tree.rejected(),"bulk rejected total covers exact original groups");check(tree.boundsTests()<=2*count-1&&tree.tests()<=count&&tree.tests()<=tree.boundsTests(),"bounded tree and leaf work receipts");int before=tree.boundsTests();for(int face=0;face<mesh.faces().size();face++)tree.face(0,face);equal(before,tree.boundsTests(),"material traversal never repeats prepared bounds work");
+            }
+            var whole=new GlCamera(origin,16,32,288,16,0.5,16,90,0.1,1024);var accepted=new GlWorldCulling(scene,whole,1,WorldClip.NONE,true);equal(1,accepted.boundsTests(),"fully contained world face hierarchy accepts at root");equal(0,accepted.tests(),"whole-parent acceptance tests no leaf");for(int face=0;face<mesh.faces().size();face++)check(accepted.face(0,face),"contained original face preserved");
+            var scope=new WorldClip(new WorldSnapshot.Extent(origin.x(),origin.y(),Math.addExact(origin.z(),24),32,1,8));var partial=new GlWorldCulling(scene,whole,1,scope,true);check(partial.rejected()>0&&partial.tests()<count,"outside subtrees reduce leaf bound tests");
+            throwsType(NullPointerException.class,()->new GlWorldCulling(scene,whole,1,scope,(GlCullingMode)null),"null world culling mode");throwsType(NullPointerException.class,()->GlWorldCulling.workingBytes(scene,(GlCullingMode)null),"null metadata-only sizing mode");
+        }
+        check(interior>100,"independent interior oracle exercises many world groups");
+        try(var fixture=WorldGpuFixture.placeholder()) { var scene=fixture.scene();var camera=new GlCamera(scene.snapshot().extent().position(0),0.5,0.5,3,0.5,0.5,0.5,60,0.1,20);var markers=new GlWorldCulling(scene,camera,1,WorldClip.NONE,true);equal(1,markers.visible,"marker-only section remains drawable");equal(0,markers.boundsTests(),"no dummy face hierarchy for markers"); }
     }
     private static void scalarDrawPreparation() {
         var context=surface(true).volume().context();var grid=new NoiseVolume.Grid(new MapSamples.Grid(-37,91,32,32,1),new MapSamples.Vertical(-64,1));var values=new double[1024];Arrays.fill(values,0.5);var present=new byte[1024];Arrays.fill(present,(byte)1);var volume=NoiseVolume.capture(context,grid,values,present,NoiseVolume.Limits.DEFAULT,()->false);var style=new NoiseSurface.Style(0,1,new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE),NoiseSurface.Meshing.CELLS);var source=NoiseSurface.prepare(volume,style,NoiseSurface.Limits.DEFAULT,()->false);
@@ -191,6 +222,7 @@ public final class GlMathContracts {
         group("full and empty scalar fitting",GlMathContracts::scalarFit);
         group("clipped scalar fitting",GlMathContracts::clippedFit);
         group("shared conservative world face-group decisions",GlMathContracts::worldGroups);
+        group("hierarchical world draw bounds and linear agreement",GlMathContracts::worldHierarchicalDraw);
         group("bounded scalar draw preparation and differential groups",GlMathContracts::scalarDrawPreparation);
         group("hierarchical scalar draw rejection and linear agreement",GlMathContracts::scalarHierarchicalDraw);
         System.out.println("PASS "+groups+" context-free display math groups; no OpenGL/native parity is claimed.");

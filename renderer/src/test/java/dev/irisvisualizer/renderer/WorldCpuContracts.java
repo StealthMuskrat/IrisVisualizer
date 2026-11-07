@@ -703,6 +703,49 @@ public final class WorldCpuContracts {
             var ray=rangeRay(transparent,0.5,0.5);var result=compareRangeQueries(index,ray,WorldPickIndex.Options.DEFAULT,null);check(result.hit().isEmpty()&&result.stats().alphaRejected()>0,"hierarchical alpha rejection never invents visible geometry");var geometry=new WorldPickIndex.Options(131071,262144,65536,false,WorldPickIndex.Alpha.GEOMETRY);check(compareRangeQueries(index,ray,geometry,null).hit().isPresent(),"explicit geometry mode keeps exact transparent source surface");
         }
     }
+    /** Independent emitted-vertex oracle, without taking unions of prepared children. */
+    private static void worldHierarchyNode(WorldMesh mesh,int first,int end,int node) {
+        if(end-first<2)return;var vertices=mesh.vertexBuffer();
+        float[] minimum={Float.POSITIVE_INFINITY,Float.POSITIVE_INFINITY,Float.POSITIVE_INFINITY},maximum={Float.NEGATIVE_INFINITY,Float.NEGATIVE_INFINITY,Float.NEGATIVE_INFINITY};
+        for(int face=first*WorldMesh.BATCH_FACES;face<Math.min(mesh.faces().size(),end*WorldMesh.BATCH_FACES);face++)for(int vertex=0;vertex<4;vertex++)for(int axis=0;axis<3;axis++) {
+            float value=vertices.get((face*4+vertex)*MeshPacket.STRIDE_FLOATS+axis);minimum[axis]=Math.min(minimum[axis],value);maximum[axis]=Math.max(maximum[axis],value);
+        }
+        for(int axis=0;axis<3;axis++) { equal(minimum[axis],mesh.faceBatchHierarchyMinimum(node,axis),"parent minimum equals actual original vertex minimum");equal(maximum[axis],mesh.faceBatchHierarchyMaximum(node,axis),"parent maximum equals actual original vertex maximum"); }
+        int middle=(first+end)>>>1;worldHierarchyNode(mesh,first,middle,node+1);worldHierarchyNode(mesh,middle,end,node+middle-first);
+    }
+    private static void worldDrawHierarchyBounds() {
+        for(int kind:new int[]{0,1,2,3})for(boolean shifted:new boolean[]{false,true}) {
+            var f=rangeFixture(true,kind,128,shifted);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
+                var scene=owner.scene().orElseThrow();var mesh=scene.sections().getFirst();int groups=mesh.faceBatchCount();
+                equal(Math.max(0,groups-1),mesh.faceBatchHierarchyCount(),"only balanced internal nodes are stored");equal(24L*Math.max(0,groups-1),mesh.faceBatchHierarchyBytes(),"six floats per internal node");
+                equal(mesh.packedBytes()+mesh.translucentBytes()+mesh.faceBatchBytes()+mesh.faceBatchHierarchyBytes(),mesh.usage().orElseThrow().outputBytes(),"section output admits every actual primitive array");
+                equal(mesh.usage().orElseThrow().outputBytes(),scene.usage().meshBytes(),"complete scene receipt includes prepared draw hierarchy");worldHierarchyNode(mesh,0,groups,0);
+                for(int face=0;face<mesh.faces().size();face++)equal(f.snapshot().state(f.snapshot().extent().index(mesh.positionForFace(face))),mesh.stateForFace(face),"original native cell and state provenance is preserved");
+                throwsType(IndexOutOfBoundsException.class,()->mesh.faceBatchHierarchyMinimum(mesh.faceBatchHierarchyCount(),0),"hierarchy upper node bound");throwsType(IndexOutOfBoundsException.class,()->mesh.faceBatchHierarchyMaximum(-1,0),"negative hierarchy node bound");
+                if(groups>1)throwsType(IndexOutOfBoundsException.class,()->mesh.faceBatchHierarchyMinimum(0,3),"hierarchy axis bound");
+                try(var retained=owner.retain()) { owner.close();equal(mesh,retained.scene().orElseThrow().sections().getFirst(),"retained complete scene keeps its exact hierarchy source"); }
+            }
+        }
+        var f=fixture(1,255,false);try(var cache=new WorldSectionCache();var owner=build(f,cache)) { var mesh=owner.scene().orElseThrow().sections().getFirst();equal(1,mesh.faceBatchCount(),"single original group");equal(0L,mesh.faceBatchHierarchyBytes(),"single-group section needs no internal allocation"); }
+        var partial=rangeFixture(false,0,255,true);var source=partial.snapshot().extent();for(int width:new int[]{21,22,31}) {
+            var mesh=WorldMesher.assemble(partial.models(),partial.visibility(),new WorldSnapshot.Extent(source.minX(),source.minY(),source.minZ(),width,1,1),LIVE);check(!mesh.requiresPlaceholder(),"complete partial last-group source");equal(width*6,mesh.faces().size(),"all original cell faces emitted across group boundary");equal(width==21?1:2,mesh.faceBatchCount(),"126/132/186-face group boundary coverage");worldHierarchyNode(mesh,0,mesh.faceBatchCount(),0);
+        }
+    }
+    private static void worldDrawHierarchyAdmission() {
+        var f=rangeFixture(false,0,255,true);var sectionPlan=f.plan().sections().getFirst();var usage=sectionPlan.usage().orElseThrow();var limits=WorldMesher.Limits.DEFAULT;
+        var exact=new WorldMesher.Limits(limits.axis(),limits.cells(),limits.faces(),limits.markers(),usage.outputBytes(),limits.prototypeBytes(),limits.sourceIndexBytes(),usage.knownPayloadBytes());
+        var plan=WorldMesher.plan(f.models(),f.visibility(),f.snapshot().extent(),exact,LIVE);check(!plan.requiresPlaceholder(),"exact section output and combined budget includes hierarchy");
+        var calls=new java.util.concurrent.atomic.AtomicInteger();var complete=WorldMesher.assemble(plan,()-> { calls.incrementAndGet();return false; });check(!complete.requiresPlaceholder(),"exact section admission emits complete hierarchy");equal(usage.outputBytes(),complete.usage().orElseThrow().outputBytes(),"count and emit payloads agree");
+        var shortOutput=new WorldMesher.Limits(limits.axis(),limits.cells(),limits.faces(),limits.markers(),usage.outputBytes()-1,limits.prototypeBytes(),limits.sourceIndexBytes(),usage.knownPayloadBytes());
+        var shortCombined=new WorldMesher.Limits(limits.axis(),limits.cells(),limits.faces(),limits.markers(),usage.outputBytes(),limits.prototypeBytes(),limits.sourceIndexBytes(),usage.knownPayloadBytes()-1);
+        for(var deficient:List.of(shortOutput,shortCombined)) { var failed=WorldMesher.assemble(f.models(),f.visibility(),f.snapshot().extent(),deficient,LIVE);check(failed.requiresPlaceholder()&&failed.faces().isEmpty()&&failed.faceBatchHierarchyCount()==0,"one-byte deficit publishes no partial geometry or hierarchy");equal(WorldProblem.Code.LIMIT,failed.problems().getFirst().code(),"hierarchy demand respects unchanged ceilings"); }
+        int late=calls.get()-1;var cancelled=new java.util.concurrent.atomic.AtomicInteger();throwsType(CancellationException.class,()->WorldMesher.assemble(plan,()->cancelled.incrementAndGet()>=late),"late hierarchy construction cancellation publishes no mesh");
+        var sceneUsage=f.plan().usage().orElseThrow();for(int deficit:new int[]{0,1}) {
+            var sceneLimits=new WorldScenePlan.Limits(32,1,20000,4096,4096,sceneUsage.meshBytes()-deficit,sceneUsage.knownPayloadBytes());var scenePlan=WorldScenePlan.plan(f.models(),f.visibility(),sceneLimits,exact,LIVE);
+            equal(deficit!=0,scenePlan.requiresPlaceholder(),"scene metadata-only plan enforces exact hierarchy payload");
+        }
+        try(var cache=new WorldSectionCache();var first=build(f,cache);var second=build(f,cache)) { equal(first.scene().orElseThrow().sections().getFirst(),second.scene().orElseThrow().sections().getFirst(),"cache reuse shares complete prepared bounds without duplicate mesh"); }
+    }
     private static void pickingRangeAdmission() {
         var f=rangeFixture(false,0,255,false);try(var cache=new WorldSectionCache();var owner=build(f,cache);var reference=WorldPickIndex.prepare(owner.retain(),LIVE);var linear=WorldPickIndex.prepare(owner.retain(),WorldPickIndex.Limits.DEFAULT.withRangeHierarchy(false),LIVE)) {
             var scene=owner.scene().orElseThrow();int batches=scene.usage().faceBatches();long expected=60L+(long)batches*24+(long)(batches-1)*24+16;equal(expected,reference.retainedBytes(),"exact one-section leaf/internal bounds and prefix payload");equal((long)(batches-1)*24+8,reference.retainedBytes()-linear.retainedBytes(),"explicit linear-build mode omits internal bounds and prefix");
@@ -1517,6 +1560,8 @@ public final class WorldCpuContracts {
         group("conservative picking hierarchy boundaries",WorldCpuContracts::pickingTraversalEdges);
         group("original-range picking hierarchy",WorldCpuContracts::pickingRangeHierarchy);
         group("range hierarchy markers alpha and ties",WorldCpuContracts::pickingRangeMarkersAndAlpha);
+        group("world draw hierarchy exact emitted bounds",WorldCpuContracts::worldDrawHierarchyBounds);
+        group("world draw hierarchy admission and ownership",WorldCpuContracts::worldDrawHierarchyAdmission);
         group("range hierarchy admission and ownership",WorldCpuContracts::pickingRangeAdmission);
         group("independent translucent centroid ordering",WorldCpuContracts::ordering);
         group("bounded two-array depth and source-key ordering",WorldCpuContracts::boundedFaceSorting);

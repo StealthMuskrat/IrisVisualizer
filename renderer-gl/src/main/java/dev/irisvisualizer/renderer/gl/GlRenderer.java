@@ -128,16 +128,20 @@ public final class GlRenderer implements AutoCloseable {
         Objects.requireNonNull(atlas);Objects.requireNonNull(plan);draw(scene,atlas,plan,target,camera);
     }
     /** Submission counts are returned only after a complete draw and host-state restoration. */
-    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces) {
+    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces,int faceBoundsTests) {
         public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,0,0,0); }
         public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,solidRangeTests,culledSolidRanges,culledSolidFaces,0,0,0); }
+        public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,solidRangeTests,culledSolidRanges,culledSolidFaces,faceBatchTests,culledFaceBatches,culledTranslucentFaces,0);if(culledFaceBatches>faceBatchTests)throw new IllegalArgumentException("Invalid legacy frame group counts"); }
         public FrameStats {
-            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0||solidRangeTests<0||culledSolidRanges<0||culledSolidRanges>solidRangeTests||culledSolidFaces<0||faceBatchTests<0||culledFaceBatches<0||culledFaceBatches>faceBatchTests||culledTranslucentFaces<0)throw new IllegalArgumentException("Invalid frame submission counts");
+            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0||solidRangeTests<0||culledSolidRanges<0||culledSolidRanges>solidRangeTests||culledSolidFaces<0||faceBatchTests<0||culledFaceBatches<0||culledTranslucentFaces<0||faceBoundsTests<0||faceBoundsTests>0&&faceBoundsTests<faceBatchTests)throw new IllegalArgumentException("Invalid frame submission counts");
         }
     }
     /** Metadata-only temporary CPU admission size; excludes retained scene/target and host-state bookkeeping. */
     public long drawScratchBytes(GlScene scene,boolean rangeCulling) {
-        Objects.requireNonNull(scene);device.live(allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Draw scratch source belongs to another device");return GlWorldCulling.workingBytes(scene.cpuScene(),rangeCulling);
+        return drawScratchBytes(scene,GlCullingMode.from(rangeCulling));
+    }
+    public long drawScratchBytes(GlScene scene,GlCullingMode mode) {
+        Objects.requireNonNull(scene);Objects.requireNonNull(mode);device.live(allocation);if(scene.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Draw scratch source belongs to another device");return GlWorldCulling.workingBytes(scene.cpuScene(),mode);
     }
     public FrameStats renderFrame(GlScene scene,GlTarget target,GlCamera camera) { return draw(scene,null,null,target,camera); }
     /** Null atlas/order select the base raster/no order; translucent scenes still require an order. */
@@ -145,26 +149,31 @@ public final class GlRenderer implements AutoCloseable {
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip) { return draw(scene,atlas,plan,target,camera,clip); }
     /** Disable face-group rejection in both material passes for differential pixel/submission comparisons. */
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) { return draw(scene,atlas,plan,target,camera,clip,rangeCulling); }
+    /** Explicit hierarchy, independent lazy leaf comparison, or no face-group rejection. */
+    public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode) { return draw(scene,atlas,plan,target,camera,clip,mode); }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) { return draw(scene,atlas,plan,target,camera,WorldClip.NONE); }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip) {
         return draw(scene,atlas,plan,target,camera,clip,true);
     }
     private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) {
-        Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
+        return draw(scene,atlas,plan,target,camera,clip,GlCullingMode.from(rangeCulling));
+    }
+    private FrameStats draw(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode) {
+        Objects.requireNonNull(mode);Objects.requireNonNull(clip);Objects.requireNonNull(scene);Objects.requireNonNull(target);Objects.requireNonNull(camera);device.live(allocation);
         if(scene.device!=device||target.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Scene, target and renderer must share one device");scene.live();device.live(target.allocation);scene.cpuScene();device.collect();
         if(plan!=null&&plan.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Face order and renderer must share one device");
         if(scene.translucentFaces>0&&plan==null)throw new GlFailure(GlFailure.Code.MATERIAL,"Prepare a complete global translucent order for this scene and camera before drawing");
         var order=plan==null?null:plan.order(scene,camera);
         int[] textures=atlas==null?scene.allocation.textures:atlas.textures(scene);
-        var scratch=device.reserve(0,GlWorldCulling.workingBytes(scene.cpuScene(),rangeCulling),0,0,0,0,0,0,0,null);Throwable escaping=null;FrameStats result;
-        try { result=drawAdmitted(scene,target,camera,clip,rangeCulling,order,textures); }
+        var scratch=device.reserve(0,GlWorldCulling.workingBytes(scene.cpuScene(),mode),0,0,0,0,0,0,0,null);Throwable escaping=null;FrameStats result;
+        try { result=drawAdmitted(scene,target,camera,clip,mode,order,textures); }
         catch(RuntimeException|Error failure) { escaping=failure;throw failure; }
         finally { try { device.retire(scratch); }catch(RuntimeException|Error cleanup) { if(escaping==null)throw cleanup;if(cleanup!=escaping)escaping.addSuppressed(cleanup); } }
         target.complete=true;return result;
     }
     /** This stack drops all temporary array owners before its covering admission is released. */
-    private FrameStats drawAdmitted(GlScene scene,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling,WorldDrawOrder order,int[] textures) {
-        var culling=new GlWorldCulling(scene.cpuScene(),camera,(double)target.width()/target.height(),clip,rangeCulling);var matrix=culling.matrix;var offsets=culling.offsets;var visible=culling.sections;var clipBounds=culling.clip;
+    private FrameStats drawAdmitted(GlScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode,WorldDrawOrder order,int[] textures) {
+        var culling=new GlWorldCulling(scene.cpuScene(),camera,(double)target.width()/target.height(),clip,mode);var matrix=culling.matrix;var offsets=culling.offsets;var visible=culling.sections;var clipBounds=culling.clip;
         int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0,rangeTests=0,culledRanges=0,culledFaces=0,culledTranslucent=0;long indices=0;var meshes=scene.cpuScene().sections();
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
@@ -174,7 +183,7 @@ public final class GlRenderer implements AutoCloseable {
                 var mesh=meshes.get(i);
                 for(var range:section.ranges()) {
                     if(range.alpha()==TexturePreparation.AlphaClass.TRANSLUCENT)continue;glBindTexture(GL_TEXTURE_2D,textures[range.page()]);glUniform1i(geometryPass,range.alpha()==TexturePreparation.AlphaClass.CUTOUT?1:0);
-                    if(!rangeCulling) { glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4);solidCalls++;indices+=range.indexCount();continue; }
+                    if(!mode.enabled()) { glDrawElements(GL_TRIANGLES,range.indexCount(),GL_UNSIGNED_INT,(long)range.firstIndex()*4);solidCalls++;indices+=range.indexCount();continue; }
                     int end=(range.firstIndex()+range.indexCount())/6,run=-1;
                     for(int face=range.firstIndex()/6;face<end;) {
                         int batch=face/WorldMesh.BATCH_FACES,stop=Math.min(end,(batch+1)*WorldMesh.BATCH_FACES);rangeTests++;
@@ -204,7 +213,7 @@ public final class GlRenderer implements AutoCloseable {
             for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(!visible[i]||section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount());markerCalls++;markers+=section.markerCount(); }
             device.check("complete offscreen scene draw");
         }
-        return new FrameStats(scene.sections.size(),culling.empty,culling.visible,culling.culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices,rangeTests,culledRanges,culledFaces,culling.tests(),culling.rejected(),culledTranslucent);
+        return new FrameStats(scene.sections.size(),culling.empty,culling.visible,culling.culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices,rangeTests,culledRanges,culledFaces,culling.tests(),culling.rejected(),culledTranslucent,culling.boundsTests());
     }
     @Override public void close() { device.retire(allocation); }
 }
