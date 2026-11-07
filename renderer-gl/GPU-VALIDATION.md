@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 28 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including bounded live playback and connected initial presentation. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 77 prepared, unexecuted groups, making 105 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 31 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including transparent material-order rebinding, reuse and admission recovery. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 77 prepared, unexecuted groups, making 108 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -33,6 +33,9 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | Output replacement admission | Readback/animated-atlas ACTIVE and READY output, exact original pixels/receipts, fresh plan consumption, host state and subsequent replacement |
 | World material copies | Separate immutable streams, full/copy pixels, both lighting modes, exact transfer totals, source closure, repeated copies, empty/marker/cutout and translucent provenance |
 | World material recovery | Stale/owned inputs, deficient admission, cancellation across copy phases, queue preservation and connected-view material adoption |
+| Exact transparent order rebinding | Same CPU scene/device, shared immutable keys, full independent byte admission, closed source wrapper, no GPU ancestry, stale/closed/foreign rejection and repeated/empty rebinding |
+| Material transparent order reuse | Raw/owned connected material refresh without sorting, projection/size/clip preservation, pose/world invalidation, shutdown and saved-frame lifetime |
+| Transparent order recovery | Deficient destination admission, no partial frame, redraw without sorting/reupload, truthful tokens and fallback when no prior complete order exists |
 | Initial world atlas | Requested clock before first presentation, material refresh, scheduled/interpolated pixels, unchanged samples and failed initial animation admission and explicit retry gates/recovery |
 | Owned world lighting | Queue/view consuming handoffs, exact tracked overlap, stale/foreign/closed rejection, immutable frame delivery and shutdown |
 | Displayed atlas material copy | Exact animated snapshot pixels/clock, changed-page admission, caller source closure, repeated inheritance and independent GPU ownership |
@@ -67,7 +70,7 @@ Each group uses a fresh bounded `GlDevice` and shared `RenderMemory`; device shu
 
 ## Successful execution evidence
 
-The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all 28 groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
+The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all 31 groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
 
 A real report records the synthetic scope, successful group names/count, start/completion instants, OS/architecture, Java and LWJGL versions, and the actual driver receipt. It is a narrow run result, not a source/dependency fingerprint manifest, independently captured native baseline, final renderer approval or an authorization to enable previews. Use fresh execution with the intended checked-out sources and retain the corresponding build/commit information when collecting final validation evidence.
 

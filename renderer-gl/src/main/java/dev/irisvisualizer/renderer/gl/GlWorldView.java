@@ -11,7 +11,7 @@ public final class GlWorldView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlRenderer renderer;private final GlDevice device;private final GlUploadQueue uploads;private final GlFrameQueue frames;private final WorldOrderWorker ordering;private final AtlasFrameWorker animationWorker;
-    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean sourceReady,atlasClockSet,atlasPlayback,atlasPrimed,dirty,closed,disposed;
+    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order,materialOrder;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean sourceReady,atlasClockSet,atlasPlayback,atlasPrimed,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlWorldView(GlRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlWorldView(GlRenderer renderer,long animationWorkingBytes) {
@@ -122,11 +122,19 @@ public final class GlWorldView implements AutoCloseable {
     private boolean refreshMaterials(long revision,BooleanSupplier submit) {
         current();if(revision<1)throw new IllegalArgumentException("Invalid world revision");if(revision<=worldRevision)return false;
         if(!sourceReady||scene==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current world scene is required for material refresh");
+        // A prior adoption can have installed its new order before old-journal cleanup failed.
+        // Finish that cleanup before admitting another replacement; never overwrite its owner.
+        if(materialOrder!=null&&order!=null)releaseMaterialOrder();
         long next=nextView();var queued=new Status(revision,next,Phase.UPLOADING,status.source(),List.of(),Optional.empty(),"");var previousUpload=uploads.status();
         try { if(!submit.getAsBoolean())throw new GlFailure(GlFailure.Code.STATE,"World upload did not accept its current materials"); }
         catch(RuntimeException|Error failure) { if(uploads.status()!=previousUpload)failed(failure);throw failure; }
         worldRevision=revision;viewRevision=next;sourceReady=false;dirty=false;sortRevision=0;status=queued;
-        try { ordering.invalidate();frames.invalidate(viewRevision);releaseScene();return true; }
+        try {
+            ordering.invalidate();frames.invalidate(viewRevision);
+            // Admission has succeeded. Keep the complete pose-bound order through this exact-geometry
+            // replacement; a later camera-pose/world change still discards it through normal cleanup.
+            if(order!=null) { materialOrder=order;order=null; }releaseScene(true);return true;
+        }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     public WorldClip clip() { current();return clip; }
@@ -157,7 +165,7 @@ public final class GlWorldView implements AutoCloseable {
     /** Explicit redraw/retry after a view failure; keeps the same complete world and native data. */
     public long redraw() {
         current();if(!sourceReady||scene==null||camera==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current world upload and camera are required to redraw");long next=nextView();var changed=displayStatus(next);viewRevision=next;dirty=true;status=changed;
-        try { frames.invalidate(viewRevision);if(order==null)resetOrder();return viewRevision; }
+        try { frames.invalidate(viewRevision);if(order==null&&materialOrder==null)resetOrder();return viewRevision; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
     /** Reopen a failed current source upload; then submit a fresh retained CPU owner at the same world token. */
@@ -180,10 +188,26 @@ public final class GlWorldView implements AutoCloseable {
         var atlasState=animation.status();if(atlasState.phase()!=GlWorldAnimation.Phase.FAILED)return false;
         long next=nextView();var waiting=new Status(worldRevision,next,Phase.WAITING_VIEW,status.source(),List.of(),Optional.empty(),"");
         if(atlasPlayback)animation.playbackClock(atlasState.requestedTick(),atlasState.requestedPartialTick());else animation.clock(atlasState.requestedTick(),atlasState.requestedPartialTick());viewRevision=next;dirty=true;status=waiting;
-        try { frames.invalidate(viewRevision);if(order==null)resetOrder();return true; }
+        try { frames.invalidate(viewRevision);if(order==null&&materialOrder==null)resetOrder();return true; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
-    private void resetOrder() { ordering.invalidate();sortRevision=0;if(order!=null) { order.close();order=null; } }
+    private void releaseMaterialOrder() {
+        if(materialOrder!=null)try { materialOrder.close();materialOrder=null; }
+        catch(RuntimeException|Error failure) { if(materialOrder.closedOrReleased())materialOrder=null;throw failure; }
+    }
+    private void releaseOrders() {
+        Throwable failure=null;
+        if(order!=null)try { order.close();order=null; }
+        catch(RuntimeException|Error error) { if(order.closedOrReleased())order=null;failure=error; }
+        try { releaseMaterialOrder(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
+    private void resetOrder() {
+        sortRevision=0;Throwable failure=null;
+        try { ordering.invalidate(); }catch(RuntimeException|Error error) { failure=error; }
+        try { releaseOrders(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     /** Upload steps are bounded; drawing a completed frame remains one synchronous context operation. */
     public Status advance(GlUploadBudget budget,long latestWorldRevision) {
         Objects.requireNonNull(budget);current();if(latestWorldRevision<1)throw new IllegalArgumentException("Invalid world revision");if(latestWorldRevision>worldRevision) { invalidate(latestWorldRevision);return status; }if(latestWorldRevision<worldRevision||status.phase()==Phase.FAILED)return status;
@@ -207,6 +231,14 @@ public final class GlWorldView implements AutoCloseable {
                 if(!atlasPrimed) { if(!animation.presentable())return status;atlasPrimed=true; }
             }
             if(!sourceReady||scene==null||camera==null||!dirty)return status;
+            // Cleanup retry owners cannot become usable again after a failed pose invalidation.
+            if(order!=null&&!order.matchesView(camera))resetOrder();
+            if(materialOrder!=null) {
+                // Install before releasing the old journal, so a release failure retains both owners
+                // for explicit retry and cannot create an unaccounted CPU-order interval.
+                if(order==null&&materialOrder.matchesView(camera))order=materialOrder.rebind(scene);
+                releaseMaterialOrder();
+            }
             if(scene.translucentFaces>0&&order==null) {
                 if(sortRevision==0)sortRevision=ordering.submit(scene.retainCpuScene(),camera.drawView());
                 var completion=ordering.take(sortRevision);
@@ -226,11 +258,12 @@ public final class GlWorldView implements AutoCloseable {
     public Optional<GlFrame> take(long expectedWorldRevision,long expectedViewRevision) {
         current();if(!sourceReady||expectedWorldRevision!=worldRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY)return Optional.empty();var delivered=new Status(worldRevision,viewRevision,Phase.DELIVERED,status.source(),List.of(),Optional.empty(),"");var frame=frames.take(viewRevision);if(frame.isPresent())status=delivered;return frame;
     }
-    private void releaseScene() {
+    private void releaseScene() { releaseScene(false); }
+    private void releaseScene(boolean keepMaterialOrder) {
         atlasPrimed=false;Throwable failure=null;
         if(animation!=null)try { animation.close();animation=null; }catch(RuntimeException|Error error) { failure=error; }
         else try { if(animationWorker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)animationWorker.invalidate(); }catch(RuntimeException|Error error) { failure=error; }
-        if(order!=null)try { order.close();order=null; }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        if(!keepMaterialOrder)try { releaseOrders(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(scene!=null)try { scene.close();scene=null; }catch(RuntimeException|Error error) { if(scene.allocation.retired||scene.allocation.released)scene=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
