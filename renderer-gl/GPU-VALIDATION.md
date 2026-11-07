@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 32 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including original-range picking hierarchy and exact scene-family receipts. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 83 prepared, unexecuted groups, making 115 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 32 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including scalar inspection hierarchy and visited-face budget handoff. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 86 prepared, unexecuted groups, making 118 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -58,7 +58,7 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | World materials | Explicit tint/final lighting, consuming/foreign material owner guards, exact lighting policy and hostile host-state restoration |
 | World diagnostics/recovery | Empty/placeholder geometry, original diagnostic picking, upload cancellation and completed-frame preflight/retry/lifetime |
 | Shared world group culling | Separate immutable enabled/disabled pixel results, exact sorted-face coverage, cache reuse across material passes, draw-scratch admission/release and deficient-budget target/state preservation, completed-frame tree/linear/exhaustive picking, exact atlas/clip identity and bounded-query failure |
-| Scalar draw admission | Separate enabled/disabled clipped pixels, full original face coverage, source/style receipts, temporary CPU charge, deficient shared memory and precision-failure target/state preservation |
+| Scalar draw admission | Separate enabled/disabled clipped pixels, full original face coverage, source/style receipts, temporary CPU charge, deficient shared memory and precision-failure target/state preservation, completed-frame scalar tree/linear/exhaustive inspection and inherited visited-face budget policy |
 | Budgets and lifetimes | GPU-budget rejection without allocation, independently owned readback surviving frame/device closure and retained wrapper release |
 
 The synthetic PNG has four explicit RGBA texels, including transparent color. Pixel expectations use those original values rather than a second renderer run. Navigation expectations come from integer nearest-neighbor replication and an explicit clear border. Scalar checks distinguish rendered interior from the same target's fully clipped clear output; they do not claim a native shading/pixel baseline. All loops have a twenty-second deadline plus a step ceiling. Hard transfer/action/work limits are checked separately from cooperative elapsed-time targets.

@@ -4,7 +4,7 @@ Renderer implementation, 2026-11-04. All 126 CPU/OpenGL main sources compile wit
 
 ## Original-order batch bounds
 
-`NoiseSurface` now indexes consecutive ranges of at most 1,024 emitted faces in both CELLS and GREEDY modes. No face is reordered, subdivided or removed. These are bounded ranges with spatial bounds, rather than a new grid partition or BVH; a range spanning distant faces can have loose bounds and remain visible. Existing greedy rectangle coverage, original scalar bits, selection thresholds, colors and source sample/direction tie policy remain intact.
+`NoiseSurface` now indexes consecutive ranges of at most 1,024 emitted faces in both CELLS and GREEDY modes. No face is reordered, subdivided or removed. These original ranges retain their spatial bounds; a group spanning distant faces can have loose bounds and remain visible. [Balanced internal unions](SCALAR-RANGE-HIERARCHY.md) now accelerate CPU inspection while GPU drawing keeps its original group culling. Existing greedy rectangle coverage, original scalar bits, selection thresholds, colors and source sample/direction tie policy remain intact.
 
 Each range stores six integer grid-space extrema in a private primitive array. Bounds enclose the actual emitted face planes and all tangent extents, including full greedy U/V spans. Positive-side faces use their upper grid plane. A single planar batch can therefore have zero thickness on its normal axis. First face and count derive from range index and complete mesh size; no separate index/permutation array is created.
 
@@ -39,3 +39,7 @@ At renderer completion, expand every range and verify its exact face coverage an
 Compare batched and unculled reference drawing on the real Windows GL path: all-visible, all-hidden, alternating visible runs, partial last ranges, near/far/side planes, camera-inside scenes, fractional scales, negative/distant anchors and every precision boundary. Verify original instance offsets, exact face/triangle totals, run coalescing, unchanged winding/depth/colors, hostile host VAO/array-buffer state and draw/restoration failures. Loose ranges are an expected performance limitation, not an omitted feature or correctness shortcut.
 
 Compare optimized queries with exhaustive original-order face traversal for random rays, parallel axes, negative zero directions, planar bounds, tangent/shared edges and corners, exact near/far ties, different source scales and greedy sample ties. Test work counters, full-face budget rejection, cancellation, retained old frames and readback receipts. Runtime correctness/performance, native sample comparisons and final editor integration remain pending.
+
+## Shared internal bounds
+
+[Scalar inspection hierarchies](SCALAR-RANGE-HIERARCHY.md) add six integer extrema per internal group node, with no face permutation or leaf copy. Empty/one-group surfaces need no internal payload. Count/emission peaks, mesh receipts and source owners now include these arrays; recoloring shares them with exact geometry identity. CPU picking can traverse trees or choose independent linear/exhaustive modes, and its explicit visited-face policy retains no partial hit after exhaustion. GPU draw culling and buffer packing keep their existing contracts. Full/default compilation passes (143/105 files); all 118 groups remain unexecuted.

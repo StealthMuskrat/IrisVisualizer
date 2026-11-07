@@ -55,3 +55,7 @@ Compare ray hits across both modes for face interiors, internal grid boundaries,
 ## Stable picking-plane receipts
 
 [Scalar picking](SCALAR-PICKING.md#exact-normal-plane-hit-coordinates) now uses the known rectangle plane for its normal coordinate and carries the accepted point into detached sample-local receipts. This avoids normal-coordinate cancellation at distant origins and closed clip boundaries while retaining original-sample lookup and lower shared-edge ties. Unit and greedy cases are prepared within the existing scalar-picking group. Compilation passed; runtime, native and GPU validation remain deferred.
+
+## Shared inspection hierarchy
+
+[Original-group internal bounds](SCALAR-RANGE-HIERARCHY.md) now accompany both greedy rectangles and unit faces. Their six-integer unions preserve full spans, native scalar bits, original sample/direction ties and exact rectangle-to-sample mapping. They are included in count-pass output/scratch admission and retained payload, shared through recoloring, and used by bounded CPU picking. No additional sample merging, source reduction or native generation behavior is introduced.

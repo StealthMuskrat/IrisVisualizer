@@ -35,16 +35,19 @@ public final class NoiseSurface {
         var colors=style.colors();return ScalarHistogram.capture(volume,Optional.of(new ScalarHistogram.Range(colors.minimum(),colors.maximum())),Objects.requireNonNull(limits).reserve(payloadBytes()-volume.payloadBytes()),cancelled);
     }
     private static long batchBytes(int faces) { return ((faces+(long)BATCH_FACES-1)/BATCH_FACES)*6*Integer.BYTES; }
-    private static long meshBytes(int faces,Meshing mode) { return (long)faces*(mode==Meshing.GREEDY?GREEDY_FACE_BYTES:UNIT_FACE_BYTES)+batchBytes(faces); }
+    private static long hierarchyBytes(int faces) { return Math.max(0,(faces+(long)BATCH_FACES-1)/BATCH_FACES-1)*6*Integer.BYTES; }
+    private static long meshBytes(int faces,Meshing mode) { return (long)faces*(mode==Meshing.GREEDY?GREEDY_FACE_BYTES:UNIT_FACE_BYTES)+batchBytes(faces)+hierarchyBytes(faces); }
     /** Detached inspection of the original native scalar and its displayed bin face, without volume arrays. */
     public record Face(UUID volumeId,int sample,NoiseVolume.Point point,double value,ModelPlan.Direction direction,int rgba) {}
-    private final NoiseVolume volume;private final Style style;private final int[] cells,spans,batches,colors;private final byte[] sides;private final Optional<Bounds> bounds;private final Optional<Usage> usage;private final List<WorldProblem> problems;
-    private NoiseSurface(NoiseVolume volume,Style style,int[] cells,byte[] sides,int[] spans,int[] batches,int[] colors,Optional<Bounds> bounds,Optional<Usage> usage,List<WorldProblem> problems) {
-        this.volume=volume;this.style=style;this.cells=cells;this.sides=sides;this.spans=spans;this.batches=batches;this.colors=colors;this.bounds=bounds;this.usage=usage;this.problems=List.copyOf(problems);
+    private final NoiseVolume volume;private final Style style;private final int[] cells,spans,batches,hierarchy,colors;private final byte[] sides;private final Optional<Bounds> bounds;private final Optional<Usage> usage;private final List<WorldProblem> problems;
+    private NoiseSurface(NoiseVolume volume,Style style,int[] cells,byte[] sides,int[] spans,int[] batches,int[] hierarchy,int[] colors,Optional<Bounds> bounds,Optional<Usage> usage,List<WorldProblem> problems) {
+        this.volume=volume;this.style=style;this.cells=cells;this.sides=sides;this.spans=spans;this.batches=batches;this.hierarchy=hierarchy;this.colors=colors;this.bounds=bounds;this.usage=usage;this.problems=List.copyOf(problems);
+        if(sides.length!=cells.length||colors.length!=cells.length||spans.length!=0&&spans.length!=cells.length||batchBytes()!=batchBytes(cells.length)||hierarchyBytes()!=hierarchyBytes(cells.length))throw new IllegalArgumentException("Invalid scalar geometry/bounds coverage");
+        if(usage.isPresent()&&(usage.orElseThrow().faces()!=cells.length||usage.orElseThrow().sourceBytes()!=volume.payloadBytes()||usage.orElseThrow().meshBytes()!=payloadBytes()-volume.payloadBytes()))throw new IllegalArgumentException("Scalar geometry differs from admitted payload");
     }
     /** Constant-time proof of the exact immutable face layout reused by recoloring; never a value scan. */
     public boolean sharesGeometry(NoiseSurface other) {
-        Objects.requireNonNull(other);return !requiresPlaceholder()&&!other.requiresPlaceholder()&&volume==other.volume&&style.sameGeometry(other.style)&&cells==other.cells&&sides==other.sides&&spans==other.spans&&batches==other.batches;
+        Objects.requireNonNull(other);return !requiresPlaceholder()&&!other.requiresPlaceholder()&&volume==other.volume&&style.sameGeometry(other.style)&&cells==other.cells&&sides==other.sides&&spans==other.spans&&batches==other.batches&&hierarchy==other.hierarchy;
     }
     private static final ModelPlan.Direction[] DIRECTIONS=ModelPlan.Direction.values();
     private static final int[] X={0,0,0,0,-1,1},Y={-1,1,0,0,0,0},Z={0,0,-1,1,0,0};
@@ -59,7 +62,7 @@ public final class NoiseSurface {
         catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(volume,style,List.of(failure.problem)); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(volume,style,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory for scalar boundary surfaces; no partial mesh published"))); }
     }
-    private static NoiseSurface failed(NoiseVolume volume,Style style,List<WorldProblem> problems) { return new NoiseSurface(volume,style,new int[0],new byte[0],new int[0],new int[0],new int[0],Optional.empty(),Optional.empty(),problems); }
+    private static NoiseSurface failed(NoiseVolume volume,Style style,List<WorldProblem> problems) { return new NoiseSurface(volume,style,new int[0],new byte[0],new int[0],new int[0],new int[0],new int[0],Optional.empty(),Optional.empty(),problems); }
     /** Full immutable source plus replacement colors; equal settings share the original color array. */
     public static long recolorReservation(NoiseSurface source,MapRaster.ScalarStyle colors) {
         Objects.requireNonNull(source);Objects.requireNonNull(colors);
@@ -76,7 +79,7 @@ public final class NoiseSurface {
             if(!same)for(int face=0;face<rgba.length;face++) { if((face&255)==0)WorldProblem.check(cancelled);rgba[face]=colors.ramp().rgba(colors.normalize(source.volume().value(source.cell(face)))); }
             var usage=source.usage().orElseThrow();long scratch=same?0:(long)source.colors.length*COLOR_BYTES;
             var receipt=new Usage(usage.selectedSamples(),source.size(),usage.meshBytes(),usage.sourceBytes(),usage.unitFaces(),scratch);WorldProblem.check(cancelled);
-            return new NoiseSurface(source.volume,style,source.cells,source.sides,source.spans,source.batches,rgba,source.bounds,Optional.of(receipt),List.of());
+            return new NoiseSurface(source.volume,style,source.cells,source.sides,source.spans,source.batches,source.hierarchy,rgba,source.bounds,Optional.of(receipt),List.of());
         }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(source.volume(),style,List.of(failure.problem)); }
         catch(OutOfMemoryError exhausted) { WorldProblem.check(cancelled);return failed(source.volume(),style,List.of(new WorldProblem(WorldProblem.Code.MEMORY,Optional.empty(),"Not enough memory to recolor scalar surfaces; no partial colors were published"))); }
     }
@@ -140,7 +143,17 @@ public final class NoiseSurface {
                 batches[at+3]=Math.max(batches[at+3],mx);batches[at+4]=Math.max(batches[at+4],my);batches[at+5]=Math.max(batches[at+5],mz);
             }
         }
-        WorldProblem.check(cancelled);return new NoiseSurface(volume,style,cells,sides,spans,batches,colors,bounds,Optional.of(usage),List.of());
+        int[] hierarchy=new int[Math.max(0,count-1)*6];if(count>1)buildHierarchy(batches,hierarchy,0,count,0,cancelled);
+        WorldProblem.check(cancelled);return new NoiseSurface(volume,style,cells,sides,spans,batches,hierarchy,colors,bounds,Optional.of(usage),List.of());
+    }
+    /** Internal nodes in preorder; original leaves are reused by hierarchy and linear inspection. */
+    private static void buildHierarchy(int[] batches,int[] hierarchy,int first,int end,int node,BooleanSupplier cancelled) {
+        WorldProblem.check(cancelled);int middle=(first+end)>>>1,left=node+1,right=node+middle-first;
+        if(middle-first>1)buildHierarchy(batches,hierarchy,first,middle,left,cancelled);
+        if(end-middle>1)buildHierarchy(batches,hierarchy,middle,end,right,cancelled);
+        var a=middle-first==1?batches:hierarchy;int ai=(middle-first==1?first:left)*6;
+        var b=end-middle==1?batches:hierarchy;int bi=(end-middle==1?middle:right)*6,at=node*6;
+        for(int axis=0;axis<3;axis++) { hierarchy[at+axis]=Math.min(a[ai+axis],b[bi+axis]);hierarchy[at+axis+3]=Math.max(a[ai+axis+3],b[bi+axis+3]); }
     }
     private static final class Greedy {
         final NoiseVolume volume;final NoiseVolume.Grid grid;final Style style;final Limits limits;final BooleanSupplier cancelled;final int[] mask;
@@ -192,13 +205,17 @@ public final class NoiseSurface {
     public Face face(int face,int u,int v) { int cell=sample(face,u,v);return new Face(volume.id(),cell,volume.grid().point(cell),volume.value(cell),direction(face),rgba(face)); }
     public Optional<Bounds> bounds() { return bounds; }
     public Optional<Usage> usage() { return usage; }
-    public long payloadBytes() { return volume.payloadBytes()+(long)cells.length*4+sides.length+((long)spans.length+colors.length)*4+batchBytes(); }
+    public long payloadBytes() { return volume.payloadBytes()+(long)cells.length*4+sides.length+((long)spans.length+colors.length)*4+batchBytes()+hierarchyBytes(); }
     public int batchCount() { return batches.length/6; }
     public int batchFirst(int batch) { Objects.checkIndex(batch,batchCount());return batch*BATCH_FACES; }
     public int batchSize(int batch) { return Math.min(BATCH_FACES,size()-batchFirst(batch)); }
     public int batchMinimum(int batch,int axis) { Objects.checkIndex(batch,batchCount());Objects.checkIndex(axis,3);return batches[batch*6+axis]; }
     public int batchMaximum(int batch,int axis) { Objects.checkIndex(batch,batchCount());Objects.checkIndex(axis,3);return batches[batch*6+axis+3]; }
     public long batchBytes() { return (long)batches.length*Integer.BYTES; }
+    public int batchHierarchyCount() { return hierarchy.length/6; }
+    public long hierarchyBytes() { return (long)hierarchy.length*Integer.BYTES; }
+    public int batchHierarchyMinimum(int node,int axis) { Objects.checkIndex(node,batchHierarchyCount());Objects.checkIndex(axis,3);return hierarchy[node*6+axis]; }
+    public int batchHierarchyMaximum(int node,int axis) { Objects.checkIndex(node,batchHierarchyCount());Objects.checkIndex(axis,3);return hierarchy[node*6+axis+3]; }
     public Bounds batchBounds(int batch) {
         double scale=volume.grid().horizontal().blocksPerSample();return new Bounds(batchMinimum(batch,0)*scale,batchMinimum(batch,1),batchMinimum(batch,2)*scale,batchMaximum(batch,0)*scale,batchMaximum(batch,1),batchMaximum(batch,2)*scale);
     }

@@ -4,7 +4,7 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.nio.*;
 import java.util.*;
-import java.util.concurrent.CancellationException;
+import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
 import java.util.zip.*;
 
@@ -278,6 +278,74 @@ public final class RendererCpuContracts {
         var clipped=NoisePick.query(source,ray,new NoisePick.Options(6,new WorldClip(new WorldSnapshot.Extent(100,0,100,1,1,1))),LIVE);check(!clipped.requiresPlaceholder()&&clipped.hit().isEmpty(),"clip excludes complete source");
         var inside=NoisePick.query(source,new WorldRay(anchor,0.25,0.5,0.25,0,0,1,0,10),6,LIVE);check(inside.hit().isEmpty(),"back faces excluded from inside");
     }
+    private static NoiseVolume inspectionVolume(boolean gap,boolean uniform) {
+        int width=64,height=16,depth=64,count=width*height*depth;double[] values=new double[count];byte[] flags=present(count);
+        for(int y=0;y<height;y++)for(int z=0;z<depth;z++)for(int x=0;x<width;x++) { int cell=(y*depth+z)*width+x;values[cell]=uniform?1:1+((x+y+z)&1);if(gap&&z>=16&&z<48)flags[cell]=0; }
+        return volume(width,height,depth,values,flags);
+    }
+    private static NoiseSurface inspectionSurface(NoiseVolume volume,NoiseSurface.Meshing mode) {
+        var surface=NoiseSurface.prepare(volume,new NoiseSurface.Style(1,2,gray(1,2),mode),NoiseSurface.Limits.DEFAULT,LIVE);check(!surface.requiresPlaceholder(),"complete full-height scalar inspection fixture");return surface;
+    }
+    private static WorldRay inspectionRay(NoiseSurface surface,double x,double z) {
+        var g=surface.volume().grid();return new WorldRay(new WorldSnapshot.Position(g.horizontal().originX(),g.vertical().minY(),g.horizontal().originZ()),x,g.height()+3,z,0,-1,0,0,64);
+    }
+    private static NoisePick.Result compareScalarQueries(NoiseSurface surface,WorldRay ray,NoisePick.Options options) {
+        var tree=NoisePick.query(surface,ray,options,LIVE);var linear=NoisePick.query(surface,ray,options.withRangeHierarchy(false),LIVE);var exhaustive=NoisePick.query(surface,ray,options.withBatchCulling(false),LIVE);
+        check(!tree.requiresPlaceholder()&&!linear.requiresPlaceholder()&&!exhaustive.requiresPlaceholder(),"scalar traversal modes finish under complete allowance");equal(exhaustive.hit(),tree.hit(),"hierarchical scalar hit equals exhaustive original rectangles");equal(linear.hit(),tree.hit(),"hierarchical scalar hit equals linear group bounds");equal(0,linear.rangeNodes(),"linear diagnostic mode has no hierarchy tests");return tree;
+    }
+    private static void scalarRangeHierarchy() {
+        var volume=inspectionVolume(false,false);
+        for(var mode:NoiseSurface.Meshing.values()) {
+            var surface=inspectionSurface(volume,mode);equal(16,volume.grid().height(),"full configured fixture height retained");check(surface.batchCount()>8&&surface.batchHierarchyCount()==surface.batchCount()-1,"one internal node per original group minus one");
+            var options=new NoisePick.Options(surface.size());for(double x:new double[]{0.25,8,16.25,31.75})for(double z:new double[]{0.25,12.25,31.75})compareScalarQueries(surface,inspectionRay(surface,x,z),options);
+            var ray=inspectionRay(surface,0.25,0.25);var result=NoisePick.query(surface,ray,options,LIVE);var hit=result.hit().orElseThrow();near(3,hit.distance(),"independent full-height top-plane distance");equal(ModelPlan.Direction.UP,hit.sample().direction(),"top-plane original direction");equal(volume.grid().index(0,15,0),hit.sample().sample(),"hierarchy preserves original top-layer scalar index");equal(volume.grid().point(hit.sample().sample()),hit.sample().point(),"hierarchy preserves original grid point");near(volume.value(hit.sample().sample()),hit.sample().value(),"original unnormalized scalar preserved");
+            var linear=NoisePick.query(surface,ray,options.withRangeHierarchy(false),LIVE);check(result.visitedBatches()<linear.visitedBatches(),"near-first hierarchy skips complete original-group subtrees");check(result.visitedFaces()<=linear.visitedFaces(),"known localized query does not add primitive work");
+            var missRay=inspectionRay(surface,-1,0.25);var miss=compareScalarQueries(surface,missRay,options);check(miss.hit().isEmpty()&&miss.visitedFaces()==0&&miss.visitedBatches()==0&&miss.rangeNodes()==1,"root miss rejects every original group without leaf scans");
+            var tie=compareScalarQueries(surface,inspectionRay(surface,0.5,0.25),options).hit().orElseThrow();equal(volume.grid().index(0,15,0),tie.sample().sample(),"shared edge selects lower original sample independent of traversal order");
+            var g=volume.grid();var clip=new WorldClip(new WorldSnapshot.Extent(g.horizontal().originX()+8,g.vertical().minY(),g.horizontal().originZ()+8,16,16,16));for(double x:new double[]{0.25,8,16.25,24})compareScalarQueries(surface,inspectionRay(surface,x,12.25),options.withClip(clip));
+            var anchor=ray.anchor();var shifted=new WorldRay(new WorldSnapshot.Position(anchor.x()+4096,anchor.y(),anchor.z()-4096),ray.x()-4096,ray.y(),ray.z()+4096,0,-1,0,0,64);equal(hit,NoisePick.query(surface,shifted,options,LIVE).hit().orElseThrow(),"shifted exact anchor retains fractional sample identity");
+        }
+        var gap=inspectionVolume(true,false);for(var mode:NoiseSurface.Meshing.values()) { var surface=inspectionSurface(gap,mode);var result=compareScalarQueries(surface,inspectionRay(surface,0.25,16.25),new NoisePick.Options(surface.size()));check(result.hit().isEmpty(),"absent interior strip remains absent through hierarchy"); }
+        var uniform=inspectionVolume(false,true);var greedy=inspectionSurface(uniform,NoiseSurface.Meshing.GREEDY);var cells=inspectionSurface(uniform,NoiseSurface.Meshing.CELLS);equal(6,greedy.size(),"uniform cuboid keeps complete greedy rectangles");equal(0,greedy.batchHierarchyCount(),"one group needs no internal arrays");
+        for(double x:new double[]{0.25,0.5,16,31.75}) { var ray=inspectionRay(greedy,x,0.25);var a=compareScalarQueries(greedy,ray,new NoisePick.Options(greedy.size())).hit().orElseThrow();var b=NoisePick.query(cells,ray,cells.size(),LIVE).hit().orElseThrow();equal(b.sample(),a.sample(),"greedy rectangle maps back to the same original sample/direction/color");near(b.distance(),a.distance(),"greedy and unit top planes agree"); }
+    }
+    private static void scalarVisitedBudgets() {
+        var surface=inspectionSurface(inspectionVolume(false,false),NoiseSurface.Meshing.CELLS);var ray=inspectionRay(surface,0.25,0.25);var full=NoisePick.query(surface,ray,surface.size(),LIVE);check(full.visitedFaces()>0&&full.visitedFaces()<surface.size(),"localized scalar query has smaller actual face demand");
+        var legacy=NoisePick.query(surface,ray,full.visitedFaces(),LIVE);check(legacy.requiresPlaceholder()&&legacy.hit().isEmpty()&&legacy.visitedFaces()==0,"legacy constructors still bound the whole source before traversal");
+        var exact=new NoisePick.Options(surface.size()).withVisitedFaceBudget(full.visitedFaces());var result=NoisePick.query(surface,ray,exact,LIVE);check(!result.requiresPlaceholder(),"actual visited-face allowance can inspect larger complete source");equal(full.hit(),result.hit(),"visited budget preserves exact complete nearest sample");equal(full.visitedFaces(),result.visitedFaces(),"exact visited allowance is stable for immutable input");
+        var failed=NoisePick.query(surface,ray,exact.withVisitedFaceBudget(full.visitedFaces()-1),LIVE);check(failed.requiresPlaceholder()&&failed.hit().isEmpty()&&failed.visitedFaces()==full.visitedFaces(),"one-face deficit retains bounded diagnostics but withholds partial nearest hit");equal(WorldProblem.Code.LIMIT,failed.problems().getFirst().code(),"visited allowance reports existing structured limit");
+        var miss=NoisePick.query(surface,inspectionRay(surface,-1,0.25),exact.withVisitedFaceBudget(0),LIVE);check(!miss.requiresPlaceholder()&&miss.hit().isEmpty()&&miss.visitedFaces()==0,"zero face allowance can certify a whole-tree miss");
+        var nodeFailure=NoisePick.query(surface,ray,new NoisePick.Options(surface.size()).withRangeNodeTests(0),LIVE);check(nodeFailure.requiresPlaceholder()&&nodeFailure.hit().isEmpty()&&nodeFailure.rangeNodes()==1,"range-node deficit fails before leaf or face work");check(!NoisePick.query(surface,ray,new NoisePick.Options(surface.size()).withRangeNodeTests(0).withRangeHierarchy(false),LIVE).requiresPlaceholder(),"linear mode is independent of hierarchy-node allowance");
+        var clip=new WorldClip(new WorldSnapshot.Extent(-4,-2,8,8,16,8));var controls=exact.withClip(clip).withBatchCulling(false).withRangeHierarchy(false).withRangeNodeTests(7);check(controls.faceBudget()==NoisePick.FaceBudget.VISITED&&!controls.batchCulling()&&!controls.rangeHierarchy()&&controls.rangeNodeTests()==7&&controls.clip().equals(clip),"all option-copy helpers preserve traversal/budget policy");
+        throwsType(IllegalArgumentException.class,()->exact.withVisitedFaceBudget(-1),"negative visited allowance rejected");throwsType(IllegalArgumentException.class,()->exact.withRangeNodeTests(NoisePick.MAX_RANGE_NODES+1),"oversized hierarchy allowance rejected");throwsType(CancellationException.class,()->NoisePick.query(surface,ray,exact,()->true),"cancelled scalar hierarchy query propagates");
+        var emptyVolume=volume(1,1,1,new double[]{1},new byte[]{0});var empty=inspectionSurface(emptyVolume,NoiseSurface.Meshing.GREEDY);var emptyResult=NoisePick.query(empty,inspectionRay(empty,0,0),new NoisePick.Options(0).withRangeNodeTests(0),LIVE);check(!emptyResult.requiresPlaceholder()&&emptyResult.hit().isEmpty()&&emptyResult.rangeNodes()==0,"empty source can finish with both zero allowances");
+        equal(0,new NoisePick.Result(surface.volume().id(),ray,Optional.empty(),0,List.of()).rangeNodes(),"legacy result constructors remain available");
+    }
+    private static final class InspectionExecutor extends AbstractExecutorService {
+        final List<Runnable> jobs=new ArrayList<>();boolean shutdown;
+        @Override public void execute(Runnable task) { if(shutdown)throw new RejectedExecutionException();jobs.add(task); }
+        void run() { while(!jobs.isEmpty())jobs.removeFirst().run(); }
+        @Override public void shutdown() { shutdown=true; }
+        @Override public List<Runnable> shutdownNow() { shutdown=true;var old=List.copyOf(jobs);jobs.clear();return old; }
+        @Override public boolean isShutdown() { return shutdown; }
+        @Override public boolean isTerminated() { return shutdown&&jobs.isEmpty(); }
+        @Override public boolean awaitTermination(long timeout,TimeUnit unit) { return isTerminated(); }
+        @Override public void close() { shutdownNow(); }
+    }
+    private static void scalarHierarchyOwnership() {
+        var volume=inspectionVolume(false,false);
+        for(var mode:NoiseSurface.Meshing.values()) {
+            var surface=inspectionSurface(volume,mode);long leaf=(long)surface.batchCount()*24,internal=(long)(surface.batchCount()-1)*24,faces=(long)surface.size()*(mode==NoiseSurface.Meshing.CELLS?9:13);equal(internal,surface.hierarchyBytes(),"exact six-integer internal bounds payload");equal(leaf+internal+faces,surface.usage().orElseThrow().meshBytes(),"mesh receipt includes every geometry/color/leaf/internal primitive");equal(volume.payloadBytes()+leaf+internal+faces,surface.payloadBytes(),"retained source payload includes hierarchy once");
+            long peak=surface.usage().orElseThrow().knownPeakBytes();var limits=new NoiseSurface.Limits(surface.size(),peak);var exact=NoiseSurface.prepare(volume,surface.style(),limits,LIVE);check(!exact.requiresPlaceholder()&&exact.payloadBytes()==surface.payloadBytes(),"exact existing surface/source/scratch allowance admits hierarchy");var deficient=NoiseSurface.prepare(volume,surface.style(),new NoiseSurface.Limits(surface.size(),peak-1),LIVE);check(deficient.requiresPlaceholder()&&deficient.size()==0&&deficient.hierarchyBytes()==0,"one-byte deficit exposes no partial hierarchy or surface");
+            var colors=new MapRaster.ScalarStyle(1,2,constant(0x123456ff));var changed=NoiseSurface.recolor(surface,colors,NoiseSurface.Limits.DEFAULT,LIVE);check(changed.sharesGeometry(surface),"recolor shares exact bounds/tree geometry");for(int node=0;node<surface.batchHierarchyCount();node++)for(int axis=0;axis<3;axis++) { equal(surface.batchHierarchyMinimum(node,axis),changed.batchHierarchyMinimum(node,axis),"immutable lower bounds survive recolor");equal(surface.batchHierarchyMaximum(node,axis),changed.batchHierarchyMaximum(node,axis),"immutable upper bounds survive recolor"); }
+            try(var memory=new RenderMemory(new RenderMemory.Limits(peak,8));var executor=new InspectionExecutor();var worker=new NoiseSurfaceWorker(peak,memory,()->executor)) { long revision=worker.submit(new NoiseSurfaceWorker.Request(volume,surface.style(),limits));executor.run();try(var complete=worker.take(revision).orElseThrow()) { equal(surface.payloadBytes(),complete.surface().payloadBytes(),"worker output includes exact internal arrays");equal(surface.payloadBytes(),memory.stats().chargedBytes(),"worker shrinks transient scratch to final source/hierarchy payload"); }equal(0L,memory.stats().chargedBytes(),"surface completion closes full hierarchy admission"); }
+            var ray=inspectionRay(surface,0.25,0.25);var reference=NoisePick.query(surface,ray,surface.size(),LIVE);var options=new NoisePick.Options(surface.size()).withVisitedFaceBudget(reference.visitedFaces());var frame=new NoisePickWorker.Frame(UUID.randomUUID(),9);
+            try(var memory=new RenderMemory(new RenderMemory.Limits(surface.payloadBytes(),8));var executor=new InspectionExecutor();var worker=new NoisePickWorker(surface.payloadBytes(),memory,()->executor)) {
+                long revision=worker.submit(new NoisePickWorker.Request(surface,ray,options,Optional.of(frame)));equal(surface.payloadBytes(),memory.stats().chargedBytes(),"pointer admission includes shared hierarchy source");executor.run();check(worker.take(revision,new NoisePickWorker.Frame(UUID.randomUUID(),9)).isEmpty(),"wrong frame cannot consume hierarchical pointer result");var completed=worker.take(revision,frame).orElseThrow();equal(reference.hit(),completed.result().hit(),"worker preserves opted-in bounded nearest sample");equal(0L,memory.stats().chargedBytes(),"detached pointer result retains no source/tree payload");
+                long rejected=worker.submit(new NoisePickWorker.Request(surface,ray,options.withVisitedFaceBudget(0),Optional.of(frame)));executor.run();equal(NoisePickWorker.Phase.FAILED,worker.status().phase(),"visited-budget worker failure remains explicit");check(worker.take(rejected).isEmpty(),"failed pointer request publishes no partial result");long cancelled=worker.submit(new NoisePickWorker.Request(surface,ray,options));worker.invalidate();executor.run();check(worker.take(cancelled).isEmpty()&&worker.reservedBytes()==0,"pending pointer cancellation releases hierarchy source");worker.close();near(volume.value(completed.result().hit().orElseThrow().sample().sample()),completed.result().hit().orElseThrow().sample().value(),"detached source scalar survives worker closure");
+            }
+        }
+    }
     private static void imageBuilder() {
         var builder=RgbaImage.builder(1,2,8);throwsType(IllegalStateException.class,builder::finish,"partial builder cannot publish");
         var source=ByteBuffer.wrap(new byte[]{99,1,2,3,4,5,6,7,8,99});source.position(1);source.limit(9);builder.appendRows(source,2,true);equal(1,source.position(),"source cursor unchanged");
@@ -441,6 +509,9 @@ public final class RendererCpuContracts {
         group("independent exposed-face oracle",RendererCpuContracts::surfaceCoverage);
         group("geometry-sharing scalar recoloring",RendererCpuContracts::scalarRecolor);
         group("scalar front-face picking",RendererCpuContracts::scalarPicking);
+        group("scalar original-group hierarchy",RendererCpuContracts::scalarRangeHierarchy);
+        group("scalar visited-face and hierarchy budgets",RendererCpuContracts::scalarVisitedBudgets);
+        group("scalar hierarchy admission and worker ownership",RendererCpuContracts::scalarHierarchyOwnership);
         group("atomic immutable RGBA builder",RendererCpuContracts::imageBuilder);
         group("original PNG pixels and receipts",RendererCpuContracts::originalImage);
         group("independent CPU admission lifetime",RendererCpuContracts::memoryOwnership);
