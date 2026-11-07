@@ -718,7 +718,7 @@ public final class WorldCpuContracts {
             var f=rangeFixture(true,kind,128,shifted);try(var cache=new WorldSectionCache();var owner=build(f,cache)) {
                 var scene=owner.scene().orElseThrow();var mesh=scene.sections().getFirst();int groups=mesh.faceBatchCount();
                 equal(Math.max(0,groups-1),mesh.faceBatchHierarchyCount(),"only balanced internal nodes are stored");equal(24L*Math.max(0,groups-1),mesh.faceBatchHierarchyBytes(),"six floats per internal node");
-                equal(mesh.packedBytes()+mesh.translucentBytes()+mesh.faceBatchBytes()+mesh.faceBatchHierarchyBytes(),mesh.usage().orElseThrow().outputBytes(),"section output admits every actual primitive array");
+                equal(mesh.packedBytes()+mesh.translucentBytes()+mesh.faceBatchBytes()+mesh.faceBatchHierarchyBytes()+mesh.markerBatchBytes()+mesh.markerBatchHierarchyBytes(),mesh.usage().orElseThrow().outputBytes(),"section output admits every actual primitive array");
                 equal(mesh.usage().orElseThrow().outputBytes(),scene.usage().meshBytes(),"complete scene receipt includes prepared draw hierarchy");worldHierarchyNode(mesh,0,groups,0);
                 for(int face=0;face<mesh.faces().size();face++)equal(f.snapshot().state(f.snapshot().extent().index(mesh.positionForFace(face))),mesh.stateForFace(face),"original native cell and state provenance is preserved");
                 throwsType(IndexOutOfBoundsException.class,()->mesh.faceBatchHierarchyMinimum(mesh.faceBatchHierarchyCount(),0),"hierarchy upper node bound");throwsType(IndexOutOfBoundsException.class,()->mesh.faceBatchHierarchyMaximum(-1,0),"negative hierarchy node bound");
@@ -730,6 +730,45 @@ public final class WorldCpuContracts {
         var partial=rangeFixture(false,0,255,true);var source=partial.snapshot().extent();for(int width:new int[]{21,22,31}) {
             var mesh=WorldMesher.assemble(partial.models(),partial.visibility(),new WorldSnapshot.Extent(source.minX(),source.minY(),source.minZ(),width,1,1),LIVE);check(!mesh.requiresPlaceholder(),"complete partial last-group source");equal(width*6,mesh.faces().size(),"all original cell faces emitted across group boundary");equal(width==21?1:2,mesh.faceBatchCount(),"126/132/186-face group boundary coverage");worldHierarchyNode(mesh,0,mesh.faceBatchCount(),0);
         }
+    }
+    private static Fixture markerFixture(int count,boolean shifted) {
+        var base=rangeFixture(false,1,255,shifted);int[] choices=new int[(int)base.snapshot().extent().cells()];Arrays.fill(choices,2);Arrays.fill(choices,0,count,1);
+        var models=WorldModels.capture(base.snapshot(),base.layout(),base.models().entries(),choices,base.models().offsets(),WorldModels.Limits.DEFAULT,LIVE);check(!models.requiresPlaceholder(),"complete marker-only group fixture");
+        var plan=WorldScenePlan.plan(models,base.visibility(),new WorldScenePlan.Limits(32,1,20000,4096,4096,4*1024*1024,8*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);check(!plan.requiresPlaceholder(),"complete marker-only metadata plan");
+        return new Fixture(base.snapshot(),base.assets(),base.block(),base.textures(),base.layout(),base.prototype(),models,base.visibility(),plan,base.raster());
+    }
+    /** Independent original unit-cell positions, without reading prepared child bounds. */
+    private static void markerBoundsOracle(WorldMesh mesh,int first,int end,int node,boolean hierarchy) {
+        float[] low={Float.POSITIVE_INFINITY,Float.POSITIVE_INFINITY,Float.POSITIVE_INFINITY},high={Float.NEGATIVE_INFINITY,Float.NEGATIVE_INFINITY,Float.NEGATIVE_INFINITY};
+        for(int marker=first*WorldMesh.BATCH_FACES;marker<Math.min(mesh.markers().size(),end*WorldMesh.BATCH_FACES);marker++) {
+            var position=mesh.markers().get(marker).position();float[] p={(float)Math.subtractExact(position.x(),mesh.origin().x()),(float)((long)position.y()-mesh.origin().y()),(float)Math.subtractExact(position.z(),mesh.origin().z())};
+            for(int axis=0;axis<3;axis++) { low[axis]=Math.min(low[axis],p[axis]);high[axis]=Math.max(high[axis],p[axis]+1); }
+        }
+        for(int axis=0;axis<3;axis++) { equal(low[axis],hierarchy?mesh.markerBatchHierarchyMinimum(node,axis):mesh.markerBatchMinimum(first,axis),"marker minimum follows exact original cells");equal(high[axis],hierarchy?mesh.markerBatchHierarchyMaximum(node,axis):mesh.markerBatchMaximum(first,axis),"marker maximum includes full unit wire box"); }
+        if(hierarchy) { int middle=(first+end)>>>1;if(middle-first>1)markerBoundsOracle(mesh,first,middle,node+1,true);if(end-middle>1)markerBoundsOracle(mesh,middle,end,node+middle-first,true); }
+    }
+    private static void markerSourceBounds() {
+        for(int count:new int[]{0,1,127,128,129,513})for(boolean shifted:new boolean[]{false,true}) {
+            var f=markerFixture(count,shifted);try(var cache=new WorldSectionCache();var owner=build(f,cache);var index=WorldPickIndex.prepare(owner.retain(),LIVE)) {
+                var scene=owner.scene().orElseThrow();var mesh=scene.sections().getFirst();int groups=(count+127)/128;
+                equal(count,mesh.markers().size(),"complete original marker count");equal(groups,mesh.markerBatchCount(),"partial marker group coverage");equal(24L*groups,mesh.markerBatchBytes(),"exact six-float marker leaf payload");equal(24L*Math.max(0,groups-1),mesh.markerBatchHierarchyBytes(),"exact internal marker payload");equal(mesh.markerBatchBytes()+mesh.markerBatchHierarchyBytes(),scene.usage().meshBytes(),"marker metadata is charged despite absent face geometry");equal(groups,scene.usage().markerBatches(),"scene marker count receipt matches emitted arrays");
+                for(int batch=0;batch<groups;batch++)markerBoundsOracle(mesh,batch,batch+1,0,false);if(groups>1)markerBoundsOracle(mesh,0,groups,0,true);
+                throwsType(IndexOutOfBoundsException.class,()->mesh.markerBatchMinimum(groups,0),"marker leaf upper bound");throwsType(IndexOutOfBoundsException.class,()->mesh.markerBatchHierarchyMaximum(Math.max(0,groups-1),0),"marker internal upper bound");
+                if(count>0) { var ray=rangeRay(f,0.5,0.5);var hit=compareRangeQueries(index,ray,WorldPickIndex.Options.DEFAULT,null).hit().orElseThrow();check(hit.placeholder(),"prepared bounds preserve marker picking");equal(f.snapshot().state(0),hit.state(),"original marker native state preserved");equal(f.snapshot().extent().position(0),hit.position(),"native model offsets do not move diagnostic unit cells"); }
+                try(var retained=owner.retain()) { owner.close();equal(mesh,retained.scene().orElseThrow().sections().getFirst(),"source lease retains complete marker metadata"); }
+            }
+        }
+    }
+    private static void markerSourceAdmission() {
+        var f=markerFixture(513,true);var usage=f.plan().sections().getFirst().usage().orElseThrow();var defaults=WorldMesher.Limits.DEFAULT;
+        for(int deficit:new int[]{0,1}) {
+            var limits=new WorldMesher.Limits(32,32768,1048576,32768,usage.outputBytes()-deficit,defaults.prototypeBytes(),defaults.sourceIndexBytes(),usage.knownPayloadBytes());var mesh=WorldMesher.assemble(f.models(),f.visibility(),f.snapshot().extent(),limits,LIVE);
+            equal(deficit!=0,mesh.requiresPlaceholder(),"marker-only admission enforces exact metadata budget");if(deficit!=0)check(mesh.markers().isEmpty()&&mesh.markerBatchCount()==0&&mesh.markerBatchHierarchyCount()==0,"deficient marker budget publishes no partial diagnostics");
+        }
+        var shortCombined=new WorldMesher.Limits(32,32768,1048576,32768,usage.outputBytes(),defaults.prototypeBytes(),defaults.sourceIndexBytes(),usage.knownPayloadBytes()-1);check(WorldMesher.plan(f.models(),f.visibility(),f.snapshot().extent(),shortCombined,LIVE).requiresPlaceholder(),"combined marker source/metadata deficit rejects before emission");
+        var plan=f.plan().sections().getFirst();var calls=new java.util.concurrent.atomic.AtomicInteger();WorldMesher.assemble(plan,()-> { calls.incrementAndGet();return false; });int last=calls.get()-1;var cancelled=new java.util.concurrent.atomic.AtomicInteger();throwsType(CancellationException.class,()->WorldMesher.assemble(plan,()->cancelled.incrementAndGet()>=last),"late marker tree cancellation publishes no source");
+        for(int deficit:new int[]{0,1}) { var sceneUsage=f.plan().usage().orElseThrow();var limits=new WorldScenePlan.Limits(32,1,20000,4096,4096,sceneUsage.meshBytes()-deficit,sceneUsage.knownPayloadBytes());equal(deficit!=0,WorldScenePlan.plan(f.models(),f.visibility(),limits,defaults,LIVE).requiresPlaceholder(),"scene plan admits exact marker payload before cache allocation"); }
+        try(var cache=new WorldSectionCache();var first=build(f,cache);var second=build(f,cache)) { equal(first.scene().orElseThrow().sections().getFirst(),second.scene().orElseThrow().sections().getFirst(),"cache shares complete immutable marker bounds");equal(first.scene().orElseThrow().usage().meshBytes(),cache.stats().meshBytes(),"shared cache charges one retained metadata copy"); }
     }
     private static void worldDrawHierarchyAdmission() {
         var f=rangeFixture(false,0,255,true);var sectionPlan=f.plan().sections().getFirst();var usage=sectionPlan.usage().orElseThrow();var limits=WorldMesher.Limits.DEFAULT;
@@ -1561,6 +1600,8 @@ public final class WorldCpuContracts {
         group("original-range picking hierarchy",WorldCpuContracts::pickingRangeHierarchy);
         group("range hierarchy markers alpha and ties",WorldCpuContracts::pickingRangeMarkersAndAlpha);
         group("world draw hierarchy exact emitted bounds",WorldCpuContracts::worldDrawHierarchyBounds);
+        group("prepared marker source bounds and original picking",WorldCpuContracts::markerSourceBounds);
+        group("marker source metadata admission and retention",WorldCpuContracts::markerSourceAdmission);
         group("world draw hierarchy admission and ownership",WorldCpuContracts::worldDrawHierarchyAdmission);
         group("range hierarchy admission and ownership",WorldCpuContracts::pickingRangeAdmission);
         group("independent translucent centroid ordering",WorldCpuContracts::ordering);

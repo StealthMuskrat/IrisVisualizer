@@ -73,7 +73,7 @@ public final class WorldPickIndex implements AutoCloseable {
         try {
             try {
                 WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0,faceSections=0,markerSections=0;
-                for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=WorldMesh.batchCount(mesh.markers().size());if(!mesh.faces().isEmpty())faceSections++;if(!mesh.markers().isEmpty())markerSections++; }
+                for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=mesh.markerBatchCount();if(!mesh.faces().isEmpty())faceSections++;if(!mesh.markers().isEmpty())markerSections++; }
                 var usage=scene.usage();if(scene.sections().size()!=usage.sections()||count!=usage.drawableSections()||faces!=usage.faceBatches()||markers!=usage.markerBatches()||faceSections!=usage.faceSections()||markerSections!=usage.markerSections())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Picking source sections/ranges differ from the complete scene receipt");
                 int nodes=count==0?0:count*2-1;
                 int faceInternal=limits.rangeHierarchy()?faces-faceSections:0,markerInternal=limits.rangeHierarchy()?markers-markerSections:0;
@@ -126,16 +126,12 @@ public final class WorldPickIndex implements AutoCloseable {
                 WorldProblem.check(cancelled);int at=faceBatch++*6;
                 for(int axis=0;axis<3;axis++) { faceRanges.bounds[at+axis]=mesh.faceBatchMinimum(batch,axis);faceRanges.bounds[at+axis+3]=mesh.faceBatchMaximum(batch,axis); }
             }
-            for(int first=0;first<mesh.markers().size();first+=BATCH_PRIMITIVES) {
-                WorldProblem.check(cancelled);int at=markerBatch++*6,end=Math.min(mesh.markers().size(),first+BATCH_PRIMITIVES);emptyBounds(markerRanges,at);
-                for(int marker=first;marker<end;marker++) {
-                    var position=mesh.markers().get(marker).position();
-                    float x=(float)relative(position.x(),mesh.origin().x()),y=(float)relative(position.y(),mesh.origin().y()),z=(float)relative(position.z(),mesh.origin().z());
-                    include(markerRanges,at,0,x,x+1);include(markerRanges,at,1,y,y+1);include(markerRanges,at,2,z,z+1);
-                }
+            for(int batch=0;batch<mesh.markerBatchCount();batch++) {
+                WorldProblem.check(cancelled);int at=markerBatch++*6;
+                for(int axis=0;axis<3;axis++) { markerRanges.bounds[at+axis]=mesh.markerBatchMinimum(batch,axis);markerRanges.bounds[at+axis+3]=mesh.markerBatchMaximum(batch,axis); }
             }
             if(faceRanges.hierarchy&&mesh.faceBatchCount()>1)faceTree=buildRangeTree(faceRanges,faceRanges.starts[sectionIndex],faceBatch,faceTree,cancelled);
-            if(markerRanges.hierarchy&&WorldMesh.batchCount(mesh.markers().size())>1)markerTree=buildRangeTree(markerRanges,markerRanges.starts[sectionIndex],markerBatch,markerTree,cancelled);
+            if(markerRanges.hierarchy&&mesh.markerBatchCount()>1)markerTree=buildRangeTree(markerRanges,markerRanges.starts[sectionIndex],markerBatch,markerTree,cancelled);
         }
         if(faceRanges!=Ranges.EMPTY)faceRanges.starts[scene.sections().size()]=faceBatch;
         if(markerRanges!=Ranges.EMPTY)markerRanges.starts[scene.sections().size()]=markerBatch;
@@ -153,8 +149,6 @@ public final class WorldPickIndex implements AutoCloseable {
         for(int axis=0;axis<3;axis++) { ranges.tree[at+axis]=Math.min(a[ai+axis],b[bi+axis]);ranges.tree[at+axis+3]=Math.max(a[ai+axis+3],b[bi+axis+3]); }
         return node+end-first-1;
     }
-    private static void emptyBounds(Ranges ranges,int at) { for(int axis=0;axis<3;axis++) { ranges.bounds[at+axis]=Float.POSITIVE_INFINITY;ranges.bounds[at+axis+3]=Float.NEGATIVE_INFINITY; } }
-    private static void include(Ranges ranges,int at,int axis,float low,float high) { ranges.bounds[at+axis]=Math.min(ranges.bounds[at+axis],low);ranges.bounds[at+axis+3]=Math.max(ranges.bounds[at+axis+3],high); }
     public UUID id() { return id; }
     public Optional<RenderMemory> memory() { return Optional.ofNullable(memory); }
     /** Exact scene identity, not just matching native source, volume or asset metadata. */

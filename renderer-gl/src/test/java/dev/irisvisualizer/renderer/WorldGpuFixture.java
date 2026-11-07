@@ -30,6 +30,13 @@ public final class WorldGpuFixture implements AutoCloseable {
         int[] assignments=new int[32*32];if(mixed)for(int z=0;z<32;z++)Arrays.fill(assignments,z*32,(z+1)*32,z&1);
         return build(materials,assignments,32,32,WorldModels.Kind.MESH);
     }
+    /** Mixed markers alternate left/right 128-instance groups to exercise disjoint retained draw runs. */
+    public static WorldGpuFixture markerCulling(boolean mixed) {
+        if(!mixed)return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[1024],32,32,WorldModels.Kind.PLACEHOLDER);
+        var materials=List.of(new Material(0xffffffff,false,false,false,false),new Material(0xc0c0c0ff,false,false,false,false));int[] assignments=new int[1024];
+        for(int z=0;z<32;z++)for(int x=0;x<32;x++)assignments[z*32+x]=((z/8&1)==0?x<16:x>=16)?0:1;
+        return build(materials,assignments,32,32,WorldModels.Kind.MESH,true);
+    }
     public static WorldGpuFixture animated(boolean interpolate) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture animated(boolean interpolate,int frameTicks) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,frameTicks)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture empty() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.EMPTY); }
@@ -55,6 +62,9 @@ public final class WorldGpuFixture implements AutoCloseable {
         }catch(IOException impossible) { throw new AssertionError(impossible); }
     }
     private static WorldGpuFixture build(List<Material> materials,int[] assignments,int width,int depth,WorldModels.Kind kind) {
+        return build(materials,assignments,width,depth,kind,false);
+    }
+    private static WorldGpuFixture build(List<Material> materials,int[] assignments,int width,int depth,WorldModels.Kind kind,boolean markerMix) {
         var assets=new TreeMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset>();var states=new ArrayList<RenderBlockState>();
         for(int i=0;i<materials.size();i++) {
             var block=new AssetId("fixture","gpu_cube_"+i);var model=new AssetId("fixture","block/gpu_cube_"+i);var sprite=new AssetId("fixture","block/gpu_pixel_"+i);var material=materials.get(i);
@@ -71,14 +81,14 @@ public final class WorldGpuFixture implements AutoCloseable {
         if(kind==WorldModels.Kind.MESH) {
             var textures=new ArrayList<TexturePreparation>();for(var state:states) { var model=BlockModels.resolve(catalog,state,LIVE);check(!model.requiresPlaceholder(),"synthetic world JSON model resolved: "+model.problems());var mesh=GeometryBaker.bake(model,new int[]{0},LIVE);check(!mesh.requiresPlaceholder(),"synthetic world model baked");var prepared=TextureMaterials.prepare(catalog,mesh,LIVE);check(!prepared.requiresPlaceholder(),"synthetic world texture prepared: "+prepared.problems());textures.add(prepared); }
             layout=AtlasBuilder.plan(textures,new AtlasBuilder.Limits(8,8,64,64,8,4,1,4096,16384,4096,16384,4096,1024*1024,4096),LIVE);check(!layout.requiresPlaceholder(),"synthetic world shared atlas planned: "+layout.problems());
-            for(var texture:textures) { var bound=AtlasMeshes.bind(layout,texture,LIVE);check(!bound.requiresPlaceholder(),"synthetic world mesh bound");entries.add(WorldModels.Entry.from(bound)); }
+            for(var texture:textures) { var bound=AtlasMeshes.bind(layout,texture,LIVE);check(!bound.requiresPlaceholder(),"synthetic world mesh bound");entries.add(markerMix&&entries.isEmpty()?WorldModels.Entry.placeholder(states.getFirst(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,states.getFirst().block(),"/mixed-marker","Synthetic marker group; original cell preserved"))):WorldModels.Entry.from(bound)); }
         }else {
             layout=AtlasBuilder.empty(catalog,states.getFirst().block(),LIVE);
             entries.add(kind==WorldModels.Kind.EMPTY?WorldModels.Entry.empty(states.getFirst()):WorldModels.Entry.placeholder(states.getFirst(),List.of(new ModelPlan.Problem(ModelPlan.Code.UNSUPPORTED_GEOMETRY,ClientAssetSnapshot.Kind.BLOCKSTATE,states.getFirst().block(),"/synthetic","Synthetic unsupported visual; original state retained"))));
         }
         var models=WorldModels.capture(snapshot,layout,entries,assignments,LIVE);check(!models.requiresPlaceholder(),"complete synthetic world assignments: "+models.problems());var masks=new byte[assignments.length];
         if(width==2&&depth==1) { masks[0]=(byte)(1<<ModelPlan.Direction.EAST.ordinal());masks[1]=(byte)(1<<ModelPlan.Direction.WEST.ordinal()); }
-        var visibility=WorldVisibility.capture(snapshot,layout,"explicit synthetic neighbor masks",masks,LIVE);var plan=WorldScenePlan.plan(models,visibility,new WorldScenePlan.Limits(width>2||depth>2?32:2,32,8192,2048,64,2*1024*1024,8*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);check(!plan.requiresPlaceholder(),"complete synthetic world plan: "+plan.problems());var raster=AtlasImages.capture(layout,0,0,LIVE);check(!raster.requiresPlaceholder(),"complete synthetic atlas raster");
+        var visibility=WorldVisibility.capture(snapshot,layout,"explicit synthetic neighbor masks",masks,LIVE);var plan=WorldScenePlan.plan(models,visibility,new WorldScenePlan.Limits(width>2||depth>2?32:2,32,8192,2048,2048,2*1024*1024,8*1024*1024),WorldMesher.Limits.DEFAULT,LIVE);check(!plan.requiresPlaceholder(),"complete synthetic world plan: "+plan.problems());var raster=AtlasImages.capture(layout,0,0,LIVE);check(!raster.requiresPlaceholder(),"complete synthetic atlas raster");
         var cache=new WorldSectionCache();try { var owner=WorldScene.build(plan,raster,cache,LIVE);if(owner.requiresPlaceholder()) { var problems=owner.problems();owner.close();throw new AssertionError("synthetic CPU world build failed: "+problems); }return new WorldGpuFixture(cache,owner); }catch(RuntimeException|Error failure) { try { cache.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public WorldLighting lighting(float red,float green,float blue) {

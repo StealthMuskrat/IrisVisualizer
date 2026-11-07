@@ -128,12 +128,13 @@ public final class GlRenderer implements AutoCloseable {
         Objects.requireNonNull(atlas);Objects.requireNonNull(plan);draw(scene,atlas,plan,target,camera);
     }
     /** Submission counts are returned only after a complete draw and host-state restoration. */
-    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces,int faceBoundsTests) {
+    public record FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces,int faceBoundsTests,int markerBatchTests,int culledMarkerBatches,int culledMarkerInstances,int markerBoundsTests) {
         public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,0,0,0); }
         public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,solidRangeTests,culledSolidRanges,culledSolidFaces,0,0,0); }
         public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,solidRangeTests,culledSolidRanges,culledSolidFaces,faceBatchTests,culledFaceBatches,culledTranslucentFaces,0);if(culledFaceBatches>faceBatchTests)throw new IllegalArgumentException("Invalid legacy frame group counts"); }
+        public FrameStats(int totalSections,int emptySections,int visibleSections,int culledSections,int solidDrawCalls,int translucentDrawCalls,int translucentFaces,int markerDrawCalls,int markerInstances,long triangleIndices,int solidRangeTests,int culledSolidRanges,int culledSolidFaces,int faceBatchTests,int culledFaceBatches,int culledTranslucentFaces,int faceBoundsTests) { this(totalSections,emptySections,visibleSections,culledSections,solidDrawCalls,translucentDrawCalls,translucentFaces,markerDrawCalls,markerInstances,triangleIndices,solidRangeTests,culledSolidRanges,culledSolidFaces,faceBatchTests,culledFaceBatches,culledTranslucentFaces,faceBoundsTests,0,0,0,0); }
         public FrameStats {
-            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0||solidRangeTests<0||culledSolidRanges<0||culledSolidRanges>solidRangeTests||culledSolidFaces<0||faceBatchTests<0||culledFaceBatches<0||culledTranslucentFaces<0||faceBoundsTests<0||faceBoundsTests>0&&faceBoundsTests<faceBatchTests)throw new IllegalArgumentException("Invalid frame submission counts");
+            if(totalSections<0||emptySections<0||visibleSections<0||culledSections<0||(long)emptySections+visibleSections+culledSections!=totalSections||solidDrawCalls<0||translucentDrawCalls<0||translucentFaces<0||markerDrawCalls<0||markerInstances<0||triangleIndices<0||solidRangeTests<0||culledSolidRanges<0||culledSolidRanges>solidRangeTests||culledSolidFaces<0||faceBatchTests<0||culledFaceBatches<0||culledTranslucentFaces<0||faceBoundsTests<0||faceBoundsTests>0&&faceBoundsTests<faceBatchTests||markerBatchTests<0||culledMarkerBatches<0||culledMarkerInstances<0||markerBoundsTests<markerBatchTests)throw new IllegalArgumentException("Invalid frame submission counts");
         }
     }
     /** Metadata-only temporary CPU admission size; excludes retained scene/target and host-state bookkeeping. */
@@ -147,7 +148,7 @@ public final class GlRenderer implements AutoCloseable {
     /** Null atlas/order select the base raster/no order; translucent scenes still require an order. */
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera) { return draw(scene,atlas,plan,target,camera); }
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip) { return draw(scene,atlas,plan,target,camera,clip); }
-    /** Disable face-group rejection in both material passes for differential pixel/submission comparisons. */
+    /** Disable face/marker group rejection for differential pixel/submission comparisons. */
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,boolean rangeCulling) { return draw(scene,atlas,plan,target,camera,clip,rangeCulling); }
     /** Explicit hierarchy, independent lazy leaf comparison, or no face-group rejection. */
     public FrameStats renderFrame(GlScene scene,GlAtlasFrame atlas,GlDrawPlan plan,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode) { return draw(scene,atlas,plan,target,camera,clip,mode); }
@@ -174,7 +175,7 @@ public final class GlRenderer implements AutoCloseable {
     /** This stack drops all temporary array owners before its covering admission is released. */
     private FrameStats drawAdmitted(GlScene scene,GlTarget target,GlCamera camera,WorldClip clip,GlCullingMode mode,WorldDrawOrder order,int[] textures) {
         var culling=new GlWorldCulling(scene.cpuScene(),camera,(double)target.width()/target.height(),clip,mode);var matrix=culling.matrix;var offsets=culling.offsets;var visible=culling.sections;var clipBounds=culling.clip;
-        int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0,rangeTests=0,culledRanges=0,culledFaces=0,culledTranslucent=0;long indices=0;var meshes=scene.cpuScene().sections();
+        int solidCalls=0,translucentCalls=0,translucentFaces=0,markerCalls=0,markers=0,rangeTests=0,culledRanges=0,culledFaces=0,culledTranslucent=0,culledMarkers=0;long indices=0;var meshes=scene.cpuScene().sections();
         try(var state=new GlState(device)) {
             state.drawing();target.complete=false;glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target.allocation.framebuffers[0]);glViewport(0,0,target.width(),target.height());glClearBufferfv(GL_COLOR,0,new float[]{0.08f,0.1f,0.14f,1});glClearBufferfv(GL_DEPTH,0,new float[]{1});
             glActiveTexture(GL_TEXTURE0);glBindSampler(0,0);glUseProgram(allocation.programs[0]);glUniformMatrix4fv(geometryMatrix,false,matrix);glUniform1i(geometryAtlas,0);glUniform1i(geometryLighting,scene.nativeLighting?1:0);geometryClip.set(clip.enabled(),clipBounds);
@@ -210,10 +211,23 @@ public final class GlRenderer implements AutoCloseable {
                 }
             }
             state.opaque();glUseProgram(allocation.programs[1]);glUniformMatrix4fv(markerMatrix,false,matrix);markerClip.set(clip.enabled(),clipBounds);
-            for(int i=0;i<scene.sections.size();i++) { var section=scene.sections.get(i);if(!visible[i]||section.markerVao()==0)continue;glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,section.markerCount());markerCalls++;markers+=section.markerCount(); }
+            for(int i=0;i<scene.sections.size();i++) {
+                var section=scene.sections.get(i);if(!visible[i]||section.markerVao()==0)continue;
+                glUniform3f(markerOffset,offsets[i*3],offsets[i*3+1],offsets[i*3+2]);glBindVertexArray(section.markerVao());glBindBuffer(GL_ARRAY_BUFFER,section.markerBuffer());
+                int run=-1,end=section.markerCount();
+                for(int marker=0;marker<end;) {
+                    int stop=mode.enabled()?Math.min(end,(marker/WorldMesh.BATCH_FACES+1)*WorldMesh.BATCH_FACES):end;
+                    if(culling.marker(i,marker)) { if(run<0)run=marker; }
+                    else { culledMarkers+=stop-marker;if(run>=0) { markerRun(run,marker-run);markerCalls++;markers+=marker-run;run=-1; } }
+                    marker=stop;
+                }
+                if(run>=0) { markerRun(run,end-run);markerCalls++;markers+=end-run; }
+            }
             device.check("complete offscreen scene draw");
         }
-        return new FrameStats(scene.sections.size(),culling.empty,culling.visible,culling.culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices,rangeTests,culledRanges,culledFaces,culling.tests(),culling.rejected(),culledTranslucent,culling.boundsTests());
+        return new FrameStats(scene.sections.size(),culling.empty,culling.visible,culling.culled,solidCalls,translucentCalls,translucentFaces,markerCalls,markers,indices,rangeTests,culledRanges,culledFaces,culling.tests(),culling.rejected(),culledTranslucent,culling.boundsTests(),culling.markerTests(),culling.markerRejected(),culledMarkers,culling.markerBoundsTests());
     }
+    /** GL 3.3 instance ranges use this owned VAO's attribute pointer, without base-instance extensions. */
+    private static void markerRun(int first,int count) { glVertexAttribPointer(3,3,GL_FLOAT,false,12,(long)first*12);glDrawElementsInstanced(GL_LINES,EDGES.length,GL_UNSIGNED_INT,0L,count); }
     @Override public void close() { device.retire(allocation); }
 }

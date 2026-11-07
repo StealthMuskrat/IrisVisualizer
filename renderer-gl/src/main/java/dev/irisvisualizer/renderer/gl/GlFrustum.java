@@ -22,11 +22,15 @@ final class GlFrustum {
         return visible(minX,minY,minZ,maxX,maxY,maxZ);
     }
     /** Original-order world face bounds, using the geometry shader's float anchor addition. */
-    boolean visible(WorldMesh mesh,int batch,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,batch,false,offsets,at,clip,false)!=Visibility.OUTSIDE; }
-    Visibility classifyHierarchy(WorldMesh mesh,int node,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,node,true,offsets,at,clip,true); }
-    private Visibility world(WorldMesh mesh,int index,boolean hierarchy,float[] offsets,int at,WorldClip.Bounds clip,boolean classify) {
-        float minX=offsets[at]+(hierarchy?mesh.faceBatchHierarchyMinimum(index,0):mesh.faceBatchMinimum(index,0)),minY=offsets[at+1]+(hierarchy?mesh.faceBatchHierarchyMinimum(index,1):mesh.faceBatchMinimum(index,1)),minZ=offsets[at+2]+(hierarchy?mesh.faceBatchHierarchyMinimum(index,2):mesh.faceBatchMinimum(index,2));
-        float maxX=offsets[at]+(hierarchy?mesh.faceBatchHierarchyMaximum(index,0):mesh.faceBatchMaximum(index,0)),maxY=offsets[at+1]+(hierarchy?mesh.faceBatchHierarchyMaximum(index,1):mesh.faceBatchMaximum(index,1)),maxZ=offsets[at+2]+(hierarchy?mesh.faceBatchHierarchyMaximum(index,2):mesh.faceBatchMaximum(index,2));
+    boolean visible(WorldMesh mesh,int batch,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,batch,false,false,offsets,at,clip,false)!=Visibility.OUTSIDE; }
+    Visibility classifyHierarchy(WorldMesh mesh,int node,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,node,true,false,offsets,at,clip,true); }
+    boolean markerVisible(WorldMesh mesh,int batch,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,batch,false,true,offsets,at,clip,false)!=Visibility.OUTSIDE; }
+    Visibility classifyMarkerHierarchy(WorldMesh mesh,int node,float[] offsets,int at,WorldClip.Bounds clip) { return world(mesh,node,true,true,offsets,at,clip,true); }
+    private static float low(WorldMesh mesh,int index,int axis,boolean hierarchy,boolean markers) { return markers?(hierarchy?mesh.markerBatchHierarchyMinimum(index,axis):mesh.markerBatchMinimum(index,axis)):(hierarchy?mesh.faceBatchHierarchyMinimum(index,axis):mesh.faceBatchMinimum(index,axis)); }
+    private static float high(WorldMesh mesh,int index,int axis,boolean hierarchy,boolean markers) { return markers?(hierarchy?mesh.markerBatchHierarchyMaximum(index,axis):mesh.markerBatchMaximum(index,axis)):(hierarchy?mesh.faceBatchHierarchyMaximum(index,axis):mesh.faceBatchMaximum(index,axis)); }
+    private Visibility world(WorldMesh mesh,int index,boolean hierarchy,boolean markers,float[] offsets,int at,WorldClip.Bounds clip,boolean classify) {
+        float minX=offsets[at]+low(mesh,index,0,hierarchy,markers),minY=offsets[at+1]+low(mesh,index,1,hierarchy,markers),minZ=offsets[at+2]+low(mesh,index,2,hierarchy,markers);
+        float maxX=offsets[at]+high(mesh,index,0,hierarchy,markers),maxY=offsets[at+1]+high(mesh,index,1,hierarchy,markers),maxZ=offsets[at+2]+high(mesh,index,2,hierarchy,markers);
         if(clip!=null) {
             double magnitude=Math.max(Math.max(Math.abs(minX),Math.abs(maxX)),Math.max(Math.max(Math.abs(minY),Math.abs(maxY)),Math.max(Math.abs(minZ),Math.abs(maxZ)))),margin=4*(double)Math.ulp((float)magnitude)+1e-6;
             if(!clip.intersects(minX-margin,minY-margin,minZ-margin,maxX+margin,maxY+margin,maxZ+margin))return Visibility.OUTSIDE;

@@ -72,7 +72,7 @@ public final class WorldScene {
                 if(!ticket.cached())ticket.complete(WorldMesher.assemble(section,cancelled));var mesh=ticket.mesh();
                 if(mesh.models()!=plan.models()||mesh.visibility()!=plan.visibility()||!mesh.extent().equals(section.extent())||!mesh.usage().equals(section.usage()))throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Cached section does not match the complete scene plan");
                 var usage=mesh.usage().orElseThrow();bytes+=usage.outputBytes();covered+=mesh.extent().cells();faces+=usage.faces();cells+=usage.nonEmptyCells();markers+=usage.markers();translucent+=usage.translucentFaces();tinted+=usage.tintedFaces();work.sections.add(mesh);
-                if(mesh.bounds().isPresent())drawable++;faceBatches+=mesh.faceBatchCount();markerBatches+=WorldMesh.batchCount(mesh.markers().size());
+                if(mesh.bounds().isPresent())drawable++;faceBatches+=mesh.faceBatchCount();markerBatches+=mesh.markerBatchCount();
                 if(!mesh.faces().isEmpty())faceSections++;if(!mesh.markers().isEmpty())markerSections++;
             }
             var usage=plan.usage().orElseThrow();

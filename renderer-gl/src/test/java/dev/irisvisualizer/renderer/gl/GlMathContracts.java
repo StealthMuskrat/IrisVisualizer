@@ -164,6 +164,32 @@ public final class GlMathContracts {
         check(interior>100,"independent interior oracle exercises many world groups");
         try(var fixture=WorldGpuFixture.placeholder()) { var scene=fixture.scene();var camera=new GlCamera(scene.snapshot().extent().position(0),0.5,0.5,3,0.5,0.5,0.5,60,0.1,20);var markers=new GlWorldCulling(scene,camera,1,WorldClip.NONE,true);equal(1,markers.visible,"marker-only section remains drawable");equal(0,markers.boundsTests(),"no dummy face hierarchy for markers"); }
     }
+    private static void markerHierarchicalDraw() {
+        var random=new Random(0x4d41524b4552L);
+        for(boolean mixed:new boolean[]{false,true})try(var fixture=WorldGpuFixture.markerCulling(mixed)) {
+            var scene=fixture.scene();var mesh=scene.sections().getFirst();var origin=mesh.origin();int count=mesh.markerBatchCount();
+            equal(mixed?512:1024,mesh.markers().size(),"complete original marker fixture");equal(1037L+8+mesh.faceBatchCount()+8+count,GlWorldCulling.workingBytes(scene,true),"exact separate face/marker prefixes and byte masks");equal(1037L,GlWorldCulling.workingBytes(scene,false),"disabled mode omits both family masks");
+            for(int trial=0;trial<48;trial++) {
+                var anchor=new WorldSnapshot.Position(Math.addExact(origin.x(),37),origin.y()-17,Math.addExact(origin.z(),-91));
+                var camera=new GlCamera(anchor,-21+(random.nextDouble()-0.5)*48,35+random.nextDouble()*24,155+random.nextDouble()*64,-21,17.5,107,40+random.nextDouble()*50,0.1,512);double aspect=0.5+random.nextDouble()*2;
+                var scope=trial%3==0?WorldClip.NONE:new WorldClip(new WorldSnapshot.Extent(Math.addExact(origin.x(),random.nextInt(24)),origin.y(),Math.addExact(origin.z(),random.nextInt(24)),8,1,8));
+                var tree=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.HIERARCHY);var linear=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.LINEAR);var none=new GlWorldCulling(scene,camera,aspect,scope,GlCullingMode.NONE);var frustum=new GlFrustum(tree.matrix);
+                for(int group=count-1;group>=0;group--) {
+                    int marker=group*128;boolean expected=tree.sections[0]&&frustum.markerVisible(mesh,group,tree.offsets,0,scope.enabled()?tree.clip:null);
+                    equal(expected,tree.marker(0,marker),"hierarchical marker decision equals independent leaf predicate");equal(linear.marker(0,marker),tree.marker(0,marker),"reverse marker walk agrees with linear mode");equal(tree.sections[0],none.marker(0,marker),"disabled mode keeps complete visible-section marker order");
+                }
+                equal(linear.markerRejected(),tree.markerRejected(),"bulk rejected count covers exact original marker groups");check(tree.markerBoundsTests()<=2*count-1&&tree.markerTests()<=count&&tree.markerBoundsTests()>=tree.markerTests(),"marker work remains structurally bounded");equal(0,none.markerBoundsTests(),"disabled markers perform no bounds work");
+                int tested=tree.markerBoundsTests();for(int marker=0;marker<mesh.markers().size();marker++)equal(linear.marker(0,marker),tree.marker(0,marker),"every original marker shares its group's cached decision");equal(tested,tree.markerBoundsTests(),"forward marker traversal repeats no bound classification");
+                for(int group=0;group<mesh.faceBatchCount();group++)equal(linear.face(0,group*128),tree.face(0,group*128),"marker family cannot overwrite face-family cache");
+            }
+            var whole=new GlCamera(origin,16,32,288,16,0.5,16,90,0.1,1024);var accepted=new GlWorldCulling(scene,whole,1,WorldClip.NONE,true);equal(1,accepted.markerBoundsTests(),"contained marker tree accepts at root");equal(0,accepted.markerTests(),"root acceptance avoids marker leaf tests");for(int marker=0;marker<mesh.markers().size();marker++)check(accepted.marker(0,marker),"root acceptance retains every original marker");
+            var scope=mixed?new WorldClip(new WorldSnapshot.Extent(origin.x(),origin.y(),origin.z(),8,1,32)):new WorldClip(new WorldSnapshot.Extent(origin.x(),origin.y(),Math.addExact(origin.z(),24),32,1,8));var clipped=new GlWorldCulling(scene,whole,1,scope,true);
+            if(mixed) { check(clipped.marker(0,0)&&!clipped.marker(0,128)&&clipped.marker(0,256)&&!clipped.marker(0,384),"alternating original marker groups create two retained runs");equal(2,clipped.markerRejected(),"exact alternate-group rejection count"); }
+            else check(clipped.markerRejected()>0&&clipped.markerTests()<count,"clipped marker subtrees reduce leaf tests");
+            throwsType(IndexOutOfBoundsException.class,()->clipped.marker(0,-1),"negative source marker index");throwsType(IndexOutOfBoundsException.class,()->clipped.marker(0,mesh.markers().size()),"source marker upper bound");throwsType(IndexOutOfBoundsException.class,()->clipped.marker(1,0),"source marker section upper bound");
+            var disjoint=new GlWorldCulling(scene,whole,1,new WorldClip(new WorldSnapshot.Extent(Math.addExact(origin.x(),64),origin.y(),origin.z(),1,1,1)),true);equal(0,disjoint.markerBoundsTests(),"whole-section rejection precedes marker tree work");check(!disjoint.marker(0,0),"outside section retains no marker candidate");
+        }
+    }
     private static void scalarDrawPreparation() {
         var context=surface(true).volume().context();var grid=new NoiseVolume.Grid(new MapSamples.Grid(-37,91,32,32,1),new MapSamples.Vertical(-64,1));var values=new double[1024];Arrays.fill(values,0.5);var present=new byte[1024];Arrays.fill(present,(byte)1);var volume=NoiseVolume.capture(context,grid,values,present,NoiseVolume.Limits.DEFAULT,()->false);var style=new NoiseSurface.Style(0,1,new MapRaster.ScalarStyle(0,1,MapRamp.GRAYSCALE),NoiseSurface.Meshing.CELLS);var source=NoiseSurface.prepare(volume,style,NoiseSurface.Limits.DEFAULT,()->false);
         check(!source.requiresPlaceholder(),"complete scalar draw fixture");equal(2176,source.size(),"complete slab outer surface without height/sample omission");equal(3,source.batchCount(),"three original scalar groups");equal(1027L,GlNoiseCulling.workingBytes(source,true),"fixed math plus exact scalar mask allowance");equal(1024L,GlNoiseCulling.workingBytes(source,false),"no group mask in disabled mode");
@@ -223,6 +249,7 @@ public final class GlMathContracts {
         group("clipped scalar fitting",GlMathContracts::clippedFit);
         group("shared conservative world face-group decisions",GlMathContracts::worldGroups);
         group("hierarchical world draw bounds and linear agreement",GlMathContracts::worldHierarchicalDraw);
+        group("hierarchical diagnostic marker groups and masks",GlMathContracts::markerHierarchicalDraw);
         group("bounded scalar draw preparation and differential groups",GlMathContracts::scalarDrawPreparation);
         group("hierarchical scalar draw rejection and linear agreement",GlMathContracts::scalarHierarchicalDraw);
         System.out.println("PASS "+groups+" context-free display math groups; no OpenGL/native parity is claimed.");

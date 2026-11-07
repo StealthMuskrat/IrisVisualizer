@@ -21,7 +21,7 @@ public final class WorldMesh {
     public record Marker(int cell,WorldSnapshot.Position position,RenderBlockState state,List<ModelPlan.Problem> problems) {
         public Marker { Objects.requireNonNull(position);Objects.requireNonNull(state);problems=List.copyOf(problems);if(cell<0||problems.isEmpty())throw new IllegalArgumentException("Invalid visual placeholder marker"); }
     }
-    /** Output includes packed geometry, face-batch bounds/hierarchy and CPU-only translucent indices/centers. */
+    /** Output includes packed geometry, face/marker group bounds/hierarchies and CPU-only translucent indices/centers. */
     public record Usage(long sourceIndexBytes,long visibilityBytes,long prototypeBytes,long atlasPayloadBytes,long outputBytes,
                         int requestedCells,int nonEmptyCells,int faces,int markers,int translucentFaces,int tintedFaces) {
         public Usage(long sourceIndexBytes,long visibilityBytes,long prototypeBytes,long atlasPayloadBytes,long outputBytes,int requestedCells,int nonEmptyCells,int faces,int markers) { this(sourceIndexBytes,visibilityBytes,prototypeBytes,atlasPayloadBytes,outputBytes,requestedCells,nonEmptyCells,faces,markers,0); }
@@ -30,20 +30,21 @@ public final class WorldMesh {
         public long knownPayloadBytes() { return sourceIndexBytes+visibilityBytes+prototypeBytes+atlasPayloadBytes+outputBytes; }
     }
     private final WorldModels models;private final WorldVisibility visibility;private final WorldSnapshot.Extent extent;private final WorldSnapshot.Position origin;
-    private final float[] vertices,faceBatches,faceHierarchy;private final int[] indices,translucentFaces;private final double[] translucentCenters;private final List<Cell> cells;private final List<Face> faces;private final List<Marker> markers;
+    private final float[] vertices,faceBatches,faceHierarchy,markerBatches,markerHierarchy;private final int[] indices,translucentFaces;private final double[] translucentCenters;private final List<Cell> cells;private final List<Face> faces;private final List<Marker> markers;
     private final List<AtlasMesh.DrawRange> ranges;private final Optional<BlockMesh.Bounds> bounds;private final Optional<Usage> usage;private final List<WorldProblem> problems;
-    private WorldMesh(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,float[] ownedVertices,int[] ownedIndices,int[] translucentFaces,double[] translucentCenters,float[] faceBatches,float[] faceHierarchy,List<Cell> cells,List<Face> faces,List<Marker> markers,List<AtlasMesh.DrawRange> ranges,Optional<BlockMesh.Bounds> bounds,Optional<Usage> usage,List<WorldProblem> problems) {
+    private WorldMesh(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,float[] ownedVertices,int[] ownedIndices,int[] translucentFaces,double[] translucentCenters,float[] faceBatches,float[] faceHierarchy,float[] markerBatches,float[] markerHierarchy,List<Cell> cells,List<Face> faces,List<Marker> markers,List<AtlasMesh.DrawRange> ranges,Optional<BlockMesh.Bounds> bounds,Optional<Usage> usage,List<WorldProblem> problems) {
         this.models=models;this.visibility=visibility;this.extent=extent;origin=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());vertices=ownedVertices;indices=ownedIndices;
-        this.translucentFaces=translucentFaces;this.translucentCenters=translucentCenters;this.faceBatches=faceBatches;this.faceHierarchy=faceHierarchy;
+        this.translucentFaces=translucentFaces;this.translucentCenters=translucentCenters;this.faceBatches=faceBatches;this.faceHierarchy=faceHierarchy;this.markerBatches=markerBatches;this.markerHierarchy=markerHierarchy;
         this.cells=List.copyOf(cells);this.faces=List.copyOf(faces);this.markers=List.copyOf(markers);this.ranges=List.copyOf(ranges);this.bounds=bounds;this.usage=usage;this.problems=List.copyOf(problems);
         if(translucentCenters.length!=(long)translucentFaces.length*3)throw new IllegalArgumentException("Invalid translucent center coverage");
         if(faceBatchBytes()!=batchBytes(faces.size())||faceBatchHierarchyBytes()!=hierarchyBytes(faces.size()))throw new IllegalArgumentException("Invalid world face-batch coverage");
+        if(markerBatchBytes()!=batchBytes(markers.size())||markerBatchHierarchyBytes()!=hierarchyBytes(markers.size()))throw new IllegalArgumentException("Invalid world marker-batch coverage");
         if(bounds.isPresent()!=(!faces.isEmpty()||!markers.isEmpty()))throw new IllegalArgumentException("World mesh drawable bounds differ from its primitives");
         if(!problems.isEmpty()&&(vertices.length!=0||indices.length!=0||translucentFaces.length!=0||!cells.isEmpty()||!faces.isEmpty()||!markers.isEmpty()||!ranges.isEmpty()||bounds.isPresent()||usage.isPresent()))throw new IllegalArgumentException("Partial section mesh escaped failure");
-        if(usage.isPresent()&&(usage.orElseThrow().faces()!=faces.size()||usage.orElseThrow().markers()!=markers.size()||usage.orElseThrow().nonEmptyCells()!=cells.size()||usage.orElseThrow().translucentFaces()!=translucentFaces.length||usage.orElseThrow().outputBytes()!=packedBytes()+translucentBytes()+faceBatchBytes()+faceBatchHierarchyBytes()))throw new IllegalArgumentException("World mesh payload differs from admitted output");
+        if(usage.isPresent()&&(usage.orElseThrow().faces()!=faces.size()||usage.orElseThrow().markers()!=markers.size()||usage.orElseThrow().nonEmptyCells()!=cells.size()||usage.orElseThrow().translucentFaces()!=translucentFaces.length||usage.orElseThrow().outputBytes()!=packedBytes()+translucentBytes()+faceBatchBytes()+faceBatchHierarchyBytes()+markerBatchBytes()+markerBatchHierarchyBytes()))throw new IllegalArgumentException("World mesh payload differs from admitted output");
     }
-    static WorldMesh success(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,float[] vertices,int[] indices,int[] translucentFaces,double[] translucentCenters,float[] faceBatches,float[] faceHierarchy,List<Cell> cells,List<Face> faces,List<Marker> markers,List<AtlasMesh.DrawRange> ranges,Optional<BlockMesh.Bounds> bounds,Usage usage) { return new WorldMesh(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,faceBatches,faceHierarchy,cells,faces,markers,ranges,bounds,Optional.of(usage),List.of()); }
-    static WorldMesh placeholder(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,List<WorldProblem> problems) { if(problems.isEmpty())throw new IllegalArgumentException("Placeholder requires a problem");return new WorldMesh(models,visibility,extent,new float[0],new int[0],new int[0],new double[0],new float[0],new float[0],List.of(),List.of(),List.of(),List.of(),Optional.empty(),Optional.empty(),problems); }
+    static WorldMesh success(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,float[] vertices,int[] indices,int[] translucentFaces,double[] translucentCenters,float[] faceBatches,float[] faceHierarchy,float[] markerBatches,float[] markerHierarchy,List<Cell> cells,List<Face> faces,List<Marker> markers,List<AtlasMesh.DrawRange> ranges,Optional<BlockMesh.Bounds> bounds,Usage usage) { return new WorldMesh(models,visibility,extent,vertices,indices,translucentFaces,translucentCenters,faceBatches,faceHierarchy,markerBatches,markerHierarchy,cells,faces,markers,ranges,bounds,Optional.of(usage),List.of()); }
+    static WorldMesh placeholder(WorldModels models,WorldVisibility visibility,WorldSnapshot.Extent extent,List<WorldProblem> problems) { if(problems.isEmpty())throw new IllegalArgumentException("Placeholder requires a problem");return new WorldMesh(models,visibility,extent,new float[0],new int[0],new int[0],new double[0],new float[0],new float[0],new float[0],new float[0],List.of(),List.of(),List.of(),List.of(),Optional.empty(),Optional.empty(),problems); }
     public WorldModels models() { return models; }
     public WorldSnapshot snapshot() { return models.snapshot(); }
     public AtlasLayout layout() { return models.layout(); }
@@ -69,6 +70,15 @@ public final class WorldMesh {
     public long faceBatchHierarchyBytes() { return (long)faceHierarchy.length*Float.BYTES; }
     public float faceBatchHierarchyMinimum(int node,int axis) { Objects.checkIndex(node,faceBatchHierarchyCount());Objects.checkIndex(axis,3);return faceHierarchy[node*6+axis]; }
     public float faceBatchHierarchyMaximum(int node,int axis) { Objects.checkIndex(node,faceBatchHierarchyCount());Objects.checkIndex(axis,3);return faceHierarchy[node*6+axis+3]; }
+    /** Unit-cell diagnostic bounds in unchanged original marker order, independent of model offsets. */
+    public int markerBatchCount() { return markerBatches.length/6; }
+    public long markerBatchBytes() { return (long)markerBatches.length*Float.BYTES; }
+    public float markerBatchMinimum(int batch,int axis) { Objects.checkIndex(batch,markerBatchCount());Objects.checkIndex(axis,3);return markerBatches[batch*6+axis]; }
+    public float markerBatchMaximum(int batch,int axis) { Objects.checkIndex(batch,markerBatchCount());Objects.checkIndex(axis,3);return markerBatches[batch*6+axis+3]; }
+    public int markerBatchHierarchyCount() { return markerHierarchy.length/6; }
+    public long markerBatchHierarchyBytes() { return (long)markerHierarchy.length*Float.BYTES; }
+    public float markerBatchHierarchyMinimum(int node,int axis) { Objects.checkIndex(node,markerBatchHierarchyCount());Objects.checkIndex(axis,3);return markerHierarchy[node*6+axis]; }
+    public float markerBatchHierarchyMaximum(int node,int axis) { Objects.checkIndex(node,markerBatchHierarchyCount());Objects.checkIndex(axis,3);return markerHierarchy[node*6+axis+3]; }
     public FloatBuffer vertexBuffer() { return FloatBuffer.wrap(vertices).asReadOnlyBuffer(); }
     public IntBuffer indexBuffer() { return IntBuffer.wrap(indices).asReadOnlyBuffer(); }
     public float[] copyVertices() { return vertices.clone(); }
