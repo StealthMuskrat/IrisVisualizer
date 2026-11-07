@@ -1,6 +1,6 @@
 # Prepared world rendering GPU contracts
 
-Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 18 GPU groups alongside 74 CPU/context-free groups: 92 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 28 GPU groups alongside 77 CPU/context-free groups: 105 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
 
 ## Synthetic fixture boundary
 
@@ -33,3 +33,5 @@ Actual preparation here: Java 25/LWJGL compilation passed for 136 CPU/OpenGL pro
 The synthetic world cases still require real Windows GPU execution. They do not prove independent native world agreement, selected-client asset fidelity, native special visuals/lighting/tint factories, broad model/UV/texture coverage, large-world face-range differential rendering, every animation/alpha material, connected world worker races, fence/quarantine/restoration fault injection, cross-context behavior, total application memory, measured performance or interactive editor/DPI integration. Keep those remaining renderer/integration checks explicit before enabling a supported preview.
 
 [Shared world face-group culling](TRANSLUCENT-CULLING.md) now adds all-translucent/mixed differential pixels, cached decision counts and deficient draw-scratch admission to the prepared GPU matrix. This remains preparation without real-driver execution.
+
+[Bounded live playback](LIVE-PLAYBACK.md) adds two GPU groups for continuous clocks, stable admitted work, initial presentation, pause/seek/mode changes, navigation, material/world replacement and zero-budget recovery. Full and dependency-free compilation pass (143/105 files). Current totals are 105 prepared, unexecuted groups: 77 CPU/context-free and 28 GPU. Native/GPU validation and final integration remain pending.

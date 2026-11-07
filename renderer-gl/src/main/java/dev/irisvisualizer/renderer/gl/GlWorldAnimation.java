@@ -11,7 +11,7 @@ public final class GlWorldAnimation implements AutoCloseable {
     }
     private final GlScene scene;private final GlDevice device;private final AtlasFrameWorker worker;private final GlAtlasQueue queue;private final long sceneRevision;
     private GlAtlasFrame frame,retiring;private AtlasFrameWorker.Request request;private long revision,cpuRevision,tick;private double partialTick;
-    private boolean clockDirty,closed,disposed,invalidated;private volatile Status status;
+    private boolean clockDirty,playback,sampleReady=true,closed,disposed,invalidated;private volatile Status status;
     public GlWorldAnimation(GlScene scene,long sceneRevision,AtlasFrameWorker worker) {
         this.scene=Objects.requireNonNull(scene);device=scene.device;this.worker=Objects.requireNonNull(worker);scene.live();
         if(sceneRevision<1)throw new IllegalArgumentException("Invalid scene revision");worker.validateDestination(device.memory().orElse(null));
@@ -22,6 +22,8 @@ public final class GlWorldAnimation implements AutoCloseable {
     public Status status() { return status; }
     /** Latest requested pixels have been observed and adopted, including clocks with unchanged pixels. */
     boolean settled() { current();return !clockDirty&&request==null&&cpuRevision==0&&status.phase()==Phase.CURRENT; }
+    /** Playback may present a completed admitted sample while its latest clock is still catching up. */
+    boolean presentable() { current();return status.phase()!=Phase.FAILED&&(settled()||playback&&sampleReady); }
     public GlAtlasQueue.Status uploadStatus() { return queue.status(); }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"World animation is closed"); }
     private void state(Phase phase,List<ModelPlan.Problem> problems,GlFailure.Code code,String reason) {
@@ -37,8 +39,15 @@ public final class GlWorldAnimation implements AutoCloseable {
     /** External clock, including seeks. A repeated failed clock explicitly retries; no internal timer runs. */
     public void clock(long tick,double partialTick) {
         current();if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid world atlas clock");
-        if(this.tick==tick&&this.partialTick==partialTick&&status.phase()!=Phase.FAILED)return;
-        this.tick=tick;this.partialTick=partialTick;clockDirty=true;state(status.phase(),status.problems(),status.code().orElse(null),status.reason());
+        if(!playback&&this.tick==tick&&this.partialTick==partialTick&&status.phase()!=Phase.FAILED)return;
+        playback=false;sampleReady=false;this.tick=tick;this.partialTick=partialTick;clockDirty=true;state(status.phase(),status.problems(),status.code().orElse(null),status.reason());
+    }
+    /** Live clock: finish an admitted sample before sampling the latest clock; use clock for immediate seeks. */
+    public void playbackClock(long tick,double partialTick) {
+        current();if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid world atlas clock");
+        if(playback&&this.tick==tick&&this.partialTick==partialTick&&status.phase()!=Phase.FAILED)return;
+        if(!playback||status.phase()==Phase.FAILED)sampleReady=false;
+        playback=true;this.tick=tick;this.partialTick=partialTick;clockDirty=true;state(status.phase(),status.problems(),status.code().orElse(null),status.reason());
     }
     private long next() { if(revision==Long.MAX_VALUE)throw new GlFailure(GlFailure.Code.LIMIT,"World animation revision counter exhausted");return revision+1; }
     private void releaseRetiring() {
@@ -50,7 +59,7 @@ public final class GlWorldAnimation implements AutoCloseable {
         if(status.phase()!=Phase.FAILED&&candidate.samePixels(request)) { clockDirty=false;return; }
         if(candidate.changedSprites()==0) {
             if(request!=null) { long next=next();worker.invalidate();revision=next;queue.invalidate(sceneRevision,revision); }
-            request=null;cpuRevision=0;clockDirty=false;state(Phase.CURRENT,List.of(),null,"");return;
+            request=null;cpuRevision=0;clockDirty=false;sampleReady=true;state(Phase.CURRENT,List.of(),null,"");return;
         }
         long next=next(),cpu=worker.submit(candidate);revision=next;cpuRevision=cpu;request=candidate;clockDirty=false;
         queue.invalidate(sceneRevision,revision);state(Phase.PREPARING,List.of(),null,"");
@@ -59,7 +68,9 @@ public final class GlWorldAnimation implements AutoCloseable {
     public boolean advance(GlUploadBudget budget) {
         Objects.requireNonNull(budget);current();
         try {
-            releaseRetiring();if(clockDirty)observeClock();if(status.phase()==Phase.FAILED||request==null)return false;
+            // Live ticks occupy only the two scalar clock fields. Do not cancel/re-admit a running
+            // CPU plan or partial GPU upload on every host tick. Explicit seeks still preempt it.
+            releaseRetiring();if(clockDirty&&(!playback||request==null||status.phase()==Phase.FAILED))observeClock();if(status.phase()==Phase.FAILED||request==null)return false;
             if(cpuRevision!=0) {
                 var completion=worker.take(cpuRevision);
                 if(completion.isPresent())try(var prepared=completion.orElseThrow()) {
@@ -76,7 +87,7 @@ public final class GlWorldAnimation implements AutoCloseable {
             queue.advance(budget,sceneRevision,revision);var completion=queue.take(sceneRevision,revision,frame);
             if(completion.isEmpty())return false;
             retiring=frame;frame=completion.orElseThrow().frame();request=null;cpuRevision=0;clockDirty=true;
-            releaseRetiring();state(Phase.CURRENT,List.of(),null,"");return true;
+            releaseRetiring();sampleReady=true;state(Phase.CURRENT,List.of(),null,"");return true;
         }catch(RuntimeException|Error failure) { clockDirty=false;failed(failure);throw failure; }
     }
     /** Borrowed only for synchronous rendering on the owning context; never close this frame externally. */

@@ -11,7 +11,7 @@ public final class GlWorldView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(source);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlRenderer renderer;private final GlDevice device;private final GlUploadQueue uploads;private final GlFrameQueue frames;private final WorldOrderWorker ordering;private final AtlasFrameWorker animationWorker;
-    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean sourceReady,atlasClockSet,atlasPrimed,dirty,closed,disposed;
+    private GlScene scene;private volatile GlWorldAnimation animation;private GlDrawPlan order;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private int width,height;private long worldRevision,viewRevision,sortRevision,atlasTick;private double atlasPartialTick;private boolean sourceReady,atlasClockSet,atlasPlayback,atlasPrimed,dirty,closed,disposed;
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlWorldView(GlRenderer renderer) { this(renderer,1024L*1024*1024); }
     public GlWorldView(GlRenderer renderer,long animationWorkingBytes) {
@@ -36,7 +36,15 @@ public final class GlWorldView implements AutoCloseable {
     /** Display-only atlas clock; no generation, model bake, camera-order invalidation or internal timer. */
     public void clock(long tick,double partialTick) {
         current();if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid world atlas clock");
-        atlasTick=tick;atlasPartialTick=partialTick;atlasClockSet=true;if(sourceReady&&animation!=null)animation.clock(tick,partialTick);
+        atlasTick=tick;atlasPartialTick=partialTick;atlasClockSet=true;atlasPlayback=false;if(sourceReady&&animation!=null)animation.clock(tick,partialTick);
+    }
+    /** Live display clock coalesces ticks behind one completing atlas update; clock performs an immediate seek. */
+    public void playbackClock(long tick,double partialTick) {
+        current();if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid world atlas clock");
+        atlasTick=tick;atlasPartialTick=partialTick;atlasClockSet=true;atlasPlayback=true;if(sourceReady&&animation!=null)animation.playbackClock(tick,partialTick);
+    }
+    private void applyClock() {
+        if(atlasPlayback)animation.playbackClock(atlasTick,atlasPartialTick);else animation.clock(atlasTick,atlasPartialTick);
     }
     private void current() { device.current();if(closed)throw new GlFailure(GlFailure.Code.STATE,"World view is closed"); }
     private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
@@ -171,7 +179,7 @@ public final class GlWorldView implements AutoCloseable {
         if(expectedWorldRevision!=worldRevision||!sourceReady||scene==null||animation==null||status.phase()!=Phase.FAILED)return false;
         var atlasState=animation.status();if(atlasState.phase()!=GlWorldAnimation.Phase.FAILED)return false;
         long next=nextView();var waiting=new Status(worldRevision,next,Phase.WAITING_VIEW,status.source(),List.of(),Optional.empty(),"");
-        animation.clock(atlasState.requestedTick(),atlasState.requestedPartialTick());viewRevision=next;dirty=true;status=waiting;
+        if(atlasPlayback)animation.playbackClock(atlasState.requestedTick(),atlasState.requestedPartialTick());else animation.clock(atlasState.requestedTick(),atlasState.requestedPartialTick());viewRevision=next;dirty=true;status=waiting;
         try { frames.invalidate(viewRevision);if(order==null)resetOrder();return true; }
         catch(RuntimeException|Error failure) { failed(failure);throw failure; }
     }
@@ -186,7 +194,7 @@ public final class GlWorldView implements AutoCloseable {
                 uploads.advance(budget,worldRevision);var completion=uploads.take(worldRevision);
                 if(completion.isPresent()) { scene=completion.orElseThrow().scene();sourceReady=true;dirty=true;state(Phase.WAITING_VIEW); }
             }
-            if(sourceReady&&scene!=null&&animation==null) { animation=new GlWorldAnimation(scene,worldRevision,animationWorker);if(atlasClockSet)animation.clock(atlasTick,atlasPartialTick); }
+            if(sourceReady&&scene!=null&&animation==null) { animation=new GlWorldAnimation(scene,worldRevision,animationWorker);if(atlasClockSet)applyClock(); }
             // Full-scene and animated-atlas upload never each spend the same caller budget in one advance.
             if(sourceReady&&animation!=null&&!sceneUploadStepped&&animation.advance(budget)) {
                 viewRevision=nextView();dirty=true;frames.invalidate(viewRevision);state(Phase.WAITING_VIEW);
@@ -194,9 +202,9 @@ public final class GlWorldView implements AutoCloseable {
             if(sourceReady&&animation!=null) {
                 var atlasState=animation.status();
                 if(atlasState.phase()==GlWorldAnimation.Phase.FAILED) { status=new Status(worldRevision,viewRevision,Phase.FAILED,status.source(),List.of(),atlasState.code(),atlasState.reason());return status; }
-                // A new source must first adopt the requested atlas pixels. Later navigation can keep
-                // using its last complete atlas while normal animation work catches up.
-                if(!atlasPrimed) { if(!animation.settled())return status;atlasPrimed=true; }
+                // Seeks wait for their exact pixels. Live playback first completes one admitted
+                // sample, then can keep displaying it while the latest host clock catches up.
+                if(!atlasPrimed) { if(!animation.presentable())return status;atlasPrimed=true; }
             }
             if(!sourceReady||scene==null||camera==null||!dirty)return status;
             if(scene.translucentFaces>0&&order==null) {
