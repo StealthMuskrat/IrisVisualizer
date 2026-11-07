@@ -12,7 +12,10 @@ import java.util.zip.*;
 public final class WorldGpuFixture implements AutoCloseable {
     private static final BooleanSupplier LIVE=()->false;
     public static final String LIGHTING="synthetic uniform final RGB; no native light provider";
-    private record Material(int rgba,boolean tinted,boolean animated,boolean interpolate,boolean cutout) {}
+    private record Material(int rgba,boolean tinted,boolean animated,boolean interpolate,boolean cutout,int frameTicks) {
+        Material(int rgba,boolean tinted,boolean animated,boolean interpolate,boolean cutout) { this(rgba,tinted,animated,interpolate,cutout,2); }
+        Material { if(frameTicks<1)throw new IllegalArgumentException("Invalid synthetic animation duration"); }
+    }
     private final WorldSectionCache cache;private final WorldScene.Result owner;
     private WorldGpuFixture(WorldSectionCache cache,WorldScene.Result owner) { this.cache=cache;this.owner=owner; }
     private static void check(boolean condition,String message) { if(!condition)throw new AssertionError(message); }
@@ -28,6 +31,7 @@ public final class WorldGpuFixture implements AutoCloseable {
         return build(materials,assignments,32,32,WorldModels.Kind.MESH);
     }
     public static WorldGpuFixture animated(boolean interpolate) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false)),new int[]{0},1,1,WorldModels.Kind.MESH); }
+    public static WorldGpuFixture animated(boolean interpolate,int frameTicks) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,frameTicks)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture empty() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.EMPTY); }
     public static WorldGpuFixture placeholder() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.PLACEHOLDER); }
     private static String hash(byte[] bytes) {
@@ -58,7 +62,7 @@ public final class WorldGpuFixture implements AutoCloseable {
             asset(assets,ClientAssetSnapshot.Kind.BLOCKSTATE,block,("{\"variants\":{\"\":{\"model\":\""+model+"\"}}}").getBytes(StandardCharsets.UTF_8));
             var faces=new StringJoiner(",");for(var direction:ModelPlan.Direction.values()) { var name=direction.name().toLowerCase(Locale.ROOT);faces.add("\""+name+"\":{\"texture\":\"#all\",\"cullface\":\""+name+"\""+(material.tinted()?",\"tintindex\":0":"")+"}"); }
             asset(assets,ClientAssetSnapshot.Kind.MODEL,model,("{\"textures\":{\"all\":\""+sprite+"\"},\"elements\":[{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":{"+faces+"}}]}").getBytes(StandardCharsets.UTF_8));asset(assets,ClientAssetSnapshot.Kind.TEXTURE,sprite,texture(material));
-            if(material.animated())asset(assets,ClientAssetSnapshot.Kind.TEXTURE_METADATA,sprite,("{\"animation\":{\"frametime\":2,\"interpolate\":"+material.interpolate()+",\"frames\":[0,1]}}").getBytes(StandardCharsets.UTF_8));
+            if(material.animated())asset(assets,ClientAssetSnapshot.Kind.TEXTURE_METADATA,sprite,("{\"animation\":{\"frametime\":"+material.frameTicks()+",\"interpolate\":"+material.interpolate()+",\"frames\":[0,1]}}").getBytes(StandardCharsets.UTF_8));
         }
         long bytes=assets.values().stream().mapToLong(ClientAssetSnapshot.Asset::bytes).sum();var receipt=new ClientAssetSnapshot.Receipt(Path.of("synthetic-world-gpu-fixture"),hash(materials.toString().getBytes(StandardCharsets.UTF_8)),bytes,BlockModels.PROFILE,BlockModels.PROFILE,assets.size(),0,bytes);var catalog=new ClientAssetSnapshot(receipt,assets);
         var biome=new WorldSnapshot.Biome(731,"fixture:original_gpu_biome",new AssetId("fixture","original_gpu_biome"));var generation=new WorldSnapshot.Source(UUID.randomUUID(),"0".repeat(64),"synthetic world GPU fixture",BlockModels.PROFILE,AssetId.minecraft("overworld"),Long.MAX_VALUE);

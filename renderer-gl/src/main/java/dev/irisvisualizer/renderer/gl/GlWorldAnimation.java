@@ -10,7 +10,7 @@ public final class GlWorldAnimation implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlScene scene;private final GlDevice device;private final AtlasFrameWorker worker;private final GlAtlasQueue queue;private final long sceneRevision;
-    private GlAtlasFrame frame,retiring;private AtlasFrameWorker.Request request;private long revision,cpuRevision,tick;private double partialTick;
+    private GlAtlasFrame frame,retiring;private AtlasFrameWorker.Request request,observation;private long revision,cpuRevision,tick;private double partialTick;
     private boolean clockDirty,playback,sampleReady=true,closed,disposed,invalidated;private volatile Status status;
     public GlWorldAnimation(GlScene scene,long sceneRevision,AtlasFrameWorker worker) {
         this.scene=Objects.requireNonNull(scene);device=scene.device;this.worker=Objects.requireNonNull(worker);scene.live();
@@ -31,6 +31,7 @@ public final class GlWorldAnimation implements AutoCloseable {
         status=new Status(sceneRevision,revision,phase,tick,partialTick,displayedTick,displayedPartial,problems,Optional.ofNullable(code),reason);
     }
     private void failed(Throwable failure) {
+        observation=null;
         try {
             String reason=Objects.toString(failure.getMessage(),failure.getClass().getSimpleName());if(reason.length()>8192)reason=reason.substring(0,8192);
             state(Phase.FAILED,List.of(),failure instanceof GlFailure gpu?gpu.code():failure instanceof OutOfMemoryError?GlFailure.Code.MEMORY:GlFailure.Code.STATE,reason);
@@ -55,7 +56,10 @@ public final class GlWorldAnimation implements AutoCloseable {
         catch(RuntimeException|Error failure) { if(retiring.closedOrReleased())retiring=null;throw failure; }
     }
     private void observeClock() {
-        var candidate=AtlasFrameWorker.Request.capture(frame.raster(),tick,partialTick);
+        var raster=frame.raster();boolean reuse=observation!=null&&observation.expected()==raster&&status.phase()!=Phase.FAILED&&observation.matchesClock(tick,partialTick);
+        // A reusable observation already agreed with the pending request at its previous observation.
+        if(reuse&&request!=null) { clockDirty=false;return; }
+        var candidate=reuse?observation:AtlasFrameWorker.Request.capture(raster,tick,partialTick);observation=candidate;
         if(status.phase()!=Phase.FAILED&&candidate.samePixels(request)) { clockDirty=false;return; }
         if(candidate.changedSprites()==0) {
             if(request!=null) { long next=next();worker.invalidate();revision=next;queue.invalidate(sceneRevision,revision); }
@@ -81,12 +85,12 @@ public final class GlWorldAnimation implements AutoCloseable {
                 } else {
                     var cpu=worker.status();
                     if(cpu.revision()!=cpuRevision||cpu.phase()==AtlasFrameWorker.Phase.CLOSED)throw new GlFailure(GlFailure.Code.STALE,"Animation worker ownership changed before CPU plan adoption");
-                    if(cpu.phase()==AtlasFrameWorker.Phase.FAILED)state(Phase.FAILED,cpu.problems(),null,"Atlas CPU preparation failed");return false;
+                    if(cpu.phase()==AtlasFrameWorker.Phase.FAILED) { observation=null;state(Phase.FAILED,cpu.problems(),null,"Atlas CPU preparation failed"); }return false;
                 }
             }
             queue.advance(budget,sceneRevision,revision);var completion=queue.take(sceneRevision,revision,frame);
             if(completion.isEmpty())return false;
-            retiring=frame;frame=completion.orElseThrow().frame();request=null;cpuRevision=0;clockDirty=true;
+            retiring=frame;frame=completion.orElseThrow().frame();request=null;observation=null;cpuRevision=0;clockDirty=true;
             releaseRetiring();sampleReady=true;state(Phase.CURRENT,List.of(),null,"");return true;
         }catch(RuntimeException|Error failure) { clockDirty=false;failed(failure);throw failure; }
     }
@@ -94,7 +98,7 @@ public final class GlWorldAnimation implements AutoCloseable {
     GlAtlasFrame frame() { current();frame.requireScene(scene);return frame; }
     /** Does not close the borrowed worker, base scene or independently completed images. */
     @Override public void close() {
-        if(disposed)return;device.current();closed=true;Throwable failure=null;
+        if(disposed)return;device.current();closed=true;observation=null;Throwable failure=null;
         if(!invalidated)try { if(worker.status().phase()!=AtlasFrameWorker.Phase.CLOSED)worker.invalidate();invalidated=true;request=null;cpuRevision=0; }
         catch(RuntimeException|Error error) { failure=error; }
         try { queue.close(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }

@@ -1,6 +1,6 @@
 # Prepared world rendering GPU contracts
 
-Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 31 GPU groups alongside 77 CPU/context-free groups: 108 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 32 GPU groups alongside 80 CPU/context-free groups: 112 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
 
 ## Synthetic fixture boundary
 
@@ -37,3 +37,5 @@ The synthetic world cases still require real Windows GPU execution. They do not 
 [Bounded live playback](LIVE-PLAYBACK.md) adds two GPU groups for continuous clocks, stable admitted work, initial presentation, pause/seek/mode changes, navigation, material/world replacement and zero-budget recovery. Full and dependency-free compilation pass (143/105 files). Current totals are 105 prepared, unexecuted groups: 77 CPU/context-free and 28 GPU. Native/GPU validation and final integration remain pending.
 
 [Transparent material-order reuse](MATERIAL-ORDER-REUSE.md) adds three GPU groups for independent exact-scene rebinding, raw/owned connected reuse and destination-admission recovery. Full/default compilation covers 143/105 files; all 108 prepared groups remain unexecuted (77 CPU/context-free, 31 GPU). No real-context, native or final integration result is claimed.
+
+[Sparse atlas clock observation](../renderer/SPARSE-ATLAS-CLOCKS.md) adds one GPU group. Current full/default compilation covers 143/105 files; all 112 prepared groups remain unexecuted (80 CPU/context-free, 32 GPU). Native/GPU validation and final integration remain pending.

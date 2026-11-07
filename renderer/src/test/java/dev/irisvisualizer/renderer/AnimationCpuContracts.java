@@ -63,16 +63,57 @@ public final class AnimationCpuContracts {
         }catch(IOException impossible) { throw new AssertionError(impossible); }
     }
     private static void add(Map<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset> map,ClientAssetSnapshot.Kind kind,AssetId id,byte[] bytes) { map.put(new ClientAssetSnapshot.Key(kind,id),ClientAssetSnapshot.Asset.owned("synthetic-animation/"+kind+"/"+id,bytes,digest(bytes))); }
-    private static AtlasLayout layout(long workingBytes,long updateBytes) {
+    private static AtlasLayout layout(long workingBytes,long updateBytes) { return layout(workingBytes,updateBytes,"{\"animation\":{\"frametime\":2,\"interpolate\":true}}"); }
+    private static AtlasLayout layout(long workingBytes,long updateBytes,String metadata) { return layout(workingBytes,updateBytes,metadata,null); }
+    private static AtlasLayout layout(long workingBytes,long updateBytes,String metadata,String secondary) {
         var entries=new TreeMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset>();add(entries,ClientAssetSnapshot.Kind.BLOCKSTATE,BLOCK,"{\"variants\":{\"\":{\"model\":\"fixture:block/animated_block\"}}}".getBytes(StandardCharsets.UTF_8));
         add(entries,ClientAssetSnapshot.Kind.MODEL,MODEL,"{\"textures\":{\"a\":\"fixture:block/animated\",\"b\":\"fixture:block/static\"},\"elements\":[{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":{\"south\":{\"texture\":\"#a\"},\"east\":{\"texture\":\"#b\"}}}]}".getBytes(StandardCharsets.UTF_8));
-        add(entries,ClientAssetSnapshot.Kind.TEXTURE,ANIMATED,png(0xff000080,0x0000ffff));add(entries,ClientAssetSnapshot.Kind.TEXTURE,STATIC,png(0x102030ff));add(entries,ClientAssetSnapshot.Kind.TEXTURE_METADATA,ANIMATED,"{\"animation\":{\"frametime\":2,\"interpolate\":true}}".getBytes(StandardCharsets.UTF_8));
+        add(entries,ClientAssetSnapshot.Kind.TEXTURE,ANIMATED,png(0xff000080,0x0000ffff));add(entries,ClientAssetSnapshot.Kind.TEXTURE,STATIC,secondary==null?png(0x102030ff):png(0x102030ff,0x405060ff));if(secondary!=null)add(entries,ClientAssetSnapshot.Kind.TEXTURE_METADATA,STATIC,secondary.getBytes(StandardCharsets.UTF_8));if(metadata!=null)add(entries,ClientAssetSnapshot.Kind.TEXTURE_METADATA,ANIMATED,metadata.getBytes(StandardCharsets.UTF_8));
         long bytes=entries.values().stream().mapToLong(ClientAssetSnapshot.Asset::bytes).sum();var assets=new ClientAssetSnapshot(new ClientAssetSnapshot.Receipt(Path.of("synthetic-animation-fixture"),"0".repeat(64),bytes,BlockModels.PROFILE,BlockModels.PROFILE,entries.size(),0,bytes),entries);var state=new RenderBlockState(991,"fixture:animated_block",BLOCK,Map.of(),Map.of());
         var block=GeometryBaker.bake(BlockModels.resolve(assets,state,()->false),new int[]{0},()->false);check(!block.requiresPlaceholder(),"animated fixture block: "+block.problems());var preparation=TextureMaterials.prepare(assets,block,()->false);check(!preparation.requiresPlaceholder(),"animated fixture textures: "+preparation.problems());
         var limits=new AtlasBuilder.Limits(1,2,2,8,4,2,1,64,1024,128,1024,updateBytes,workingBytes,1024);var layout=AtlasBuilder.plan(List.of(preparation),limits,()->false);check(!layout.requiresPlaceholder(),"animated layout: "+layout.problems());equal(2,layout.pages().size(),"small page limit separates sprites");return layout;
     }
     private static AtlasRaster baseline(AtlasLayout layout) { var raster=AtlasImages.capture(layout,0,0,()->false);check(!raster.requiresPlaceholder(),"complete baseline");return raster; }
     private static int content(AtlasRaster raster,AssetId id) { var slot=raster.layout().sprites().get(id);return raster.pages().get(slot.page()).rgba(slot.x(),slot.y()); }
+    /** Independent linear schedule oracle, deliberately separate from binary slot/window helpers. */
+    private static TextureSprite.PixelSample clockOracle(TextureSprite sprite,long tick) {
+        long time=tick%sprite.cycleTicks();int slot=0;while(time>=sprite.frames().get(slot).ticks())time-=sprite.frames().get(slot++).ticks();
+        int current=sprite.frames().get(slot).index(),next=sprite.frames().get((slot+1)%sprite.frames().size()).index();int blend=sprite.interpolate()?(int)(((float)time/sprite.frames().get(slot).ticks())*1000.0f):0;
+        if(blend>=1000)return new TextureSprite.PixelSample(next,next,0);if(blend==0||current==next)return new TextureSprite.PixelSample(current,current,0);return new TextureSprite.PixelSample(current,next,blend);
+    }
+    private static void clockWindows() {
+        var stepped=sprite("{\"animation\":{\"frames\":[{\"index\":1,\"time\":3},{\"index\":0,\"time\":2},{\"index\":1,\"time\":1}]}}");
+        equal(2L,stepped.pixelWindow(0,0.9).lastTick(),"stepped interval reaches current entry end");equal(4L,stepped.pixelWindow(3,0).lastTick(),"unequal stepped duration boundary");equal(5L,stepped.pixelWindow(5,0).lastTick(),"repeated tile boundary may conservatively recheck");
+        var repeated=sprite("{\"animation\":{\"interpolate\":true,\"frames\":[1,1,1]}}");check(repeated.animated()&&repeated.interpolate()&&!repeated.timeVarying(),"native repeated schedule metadata stays intact while pixel inputs are fixed");equal(new TextureSprite.PixelSample(1,1,0),repeated.pixelWindow(Long.MAX_VALUE,0.5).sample(),"constant nonzero source tile preserved");equal(Long.MAX_VALUE,repeated.pixelWindow(0,0).lastTick(),"fixed schedule interval spans all future ticks");
+        for(String metadata:Arrays.asList(null,"{\"animation\":{}}","{\"animation\":{\"frametime\":7,\"interpolate\":true}}","{\"animation\":{\"interpolate\":true,\"frames\":[{\"index\":1,\"time\":3},{\"index\":1,\"time\":7},{\"index\":0,\"time\":11}]}}")) {
+            var value=sprite(metadata);for(long tick=0;tick<128;tick++) {
+                var window=value.pixelWindow(tick,0.9);equal(tick,window.firstTick(),"window begins at observed exact clock");equal(clockOracle(value,tick),window.sample(),"window sample matches independent linear schedule");equal(clockOracle(value,tick),value.pixelSample(tick,0.1),"optimized pixel sampling preserves independent scheduling");
+                for(long probe: new long[]{tick,Math.min(tick+1,window.lastTick()),tick+(window.lastTick()-tick)/2,window.lastTick()})equal(window.sample(),clockOracle(value,probe),"entire conservative interval preserves canonical samples");
+            }
+        }
+        var longFrame=sprite("{\"animation\":{\"frametime\":2147483647,\"interpolate\":true}}");equal(2147483L,longFrame.pixelWindow(0,0).lastTick(),"float quantization first plateau has independent known boundary");equal(new TextureSprite.PixelSample(0,1,1),longFrame.pixelWindow(2147484,0).sample(),"first nonzero thousandth boundary");
+        for(var value:List.of(longFrame,stepped,repeated))for(long tick:new long[]{2147483646L,2147483647L,Long.MAX_VALUE-1,Long.MAX_VALUE}) { var window=value.pixelWindow(tick,0);check(window.lastTick()>=tick,"large clock interval never overflows");equal(clockOracle(value,tick),window.sample(),"large clock modulo matches linear oracle");equal(window.sample(),clockOracle(value,window.lastTick()),"large endpoint remains inside same canonical inputs"); }
+        equal(Long.MAX_VALUE,longFrame.pixelWindow(Long.MAX_VALUE-1,0).lastTick(),"future interval saturates at maximum clock");throwsType(IllegalArgumentException.class,()->longFrame.pixelWindow(-1,0),"negative window clock rejected");throwsType(IllegalArgumentException.class,()->longFrame.pixelWindow(0,Double.NaN),"nonfinite window partial rejected");throwsType(IllegalArgumentException.class,()->longFrame.pixelWindow(0,1),"exclusive partial endpoint rejected");
+    }
+    private static void sparsePreflight() {
+        var layout=layout(4096,512);equal(Set.of(ANIMATED),layout.timeVaryingSprites().keySet(),"clock index excludes fixed sprite");check(layout.timeVaryingSprites().get(ANIMATED)==layout.sprites().get(ANIMATED),"clock index shares exact placement identity");throwsType(UnsupportedOperationException.class,()->layout.timeVaryingSprites().clear(),"clock index is immutable");
+        var raster=baseline(layout);for(long tick:new long[]{0,1,2,3,4,Long.MAX_VALUE}) {
+            var request=AtlasFrameWorker.Request.capture(raster,tick,0);var update=AtlasImages.updates(raster,tick,0,()->false);var plan=AtlasFramePlan.prepare(raster,update,()->false);check(!plan.requiresPlaceholder(),"sparse preflight has complete CPU plan");equal(update.patches().size(),request.changedSprites(),"sparse changed count agrees with complete patch pass");equal(plan.extraCpuBytes(),request.extraCpuBytes(),"sparse page/patch payload agrees with actual plan");equal(layout.sprites().keySet(),plan.raster().orElseThrow().samples().keySet(),"output sample receipt remains complete");equal(raster.samples().get(STATIC),plan.raster().orElseThrow().samples().get(STATIC),"static canonical input remains intact");
+        }
+        var slow=baseline(layout(4096,512,"{\"animation\":{\"frametime\":10000,\"interpolate\":true}}"));var atZero=AtlasFrameWorker.Request.capture(slow,0,0.9);equal(9L,atZero.lastTick(),"atlas interval is minimum varying-sprite plateau");check(atZero.matchesClock(9,0)&&!atZero.matchesClock(10,0),"atlas proof admits only proven forward plateau");var later=AtlasFrameWorker.Request.capture(slow,10,0);check(!later.matchesClock(9,0),"backward seek requires fresh dynamic observation");check(later.matchesClock(19,0.99)&&!later.matchesClock(20,0),"quantized interpolation boundary invalidates proof");
+        var mixed=baseline(layout(4096,512,"{\"animation\":{\"frametime\":10000,\"interpolate\":true}}","{\"animation\":{\"frametime\":3000,\"interpolate\":true}}"));equal(2,mixed.layout().timeVaryingSprites().size(),"multiple varying slots are indexed");equal(2L,AtlasFrameWorker.Request.capture(mixed,0,0).lastTick(),"atlas proof stops at earliest distinct sprite boundary");
+        for(long tick:new long[]{3,10}) { var request=AtlasFrameWorker.Request.capture(mixed,tick,0);var plan=AtlasFramePlan.prepare(mixed,AtlasImages.updates(mixed,tick,0,()->false),()->false);equal(tick==3?1:2,request.changedSprites(),"independent sprite durations produce exact changed count");equal(plan.extraCpuBytes(),request.extraCpuBytes(),"page-copy preflight remains exact for multiple varying slots"); }
+        throwsType(IllegalArgumentException.class,()->atZero.matchesClock(0,Double.POSITIVE_INFINITY),"proof cannot bypass clock validation");throwsType(IllegalArgumentException.class,()->atZero.matchesClock(-1,0),"proof rejects negative clock");check(!atZero.samePixels(AtlasFrameWorker.Request.capture(baseline(slow.layout()),0,0)),"proof retains exact-raster identity guard");
+    }
+    private static void staticAtlasWorkers() {
+        for(String metadata:Arrays.asList(null,"{\"animation\":{\"interpolate\":true,\"frames\":[1,1]}}")) {
+            var layout=layout(4096,512,metadata);check(layout.timeVaryingSprites().isEmpty(),"all fixed inputs produce empty clock index");var raster=baseline(layout);var request=AtlasFrameWorker.Request.capture(raster,Long.MAX_VALUE,0.5);equal(0,request.changedSprites(),"static request changes no sprite");equal(0L,request.extraCpuBytes(),"static preflight has no patch/page payload");equal(layout.usage().orElseThrow().knownPayloadBytes(),request.reservation(),"direct worker still admits retained source even for no-op output");check(request.matchesClock(0,0)&&request.matchesClock(Long.MAX_VALUE,0.9),"static proof can accept forward/backward clocks");
+            var executor=new QueuedExecutor();try(var memory=new RenderMemory(new RenderMemory.Limits(4096,8));var worker=new AtlasFrameWorker(4096,memory,()->executor)) {
+                long revision=worker.submit(request);executor.runAll();try(var complete=worker.take(revision).orElseThrow()) { var output=complete.plan().raster().orElseThrow();equal(layout.sprites().keySet(),output.samples().keySet(),"direct no-op worker preserves complete sample map");equal(raster.samples(),output.samples(),"fixed nonzero tiles survive full worker handoff");equal(0L,complete.plan().extraCpuBytes(),"no-op worker output matches sparse reservation");for(int page=0;page<raster.pages().size();page++)check(raster.pages().get(page)==output.pages().get(page),"no-op worker shares unchanged pages"); }
+                equal(0L,worker.reservedBytes(),"no-op completion ownership releases worker charge");equal(0L,memory.stats().chargedBytes(),"static handoff releases shared admission");
+            }
+        }
+    }
     private static void patchPixels() {
         var source=baseline(layout(4096,512));var update=AtlasImages.updates(source,1,0.9,()->false);check(!update.requiresPlaceholder(),"complete half-blend patch");equal(1,update.patches().size(),"one animated slot changed");equal(36L,update.bytes(),"complete three-by-three RGBA gutter patch");var patch=update.patches().getFirst();
         for(int y=0;y<3;y++)for(int x=0;x<3;x++)equal(0x800080c0,patch.pixels().rgba(x,y),"independent half-blend straight RGBA including alpha");
@@ -144,6 +185,9 @@ public final class AnimationCpuContracts {
         group("integer repeated-frame scheduling",AnimationCpuContracts::schedule);
         group("animation metadata and clock guards",AnimationCpuContracts::metadataGuards);
         group("canonical pixel sample inputs",AnimationCpuContracts::canonicalSamples);
+        group("conservative canonical clock windows",AnimationCpuContracts::clockWindows);
+        group("sparse atlas animation preflight",AnimationCpuContracts::sparsePreflight);
+        group("static atlas worker receipts",AnimationCpuContracts::staticAtlasWorkers);
         group("independent RGBA interpolation patches",AnimationCpuContracts::patchPixels);
         group("same-pixel clock coalescing",AnimationCpuContracts::noOpClocks);
         group("copy-on-write pages and accounting",AnimationCpuContracts::pageSharing);

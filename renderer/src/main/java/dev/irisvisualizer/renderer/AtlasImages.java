@@ -37,8 +37,9 @@ public final class AtlasImages {
     }
     private static AtlasUpdate patches(AtlasRaster expected,long tick,double partialTick,BooleanSupplier cancelled) {
         if(expected.requiresPlaceholder())return AtlasUpdate.placeholder(expected,tick,partialTick,expected.problems());
-        var layout=expected.layout();var samples=new TreeMap<AssetId,TextureSprite.PixelSample>();var changed=new ArrayList<AtlasLayout.Sprite>();long bytes=0;
-        for(var entry:layout.sprites().entrySet()) {
+        // Keep complete public receipts while resampling only the epoch's time-varying slots.
+        var layout=expected.layout();var samples=new TreeMap<>(expected.samples());var changed=new ArrayList<AtlasLayout.Sprite>();long bytes=0;
+        for(var entry:layout.timeVaryingSprites().entrySet()) {
             AtlasBuilder.check(cancelled);var slot=entry.getValue();var sample=slot.source().pixelSample(tick,partialTick);samples.put(entry.getKey(),sample);
             if(!Objects.equals(expected.samples().get(entry.getKey()),sample)) { changed.add(slot);bytes+=slot.paddedBytes(); }
         }

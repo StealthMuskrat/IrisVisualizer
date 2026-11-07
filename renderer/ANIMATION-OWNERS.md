@@ -60,3 +60,7 @@ The context-free runner set compiles without external dependencies: 88 CPU produ
 ## Owned upload creation and input release
 
 [Direct GPU factory handoff](../renderer-gl/INPUT-HANDOFFS.md) now keeps a created atlas uploader locally owned until supplied/temporary CPU wrappers finish closing. If that release prevents return, the uploader is closed on the failure path and a distinct close error is suppressed onto the original input error. The displayed atlas and independently retained CPU plans keep their existing ownership; unfinished GPU cleanup remains device-journal-owned and charged. Full and dependency-free compilation passed. All 64 prepared groups and Windows GL/failure-injection checks remain unexecuted.
+
+## Sparse clock observations
+
+[Time-varying sprite indices and conservative canonical intervals](SPARSE-ATLAS-CLOCKS.md) now reduce context-thread preflight while complete worker output retains every sprite receipt. Three additional groups bring this harness to 14; the overall prepared total is 112 (80 CPU/context-free, 32 GPU). Both 143-file full and 105-file dependency-free sets compile. No renderer/worker/GPU assertion has executed.

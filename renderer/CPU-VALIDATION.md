@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 28 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 15 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 11, for 74 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 31 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 15 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 14, for 80 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -71,3 +71,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Displayed atlas material refresh](../renderer-gl/DISPLAYED-ATLAS-REFRESH.md) adds two GPU groups and extends the connected initial-clock group. Full compilation remains 143 files, including the unchanged 105-file dependency-free set. All 102 groups remain unexecuted: 76 CPU/context-free and 26 GPU.
 
 [Worker abandonment recovery](WORKER-ABANDONMENT.md) adds one world CPU group. Both full and dependency-free compilation pass (143/105 files). All 103 groups remain unexecuted: 77 CPU/context-free and 26 GPU. The new asset READY fixture opens only its own tiny generated ZIP during eventual execution, never a user archive.
+
+[Sparse atlas clocks](SPARSE-ATLAS-CLOCKS.md) add three animation groups, bringing that harness to 14 and the CPU/context-free total to 80. The separate GPU harness contains 32, for 112 prepared groups overall. Full/dependency-free compilation passes (143/105 files); all assertions remain unexecuted.

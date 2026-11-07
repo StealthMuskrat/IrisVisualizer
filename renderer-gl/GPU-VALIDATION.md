@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 31 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including transparent material-order rebinding, reuse and admission recovery. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 77 prepared, unexecuted groups, making 108 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 32 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including sparse clock observation and conservative sampling intervals. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 80 prepared, unexecuted groups, making 112 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -52,6 +52,7 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | World geometry and identity | Textured neighbor-cull meshes, exact long native coordinates/state/biome picking, clipped submission and independent CPU inspection |
 | World alpha | Exact cutout coverage/inspection, ordered two-layer analytical blending, missing/stale camera order rejection |
 | World animation | Scheduled/interpolated red/blue textures, bounded atlas page/patch updates, immutable earlier frames and stale baseline rejection |
+| Sparse atlas clock observation | Static zero-budget clocks, exact proof reuse, stepped/interpolated boundaries, pending coalescing, adoption invalidation, backward seek and failure/shutdown cleanup |
 | Live atlas playback | Continuously changing clock with stable admitted revision, first-sample completion, latest-clock pause, explicit seek cancellation, mode switching and immutable output |
 | Connected live playback | First-image progress under continuous ticks, navigation during upload, material/world replacement, zero-budget failure and same-source retry |
 | World materials | Explicit tint/final lighting, consuming/foreign material owner guards, exact lighting policy and hostile host-state restoration |
@@ -70,7 +71,7 @@ Each group uses a fresh bounded `GlDevice` and shared `RenderMemory`; device shu
 
 ## Successful execution evidence
 
-The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all 31 groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
+The wrapper first removes `renderer-gl/build/validation/gpu-contracts.properties`, including for compile-only or rejected runtime/build attempts. The harness also removes its configured report before checking execution prerequisites. It publishes that report atomically only after all 32 groups and context cleanup finish without error. Individual PASS log lines during a failed run are not a complete-stage success report. No report is supplied or claimed from this implementation batch.
 
 A real report records the synthetic scope, successful group names/count, start/completion instants, OS/architecture, Java and LWJGL versions, and the actual driver receipt. It is a narrow run result, not a source/dependency fingerprint manifest, independently captured native baseline, final renderer approval or an authorization to enable previews. Use fresh execution with the intended checked-out sources and retain the corresponding build/commit information when collecting final validation evidence.
 

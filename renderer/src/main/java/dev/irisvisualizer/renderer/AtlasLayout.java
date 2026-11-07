@@ -24,10 +24,11 @@ public final class AtlasLayout {
         public long knownPayloadBytes() { return sourceRgbaBytes+sourcePackedBytes+atlasBytes+boundMeshBytes; }
     }
     private final ClientAssetSnapshot.Receipt assets;private final AssetId owner;private final AtlasBuilder.Limits limits;
-    private final List<TexturePreparation> inputs;private final List<Page> pages;private final NavigableMap<AssetId,Sprite> sprites;private final Optional<Usage> usage;private final List<ModelPlan.Problem> problems;
+    private final List<TexturePreparation> inputs;private final List<Page> pages;private final NavigableMap<AssetId,Sprite> sprites,timeVaryingSprites;private final Optional<Usage> usage;private final List<ModelPlan.Problem> problems;
     private AtlasLayout(ClientAssetSnapshot.Receipt assets,AssetId owner,AtlasBuilder.Limits limits,List<TexturePreparation> inputs,List<Page> pages,Map<AssetId,Sprite> sprites,Optional<Usage> usage,List<ModelPlan.Problem> problems) {
         this.assets=Objects.requireNonNull(assets);this.owner=Objects.requireNonNull(owner);this.limits=Objects.requireNonNull(limits);this.pages=List.copyOf(pages);
         this.inputs=List.copyOf(inputs);this.sprites=Collections.unmodifiableNavigableMap(new TreeMap<>(sprites));this.usage=Objects.requireNonNull(usage);this.problems=List.copyOf(problems);
+        var varying=new TreeMap<AssetId,Sprite>();this.sprites.forEach((id,slot)->{ if(slot.source().timeVarying())varying.put(id,slot); });timeVaryingSprites=Collections.unmodifiableNavigableMap(varying);
         if(!problems.isEmpty()&&(!inputs.isEmpty()||!pages.isEmpty()||!sprites.isEmpty()||usage.isPresent()))throw new IllegalArgumentException("Partial atlas layout escaped a failed plan");
     }
     static AtlasLayout success(ClientAssetSnapshot.Receipt assets,AssetId owner,AtlasBuilder.Limits limits,List<TexturePreparation> inputs,List<Page> pages,Map<AssetId,Sprite> sprites,Usage usage) { return new AtlasLayout(assets,owner,limits,inputs,pages,sprites,Optional.of(usage),List.of()); }
@@ -37,6 +38,8 @@ public final class AtlasLayout {
     public List<TexturePreparation> inputs() { return inputs; }
     public List<Page> pages() { return pages; }
     public NavigableMap<AssetId,Sprite> sprites() { return sprites; }
+    /** Reusable metadata-only clock index; values are the exact slots from sprites(). */
+    public NavigableMap<AssetId,Sprite> timeVaryingSprites() { return timeVaryingSprites; }
     public Optional<Usage> usage() { return usage; }
     public List<ModelPlan.Problem> problems() { return problems; }
     public boolean requiresPlaceholder() { return !problems.isEmpty(); }

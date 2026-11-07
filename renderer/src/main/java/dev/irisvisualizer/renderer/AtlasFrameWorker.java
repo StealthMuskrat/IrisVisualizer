@@ -9,24 +9,24 @@ import java.util.function.Supplier;
 public final class AtlasFrameWorker implements AutoCloseable {
     public static final class Request {
         private final AtlasRaster expected;private final long tick;private final double partialTick;private final NavigableMap<AssetId,TextureSprite.PixelSample> samples;
-        private final int changedSprites;private final long extraBytes,reservation;
-        private Request(AtlasRaster expected,long tick,double partialTick,NavigableMap<AssetId,TextureSprite.PixelSample> samples,int changedSprites,long extraBytes,long reservation) {
-            this.expected=expected;this.tick=tick;this.partialTick=partialTick;this.samples=Collections.unmodifiableNavigableMap(samples);this.changedSprites=changedSprites;this.extraBytes=extraBytes;this.reservation=reservation;
+        private final int changedSprites;private final long extraBytes,reservation,lastTick;
+        private Request(AtlasRaster expected,long tick,double partialTick,NavigableMap<AssetId,TextureSprite.PixelSample> samples,int changedSprites,long extraBytes,long reservation,long lastTick) {
+            this.expected=expected;this.tick=tick;this.partialTick=partialTick;this.samples=Collections.unmodifiableNavigableMap(samples);this.changedSprites=changedSprites;this.extraBytes=extraBytes;this.reservation=reservation;this.lastTick=lastTick;
         }
         /** Metadata-only preflight. Pixel patching and page copies happen later on the worker. */
         public static Request capture(AtlasRaster expected,long tick,double partialTick) {
             Objects.requireNonNull(expected);if(expected.requiresPlaceholder())throw new IllegalArgumentException("Atlas animation requires a successful exact raster");
             if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid atlas animation clock");
-            var layout=expected.layout();var samples=new TreeMap<AssetId,TextureSprite.PixelSample>();boolean[] pages=new boolean[layout.pages().size()];long patches=0,copies=0;int changed=0;
-            for(var entry:layout.sprites().entrySet()) {
-                var slot=entry.getValue();var sample=slot.source().pixelSample(tick,partialTick);samples.put(entry.getKey(),sample);
+            var layout=expected.layout();NavigableMap<AssetId,TextureSprite.PixelSample> samples=layout.timeVaryingSprites().isEmpty()?Collections.emptyNavigableMap():new TreeMap<>();boolean[] pages=null;long patches=0,copies=0,lastTick=Long.MAX_VALUE;int changed=0;
+            for(var entry:layout.timeVaryingSprites().entrySet()) {
+                var slot=entry.getValue();var window=slot.source().pixelWindow(tick,partialTick);var sample=window.sample();samples.put(entry.getKey(),sample);lastTick=Math.min(lastTick,window.lastTick());
                 if(!Objects.equals(expected.samples().get(entry.getKey()),sample)) {
-                    changed++;patches+=slot.paddedBytes();if(!pages[slot.page()]) { pages[slot.page()]=true;copies+=layout.pages().get(slot.page()).bytes(); }
+                    changed++;patches+=slot.paddedBytes();if(pages==null)pages=new boolean[layout.pages().size()];if(!pages[slot.page()]) { pages[slot.page()]=true;copies+=layout.pages().get(slot.page()).bytes(); }
                 }
             }
             long extra=patches+copies,reservation=layout.usage().orElseThrow().knownPayloadBytes()+extra;
             if(patches>layout.limits().updateBytes()||reservation>layout.limits().workingBytes())throw new IllegalArgumentException("Atlas animation patch/copy preflight exceeds its working budget");
-            return new Request(expected,tick,partialTick,samples,changed,extra,reservation);
+            return new Request(expected,tick,partialTick,samples,changed,extra,reservation,lastTick);
         }
         public AtlasRaster expected() { return expected; }
         public long tick() { return tick; }
@@ -34,6 +34,12 @@ public final class AtlasFrameWorker implements AutoCloseable {
         public int changedSprites() { return changedSprites; }
         public long extraCpuBytes() { return extraBytes; }
         public long reservation() { return reservation; }
+        /** Inclusive forward interval for the same canonical samples; static atlases also admit backward clocks. */
+        public long lastTick() { return lastTick; }
+        public boolean matchesClock(long tick,double partialTick) {
+            if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid atlas animation clock");
+            return samples.isEmpty()||tick>=this.tick&&tick<=lastTick;
+        }
         /** Equal canonical sampling inputs, including blend progress and repeated schedule entries. */
         public boolean samePixels(Request other) { return other!=null&&expected==other.expected&&samples.equals(other.samples); }
     }
