@@ -11,19 +11,32 @@ public final class WorldPickIndex implements AutoCloseable {
     private static final float[] EMPTY_RANGE_BOUNDS=new float[0];
     public static final int BATCH_PRIMITIVES=WorldMesh.BATCH_FACES;
     private static final class Ranges {
-        static final Ranges EMPTY=new Ranges(0,0,0,false);
-        final float[] bounds,tree;final int[] starts,treeStarts;final boolean hierarchy;
-        Ranges(int batches,int sections,int internal,boolean hierarchy) {
+        static final Ranges EMPTY=new Ranges(0,0,0,false,false);
+        final float[] bounds,tree;final int[] starts,treeStarts;final boolean hierarchy,source;
+        Ranges(int batches,int sections,int internal,boolean hierarchy,boolean source) {
+            this.source=source;if(source) { batches=0;internal=0; }
             bounds=batches==0?EMPTY_RANGE_BOUNDS:new float[batches*6];starts=batches==0?EMPTY_NODES:new int[sections+1];
             tree=internal==0?EMPTY_RANGE_BOUNDS:new float[internal*6];treeStarts=internal==0?EMPTY_NODES:new int[sections+1];this.hierarchy=hierarchy;
         }
         long bytes() { return ((long)bounds.length+tree.length+starts.length+treeStarts.length)*4; }
+        float low(WorldMesh mesh,boolean marker,boolean leaf,int index,int axis) {
+            if(!source)return (leaf?bounds:tree)[index*6+axis];
+            return marker?(leaf?mesh.markerBatchMinimum(index,axis):mesh.markerBatchHierarchyMinimum(index,axis)):(leaf?mesh.faceBatchMinimum(index,axis):mesh.faceBatchHierarchyMinimum(index,axis));
+        }
+        float high(WorldMesh mesh,boolean marker,boolean leaf,int index,int axis) {
+            if(!source)return (leaf?bounds:tree)[index*6+axis+3];
+            return marker?(leaf?mesh.markerBatchMaximum(index,axis):mesh.markerBatchHierarchyMaximum(index,axis)):(leaf?mesh.faceBatchMaximum(index,axis):mesh.faceBatchHierarchyMaximum(index,axis));
+        }
     }
-    public record Limits(long indexBytes,long workingBytes,boolean rangeHierarchy) {
+    /** SOURCE borrows immutable section metadata through the index's independent complete-scene lease. */
+    public enum RangeStorage { SOURCE, COPY }
+    public record Limits(long indexBytes,long workingBytes,boolean rangeHierarchy,RangeStorage rangeStorage) {
         public static final Limits DEFAULT=new Limits(16L*1024*1024,512L*1024*1024);
-        public Limits(long indexBytes,long workingBytes) { this(indexBytes,workingBytes,true); }
-        public Limits withRangeHierarchy(boolean enabled) { return new Limits(indexBytes,workingBytes,enabled); }
-        public Limits { if(indexBytes<0||indexBytes>16L*1024*1024||workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Picking index limits exceed renderer bounds"); }
+        public Limits(long indexBytes,long workingBytes) { this(indexBytes,workingBytes,true,RangeStorage.SOURCE); }
+        public Limits(long indexBytes,long workingBytes,boolean rangeHierarchy) { this(indexBytes,workingBytes,rangeHierarchy,RangeStorage.SOURCE); }
+        public Limits withRangeHierarchy(boolean enabled) { return new Limits(indexBytes,workingBytes,enabled,rangeStorage); }
+        public Limits withRangeStorage(RangeStorage storage) { return new Limits(indexBytes,workingBytes,rangeHierarchy,storage); }
+        public Limits { Objects.requireNonNull(rangeStorage);if(indexBytes<0||indexBytes>16L*1024*1024||workingBytes<0||workingBytes>512L*1024*1024)throw new IllegalArgumentException("Picking index limits exceed renderer bounds"); }
     }
     public enum Alpha { GEOMETRY, DISPLAYED_BASE_LEVEL }
     public record Options(int nodeTests,int faceTests,int markerTests,boolean backFaces,Alpha alpha,WorldClip clip,boolean batchCulling,boolean rangeHierarchy,int rangeNodeTests) {
@@ -51,15 +64,16 @@ public final class WorldPickIndex implements AutoCloseable {
     public static WorldPickIndex prepare(WorldScene.Result owner,Limits limits,RenderMemory memory,BooleanSupplier cancelled) {
         return prepare(owner,limits,memory,RenderMemory.Hold.none(),-1,cancelled);
     }
-    private static long indexBytes(int sections,int drawable,int faceBatches,int markerBatches,int faceInternal,int markerInternal) {
+    private static long indexBytes(int sections,int drawable,int faceBatches,int markerBatches,int faceInternal,int markerInternal,RangeStorage storage) {
+        if(storage==RangeStorage.SOURCE) { faceBatches=0;markerBatches=0;faceInternal=0;markerInternal=0; }
         int nodes=drawable==0?0:drawable*2-1,starts=(faceBatches==0?0:sections+1)+(markerBatches==0?0:sections+1)+(faceInternal==0?0:sections+1)+(markerInternal==0?0:sections+1);
         return (long)nodes*(6*Double.BYTES+3*Integer.BYTES)+((long)faceBatches+markerBatches+faceInternal+markerInternal)*6*Float.BYTES+(long)starts*Integer.BYTES;
     }
-    private static long preparationBytes(int sections,int drawable,int faceBatches,int markerBatches,int faceInternal,int markerInternal) { return indexBytes(sections,drawable,faceBatches,markerBatches,faceInternal,markerInternal)+(long)drawable*Integer.BYTES+(drawable==0?0:Integer.BYTES); }
+    private static long preparationBytes(int sections,int drawable,int faceBatches,int markerBatches,int faceInternal,int markerInternal,RangeStorage storage) { return indexBytes(sections,drawable,faceBatches,markerBatches,faceInternal,markerInternal,storage)+(long)drawable*Integer.BYTES+(drawable==0?0:Integer.BYTES); }
     /** Verified counters size the exact peak in constant time; per-section tree counts are rechecked on the worker. */
     static long reservation(WorldScene scene,Limits limits) {
         var usage=scene.usage();int faceInternal=limits.rangeHierarchy()?usage.faceBatches()-usage.faceSections():0,markerInternal=limits.rangeHierarchy()?usage.markerBatches()-usage.markerSections():0;
-        long source=usage.knownPayloadBytes(),peak=preparationBytes(usage.sections(),usage.drawableSections(),usage.faceBatches(),usage.markerBatches(),faceInternal,markerInternal);
+        long source=usage.knownPayloadBytes(),peak=preparationBytes(usage.sections(),usage.drawableSections(),usage.faceBatches(),usage.markerBatches(),faceInternal,markerInternal,limits.rangeStorage());
         if(source>limits.workingBytes())throw new IllegalArgumentException("Picking source scene exceeds the preparation allowance");
         return Math.min(limits.workingBytes(),source+Math.min(limits.indexBytes(),peak));
     }
@@ -72,12 +86,12 @@ public final class WorldPickIndex implements AutoCloseable {
         Objects.requireNonNull(owner);Objects.requireNonNull(limits);Objects.requireNonNull(cancelled);boolean transferred=false;Throwable escapingFailure=null;var source=owner.source();
         try {
             try {
-                WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0,faceSections=0,markerSections=0;
-                for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=mesh.markerBatchCount();if(!mesh.faces().isEmpty())faceSections++;if(!mesh.markers().isEmpty())markerSections++; }
-                var usage=scene.usage();if(scene.sections().size()!=usage.sections()||count!=usage.drawableSections()||faces!=usage.faceBatches()||markers!=usage.markerBatches()||faceSections!=usage.faceSections()||markerSections!=usage.markerSections())throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Picking source sections/ranges differ from the complete scene receipt");
+                WorldProblem.check(cancelled);if(owner.requiresPlaceholder())return failed(source,owner.problems());var scene=owner.scene().orElseThrow();int count=0,faces=0,markers=0,faceSections=0,markerSections=0,faceNodes=0,markerNodes=0;
+                for(var mesh:scene.sections()) { WorldProblem.check(cancelled);if(mesh.bounds().isPresent())count++;faces+=mesh.faceBatchCount();markers+=mesh.markerBatchCount();faceNodes+=mesh.faceBatchHierarchyCount();markerNodes+=mesh.markerBatchHierarchyCount();if(!mesh.faces().isEmpty())faceSections++;if(!mesh.markers().isEmpty())markerSections++; }
+                var usage=scene.usage();if(scene.sections().size()!=usage.sections()||count!=usage.drawableSections()||faces!=usage.faceBatches()||markers!=usage.markerBatches()||faceSections!=usage.faceSections()||markerSections!=usage.markerSections()||faceNodes!=faces-faceSections||markerNodes!=markers-markerSections)throw WorldProblem.fail(WorldProblem.Code.ASSIGNMENT,"Picking source sections/ranges differ from the complete scene receipt");
                 int nodes=count==0?0:count*2-1;
                 int faceInternal=limits.rangeHierarchy()?faces-faceSections:0,markerInternal=limits.rangeHierarchy()?markers-markerSections:0;
-                long bytes=indexBytes(scene.sections().size(),count,faces,markers,faceInternal,markerInternal),peak=preparationBytes(scene.sections().size(),count,faces,markers,faceInternal,markerInternal);
+                long bytes=indexBytes(scene.sections().size(),count,faces,markers,faceInternal,markerInternal,limits.rangeStorage()),peak=preparationBytes(scene.sections().size(),count,faces,markers,faceInternal,markerInternal,limits.rangeStorage());
                 if(peak>limits.indexBytes()||scene.usage().knownPayloadBytes()+peak>limits.workingBytes())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking hierarchy/range arrays or combined CPU payload budget exceeded");
                 if(reserved>=0) {
                     if(memory!=null&&!admission.tracked()||admission.tracked()&&!admission.belongsTo(memory))throw new IllegalArgumentException("Admitted picking preparation requires its exact memory coordinator");
@@ -86,7 +100,7 @@ public final class WorldPickIndex implements AutoCloseable {
                 catch(RenderMemory.LimitException failure) { throw WorldProblem.fail(WorldProblem.Code.LIMIT,failure.getMessage()); }
                 var extent=scene.snapshot().extent();var anchor=new WorldSnapshot.Position(extent.minX(),extent.minY(),extent.minZ());int[] admitted=new int[count];int at=0;
                 for(int i=0;i<scene.sections().size();i++) { WorldProblem.check(cancelled);if(scene.sections().get(i).bounds().isPresent())admitted[at++]=i; }
-                var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],faces==0?Ranges.EMPTY:new Ranges(faces,scene.sections().size(),faceInternal,limits.rangeHierarchy()),markers==0?Ranges.EMPTY:new Ranges(markers,scene.sections().size(),markerInternal,limits.rangeHierarchy()),List.of(),memory,admission);Arrays.fill(result.section,-1);
+                var result=new WorldPickIndex(source,anchor,owner,scene,new double[nodes*6],new int[nodes],new int[nodes],new int[nodes],faces==0?Ranges.EMPTY:new Ranges(faces,scene.sections().size(),faceInternal,limits.rangeHierarchy(),limits.rangeStorage()==RangeStorage.SOURCE),markers==0?Ranges.EMPTY:new Ranges(markers,scene.sections().size(),markerInternal,limits.rangeHierarchy(),limits.rangeStorage()==RangeStorage.SOURCE),List.of(),memory,admission);Arrays.fill(result.section,-1);
                 if(count>0)result.build(admitted,0,count,new int[1],cancelled);result.buildRanges(cancelled);WorldProblem.check(cancelled);admitted=null;
                 if(reserved<0)admission.shrinkTo(scene.usage().knownPayloadBytes()+bytes);transferred=true;return result;
             }catch(WorldProblem.Failure failure) { WorldProblem.check(cancelled);return failed(source,List.of(failure.problem)); }
@@ -115,7 +129,7 @@ public final class WorldPickIndex implements AutoCloseable {
     }
     /** Preserve original face order; bounds come from emitted vertices, including native offsets and overhangs. */
     private void buildRanges(BooleanSupplier cancelled) {
-        if(faceRanges==Ranges.EMPTY&&markerRanges==Ranges.EMPTY)return;int faceBatch=0,markerBatch=0,faceTree=0,markerTree=0;
+        if(faceRanges.source||markerRanges.source||faceRanges==Ranges.EMPTY&&markerRanges==Ranges.EMPTY)return;int faceBatch=0,markerBatch=0,faceTree=0,markerTree=0;
         for(int sectionIndex=0;sectionIndex<scene.sections().size();sectionIndex++) {
             WorldProblem.check(cancelled);var mesh=scene.sections().get(sectionIndex);
             if(faceRanges!=Ranges.EMPTY)faceRanges.starts[sectionIndex]=faceBatch;
@@ -262,34 +276,32 @@ public final class WorldPickIndex implements AutoCloseable {
                 if(marker)markerRange(mesh,sectionIndex,first,end,rx,ry,rz,scope);else faceRange(mesh,sectionIndex,first,end,vertices,indices,rx,ry,rz,scope);
             }
             void emitBatch(Ranges ranges,int batch,boolean marker) {
-                int first=(batch-ranges.starts[sectionIndex])*BATCH_PRIMITIVES;emit(marker,first,Math.min(marker?mesh.markers().size():mesh.faces().size(),first+BATCH_PRIMITIVES));
+                int first=(ranges.source?batch:batch-ranges.starts[sectionIndex])*BATCH_PRIMITIVES;emit(marker,first,Math.min(marker?mesh.markers().size():mesh.faces().size(),first+BATCH_PRIMITIVES));
             }
             void ranges(Ranges ranges,boolean marker) {
-                int first=ranges.starts[sectionIndex],end=ranges.starts[sectionIndex+1];
+                int first=ranges.source?0:ranges.starts[sectionIndex],end=ranges.source?(marker?mesh.markerBatchCount():mesh.faceBatchCount()):ranges.starts[sectionIndex+1];
                 if(options.rangeHierarchy()&&ranges.hierarchy) {
-                    int node=ranges.treeStarts.length==0?0:ranges.treeStarts[sectionIndex];visit(ranges,first,end,node,entry(ranges,first,end,node),marker);
-                }else for(int batch=first;batch<end;batch++) { check();batches++;if(!range(ranges,batch,x,y,z)) { culledBatches++;continue; }emitBatch(ranges,batch,marker); }
+                    int node=ranges.treeStarts.length==0?0:ranges.treeStarts[sectionIndex];visit(ranges,first,end,node,entry(ranges,first,end,node,marker),marker);
+                }else for(int batch=first;batch<end;batch++) { check();batches++;if(!range(ranges,batch,marker)) { culledBatches++;continue; }emitBatch(ranges,batch,marker); }
             }
-            double entry(Ranges ranges,int first,int end,int node) {
+            double entry(Ranges ranges,int first,int end,int node,boolean marker) {
                 check();if(++rangeNodes>options.rangeNodeTests())throw WorldProblem.fail(WorldProblem.Code.LIMIT,"Picking range-node budget exceeded; no nearest hit can be certified");
-                boolean leaf=end-first==1;if(leaf)batches++;var b=leaf?ranges.bounds:ranges.tree;int at=(leaf?first:node)*6;
-                double result=candidate(x+b[at],y+b[at+1],z+b[at+2],x+b[at+3],y+b[at+4],z+b[at+5],ox,oy,oz);
+                boolean leaf=end-first==1;if(leaf)batches++;double result=boundsEntry(ranges,leaf?first:node,leaf,marker);
                 if(!Double.isFinite(result)) { culledRangeNodes++;if(leaf)culledBatches++; }return result;
             }
+            double boundsEntry(Ranges ranges,int index,boolean leaf,boolean marker) {
+                return candidate(x+ranges.low(mesh,marker,leaf,index,0),y+ranges.low(mesh,marker,leaf,index,1),z+ranges.low(mesh,marker,leaf,index,2),x+ranges.high(mesh,marker,leaf,index,0),y+ranges.high(mesh,marker,leaf,index,1),z+ranges.high(mesh,marker,leaf,index,2),ox,oy,oz);
+            }
+            boolean range(Ranges ranges,int batch,boolean marker) { double entry=boundsEntry(ranges,batch,true,marker);return Double.isFinite(entry)&&entry<=nearest; }
             void visit(Ranges ranges,int first,int end,int node,double distance,boolean marker) {
                 check();if(!Double.isFinite(distance))return;
                 if(distance>nearest) { culledRangeNodes++;if(end-first==1)culledBatches++;return; }
                 if(end-first==1) { emitBatch(ranges,first,marker);return; }
                 int middle=(first+end)>>>1,left=node+1,right=node+middle-first;
-                double a=entry(ranges,first,middle,left),b=entry(ranges,middle,end,right);
+                double a=entry(ranges,first,middle,left,marker),b=entry(ranges,middle,end,right,marker);
                 if(a<=b) { visit(ranges,first,middle,left,a,marker);visit(ranges,middle,end,right,b,marker); }
                 else { visit(ranges,middle,end,right,b,marker);visit(ranges,first,middle,left,a,marker); }
             }
-        }
-        boolean range(Ranges ranges,int batch,double x,double y,double z) {
-            int at=batch*6;var b=ranges.bounds;
-            double entry=candidate(x+b[at],y+b[at+1],z+b[at+2],x+b[at+3],y+b[at+4],z+b[at+5],ox,oy,oz);
-            return Double.isFinite(entry)&&entry<=nearest;
         }
         void markerRange(WorldMesh mesh,int sectionIndex,int first,int end,double x,double y,double z,WorldClip.Bounds scope) {
             for(int marker=first;marker<end;marker++) {

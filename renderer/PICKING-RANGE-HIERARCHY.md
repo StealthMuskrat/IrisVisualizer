@@ -2,6 +2,8 @@
 
 Renderer implementation with compilation only. All 143 renderer/validation sources compile with Java 25/LWJGL; the dependency-free set contains 105 files. Three additional world CPU groups bring the prepared total to 115: 83 CPU/context-free and 32 GPU. The existing world GPU culling group also prepares completed-frame hierarchy comparisons. All assertions remain unexecuted. Native/GPU correctness, performance measurements, total application memory and final integration remain pending; unsupported previews stay disabled.
 
+Current default preparation uses [source-backed range bounds](SOURCE-RANGE-REUSE.md). The flattened leaf/internal allocations described below apply to explicit `RangeStorage.COPY`; SOURCE reads immutable section-local bounds under its independently retained complete-scene lease. Traversal policies, query budgets and deterministic original hits remain the same.
+
 ## Rejection inside a section
 
 The section hierarchy remains the first picking stage. Previously every reached section then tested every original face/marker group's bounds. The default index now adds separate balanced hierarchies over those contiguous groups, letting a ray reject an entire subtree before scanning its leaves.

@@ -106,3 +106,5 @@ This uses three ray-origin scalars and one immutable clip-bound value per reache
 ## Hierarchical original-range rejection
 
 [Balanced per-section group trees](PICKING-RANGE-HIERARCHY.md) now reuse original leaf bounds and preserve nearest-first source ties, displayed alpha and exact clipping. Scene receipts count face/marker-bearing sections so metadata-only worker demand remains exact. Default trees, explicit linear builds/queries and exhaustive primitive queries retain independent work/admission controls; exhausted budgets expose no partial hit. Current compilation covers 143 full and 105 dependency-free files; all 115 prepared groups remain unexecuted.
+
+[Source-backed range reuse](SOURCE-RANGE-REUSE.md) now makes SOURCE the default index storage, retaining only its section hierarchy beyond the complete source. Explicit COPY storage preserves independent flattened bounds and exact storage-specific admission; source/query lifetime and native hit identity remain unchanged.
