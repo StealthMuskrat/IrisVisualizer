@@ -57,3 +57,5 @@ Check exact image charge through destination admission, device-journal release, 
 ## Preserved output and failed-job recovery
 
 [Readback queue preflight](READBACK-RECOVERY.md) now preserves earlier READY output when an invalid replacement source is rejected before admission. Actual FAILED jobs can explicitly reopen the current token after cleanup. Owned-take admission rejection still leaves READY intact, so retry the take operation directly; queue retry intentionally rejects READY/DELIVERED phases. Taken CPU owners keep their independent charge and pixels. Runtime/GPU validation remains deferred.
+
+[Complete transfer storage admission](FULL-STORAGE-ADMISSION.md) now reserves CPU pixels and GPU transfer-buffer storage together before queue replacement. Unstarted work refunds immediately; started work retains source/frame dependencies through normal GPU retirement. Detached output ownership and its separate handoff admission remain unchanged. All 148 prepared groups remain unexecuted.

@@ -45,7 +45,7 @@ public final class GlDevice implements AutoCloseable {
     }
     static final class Allocation {
         int[] buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders;long gpu,cpu;int names;WorldScene.Result owner;Object retained;
-        boolean retired,released,quarantined,retirementReady;int deleteGroup,deleteIndex;long fence,transferFence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
+        boolean retired,released,quarantined,retirementReady,unstartedStorage;int deleteGroup,deleteIndex;long fence,transferFence;final List<Allocation> dependencies=new ArrayList<>();int dependents;
         Allocation(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
             this.gpu=gpu;this.cpu=cpu;this.owner=owner;this.buffers=new int[buffers];this.textures=new int[textures];this.vaos=new int[vaos];this.framebuffers=new int[framebuffers];this.renderbuffers=new int[renderbuffers];this.programs=new int[programs];this.shaders=new int[shaders];names=buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders;
         }
@@ -144,6 +144,15 @@ public final class GlDevice implements AutoCloseable {
         allocations=nextAllocations;gpuBytes+=gpu;cpuBytes+=cpu;names+=allocation.names;return allocation;
     }
     void live(Allocation allocation) { current();if(allocation.retired||allocation.released)throw new GlFailure(GlFailure.Code.STATE,"GPU resource is retired or released"); }
+    /** Admit complete known storage before ownership acceptance; no native names or commands are created. */
+    Allocation reserveStorage(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders) {
+        if(gpu<=0||(long)buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders<=0)throw new IllegalArgumentException("Storage admission requires payload and object slots");
+        var allocation=reserve(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,null);allocation.unstartedStorage=true;return allocation;
+    }
+    /** One-way transition before the first native storage operation, even if no handle is returned. */
+    void beginStorage(Allocation allocation) {
+        live(allocation);if(!allocations.contains(allocation)||!allocation.unstartedStorage)throw new GlFailure(GlFailure.Code.STATE,"Storage is foreign or already started");allocation.unstartedStorage=false;
+    }
     /** Upgrade a CPU-only journal after incremental validation, before any scene GL name is made. */
     void expand(Allocation allocation,long gpu,int buffers,int textures,int vaos) {
         live(allocation);collect(CollectionBudget.DEFAULT);if(allocation.gpu!=0||allocation.names!=0)throw new GlFailure(GlFailure.Code.STATE,"Upload reservation was already expanded");
@@ -175,6 +184,14 @@ public final class GlDevice implements AutoCloseable {
             if(allocation.names==0&&allocation.gpu==0&&allocation.dependents==0) { release(allocation);removeAllocation(allocation);return; }
             allocation.retired=true;allocation.fence=glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE,0);check("resource retirement fence");if(allocation.fence==0)throw new GlFailure(GlFailure.Code.GL_ERROR,"Could not create resource retirement fence");glFlush();check("resource retirement flush");
         }catch(RuntimeException|Error failure) { allocation.retired=true;allocation.quarantined=true;throw failure; }
+    }
+    /** Only explicitly admitted, never-started storage can refund CPU payload and source pins without a fence. */
+    void discardUnstarted(Allocation allocation) {
+        if(allocation.released)return;live(allocation);if(!allocations.contains(allocation))throw new GlFailure(GlFailure.Code.STATE,"Reservation belongs to another device");
+        if(!allocation.unstartedStorage||allocation.dependents!=0||allocation.owner!=null||allocation.fence!=0||allocation.transferFence!=0)throw new GlFailure(GlFailure.Code.STATE,"Only never-started storage without dependents can be discarded");
+        for(int group=0;group<7;group++)for(int name:nameArray(allocation,group))if(name!=0)throw new GlFailure(GlFailure.Code.STATE,"Started GPU storage cannot be discarded");
+        try { release(allocation);removeAllocation(allocation); }
+        catch(RuntimeException|Error failure) { allocation.retired=true;allocation.quarantined=true;throw failure; }
     }
     private void removeAllocation(Allocation allocation) {
         int at=allocations.indexOf(allocation);if(at<0)return;allocations.remove(at);if(at<collectionCursor)collectionCursor--;if(collectionCursor>=allocations.size())collectionCursor=0;

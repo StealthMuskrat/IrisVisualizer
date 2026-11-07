@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06; updated 2026-11-07. `GlGpuContracts` contains 38 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 105 prepared, unexecuted groups, making 143 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06; updated 2026-11-07. `GlGpuContracts` contains 43 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 105 prepared, unexecuted groups, making 148 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -84,3 +84,5 @@ The GPU harness is an initial real-driver path. The new [synthetic world groups]
 [Dirty atlas rectangles](../renderer/ATLAS-DIRTY-RECTANGLES.md) add a differential texture/upload/controller group, bringing this harness to 36. The completion guard now requires all 36 registered groups before reporting success; its obsolete eighteen-group guard would have rejected a complete expanded run. All 141 prepared renderer groups remain unexecuted. Both compilation sets pass (144/106 files).
 
 [Bounded GPU retirement](BOUNDED-RETIREMENT.md) adds two groups for per-call work/action receipts, round-robin progress, sparse zero-name slots, all seven object families, transfer/retirement fences, full payload/source/dependency retention, automatic cleanup limits, compatibility collection and teardown after partial deletion. The completion guard requires all 38 registered GPU groups. Full/default compilation passes (144/106 files); all 143 prepared groups remain unexecuted.
+
+[Complete transfer storage admission](FULL-STORAGE-ADMISSION.md) adds five groups for raster/scalar/readback full-peak rejection, GPU/journal/name deficits, pending/READY preservation, exact-budget transfers, cancellation/refunds, source pins and storage lifecycle guards. The completion guard requires all 43 registered GPU groups. Full/default compilation passes (144/106 files); all 148 prepared groups remain unexecuted.

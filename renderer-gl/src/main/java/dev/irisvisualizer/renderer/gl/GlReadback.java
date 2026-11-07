@@ -86,11 +86,11 @@ public final class GlReadback implements AutoCloseable {
         var target=source.target();validate(target,limits);var device=target.device;long bytes=(long)target.width()*target.height()*4;
         GlDevice.Allocation work=null,output=null;
         try {
-            work=device.reserve(0,bytes,0,0,0,0,0,0,0,null);device.depend(work,source.journal());output=device.reserve(0,0,0,0,0,0,0,0,0,null);
+            work=device.reserveStorage(bytes,bytes,1,0,0,0,0,0,0);device.depend(work,source.journal());output=device.reserve(0,0,0,0,0,0,0,0,0,null);
             var builder=RgbaImage.builder(target.width(),target.height(),limits.pixelBytes());work.retained=builder;return new GlReadback(source,work,output,builder);
         }catch(RuntimeException|Error failure) {
             if(output!=null)try { device.retire(output); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
-            if(work!=null)try { device.retire(work); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+            if(work!=null)try { device.discardUnstarted(work); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
     }
     public Progress progress() { return new Progress(phase,gpuRows,cpuRows,height,(long)gpuRows*rowBytes,(long)cpuRows*rowBytes,bytes); }
@@ -115,7 +115,7 @@ public final class GlReadback implements AutoCloseable {
                 if(binds&&state==null) { state=new GlPackState(device);state.tightlyPacked(); }
                 switch(phase) {
                     case STORAGE -> {
-                        device.expand(work,bytes,1,0,0);work.buffers[0]=glGenBuffers();glBindBuffer(GL_PIXEL_PACK_BUFFER,work.buffers[0]);glBufferData(GL_PIXEL_PACK_BUFFER,bytes,GL_STREAM_READ);device.check("readback pixel buffer storage");storage+=bytes;phase=Phase.READING;
+                        device.beginStorage(work);work.buffers[0]=glGenBuffers();glBindBuffer(GL_PIXEL_PACK_BUFFER,work.buffers[0]);glBufferData(GL_PIXEL_PACK_BUFFER,bytes,GL_STREAM_READ);device.check("readback pixel buffer storage");storage+=bytes;phase=Phase.READING;
                     }
                     case READING -> {
                         int capacity=Math.min(65536,budget.transferBytes()-readNow-copiedNow),rows=Math.min(height-gpuRows,capacity/rowBytes);if(rows==0)break steps;
@@ -175,7 +175,7 @@ public final class GlReadback implements AutoCloseable {
     }
     private void releaseWork() {
         Throwable failure=null;
-        if(work!=null)try { device.retire(work);work=null; }catch(RuntimeException|Error error) { if(work.retired||work.released)work=null;failure=error; }
+        if(work!=null)try { if(work.unstartedStorage)device.discardUnstarted(work);else device.retire(work);work=null; }catch(RuntimeException|Error error) { if(work.retired||work.released)work=null;failure=error; }
         if(source!=null)try { source.close();source=null; }catch(RuntimeException|Error error) { if(source.closed())source=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         builder=null;if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }

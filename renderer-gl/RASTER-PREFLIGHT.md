@@ -16,13 +16,13 @@ Both queues now perform the existing positive-token and phase checks first, foll
 | Valid complete source | Continue normal revision acceptance, cleanup and admission |
 | Stale/duplicate token in an ineligible phase | Return false before inspecting candidate completeness/capabilities |
 
-Direct upload begin and queue submission share `GlMapUpload.validate` / `GlImageUpload.validate`, keeping their source and capability checks aligned. Begin validates again after queue replacement before its device journal is reserved. The checks inspect bounded metadata and perform no pixel scan, colorization, decoding, native sampling or GPU allocation.
+Direct upload begin and queue submission share `GlMapUpload.validate` / `GlImageUpload.validate`, keeping their source and capability checks aligned. Begin validates again before its device journal is reserved and before queue replacement. The checks inspect bounded metadata and perform no pixel scan, colorization, decoding, native sampling or GPU allocation.
 
 Explicit `invalidate(newRevision)` still abandons old work immediately. Connected map/image views retain their existing source-request invalidation policy, including invalidation before asynchronous preparation completes. The new guarantee applies while the lower-level queue still owns prior work; it does not restore something explicitly invalidated upstream. Hosts continue to compare desired revisions before taking or displaying old results.
 
 ## Admission and recovery boundaries
 
-Preflight does not reserve shared/device memory. Once a valid new request is accepted, old queue-owned work is disposed and actual device/shared admission and setup proceed through the existing path. Cleanup, admission or setup failure after acceptance still publishes FAILED at the accepted revision and retains unfinished ownership or device-retired/quarantined charges. A successful shape preflight does not promise that the request will fit current combined memory pressure.
+Metadata preflight does not reserve shared/device memory. The queue then admits the candidate's [complete known CPU/GPU/object footprint](FULL-STORAGE-ADMISSION.md) before accepting its token or disposing old work. Admission rejection preserves the earlier token/status/output. Old-owner cleanup or native setup failure after admission follows the existing FAILED protocol and retains unfinished ownership or device-retired/quarantined charges. A successful shape preflight does not promise that the request will fit current combined memory pressure.
 
 Existing exact FAILED-token `retry` and connected retained-source recovery remain unchanged. A preflight-rejected candidate has not accepted a new token or failed the old job, so it needs no retry transition: supply a valid candidate or explicitly invalidate according to the host's current source decision. A WAITING queue remains WAITING after rejection; a READY result can still be taken at its old token if the host still wants it. Previously transferred map/image owners remain independent.
 

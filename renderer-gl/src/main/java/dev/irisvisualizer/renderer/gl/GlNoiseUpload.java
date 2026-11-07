@@ -24,11 +24,17 @@ public final class GlNoiseUpload implements AutoCloseable {
     static void validate(GlDevice device,NoiseSurface surface) {
         Objects.requireNonNull(device);Objects.requireNonNull(surface);device.current();if(surface.requiresPlaceholder())throw new GlFailure(GlFailure.Code.STATE,"A complete scalar boundary surface is required");precision(surface.volume().grid());
     }
+    private static GlDevice.Allocation admit(GlDevice device,NoiseSurface surface) {
+        return surface.size()==0?device.reserve(0,surface.payloadBytes(),0,0,0,0,0,0,0,null):device.reserveStorage((long)surface.size()*INSTANCE_BYTES,surface.payloadBytes(),2,0,1,0,0,0,0);
+    }
+    private static void release(GlDevice device,GlDevice.Allocation allocation) {
+        if(allocation.unstartedStorage)device.discardUnstarted(allocation);else device.retire(allocation);
+    }
     public static GlNoiseUpload begin(GlDevice device,NoiseSurface surface) {
         validate(device,surface);
         GlDevice.Allocation allocation=null;
-        try { allocation=device.reserve(0,surface.payloadBytes(),0,0,0,0,0,0,0,null);allocation.retained=surface;return new GlNoiseUpload(device,allocation,surface.size(),null); }
-        catch(RuntimeException|Error failure) { if(allocation!=null)try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
+        try { allocation=admit(device,surface);allocation.retained=surface;return new GlNoiseUpload(device,allocation,surface.size(),null); }
+        catch(RuntimeException|Error failure) { if(allocation!=null)try { release(device,allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     /** Borrowed source; retain its complete GPU owner through the last queued copy and source release. */
     public static GlNoiseUpload recolor(GlNoiseScene source,NoiseSurface surface) {
@@ -36,10 +42,10 @@ public final class GlNoiseUpload implements AutoCloseable {
         if(!original.sharesGeometry(surface))throw new GlFailure(GlFailure.Code.STALE,"Scalar GPU recoloring requires the exact shared immutable geometry");
         GlDevice.Allocation allocation=null;GlNoiseScene owner=null;
         try {
-            allocation=device.reserve(0,surface.payloadBytes(),0,0,0,0,0,0,0,null);allocation.retained=surface;owner=source.retain();return new GlNoiseUpload(device,allocation,surface.size(),owner);
+            allocation=admit(device,surface);allocation.retained=surface;owner=source.retain();return new GlNoiseUpload(device,allocation,surface.size(),owner);
         }catch(RuntimeException|Error failure) {
             if(owner!=null)try { owner.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
-            if(allocation!=null)try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+            if(allocation!=null)try { release(device,allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
     }
     /** Consumes a fresh recolored CPU surface through destination admission, including rejection. */
@@ -83,8 +89,8 @@ public final class GlNoiseUpload implements AutoCloseable {
                 if(gpu&&state==null)state=new GlTransferState(device);
                 switch(phase) {
                     case STORAGE -> {
-                        device.expand(allocation,(long)count*INSTANCE_BYTES,count==0?0:2,0,count==0?0:1);
                         if(count>0) {
+                            device.beginStorage(allocation);
                             allocation.buffers[0]=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[0]);glBufferData(GL_ARRAY_BUFFER,(long)count*GEOMETRY_BYTES,GL_STATIC_DRAW);
                             allocation.buffers[1]=glGenBuffers();glBindBuffer(GL_ARRAY_BUFFER,allocation.buffers[1]);glBufferData(GL_ARRAY_BUFFER,(long)count*COLOR_BYTES,GL_STATIC_DRAW);device.check("scalar geometry/color storage");storage=(long)count*INSTANCE_BYTES;
                         }phase=count==0?Phase.FINISHING:Phase.GEOMETRY;
@@ -132,7 +138,7 @@ public final class GlNoiseUpload implements AutoCloseable {
     private void releaseSource() { if(geometrySource!=null)try { geometrySource.close();geometrySource=null; }catch(RuntimeException|Error failure) { if(geometrySource.closed())geometrySource=null;throw failure; } }
     private void dispose(Phase terminal) {
         Throwable failure=null;
-        try { if(allocation!=null)device.retire(allocation); }catch(RuntimeException|Error error) { failure=error; }
+        try { if(allocation!=null)release(device,allocation); }catch(RuntimeException|Error error) { failure=error; }
         finally { if(allocation==null||allocation.retired||allocation.released) { allocation=null;completed=null; }phase=terminal; }
         try { releaseSource(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;

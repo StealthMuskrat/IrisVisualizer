@@ -83,3 +83,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Dirty atlas rectangles](ATLAS-DIRTY-RECTANGLES.md) add three animation groups, bringing that harness to 17 and the CPU/context-free total to 105. Together with 36 GPU groups, all 141 prepared groups remain unexecuted. Full/default compilation passes (144/106 files).
 
 [Bounded GPU retirement](../renderer-gl/BOUNDED-RETIREMENT.md) adds two GPU groups. The CPU/context-free suites remain at 105 groups; GPU groups now total 38 for 143 overall, all unexecuted. Both compilation sets pass (144/106 files).
+
+[Complete transfer storage admission](../renderer-gl/FULL-STORAGE-ADMISSION.md) adds five GPU groups. CPU/context-free suites remain at 105; GPU groups now total 43 for 148 overall, all unexecuted. Both compilation sets pass (144/106 files).

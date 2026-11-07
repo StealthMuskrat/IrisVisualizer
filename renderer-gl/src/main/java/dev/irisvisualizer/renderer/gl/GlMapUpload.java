@@ -27,8 +27,8 @@ public final class GlMapUpload implements AutoCloseable {
     public static GlMapUpload begin(GlDevice device,MapRaster raster) {
         validate(device,raster);
         GlDevice.Allocation allocation=null;
-        try { allocation=device.reserve(0,raster.payloadBytes(),0,0,0,0,0,0,0,null);allocation.retained=raster;return new GlMapUpload(device,raster,allocation); }
-        catch(RuntimeException|Error failure) { if(allocation!=null)try { device.retire(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
+        try { allocation=device.reserveStorage(raster.image().orElseThrow().bytes(),raster.payloadBytes(),0,1,0,0,0,0,0);allocation.retained=raster;return new GlMapUpload(device,raster,allocation); }
+        catch(RuntimeException|Error failure) { if(allocation!=null)try { device.discardUnstarted(allocation); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
     }
     public MapSamples.Context context() { return context; }
     public Progress progress() { return new Progress(phase,row,height,uploaded,totalBytes); }
@@ -49,7 +49,7 @@ public final class GlMapUpload implements AutoCloseable {
                 if(gpu&&state==null) { state=new GlTransferState(device);GlTransferState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
                 switch(phase) {
                     case STORAGE -> {
-                        device.expand(allocation,totalBytes,0,1,0);allocation.textures[0]=glGenTextures();glBindTexture(GL_TEXTURE_2D,allocation.textures[0]);
+                        device.beginStorage(allocation);allocation.textures[0]=glGenTextures();glBindTexture(GL_TEXTURE_2D,allocation.textures[0]);
                         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_BASE_LEVEL,0);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,0);
                         glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,0L);device.check("map texture storage");storage+=totalBytes;phase=Phase.ROWS;
                     }
@@ -72,6 +72,6 @@ public final class GlMapUpload implements AutoCloseable {
     }
     private Step stepResult(long start,int bytes,long storage,int actions,int work) { return new Step(progress(),bytes,storage,actions,work,System.nanoTime()-start); }
     public GlMap take() { device.current();if(!ready()||completed==null)throw new GlFailure(GlFailure.Code.STATE,"No complete GPU map is available");var result=completed;completed=null;allocation=null;phase=Phase.TAKEN;return result; }
-    private void dispose(Phase terminal) { try { if(allocation!=null)device.retire(allocation); }finally { if(allocation==null||allocation.retired||allocation.released) { allocation=null;raster=null;completed=null; }phase=terminal; } }
+    private void dispose(Phase terminal) { try { if(allocation!=null) { if(allocation.unstartedStorage)device.discardUnstarted(allocation);else device.retire(allocation); } }finally { if(allocation==null||allocation.retired||allocation.released) { allocation=null;raster=null;completed=null; }phase=terminal; } }
     @Override public void close() { if(phase==Phase.TAKEN||phase==Phase.CLOSED&&allocation==null)return;dispose(Phase.CLOSED); }
 }
