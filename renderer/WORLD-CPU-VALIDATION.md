@@ -1,6 +1,6 @@
 # Prepared world-pipeline CPU contracts
 
-Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 31 synthetic contract groups alongside 20 map/scalar/image/ownership groups: 51 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 15 groups, and [animation contracts](ANIMATION-OWNERS.md) add 11 for 77 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. `WorldCpuContracts` has 34 synthetic contract groups alongside 20 map/scalar/image/ownership groups: 54 prepared groups across those two suites. The separate [display math suite](../renderer-gl/MATH-VALIDATION.md) adds 15 groups, and [animation contracts](ANIMATION-OWNERS.md) add 14 for 83 total. All four harness sources compile and none has been executed. No PASS results, renderer-stage completion, native parity or GPU readiness are claimed. Unsupported previews remain disabled.
 
 ## Reproducible supplied fixtures
 
@@ -21,6 +21,9 @@ The one-cell section grid includes exact long world anchors beyond double's inte
 | Complete limits | A one-face deficit publishes no partial scene; foreign visibility and cancellation remain explicit |
 | Pinned replacement | Pinned data survives pressure rejection and tentative cache-entry insertion failure; exact counters/admission, suppressed rollback errors, one-lease retry and original native metadata remain intact |
 | Geometry picking | Analytic unit-cube plane distance and exact source identities, batch/exhaustive agreement, clipping, budget failure and alpha/geometry modes |
+| Original-range picking hierarchy | Tree/linear-group/exhaustive comparisons, complete two-layer sections, localized rays/gaps, actual offsets, original identity and cross-leaf ties |
+| Range markers and alpha | Original diagnostic boxes/problems, geometry-marker ties, displayed transparency, explicit geometry mode and late budget failure with no partial hit |
+| Range admission and ownership | Exact internal bounds/prefix/cursor payload, source-family counts, sparse/no-tree builds, deficient limits, cancellation, worker shrink/transfer and empty-source zero budgets |
 | Conservative picking hierarchy | Analytic edge/corner hits survive node/range rejection; six exact source planes and tiny translated planes retain detached coordinates; section-local tiny inside/outside points, six marker entry planes, inside-box near distances, closed clip/ray endpoints, strict exclusions, shifted anchors, lower-section ties, atomic budget failure and unexpanded actual marker boxes |
 | Translucent ordering | An independent vertex-centroid reference sort checks complete global back-to-front keys and stable ties; scratch deficit withholds the entire order |
 | Independent histogram ownership/ranges | Raw map/volume and retained raster/surface input, automatic/explicit/display ranges, absent coverage, metadata preflight, exact receipts, tracked admission, idle replacement and independent detached lifetime |
@@ -55,3 +58,5 @@ The [initial CPU validation scope](CPU-VALIDATION.md) remains explicit. Broader 
 [Bounded face sorting](BOUNDED-FACE-SORT.md) adds the thirtieth world group: independent reference pairs, exact signed-zero/key order, ordered fast paths, cancellation and halved scratch admission. All 94 prepared groups remain unexecuted.
 
 [Worker abandonment](WORKER-ABANDONMENT.md) adds the thirty-first world group. Full and dependency-free compilation pass (143/105 files); all 103 prepared groups remain unexecuted. The synthetic asset ZIP exists only during eventual explicit contract execution.
+
+[Original-range hierarchies](PICKING-RANGE-HIERARCHY.md) bring this harness to 34 groups. The overall total is 115 (83 CPU/context-free, 32 GPU). Both compilation sets pass (143/105 files); all groups remain unexecuted. No native/GPU/integration result is claimed.

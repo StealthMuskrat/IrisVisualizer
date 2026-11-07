@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06. `GlGpuContracts` contains 32 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including sparse clock observation and conservative sampling intervals. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 80 prepared, unexecuted groups, making 112 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06. `GlGpuContracts` contains 32 synthetic GPU groups. Java 25/LWJGL compilation passes for all 143 renderer/validation sources, including original-range picking hierarchy and exact scene-family receipts. **None of these groups has been executed**. The four earlier CPU/context-free suites contain 83 prepared, unexecuted groups, making 115 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -57,7 +57,7 @@ The explicit path compiles first, then launches the GPU harness in its own JVM. 
 | Connected live playback | First-image progress under continuous ticks, navigation during upload, material/world replacement, zero-budget failure and same-source retry |
 | World materials | Explicit tint/final lighting, consuming/foreign material owner guards, exact lighting policy and hostile host-state restoration |
 | World diagnostics/recovery | Empty/placeholder geometry, original diagnostic picking, upload cancellation and completed-frame preflight/retry/lifetime |
-| Shared world group culling | Separate immutable enabled/disabled pixel results, exact sorted-face coverage, cache reuse across material passes, draw-scratch admission/release and deficient-budget target/state preservation |
+| Shared world group culling | Separate immutable enabled/disabled pixel results, exact sorted-face coverage, cache reuse across material passes, draw-scratch admission/release and deficient-budget target/state preservation, completed-frame tree/linear/exhaustive picking, exact atlas/clip identity and bounded-query failure |
 | Scalar draw admission | Separate enabled/disabled clipped pixels, full original face coverage, source/style receipts, temporary CPU charge, deficient shared memory and precision-failure target/state preservation |
 | Budgets and lifetimes | GPU-budget rejection without allocation, independently owned readback surviving frame/device closure and retained wrapper release |
 

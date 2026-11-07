@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 31 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 15 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 14, for 80 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-06. The `RendererCpuContracts` harness has 20 deterministic contract groups. [World-pipeline contracts](WORLD-CPU-VALIDATION.md) add 34 groups, [context-free display math](../renderer-gl/MATH-VALIDATION.md) adds 15 and [animation ownership/contracts](ANIMATION-OWNERS.md) adds 14, for 83 prepared CPU/context-free groups total. All four harnesses compile; they have **not been executed**, and no group is claimed to pass. Renderer implementation is still in progress and execution remains deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -73,3 +73,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Worker abandonment recovery](WORKER-ABANDONMENT.md) adds one world CPU group. Both full and dependency-free compilation pass (143/105 files). All 103 groups remain unexecuted: 77 CPU/context-free and 26 GPU. The new asset READY fixture opens only its own tiny generated ZIP during eventual execution, never a user archive.
 
 [Sparse atlas clocks](SPARSE-ATLAS-CLOCKS.md) add three animation groups, bringing that harness to 14 and the CPU/context-free total to 80. The separate GPU harness contains 32, for 112 prepared groups overall. Full/dependency-free compilation passes (143/105 files); all assertions remain unexecuted.
+
+[Hierarchical original-range picking](PICKING-RANGE-HIERARCHY.md) adds three world groups for differential traversal, markers/alpha/ties and exact admission/ownership. There are now 83 CPU/context-free and 32 GPU groups (115 total), all unexecuted. Full/default compilation covers 143/105 files.
