@@ -4,7 +4,7 @@ import java.util.*;
 
 /** Atomic CPU patch transaction, valid only for the exact expected immutable raster object. */
 public final class AtlasUpdate {
-    /** Tightly packed RGBA rows. x/y include the sprite's complete edge-extruded gutter. */
+    /** Tightly packed RGBA subrectangle contained within its sprite's padded slot; includes changed gutter pixels. */
     public record Patch(AssetId sprite,int page,int x,int y,int frame,RgbaImage pixels) {
         public Patch { Objects.requireNonNull(sprite);Objects.requireNonNull(pixels);if(page<0||x<0||y<0||frame<0)throw new IllegalArgumentException("Invalid atlas patch"); }
         public int rowBytes() { return pixels.width()*4; }

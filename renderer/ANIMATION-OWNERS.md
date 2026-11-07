@@ -64,3 +64,7 @@ The context-free runner set compiles without external dependencies: 88 CPU produ
 ## Sparse clock observations
 
 [Time-varying sprite indices and conservative canonical intervals](SPARSE-ATLAS-CLOCKS.md) now reduce context-thread preflight while complete worker output retains every sprite receipt. Three additional groups bring this harness to 14; the overall prepared total is 112 (80 CPU/context-free, 32 GPU). Both 143-file full and 105-file dependency-free sets compile. No renderer/worker/GPU assertion has executed.
+
+## Dirty rectangle preparation
+
+[Dirty atlas rectangles](ATLAS-DIRTY-RECTANGLES.md) add three groups, bringing animation coverage to 17 prepared groups. Dirty requests reserve a bounded metadata upper estimate and shrink to actual retained source/patch/page payload after worker unwind; full-slot requests keep exact preflight. Independent completion/input lifetime and destination checks remain enforced. The overall total is now 141 (105 CPU/context-free, 36 GPU), all unexecuted.

@@ -16,7 +16,7 @@ This is a deterministic CPU base-level implementation of the reviewed operation.
 
 Initial capture, patch generation and worker preflight all use the same `pixelSample`. `AtlasRaster.samples()` and `AtlasUpdate.samples()` retain complete canonical inputs. Their legacy `frames()` maps expose only the effective current tile and are insufficient for interpolation comparisons.
 
-Progress changes can produce patches while the current tile stays unchanged. Request coalescing compares full tile/progress maps against the exact expected raster. Equal quantized inputs, partial-tick-only changes and repeated tiles avoid redundant work; seeking back to displayed inputs cancels obsolete work under existing revisions. Different inputs may conservatively trigger updates even if their rounded output pixels happen to match.
+Progress changes can produce patches while the current tile stays unchanged. Request coalescing compares full tile/progress maps against the exact expected raster. Equal quantized inputs, partial-tick-only changes and repeated tiles avoid redundant work; seeking back to displayed inputs cancels obsolete work under existing revisions. Different inputs still trigger worker preparation even if their rounded output pixels happen to match. The connected [dirty rectangle path](ATLAS-DIRTY-RECTANGLES.md) then omits visually identical patches while advancing complete canonical receipts. Full-slot mode keeps its conservative patches.
 
 `WorldVisuals` now admits supported interpolated sprites through shared texture/atlas preparation instead of replacing them with animation placeholders. Generic mapped-material diagnostics still retain possible translucent transitions. Baked JSON faces now follow the [reviewed raw source-UV alpha policy](MODEL-MATERIALS.md), and fluids follow whole-source groups; interpolation does not promote those declared passes. No native block/state/biome identity, geometry, material ordering or generation data changes.
 
@@ -24,7 +24,7 @@ The existing GPU uploader consumes completed RGBA patches without running a seco
 
 ## Admission and failures
 
-Blending writes directly into the already-budgeted page or padded patch arrays; no intermediate tile images are allocated. Changed-sprite preflight includes progress changes and reserves padded patches plus one copy per changed page before worker submission. Existing 32 MiB patch, 128 MiB atlas, 512 MiB atlas working and 1 GiB worker ceilings remain unchanged. Cancelled active work, ready plans and device retirement keep their existing ownership charges. Sample maps add bounded object metadata, excluded from primitive byte totals as before.
+Blending writes directly into the already-budgeted page or padded patch arrays; no intermediate tile images are allocated. Full-slot changed-sprite preflight includes progress changes and reserves padded patches plus one copy per changed page before worker submission. Dirty mode instead reserves a metadata upper bound within the declared ceilings, checks actual patch/copy costs before their allocations and shrinks successful completion admission to actual retained payload. Existing 32 MiB patch, 128 MiB atlas, 512 MiB atlas working and 1 GiB worker ceilings remain unchanged. Cancelled active work, ready plans and device retirement keep their existing ownership charges. Sample maps add bounded object metadata, excluded from primitive byte totals as before.
 
 ## Source review and pending validation
 

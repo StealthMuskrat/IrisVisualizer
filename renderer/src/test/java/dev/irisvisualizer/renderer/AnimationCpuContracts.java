@@ -56,22 +56,30 @@ public final class AnimationCpuContracts {
     private static void chunk(DataOutputStream out,String name,byte[] bytes) throws IOException {
         var type=name.getBytes(StandardCharsets.US_ASCII);var crc=new CRC32();crc.update(type);crc.update(bytes);out.writeInt(bytes.length);out.write(type);out.write(bytes);out.writeInt((int)crc.getValue());
     }
-    private static byte[] png(int... colors) {
+    private static byte[] png(int... colors) { return pngImage(1,colors.length,colors); }
+    private static byte[] pngImage(int width,int height,int[] colors) {
         try {
-            var bytes=new ByteArrayOutputStream();var out=new DataOutputStream(bytes);out.writeLong(0x89504e470d0a1a0aL);var headers=new ByteArrayOutputStream();var header=new DataOutputStream(headers);header.writeInt(1);header.writeInt(colors.length);header.write(new byte[]{8,6,0,0,0});chunk(out,"IHDR",headers.toByteArray());
-            var packed=new ByteArrayOutputStream();try(var zlib=new DeflaterOutputStream(packed)) { for(int rgba:colors)zlib.write(new byte[]{0,(byte)(rgba>>>24),(byte)(rgba>>>16),(byte)(rgba>>>8),(byte)rgba}); }chunk(out,"IDAT",packed.toByteArray());chunk(out,"IEND",new byte[0]);return bytes.toByteArray();
+            var bytes=new ByteArrayOutputStream();var out=new DataOutputStream(bytes);out.writeLong(0x89504e470d0a1a0aL);var headers=new ByteArrayOutputStream();var header=new DataOutputStream(headers);header.writeInt(width);header.writeInt(height);header.write(new byte[]{8,6,0,0,0});chunk(out,"IHDR",headers.toByteArray());
+            var packed=new ByteArrayOutputStream();try(var zlib=new DeflaterOutputStream(packed)) { for(int y=0;y<height;y++) { zlib.write(0);for(int x=0;x<width;x++) { int rgba=colors[y*width+x];zlib.write(new byte[]{(byte)(rgba>>>24),(byte)(rgba>>>16),(byte)(rgba>>>8),(byte)rgba}); } } }chunk(out,"IDAT",packed.toByteArray());chunk(out,"IEND",new byte[0]);return bytes.toByteArray();
         }catch(IOException impossible) { throw new AssertionError(impossible); }
     }
     private static void add(Map<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset> map,ClientAssetSnapshot.Kind kind,AssetId id,byte[] bytes) { map.put(new ClientAssetSnapshot.Key(kind,id),ClientAssetSnapshot.Asset.owned("synthetic-animation/"+kind+"/"+id,bytes,digest(bytes))); }
     private static AtlasLayout layout(long workingBytes,long updateBytes) { return layout(workingBytes,updateBytes,"{\"animation\":{\"frametime\":2,\"interpolate\":true}}"); }
     private static AtlasLayout layout(long workingBytes,long updateBytes,String metadata) { return layout(workingBytes,updateBytes,metadata,null); }
     private static AtlasLayout layout(long workingBytes,long updateBytes,String metadata,String secondary) {
+        return layout(workingBytes,updateBytes,metadata,secondary,1,new int[]{0xff000080,0x0000ffff});
+    }
+    private static AtlasLayout patterned(long workingBytes,long updateBytes,boolean interpolate,int... indices) {
+        int[] colors=new int[32];Arrays.fill(colors,0x203040ff);for(int i:indices)colors[16+i]=0x90a0b0ff;
+        return layout(workingBytes,updateBytes,"{\"animation\":{\"frametime\":2,\"interpolate\":"+interpolate+"}}",null,4,colors);
+    }
+    private static AtlasLayout layout(long workingBytes,long updateBytes,String metadata,String secondary,int width,int[] colors) {
         var entries=new TreeMap<ClientAssetSnapshot.Key,ClientAssetSnapshot.Asset>();add(entries,ClientAssetSnapshot.Kind.BLOCKSTATE,BLOCK,"{\"variants\":{\"\":{\"model\":\"fixture:block/animated_block\"}}}".getBytes(StandardCharsets.UTF_8));
         add(entries,ClientAssetSnapshot.Kind.MODEL,MODEL,"{\"textures\":{\"a\":\"fixture:block/animated\",\"b\":\"fixture:block/static\"},\"elements\":[{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":{\"south\":{\"texture\":\"#a\"},\"east\":{\"texture\":\"#b\"}}}]}".getBytes(StandardCharsets.UTF_8));
-        add(entries,ClientAssetSnapshot.Kind.TEXTURE,ANIMATED,png(0xff000080,0x0000ffff));add(entries,ClientAssetSnapshot.Kind.TEXTURE,STATIC,secondary==null?png(0x102030ff):png(0x102030ff,0x405060ff));if(secondary!=null)add(entries,ClientAssetSnapshot.Kind.TEXTURE_METADATA,STATIC,secondary.getBytes(StandardCharsets.UTF_8));if(metadata!=null)add(entries,ClientAssetSnapshot.Kind.TEXTURE_METADATA,ANIMATED,metadata.getBytes(StandardCharsets.UTF_8));
+        add(entries,ClientAssetSnapshot.Kind.TEXTURE,ANIMATED,pngImage(width,colors.length/width,colors));add(entries,ClientAssetSnapshot.Kind.TEXTURE,STATIC,secondary==null?png(0x102030ff):png(0x102030ff,0x405060ff));if(secondary!=null)add(entries,ClientAssetSnapshot.Kind.TEXTURE_METADATA,STATIC,secondary.getBytes(StandardCharsets.UTF_8));if(metadata!=null)add(entries,ClientAssetSnapshot.Kind.TEXTURE_METADATA,ANIMATED,metadata.getBytes(StandardCharsets.UTF_8));
         long bytes=entries.values().stream().mapToLong(ClientAssetSnapshot.Asset::bytes).sum();var assets=new ClientAssetSnapshot(new ClientAssetSnapshot.Receipt(Path.of("synthetic-animation-fixture"),"0".repeat(64),bytes,BlockModels.PROFILE,BlockModels.PROFILE,entries.size(),0,bytes),entries);var state=new RenderBlockState(991,"fixture:animated_block",BLOCK,Map.of(),Map.of());
         var block=GeometryBaker.bake(BlockModels.resolve(assets,state,()->false),new int[]{0},()->false);check(!block.requiresPlaceholder(),"animated fixture block: "+block.problems());var preparation=TextureMaterials.prepare(assets,block,()->false);check(!preparation.requiresPlaceholder(),"animated fixture textures: "+preparation.problems());
-        var limits=new AtlasBuilder.Limits(1,2,2,8,4,2,1,64,1024,128,1024,updateBytes,workingBytes,1024);var layout=AtlasBuilder.plan(List.of(preparation),limits,()->false);check(!layout.requiresPlaceholder(),"animated layout: "+layout.problems());equal(2,layout.pages().size(),"small page limit separates sprites");return layout;
+        var limits=new AtlasBuilder.Limits(1,2,2,8,width==1?4:8,2,1,4096,1024,1024,1024,updateBytes,workingBytes,1024);var layout=AtlasBuilder.plan(List.of(preparation),limits,()->false);check(!layout.requiresPlaceholder(),"animated layout: "+layout.problems());equal(2,layout.pages().size(),"small page limit separates sprites");return layout;
     }
     private static AtlasRaster baseline(AtlasLayout layout) { var raster=AtlasImages.capture(layout,0,0,()->false);check(!raster.requiresPlaceholder(),"complete baseline");return raster; }
     private static int content(AtlasRaster raster,AssetId id) { var slot=raster.layout().sprites().get(id);return raster.pages().get(slot.page()).rgba(slot.x(),slot.y()); }
@@ -178,6 +186,49 @@ public final class AnimationCpuContracts {
         var source=baseline(layout(4096,512));var plan=AtlasFramePlan.prepare(source,AtlasImages.updates(source,1,0,()->false),()->false);long bytes=source.layout().usage().orElseThrow().knownPayloadBytes()+plan.extraCpuBytes();
         try(var memory=new RenderMemory(new RenderMemory.Limits(8192,4))) { var completion=new AtlasFrameWorker.Completion(1,plan,memory.hold("prepared atlas",bytes));var input=completion.retainInput();var independent=input.retain();completion.close();input.close();check(independent.value()==plan,"independent exact CPU plan");equal(bytes,memory.stats().chargedBytes(),"retained plan remains fully charged");memory.close();equal(bytes,memory.stats().chargedBytes(),"coordinator close preserves plan charge");independent.close();equal(0L,memory.stats().chargedBytes(),"last plan input releases charge");equal(0,memory.stats().accounts(),"no leaked plan account"); }
     }
+    private static AtlasUpdate dirty(AtlasRaster source,long tick) { return AtlasImages.updates(source,tick,0,AtlasImages.PatchMode.DIRTY_RECTANGLES,()->false); }
+    private static void sameRaster(AtlasRaster expected,AtlasRaster actual,String message) {
+        check(!expected.requiresPlaceholder()&&!actual.requiresPlaceholder(),message+" complete rasters");equal(expected.samples(),actual.samples(),message+" canonical samples");equal(expected.tick(),actual.tick(),message+" exact clock");
+        for(int page=0;page<expected.pages().size();page++)check(Arrays.equals(expected.pages().get(page).copyPixels(),actual.pages().get(page).copyPixels()),message+" page "+page);
+    }
+    private static void dirtyPixels() {
+        for(int[] indices:new int[][]{{5},{0},{15},{5,10},{6}}) {
+            var source=baseline(patterned(8192,1024,false,indices));var slot=source.layout().sprites().get(ANIMATED);var change=dirty(source,2);check(!change.requiresPlaceholder(),"bounded rectangle preparation");equal(1,change.patches().size(),"one rectangle per changed sprite");var patch=change.patches().getFirst();
+            int x=indices[0]==0?-1:indices[0]==15?3:indices[0]==6?2:1,y=indices[0]==0?-1:indices[0]==15?3:1;int size=indices.length==2?2:indices[0]==5||indices[0]==6?1:2;
+            equal(slot.x()+x,patch.x(),"nonzero content or extruded corner X");equal(slot.y()+y,patch.y(),"nonzero content or extruded corner Y");equal(size,patch.pixels().width(),"minimal bounding width");equal(size,patch.pixels().height(),"minimal bounding height");equal((long)size*size*4,change.bytes(),"tight patch payload");
+            if(indices.length==2)equal(0x203040ff,patch.pixels().rgba(1,0),"enclosing sparse rectangle preserves unchanged interior");
+            var plan=AtlasFramePlan.prepare(source,change,()->false);var full=AtlasImages.capture(source.layout(),2,0,()->false);sameRaster(full,plan.raster().orElseThrow(),"dirty/full recapture");sameRaster(full,AtlasImages.apply(source,AtlasImages.updates(source,2,0,()->false),()->false),"whole-slot reference");
+            equal(slot.paddedBytes(),AtlasImages.updates(source,2,0,()->false).bytes(),"compatibility overload keeps full slot");equal(source.layout().pages().get(slot.page()).bytes(),plan.copiedBytes(),"changed page remains a complete immutable copy");
+            check(source.pages().get(slot.page())!=plan.raster().orElseThrow().pages().get(slot.page()),"changed page is independent");equal(0x203040ff,content(source,ANIMATED),"base raster unchanged");
+            int fixed=source.layout().sprites().get(STATIC).page();check(source.pages().get(fixed)==plan.raster().orElseThrow().pages().get(fixed),"static page shared");
+            var stale=AtlasImages.apply(baseline(source.layout()),change,()->false);check(stale.requiresPlaceholder()&&stale.problems().getFirst().code()==ModelPlan.Code.STALE_ATLAS,"subrectangle still requires exact raster");
+            var bad=new AtlasUpdate.Patch(ANIMATED,slot.page(),slot.x()+slot.width()+slot.gutter(),slot.y(),1,RgbaImage.owned(1,1,new byte[4]));
+            var rejected=AtlasImages.apply(source,AtlasUpdate.success(source,2,0,List.of(bad),change.samples(),4),()->false);check(rejected.requiresPlaceholder()&&rejected.pages().isEmpty()&&rejected.problems().getFirst().code()==ModelPlan.Code.ATLAS,"rectangle beyond slot rejected atomically");
+        }
+        var interpolated=baseline(patterned(8192,1024,true,5));for(long tick:new long[]{1,2,3,4,Long.MAX_VALUE})sameRaster(AtlasImages.capture(interpolated.layout(),tick,0,()->false),AtlasImages.apply(interpolated,dirty(interpolated,tick),()->false),"interpolated rectangle oracle");
+        throwsType(NullPointerException.class,()->AtlasImages.updates(interpolated,1,0,null,()->false),"typed mode is required");
+    }
+    private static void dirtyReceipts() {
+        var identical=baseline(patterned(8192,0,false));var change=dirty(identical,2);equal(0L,change.bytes(),"different tiles with identical pixels need no payload");equal(1,change.samples().get(ANIMATED).currentFrame(),"new tile receipt retained");check(!change.samples().equals(identical.samples()),"visually identical inputs are not falsely relabelled");
+        var plan=AtlasFramePlan.prepare(identical,change,()->false);equal(0L,plan.extraCpuBytes(),"identical output copies no pages");equal(List.of(),plan.changedPages(),"no changed page indices");var output=plan.raster().orElseThrow();equal(2L,output.tick(),"metadata-only frame advances exact clock");equal(identical.layout().sprites().keySet(),output.samples().keySet(),"static receipt stays complete");for(int i=0;i<output.pages().size();i++)check(output.pages().get(i)==identical.pages().get(i),"identical output shares all pages");
+        int[] colors=new int[32];Arrays.fill(colors,0x203040ff);colors[21]=0x213040ff;var rounded=baseline(layout(8192,1024,"{\"animation\":{\"frametime\":1000,\"interpolate\":true}}",null,4,colors));
+        var plateau=dirty(rounded,1);check(!plateau.samples().equals(rounded.samples()),"progress sample actually changed");equal(0L,plateau.bytes(),"RGBA rounding plateau has no upload");sameRaster(AtlasImages.capture(rounded.layout(),1,0,()->false),AtlasImages.apply(rounded,plateau,()->false),"rounded plateau receipt");equal(4L,dirty(rounded,500).bytes(),"rounded channel transition becomes dirty");
+    }
+    private static void dirtyAdmission() {
+        var source=baseline(patterned(8192,4,false,5));long base=source.layout().usage().orElseThrow().knownPayloadBytes(),copy=source.layout().pages().get(source.layout().sprites().get(ANIMATED).page()).bytes(),peak=base+copy+4;
+        var exact=baseline(patterned(peak,4,false,5));var request=AtlasFrameWorker.Request.capture(exact,2,0,AtlasImages.PatchMode.DIRTY_RECTANGLES);equal(peak,request.reservation(),"exact dirty peak reserved");equal(AtlasImages.PatchMode.DIRTY_RECTANGLES,request.mode(),"request strategy retained");equal(1,request.changedSprites(),"metadata candidates stay conservative");throwsType(IllegalArgumentException.class,()->AtlasFrameWorker.Request.capture(exact,2,0),"full-slot mode keeps exact preflight rejection");check(!AtlasFramePlan.prepare(exact,dirty(exact,2),()->false).requiresPlaceholder(),"exact dirty peak fits");
+        var lower=baseline(patterned(peak-1,4,false,5));var lowerRequest=AtlasFrameWorker.Request.capture(lower,2,0,AtlasImages.PatchMode.DIRTY_RECTANGLES);equal(peak-1,lowerRequest.reservation(),"dirty upper bound respects working ceiling");var failed=AtlasFramePlan.prepare(lower,dirty(lower,2),()->false);check(failed.requiresPlaceholder()&&failed.raster().isEmpty()&&failed.problems().getFirst().code()==ModelPlan.Code.LIMIT,"one-byte copy deficit fails without partial pages");
+        var narrow=baseline(patterned(8192,3,false,5));var rejected=dirty(narrow,2);check(rejected.requiresPlaceholder()&&rejected.bytes()==0&&rejected.patches().isEmpty(),"one-byte patch deficit fails atomically");
+        for(var baseline:List.of(source,baseline(patterned(8192,1024,false,5)),baseline(patterned(8192,1024,false)),lower,narrow)) {
+            var candidate=AtlasFrameWorker.Request.capture(baseline,2,0,AtlasImages.PatchMode.DIRTY_RECTANGLES);try(var memory=new RenderMemory(new RenderMemory.Limits(16384,8));var executor=new QueuedExecutor();var worker=new AtlasFrameWorker(16384,memory,()->executor)) {
+                long revision=worker.submit(candidate);equal(candidate.reservation(),worker.reservedBytes(),"queued upper bound held");equal(candidate.reservation(),memory.stats().chargedBytes(),"shared admission holds upper bound");executor.runAll();
+                if(baseline==lower||baseline==narrow) { equal(AtlasFrameWorker.Phase.FAILED,worker.status().phase(),"worker publishes exact budget failure");equal(ModelPlan.Code.LIMIT,worker.status().problems().getFirst().code(),"structured worker limit");check(worker.take(revision).isEmpty(),"failed worker yields no output");equal(0L,worker.reservedBytes(),"failed worker releases upper bound"); }
+                else { long actual=baseline.layout().usage().orElseThrow().knownPayloadBytes()+AtlasFramePlan.prepare(baseline,dirty(baseline,2),()->false).extraCpuBytes();equal(actual,worker.reservedBytes(),"READY shrinks to actual retained pages/patches");equal(actual,memory.stats().chargedBytes(),"shared charge shrinks too");try(var complete=worker.take(revision).orElseThrow();var input=complete.retainInput()) { complete.close();worker.close();equal(actual,memory.stats().chargedBytes(),"independent input survives worker/completion closure");sameRaster(AtlasImages.capture(baseline.layout(),2,0,()->false),input.value().raster().orElseThrow(),"owned worker output"); } }
+                equal(0L,memory.stats().chargedBytes(),"final charge released");equal(0,memory.stats().accounts(),"no admission leak");
+            }
+        }
+        throwsType(CancellationException.class,()->AtlasImages.updates(source,2,0,AtlasImages.PatchMode.DIRTY_RECTANGLES,()->true),"cancel before dirty scan");int[] polls={0};throwsType(CancellationException.class,()->AtlasImages.updates(source,2,0,AtlasImages.PatchMode.DIRTY_RECTANGLES,()->++polls[0]>=5),"cancel within dirty row scan");equal(0x203040ff,content(source,ANIMATED),"cancellation preserves source");
+    }
     public static void main(String[] arguments) {
         if(arguments.length!=0)throw new IllegalArgumentException("No arguments supported");
         group("animation and texture metadata",AnimationCpuContracts::metadata);
@@ -194,6 +245,9 @@ public final class AnimationCpuContracts {
         group("exact stale baseline rejection",AnimationCpuContracts::staleBaseline);
         group("atlas working limits and cancellation",AnimationCpuContracts::limitsAndCancellation);
         group("independent atlas completion inputs",AnimationCpuContracts::retainedCompletion);
+        group("minimal atlas rectangles and full-frame equivalence",AnimationCpuContracts::dirtyPixels);
+        group("identical pixels and exact animation receipts",AnimationCpuContracts::dirtyReceipts);
+        group("dirty atlas admission and retained worker payload",AnimationCpuContracts::dirtyAdmission);
         System.out.println("PASS "+groups+" synthetic animation groups; no native/GPU parity is claimed.");
     }
 }

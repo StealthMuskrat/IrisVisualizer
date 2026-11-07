@@ -12,7 +12,8 @@ import java.util.zip.*;
 public final class WorldGpuFixture implements AutoCloseable {
     private static final BooleanSupplier LIVE=()->false;
     public static final String LIGHTING="synthetic uniform final RGB; no native light provider";
-    private record Material(int rgba,boolean tinted,boolean animated,boolean interpolate,boolean cutout,int frameTicks) {
+    private record Material(int rgba,boolean tinted,boolean animated,boolean interpolate,boolean cutout,int frameTicks,int pattern) {
+        Material(int rgba,boolean tinted,boolean animated,boolean interpolate,boolean cutout,int frameTicks) { this(rgba,tinted,animated,interpolate,cutout,frameTicks,0); }
         Material(int rgba,boolean tinted,boolean animated,boolean interpolate,boolean cutout) { this(rgba,tinted,animated,interpolate,cutout,2); }
         Material { if(frameTicks<1)throw new IllegalArgumentException("Invalid synthetic animation duration"); }
     }
@@ -39,6 +40,7 @@ public final class WorldGpuFixture implements AutoCloseable {
     }
     public static WorldGpuFixture animated(boolean interpolate) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture animated(boolean interpolate,int frameTicks) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,frameTicks)),new int[]{0},1,1,WorldModels.Kind.MESH); }
+    public static WorldGpuFixture animatedRectangle(int pattern,boolean interpolate) { if(pattern<1||pattern>3)throw new IllegalArgumentException("Invalid synthetic pattern");return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,2,pattern)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture empty() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.EMPTY); }
     public static WorldGpuFixture placeholder() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.PLACEHOLDER); }
     private static String hash(byte[] bytes) {
@@ -52,11 +54,11 @@ public final class WorldGpuFixture implements AutoCloseable {
         byte[] type=name.getBytes(StandardCharsets.US_ASCII);var crc=new CRC32();crc.update(type);crc.update(bytes);out.writeInt(bytes.length);out.write(type);out.write(bytes);out.writeInt((int)crc.getValue());
     }
     private static byte[] texture(Material material) {
-        int width=material.cutout()?2:1,height=material.animated()?2:1;
+        int width=material.pattern()>0?4:material.cutout()?2:1,height=material.pattern()>0?8:material.animated()?2:1;
         try {
             var bytes=new ByteArrayOutputStream();var out=new DataOutputStream(bytes);out.writeLong(0x89504e470d0a1a0aL);var headerBytes=new ByteArrayOutputStream();var header=new DataOutputStream(headerBytes);header.writeInt(width);header.writeInt(height);header.write(new byte[]{8,6,0,0,0});chunk(out,"IHDR",headerBytes.toByteArray());
             var compressed=new ByteArrayOutputStream();try(var zlib=new DeflaterOutputStream(compressed)) {
-                for(int y=0;y<height;y++) { zlib.write(0);for(int x=0;x<width;x++) { int rgba=material.cutout()&&x==0?0xff000000:material.animated()&&y==1?0x0000ffff:material.rgba();for(int shift=24;shift>=0;shift-=8)zlib.write(rgba>>>shift&255); } }
+                for(int y=0;y<height;y++) { zlib.write(0);for(int x=0;x<width;x++) { int rgba=material.cutout()&&x==0?0xff000000:material.animated()&&y==1?0x0000ffff:material.rgba();if(material.pattern()>0)rgba=y>=4&&((material.pattern()==1&&x==1&&y==5)||(material.pattern()==2&&x==0&&y==4))?0x0000ffff:material.rgba();for(int shift=24;shift>=0;shift-=8)zlib.write(rgba>>>shift&255); } }
             }
             chunk(out,"IDAT",compressed.toByteArray());chunk(out,"IEND",new byte[0]);return bytes.toByteArray();
         }catch(IOException impossible) { throw new AssertionError(impossible); }

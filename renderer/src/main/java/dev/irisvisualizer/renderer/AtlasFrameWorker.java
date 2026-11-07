@@ -9,13 +9,15 @@ import java.util.function.Supplier;
 public final class AtlasFrameWorker implements AutoCloseable {
     public static final class Request {
         private final AtlasRaster expected;private final long tick;private final double partialTick;private final NavigableMap<AssetId,TextureSprite.PixelSample> samples;
-        private final int changedSprites;private final long extraBytes,reservation,lastTick;
-        private Request(AtlasRaster expected,long tick,double partialTick,NavigableMap<AssetId,TextureSprite.PixelSample> samples,int changedSprites,long extraBytes,long reservation,long lastTick) {
-            this.expected=expected;this.tick=tick;this.partialTick=partialTick;this.samples=Collections.unmodifiableNavigableMap(samples);this.changedSprites=changedSprites;this.extraBytes=extraBytes;this.reservation=reservation;this.lastTick=lastTick;
+        private final AtlasImages.PatchMode mode;private final int changedSprites;private final long extraBytes,reservation,lastTick;
+        private Request(AtlasRaster expected,long tick,double partialTick,NavigableMap<AssetId,TextureSprite.PixelSample> samples,int changedSprites,long extraBytes,long reservation,long lastTick,AtlasImages.PatchMode mode) {
+            this.expected=expected;this.tick=tick;this.partialTick=partialTick;this.samples=Collections.unmodifiableNavigableMap(samples);this.changedSprites=changedSprites;this.extraBytes=extraBytes;this.reservation=reservation;this.lastTick=lastTick;this.mode=mode;
         }
-        /** Metadata-only preflight. Pixel patching and page copies happen later on the worker. */
-        public static Request capture(AtlasRaster expected,long tick,double partialTick) {
-            Objects.requireNonNull(expected);if(expected.requiresPlaceholder())throw new IllegalArgumentException("Atlas animation requires a successful exact raster");
+        /** Metadata-only full-slot preflight. Pixel patching and page copies happen later on the worker. */
+        public static Request capture(AtlasRaster expected,long tick,double partialTick) { return capture(expected,tick,partialTick,AtlasImages.PatchMode.FULL_SLOTS); }
+        /** Dirty mode records a bounded upper reservation; success shrinks it to actual retained output. */
+        public static Request capture(AtlasRaster expected,long tick,double partialTick,AtlasImages.PatchMode mode) {
+            Objects.requireNonNull(expected);Objects.requireNonNull(mode);if(expected.requiresPlaceholder())throw new IllegalArgumentException("Atlas animation requires a successful exact raster");
             if(tick<0||!Double.isFinite(partialTick)||partialTick<0||partialTick>=1)throw new IllegalArgumentException("Invalid atlas animation clock");
             var layout=expected.layout();NavigableMap<AssetId,TextureSprite.PixelSample> samples=layout.timeVaryingSprites().isEmpty()?Collections.emptyNavigableMap():new TreeMap<>();boolean[] pages=null;long patches=0,copies=0,lastTick=Long.MAX_VALUE;int changed=0;
             for(var entry:layout.timeVaryingSprites().entrySet()) {
@@ -24,13 +26,22 @@ public final class AtlasFrameWorker implements AutoCloseable {
                     changed++;patches+=slot.paddedBytes();if(pages==null)pages=new boolean[layout.pages().size()];if(!pages[slot.page()]) { pages[slot.page()]=true;copies+=layout.pages().get(slot.page()).bytes(); }
                 }
             }
-            long extra=patches+copies,reservation=layout.usage().orElseThrow().knownPayloadBytes()+extra;
-            if(patches>layout.limits().updateBytes()||reservation>layout.limits().workingBytes())throw new IllegalArgumentException("Atlas animation patch/copy preflight exceeds its working budget");
-            return new Request(expected,tick,partialTick,samples,changed,extra,reservation,lastTick);
+            long source=layout.usage().orElseThrow().knownPayloadBytes(),extra=patches+copies,reservation=source+extra;
+            if(source>layout.limits().workingBytes())throw new IllegalArgumentException("Atlas animation source exceeds its working budget");
+            if(mode==AtlasImages.PatchMode.FULL_SLOTS) {
+                if(patches>layout.limits().updateBytes()||reservation>layout.limits().workingBytes())throw new IllegalArgumentException("Atlas animation patch/copy preflight exceeds its working budget");
+            }else {
+                // Dirty output is unknown until the worker scans pixels. Reserve the largest allowed
+                // candidate payload; exact patch/page gates can still reject before their allocations.
+                reservation=Math.min(layout.limits().workingBytes(),source+copies+Math.min(patches,layout.limits().updateBytes()));extra=reservation-source;
+            }
+            return new Request(expected,tick,partialTick,samples,changed,extra,reservation,lastTick,mode);
         }
         public AtlasRaster expected() { return expected; }
         public long tick() { return tick; }
         public double partialTick() { return partialTick; }
+        public AtlasImages.PatchMode mode() { return mode; }
+        /** Metadata candidate count; dirty-rectangle preparation may find fewer actual pixel patches. */
         public int changedSprites() { return changedSprites; }
         public long extraCpuBytes() { return extraBytes; }
         public long reservation() { return reservation; }
@@ -121,17 +132,17 @@ public final class AtlasFrameWorker implements AutoCloseable {
     private void phase(Job job,Phase phase) { synchronized(lock) { if(current(job))status=state(job,phase,List.of()); } }
     private void execute(Job job) {
         try {
-            AtlasBuilder.check(job::cancelled);phase(job,Phase.PATCHING);var request=job.request;var update=AtlasImages.updates(request.expected(),request.tick(),request.partialTick(),job::cancelled);
+            AtlasBuilder.check(job::cancelled);phase(job,Phase.PATCHING);var request=job.request;var update=AtlasImages.updates(request.expected(),request.tick(),request.partialTick(),request.mode(),job::cancelled);
             if(update.requiresPlaceholder()) { synchronized(lock) { if(current(job))status=state(job,Phase.FAILED,update.problems()); }return; }
             phase(job,Phase.COPYING);var plan=AtlasFramePlan.prepare(request.expected(),update,job::cancelled);AtlasBuilder.check(job::cancelled);
             synchronized(lock) {
                 if(current(job)) {
                     if(plan.requiresPlaceholder())status=state(job,Phase.FAILED,plan.problems());
                     else {
-                        if(plan.extraCpuBytes()!=request.extraCpuBytes())throw new IllegalStateException("Atlas plan payload differs from metadata preflight");
+                        if(plan.extraCpuBytes()>request.extraCpuBytes()||request.mode()==AtlasImages.PatchMode.FULL_SLOTS&&plan.extraCpuBytes()!=request.extraCpuBytes())throw new IllegalStateException("Atlas plan payload exceeds metadata preflight");
                         var ready=state(job,Phase.READY,List.of());var hold=job.admission.retain();Completion result;
                         try { result=new Completion(job.revision,plan,hold); }catch(RuntimeException|Error failure) { try { hold.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
-                        job.retainedBytes=request.reservation();completed=result;completedReservation=request.reservation();status=ready;
+                        long retained=request.expected().layout().usage().orElseThrow().knownPayloadBytes()+plan.extraCpuBytes();job.retainedBytes=retained;completed=result;completedReservation=retained;status=ready;
                     }
                 }
             }

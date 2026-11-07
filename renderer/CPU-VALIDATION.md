@@ -79,3 +79,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Scalar inspection hierarchy and visited-face budgets](SCALAR-RANGE-HIERARCHY.md) add three groups, bringing this harness to 23. Current totals are 118 prepared, unexecuted groups: 86 CPU/context-free and 32 GPU. Full/default compilation covers 143/105 files; no renderer/worker/GPU assertions have executed.
 
 [Scalar draw hierarchies](../renderer-gl/HIERARCHICAL-SCALAR-CULLING.md) add the sixteenth context-free math group and the seventh context-free GL type/helper in the compile-only runner. Full/default compilation covers 144/106 files; all 119 groups remain unexecuted (87 CPU/context-free, 32 GPU). The PowerShell runner change was source-inspected only.
+
+[Dirty atlas rectangles](ATLAS-DIRTY-RECTANGLES.md) add three animation groups, bringing that harness to 17 and the CPU/context-free total to 105. Together with 36 GPU groups, all 141 prepared groups remain unexecuted. Full/default compilation passes (144/106 files).

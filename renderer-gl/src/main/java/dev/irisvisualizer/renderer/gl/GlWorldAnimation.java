@@ -59,7 +59,7 @@ public final class GlWorldAnimation implements AutoCloseable {
         var raster=frame.raster();boolean reuse=observation!=null&&observation.expected()==raster&&status.phase()!=Phase.FAILED&&observation.matchesClock(tick,partialTick);
         // A reusable observation already agreed with the pending request at its previous observation.
         if(reuse&&request!=null) { clockDirty=false;return; }
-        var candidate=reuse?observation:AtlasFrameWorker.Request.capture(raster,tick,partialTick);observation=candidate;
+        var candidate=reuse?observation:AtlasFrameWorker.Request.capture(raster,tick,partialTick,AtlasImages.PatchMode.DIRTY_RECTANGLES);observation=candidate;
         if(status.phase()!=Phase.FAILED&&candidate.samePixels(request)) { clockDirty=false;return; }
         if(candidate.changedSprites()==0) {
             if(request!=null) { long next=next();worker.invalidate();revision=next;queue.invalidate(sceneRevision,revision); }
