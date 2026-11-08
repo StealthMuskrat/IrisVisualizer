@@ -1,6 +1,6 @@
 # Prepared context-free display math contracts
 
-Prepared 2026-11-04; updated 2026-11-08. `GlMathContracts` contains 21 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 48 world CPU and 17 animation groups, the context-free suites contain 109 prepared groups. The separate GPU harness adds 66 for 175 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
+Prepared 2026-11-04; updated 2026-11-08. `GlMathContracts` contains 21 groups for projection, navigation, clipping and conservative scalar/world culling. Together with 23 renderer CPU, 48 world CPU and 17 animation groups, the context-free suites contain 109 prepared groups. The separate GPU harness adds 69 for 178 total. All 144 renderer/validation sources and the 106-file dependency-free set compile; no group has executed. Renderer completion, native parity and GPU correctness remain unverified, and unsupported previews stay disabled.
 
 ## No context or driver required
 
@@ -47,3 +47,5 @@ The existing navigation group now also prepares end-to-end [grid-aware scalar fo
 [Source precision preflight](PRECISION-PREFLIGHT.md) adds a context-free group for inclusive and overflowing anchor differences, atomic offset failure, complete empty/nonempty source guards and scalar four-ULP spacing boundaries across culling modes. The shared metadata checks now guard view/frame admission and actual drawing. All 152 prepared groups remain unexecuted.
 
 [Implicit world section culling](SECTION-CULLING.md) adds exhaustive interval-envelope checks and deterministic original-leaf comparisons on irregular full XYZ grids, including empty and marker sources. There are now 21 math groups, 109 context-free groups and 51 GPU groups (160 total), all unexecuted. Both source sets compile (144/106 files).
+
+[Animated image admission](ANIMATED-IMAGE-ADMISSION.md) now reserves replacement frame capacity before adopting a READY atlas. Capacity rejection preserves the displayed atlas, view tokens and untaken image; later advances retry without re-upload. Three added GPU groups bring the prepared total to 178 (109 CPU/context-free, 69 GPU), all unexecuted. Full/default compilation passes (144/106 files).

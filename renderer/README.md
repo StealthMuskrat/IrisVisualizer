@@ -1,6 +1,6 @@
 # Renderer foundation
 
-**Current verification:** Full/default compilation passes (144/106 files). All 175 prepared renderer groups (109 CPU/context-free, 66 GPU) remain unexecuted. [World uploads now admit complete storage](../renderer-gl/WORLD-STORAGE-ADMISSION.md) before replacing accepted work. Renderer completion, genuine Windows/native/GPU validation and final integration remain pending.
+**Current verification:** Full/default compilation passes (144/106 files). All 178 prepared renderer groups (109 CPU/context-free, 69 GPU) remain unexecuted. [World uploads now admit complete storage](../renderer-gl/WORLD-STORAGE-ADMISSION.md) before replacing accepted work. Renderer completion, genuine Windows/native/GPU validation and final integration remain pending.
 
 Java 25 library, separate from the editor and generation engine. UI implementation and automated validation finished before this stage; see [UI-VALIDATION.md](../docs/UI-VALIDATION.md).
 
@@ -437,3 +437,5 @@ The [prepared world GPU groups](../renderer-gl/WORLD-GPU-VALIDATION.md) now conn
 [Admitted scalar navigation](../renderer-gl/SCALAR-NAVIGATION-ADMISSION.md) now reserves target and strategy-specific draw scratch before accepting camera/viewport, clip, fit or redraw changes on complete sources. Capacity rejection preserves READY or undrawn scalar output and exact view tokens; advance reuses the held reservations, and supersession/invalidation/closure release unused storage. Both compilation sets pass (144/106 files); all 172 prepared groups (109 CPU/context-free, 63 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
 
 [Admitted world navigation](../renderer-gl/WORLD-NAVIGATION-ADMISSION.md) now reserves frame storage, any needed order destination and a new sort request before accepting view changes. Late order/atlas binding reuses held capacity, animation adoption can retoken an unused target, and rejected capacity preserves READY or undrawn views. Both compilation sets pass (144/106 files); all 175 prepared groups (109 CPU/context-free, 66 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
+
+[Animated image admission](../renderer-gl/ANIMATED-IMAGE-ADMISSION.md) now reserves replacement frame capacity before adopting a READY atlas. Capacity rejection preserves the displayed atlas, view tokens and untaken image; later advances retry without re-upload. Three added GPU groups bring the prepared total to 178 (109 CPU/context-free, 69 GPU), all unexecuted. Full/default compilation passes (144/106 files).

@@ -70,7 +70,11 @@ public final class GlWorldAnimation implements AutoCloseable {
     }
     /** At most one bounded atlas upload step; true means a complete new immutable atlas was adopted. */
     public boolean advance(GlUploadBudget budget) {
-        Objects.requireNonNull(budget);current();
+        return advance(budget,()->{});
+    }
+    /** A host can admit its eventual image before consuming READY atlas output; rejection keeps it retryable. */
+    boolean advance(GlUploadBudget budget,Runnable beforeAdoption) {
+        Objects.requireNonNull(budget);Objects.requireNonNull(beforeAdoption);current();
         try {
             // Live ticks occupy only the two scalar clock fields. Do not cancel/re-admit a running
             // CPU plan or partial GPU upload on every host tick. Explicit seeks still preempt it.
@@ -88,7 +92,12 @@ public final class GlWorldAnimation implements AutoCloseable {
                     if(cpu.phase()==AtlasFrameWorker.Phase.FAILED) { observation=null;state(Phase.FAILED,cpu.problems(),null,"Atlas CPU preparation failed"); }return false;
                 }
             }
-            queue.advance(budget,sceneRevision,revision);var completion=queue.take(sceneRevision,revision,frame);
+            queue.advance(budget,sceneRevision,revision);if(queue.status().phase()!=GlAtlasQueue.Phase.READY)return false;
+        }catch(RuntimeException|Error failure) { clockDirty=false;failed(failure);throw failure; }
+        // The completed atlas remains queue-owned if independent host-image admission rejects.
+        beforeAdoption.run();
+        try {
+            var completion=queue.take(sceneRevision,revision,frame);
             if(completion.isEmpty())return false;
             retiring=frame;frame=completion.orElseThrow().frame();request=null;observation=null;cpuRevision=0;clockDirty=true;
             releaseRetiring();sampleReady=true;state(Phase.CURRENT,List.of(),null,"");return true;

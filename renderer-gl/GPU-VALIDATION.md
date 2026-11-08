@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06; updated 2026-11-08. `GlGpuContracts` contains 66 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 109 prepared, unexecuted groups, making 175 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06; updated 2026-11-08. `GlGpuContracts` contains 69 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 109 prepared, unexecuted groups, making 178 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -104,3 +104,5 @@ The GPU harness is an initial real-driver path. The new [synthetic world groups]
 [Admitted scalar navigation](SCALAR-NAVIGATION-ADMISSION.md) adds three GPU groups for prepared source/target/scratch ownership, exact shared/device admission, READY/undrawn camera/clip preservation, differential scalar pixels and histogram reuse. The report guard requires 63 GPU groups; all 172 prepared groups remain unexecuted. Full/default compilation covers 144/106 files.
 
 [Admitted world navigation](WORLD-NAVIGATION-ADMISSION.md) adds three GPU groups for late-bound frame/order ownership, atlas upper refunds, shared/device/worker rejection, compatible/pending orders, animated retokening and material/source cleanup. The report guard requires 66 GPU groups; all 175 prepared groups remain unexecuted. Full/default compilation covers 144/106 files.
+
+[Animated image admission](ANIMATED-IMAGE-ADMISSION.md) now reserves replacement frame capacity before adopting a READY atlas. Capacity rejection preserves the displayed atlas, view tokens and untaken image; later advances retry without re-upload. Three added GPU groups bring the prepared total to 178 (109 CPU/context-free, 69 GPU), all unexecuted. Full/default compilation passes (144/106 files).

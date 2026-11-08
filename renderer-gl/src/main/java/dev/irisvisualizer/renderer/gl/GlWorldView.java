@@ -230,10 +230,21 @@ public final class GlWorldView implements AutoCloseable {
         try { releaseOrders(); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
+    /** Temporary ownership of the next animated image, independent of READY atlas/source ownership. */
+    private final class AnimationAdmission implements AutoCloseable {
+        GlFrame.Prepared prepared;Throwable rejection;
+        void prepare() {
+            if(pendingFrame==null&&sourceReady&&scene!=null&&camera!=null)try { prepared=GlFrame.reserve(renderer,nextView(),scene,camera,width,height,clip); }
+            catch(RuntimeException|Error failure) { rejection=failure;throw failure; }
+        }
+        GlFrame.Prepared take(long revision) { if(prepared==null)return null;prepared.retarget(revision);var result=prepared;prepared=null;return result; }
+        @Override public void close() { if(prepared!=null)prepared.close(); }
+    }
     /** Upload steps are bounded; drawing a completed frame remains one synchronous context operation. */
     public Status advance(GlUploadBudget budget,long latestWorldRevision) {
         Objects.requireNonNull(budget);current();if(latestWorldRevision<1)throw new IllegalArgumentException("Invalid world revision");if(latestWorldRevision>worldRevision) { invalidate(latestWorldRevision);return status; }if(latestWorldRevision<worldRevision||status.phase()==Phase.FAILED)return status;
-        try {
+        var animationAdmission=new AnimationAdmission();
+        try(animationAdmission) {
             boolean sceneUploadStepped=false;
             if(status.phase()==Phase.UPLOADING) {
                 sceneUploadStepped=true;
@@ -242,8 +253,8 @@ public final class GlWorldView implements AutoCloseable {
             }
             if(sourceReady&&scene!=null&&animation==null) { animation=new GlWorldAnimation(scene,worldRevision,animationWorker);if(atlasClockSet)applyClock(); }
             // Full-scene and animated-atlas upload never each spend the same caller budget in one advance.
-            if(sourceReady&&animation!=null&&!sceneUploadStepped&&animation.advance(budget)) {
-                long next=nextView();if(pendingFrame!=null)pendingFrame.retarget(next);viewRevision=next;dirty=true;frames.invalidate(viewRevision);state(Phase.WAITING_VIEW);
+            if(sourceReady&&animation!=null&&!sceneUploadStepped&&animation.advance(budget,animationAdmission::prepare)) {
+                long next=nextView();if(pendingFrame!=null)pendingFrame.retarget(next);else pendingFrame=animationAdmission.take(next);viewRevision=next;dirty=true;frames.invalidate(viewRevision);state(Phase.WAITING_VIEW);
             }
             if(sourceReady&&animation!=null) {
                 var atlasState=animation.status();
@@ -274,7 +285,7 @@ public final class GlWorldView implements AutoCloseable {
             }
             var request=new GlFrameQueue.Request(scene,Optional.of(animation.frame()),Optional.ofNullable(order),camera,width,height,clip);boolean rendered=pendingFrame==null?frames.render(viewRevision,request,()->false):frames.renderPrepared(viewRevision,request,()->false,pendingFrame);releasePending();
             if(!rendered)throw new GlFailure(GlFailure.Code.STATE,"Completed-frame queue rejected the current view revision");dirty=false;state(Phase.FRAME_READY);return status;
-        }catch(RuntimeException|Error failure) { try { releasePending(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }
+        }catch(RuntimeException|Error failure) { if(failure==animationAdmission.rejection)throw failure;try { releasePending(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }failed(failure);throw failure; }
     }
     /** Caller owns the returned image; it survives later world, camera, resize and failed replacement work. */
     public Optional<GlFrame> take(long expectedWorldRevision,long expectedViewRevision) {
