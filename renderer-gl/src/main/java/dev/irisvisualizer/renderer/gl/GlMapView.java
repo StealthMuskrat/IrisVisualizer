@@ -10,7 +10,7 @@ public final class GlMapView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlMapRenderer renderer;private final GlDevice device;private final MapRasterWorker worker;private final GlMapQueue uploads;
-    private GlMap map;private GlMapFrame completed;private MapSamples.Grid grid;private MapView view;private UUID latestSamples;private MapRaster.Style latestStyle;private MapRaster.Limits latestLimits;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private GlMap map;private GlMapFrame completed;private GlMapFrame.Prepared pendingFrame;private MapSamples.Grid grid;private MapView view;private UUID latestSamples;private MapRaster.Style latestStyle;private MapRaster.Limits latestLimits;private int width,height;private long mapRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private RenderInput<ScalarHistogram> histogram;private Optional<ScalarHistogram.Limits> latestHistogram=Optional.empty();
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlMapView(GlMapRenderer renderer) { this(renderer,128L*1024*1024); }
@@ -94,17 +94,22 @@ public final class GlMapView implements AutoCloseable {
     /** Display-only framing; the source grid, sampling scale and native values are never changed. */
     public long view(MapView view,int width,int height) {
         Objects.requireNonNull(view);current();dimensions(width,height);if(grid==null||view.width()!=grid.width()||view.height()!=grid.height())throw new GlFailure(GlFailure.Code.STALE,"Map view dimensions must match the latest submitted native grid");
-        if(view.equals(this.view)&&width==this.width&&height==this.height)return viewRevision;long next=nextView();var changed=displayStatus(next);
-        this.view=view;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
-        try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        if(view.equals(this.view)&&width==this.width&&height==this.height)return viewRevision;return changeView(view,width,height);
+    }
+    /** Admit known frame storage before accepting navigation or releasing earlier prepared/completed output. */
+    private long changeView(MapView view,int width,int height) {
+        long next=nextView();var changed=displayStatus(next);GlMapFrame.Prepared fresh=sourceReady&&map!=null?GlMapFrame.prepare(renderer,next,map,view,width,height):null;Throwable rejection=null;
+        try {
+            this.view=view;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;releaseFrame();pendingFrame=fresh;fresh=null;return viewRevision;
+        }catch(RuntimeException|Error failure) { rejection=failure;failed(failure);throw failure; }
+        finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
     }
     public long fit(int width,int height) { current();dimensions(width,height);if(grid==null)throw new GlFailure(GlFailure.Code.STATE,"Submit native map samples before fitting their view");return view(MapView.fit(grid,0,0,width,height),width,height); }
     public long pan(double dx,double dy) { current();if(view==null)throw new GlFailure(GlFailure.Code.STATE,"Configure a map viewport before panning");return view(view.pan(dx,dy),width,height); }
     public long zoomAt(double factor,double x,double y) { current();if(view==null)throw new GlFailure(GlFailure.Code.STATE,"Configure a map viewport before zooming");return view(view.zoomAt(factor,x,y),width,height); }
     /** Retry drawing the existing complete map after a display failure. CPU/upload failures require resubmission. */
     public long redraw() {
-        current();if(!sourceReady||map==null||view==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current map upload and configured viewport are required to redraw");long next=nextView();var waiting=displayStatus(next);viewRevision=next;dirty=true;status=waiting;
-        try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        current();if(!sourceReady||map==null||view==null)throw new GlFailure(GlFailure.Code.STATE,"A complete current map upload and configured viewport are required to redraw");return changeView(view,width,height);
     }
     /** Restart a failed current upload from complete exact-capture/style data, preserving navigation. */
     public boolean retryUpload(long expectedMapRevision,MapRaster source) {
@@ -152,7 +157,7 @@ public final class GlMapView implements AutoCloseable {
             if(status.phase()==Phase.UPLOADING) { uploads.advance(budget,mapRevision);var result=uploads.take(mapRevision);if(result.isPresent()) { map=result.orElseThrow().map();sourceReady=true;dirty=true;state(Phase.WAITING_VIEW); } }
             if(!sourceReady||map==null||view==null||!dirty)return status;
             if(completed!=null)throw new GlFailure(GlFailure.Code.STATE,"An untaken map frame survived view invalidation");
-            var frame=GlMapFrame.render(renderer,viewRevision,map,view,width,height,()->false);
+            var frame=drawFrame();
             try { var ready=new Status(mapRevision,viewRevision,Phase.FRAME_READY,status.context(),List.of(),Optional.empty(),"");completed=frame;dirty=false;status=ready; }
             catch(RuntimeException|Error failure) { try { frame.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
             return status;
@@ -161,7 +166,20 @@ public final class GlMapView implements AutoCloseable {
     public Optional<GlMapFrame> take(long expectedMapRevision,long expectedViewRevision) {
         current();if(!sourceReady||expectedMapRevision!=mapRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY||completed==null||completed.info().revision()!=viewRevision)return Optional.empty();var result=Optional.of(completed);var delivered=new Status(mapRevision,viewRevision,Phase.DELIVERED,status.context(),List.of(),Optional.empty(),"");completed=null;status=delivered;return result;
     }
-    private void releaseFrame() { if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.closed())completed=null;throw error; } }
+    private GlMapFrame drawFrame() {
+        if(pendingFrame==null)pendingFrame=GlMapFrame.prepare(renderer,viewRevision,map,view,width,height);GlMapFrame result=null;
+        try { result=pendingFrame.render(()->false);releasePrepared();return result; }
+        catch(RuntimeException|Error failure) {
+            if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { releasePrepared(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+        }
+    }
+    private void releasePrepared() { if(pendingFrame!=null)try { pendingFrame.close();pendingFrame=null; }catch(RuntimeException|Error failure) { if(!pendingFrame.ownsResources())pendingFrame=null;throw failure; } }
+    private void releaseFrame() {
+        Throwable failure=null;try { releasePrepared(); }catch(RuntimeException|Error error) { failure=error; }
+        if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.closed())completed=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     private void releaseDisplay() {
         Throwable failure=null;try { releaseFrame(); }catch(RuntimeException|Error error) { failure=error; }
         if(map!=null)try { map.close();map=null; }catch(RuntimeException|Error error) { if(map.closed())map=null;if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }

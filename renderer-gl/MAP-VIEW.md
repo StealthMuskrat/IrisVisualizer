@@ -79,3 +79,5 @@ The lower-level `GlMapQueue` now supports [explicit current-failure retry](UPLOA
 ## Retained upload recovery
 
 [Map upload recovery](RASTER-RECOVERY.md) now accepts a complete retained raster at the same current map token after a source failure, checking exact sample UUID, entire latest style and lowered output limits. It cancels obsolete CPU adoption, advances the display token and restarts GPU work after cleanup while preserving navigation. Map/complete-frame `retainInput`/`retainRasterInput` handoffs provide independent CPU ownership for retry or recoloring. Display failures with an adopted map still use redraw. Runtime/GPU checks remain deferred.
+
+[Prepared navigation admission](CANVAS-NAVIGATION-ADMISSION.md) now reserves the complete frame/target before accepting display changes on an uploaded source. Capacity rejection preserves READY or undrawn output and exact view tokens; subsequent drawing reuses the held reservation. Supersession, source invalidation and closure release unused targets. Both source sets compile (144/106 files); all 169 prepared groups remain unexecuted.

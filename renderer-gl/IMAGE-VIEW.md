@@ -41,3 +41,5 @@ The lower-level `GlImageQueue` now supports [explicit current-failure retry](UPL
 ## Retained upload recovery
 
 [Image upload recovery](RASTER-RECOVERY.md) now accepts complete retained decoded pixels at the same source token after a source upload failure. The view freezes the successful CPU decode receipt before GPU handoff and requires the exact resource/revision, encoded digest/length, dimensions and format on retry. A failed decode still requires encoded-input resubmission. Image/complete-frame `retainInput`/`retainRasterInput` handoffs independently admit CPU pixels without copying; navigation and old frames retain their existing contracts. Runtime/GPU checks remain deferred.
+
+[Prepared navigation admission](CANVAS-NAVIGATION-ADMISSION.md) now reserves the complete frame/target before accepting display changes on an uploaded source. Capacity rejection preserves READY or undrawn output and exact view tokens; subsequent drawing reuses the held reservation. Supersession, source invalidation and closure release unused targets. Both source sets compile (144/106 files); all 169 prepared groups remain unexecuted.

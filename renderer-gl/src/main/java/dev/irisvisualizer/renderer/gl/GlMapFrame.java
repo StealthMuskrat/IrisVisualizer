@@ -45,17 +45,42 @@ public final class GlMapFrame implements AutoCloseable {
     private final Info info;private Shared shared;
     private GlMapFrame(Shared shared) { this.shared=shared;info=shared.info; }
     private static void check(BooleanSupplier obsolete) { if(obsolete.getAsBoolean())throw new CancellationException("Map frame request is obsolete"); }
+    private static MapRaster validate(GlMapRenderer renderer,GlMap source,MapView view) {
+        Objects.requireNonNull(renderer);Objects.requireNonNull(source);Objects.requireNonNull(view);var device=renderer.device;device.live(renderer.allocation);
+        if(source.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Map frame inputs must share the renderer device");
+        var raster=source.raster();if(view.width()!=source.width()||view.height()!=source.height())throw new GlFailure(GlFailure.Code.STALE,"Map frame transform differs from its source dimensions");return raster;
+    }
     /** Inputs are borrowed; only a successful draw/restoration publishes a fresh private target. */
     public static GlMapFrame render(GlMapRenderer renderer,long revision,GlMap source,MapView view,int width,int height,BooleanSupplier obsolete) {
-        Objects.requireNonNull(renderer);Objects.requireNonNull(source);Objects.requireNonNull(view);Objects.requireNonNull(obsolete);if(revision<1)throw new IllegalArgumentException("Invalid map frame revision");
-        var device=renderer.device;device.live(renderer.allocation);if(source.device!=device)throw new GlFailure(GlFailure.Code.CONTEXT,"Map frame inputs must share the renderer device");
-        var raster=source.raster();if(view.width()!=source.width()||view.height()!=source.height())throw new GlFailure(GlFailure.Code.STALE,"Map frame transform differs from its source dimensions");check(obsolete);GlTarget.validate(device,width,height);
+        Objects.requireNonNull(obsolete);if(revision<1)throw new IllegalArgumentException("Invalid map frame revision");validate(renderer,source,view);check(obsolete);
+        try(var prepared=prepare(renderer,revision,source,view,width,height)) { return prepared.render(obsolete); }
+    }
+    /** One-shot frame/target admission; the exact source remains independently owned until draw or closure. */
+    static final class Prepared implements AutoCloseable {
+        private final GlMapRenderer renderer;private final long revision;private final MapView view;private final int width,height;
+        private GlMap owner;private GlDevice.Allocation journal;private GlTarget target;private boolean used,closed;
+        private Prepared(GlMapRenderer renderer,long revision,GlMap owner,MapView view,int width,int height,GlDevice.Allocation journal,GlTarget target) { this.renderer=renderer;this.revision=revision;this.owner=owner;this.view=view;this.width=width;this.height=height;this.journal=journal;this.target=target; }
+        GlMapFrame render(BooleanSupplier obsolete) {
+            Objects.requireNonNull(obsolete);if(used||closed)throw new GlFailure(GlFailure.Code.STATE,"Map frame preparation is already used or closed");used=true;var raster=validate(renderer,owner,view);
+            check(obsolete);target.initialize();check(obsolete);renderer.render(owner,target,view);check(obsolete);
+            var identity=raster.samples().kind()==MapSamples.Kind.BIOME?Optional.<ScalarHistogram.Receipt>empty():Optional.of(ScalarHistogram.receipt(raster.samples()));
+            var info=new Info(UUID.randomUUID(),revision,raster.samples().context(),raster.samples().kind(),raster.samples().grid(),view,width,height,Optional.of(raster.style()),raster.summary(),identity);var result=new GlMapFrame(new Shared(renderer.device,journal,target,owner,info));journal=null;target=null;owner=null;return result;
+        }
+        boolean ownsResources() { return journal!=null||target!=null||owner!=null; }
+        @Override public void close() {
+            closed=true;var device=renderer.device;Throwable failure=null;
+            if(journal!=null)try { device.retire(journal);journal=null; }catch(RuntimeException|Error error) { if(journal.retired||journal.released)journal=null;failure=error; }
+            if(target!=null)try { target.close();target=null; }catch(RuntimeException|Error error) { if(target.allocation.retired||target.allocation.released)target=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+            if(owner!=null)try { owner.close();owner=null; }catch(RuntimeException|Error error) { if(owner.closed())owner=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+            if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+        }
+    }
+    static Prepared prepare(GlMapRenderer renderer,long revision,GlMap source,MapView view,int width,int height) {
+        if(revision<1)throw new IllegalArgumentException("Invalid map frame revision");var raster=validate(renderer,source,view);var device=renderer.device;GlTarget.validate(device,width,height);
         GlMap owner=null;GlDevice.Allocation journal=null;GlTarget target=null;
         try {
             owner=source.retain();journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,source.allocation);journal.retained=raster;
-            target=GlTarget.admit(device,width,height);device.depend(journal,target.allocation);check(obsolete);target.initialize();check(obsolete);renderer.render(owner,target,view);check(obsolete);
-            var identity=raster.samples().kind()==MapSamples.Kind.BIOME?Optional.<ScalarHistogram.Receipt>empty():Optional.of(ScalarHistogram.receipt(raster.samples()));
-            var info=new Info(UUID.randomUUID(),revision,raster.samples().context(),raster.samples().kind(),raster.samples().grid(),view,width,height,Optional.of(raster.style()),raster.summary(),identity);return new GlMapFrame(new Shared(device,journal,target,owner,info));
+            target=GlTarget.admit(device,width,height);device.depend(journal,target.allocation);return new Prepared(renderer,revision,owner,view,width,height,journal,target);
         }catch(RuntimeException|Error failure) {
             if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(target!=null)try { target.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
