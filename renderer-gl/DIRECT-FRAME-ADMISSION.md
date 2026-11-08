@@ -28,3 +28,5 @@ Two new GPU groups prepare scalar frames in every culling mode and map/image fra
 Both compilation sets pass: 144 full Java 25/LWJGL renderer/validation files and 106 dependency-free files. All 157 prepared groups remain unexecuted: 107 CPU/context-free and 50 GPU. No renderer harness, shader, GL context, native comparison or workflow ran. Renderer completion, genuine Windows/native/GPU validation, cleanup fault injection, total-process memory/performance measurement and final editor integration remain pending. Unsupported previews remain disabled.
 
 [Map/image navigation](CANVAS-NAVIGATION-ADMISSION.md) now uses one-shot prepared frame owners, preserving the public direct-render gates and admitted footprint while retaining reservations across controller navigation and advance. All 169 prepared groups remain unexecuted; both compilation sets pass (144/106 files).
+
+[Scalar navigation](SCALAR-NAVIGATION-ADMISSION.md) now retains one-shot frame/target/scratch admission across controller navigation and advance, preserving direct-render signatures, callback order and differential modes. All 172 groups remain unexecuted; both compilation sets pass (144/106 files).

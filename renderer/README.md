@@ -1,6 +1,6 @@
 # Renderer foundation
 
-**Current verification:** Full/default compilation passes (144/106 files). All 169 prepared renderer groups (109 CPU/context-free, 60 GPU) remain unexecuted. [World uploads now admit complete storage](../renderer-gl/WORLD-STORAGE-ADMISSION.md) before replacing accepted work. Renderer completion, genuine Windows/native/GPU validation and final integration remain pending.
+**Current verification:** Full/default compilation passes (144/106 files). All 172 prepared renderer groups (109 CPU/context-free, 63 GPU) remain unexecuted. [World uploads now admit complete storage](../renderer-gl/WORLD-STORAGE-ADMISSION.md) before replacing accepted work. Renderer completion, genuine Windows/native/GPU validation and final integration remain pending.
 
 Java 25 library, separate from the editor and generation engine. UI implementation and automated validation finished before this stage; see [UI-VALIDATION.md](../docs/UI-VALIDATION.md).
 
@@ -433,3 +433,5 @@ The [prepared world GPU groups](../renderer-gl/WORLD-GPU-VALIDATION.md) now conn
 [Complete atlas update admission](../renderer-gl/ATLAS-STORAGE-ADMISSION.md) now reserves every changed texture, copy framebuffer and eventual output-frame journal before accepting a replacement revision. Unused pages refund independently of started pages, while exact atlas clocks/pixels and earlier queue output remain protected on capacity rejection. Both compilation sets pass (144/106 files); all 166 prepared groups (109 CPU/context-free, 57 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
 
 [Admitted map/image navigation](../renderer-gl/CANVAS-NAVIGATION-ADMISSION.md) now retains a complete prepared target before accepting pan/zoom/fit/resize/redraw on uploaded sources. Capacity rejection preserves READY or undrawn output and its exact view revision; advance reuses held storage, and supersession/invalidation/closure release unused targets. Both compilation sets pass (144/106 files); all 169 prepared groups (109 CPU/context-free, 60 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
+
+[Admitted scalar navigation](../renderer-gl/SCALAR-NAVIGATION-ADMISSION.md) now reserves target and strategy-specific draw scratch before accepting camera/viewport, clip, fit or redraw changes on complete sources. Capacity rejection preserves READY or undrawn scalar output and exact view tokens; advance reuses the held reservations, and supersession/invalidation/closure release unused storage. Both compilation sets pass (144/106 files); all 172 prepared groups (109 CPU/context-free, 63 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.

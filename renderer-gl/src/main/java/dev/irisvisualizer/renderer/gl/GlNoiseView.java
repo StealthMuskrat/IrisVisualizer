@@ -10,7 +10,7 @@ public final class GlNoiseView implements AutoCloseable {
         public Status { Objects.requireNonNull(phase);Objects.requireNonNull(context);problems=List.copyOf(problems);Objects.requireNonNull(code);Objects.requireNonNull(reason); }
     }
     private final GlNoiseRenderer renderer;private final GlDevice device;private final NoiseSurfaceWorker worker;
-    private GlNoiseUpload upload;private GlNoiseScene scene,recolorSource;private GlNoiseFrame completed;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private NoiseSurface.Limits latestLimits;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
+    private GlNoiseUpload upload;private GlNoiseScene scene,recolorSource;private GlNoiseFrame completed;private GlNoiseFrame.Prepared pendingFrame;private GlCamera camera;private WorldClip clip=WorldClip.NONE;private NoiseSurface.Style latestStyle;private NoiseSurface.Limits latestLimits;private UUID latestVolume;private int width,height;private long dataRevision,viewRevision,cpuRevision;private boolean sourceReady,dirty,closed,disposed;
     private RenderInput<ScalarHistogram> histogram;private Optional<ScalarHistogram.Limits> latestHistogram=Optional.empty();
     private volatile Status status=new Status(0,0,Phase.IDLE,Optional.empty(),List.of(),Optional.empty(),"");
     public GlNoiseView(GlNoiseRenderer renderer) { this(renderer,1024L*1024*1024); }
@@ -97,15 +97,20 @@ public final class GlNoiseView implements AutoCloseable {
     private void dimensions(int width,int height) { GlTarget.validate(device,width,height); }
     public long view(GlCamera camera,int width,int height) {
         Objects.requireNonNull(camera);current();dimensions(width,height);camera.matrix((double)width/height);if(sourceReady&&scene!=null)GlNoiseCulling.validateView(scene.surface(),camera);if(camera.equals(this.camera)&&width==this.width&&height==this.height)return viewRevision;
-        long next=nextView();var changed=displayStatus(next);this.camera=camera;this.width=width;this.height=height;viewRevision=next;dirty=true;status=changed;
-        try { releaseFrame();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        return changeView(camera,width,height,clip);
     }
     public WorldClip clip() { current();return clip; }
     /** Display-only scope; pending preparation/upload and complete source data stay unchanged. */
     public long clip(WorldClip clip) {
-        Objects.requireNonNull(clip);current();if(clip.equals(this.clip))return viewRevision;long next=nextView();var changed=displayStatus(next);
-        this.clip=clip;viewRevision=next;dirty=true;status=changed;
-        try { releaseFrame();return viewRevision; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        Objects.requireNonNull(clip);current();if(clip.equals(this.clip))return viewRevision;return changeView(camera,width,height,clip);
+    }
+    /** Retain complete frame/scratch admission before accepting navigation or discarding earlier output. */
+    private long changeView(GlCamera camera,int width,int height,WorldClip clip) {
+        long next=nextView();var changed=displayStatus(next);GlNoiseFrame.Prepared fresh=sourceReady&&scene!=null&&camera!=null?GlNoiseFrame.prepare(renderer,next,scene,camera,width,height,clip,GlCullingMode.HIERARCHY):null;Throwable rejection=null;
+        try {
+            this.camera=camera;this.width=width;this.height=height;this.clip=clip;viewRevision=next;dirty=true;status=changed;releaseFrame();pendingFrame=fresh;fresh=null;return next;
+        }catch(RuntimeException|Error failure) { rejection=failure;failed(failure);throw failure; }
+        finally { if(fresh!=null)try { fresh.close(); }catch(RuntimeException|Error cleanup) { if(rejection==null)throw cleanup;if(cleanup!=rejection)rejection.addSuppressed(cleanup); } }
     }
     public long fit(int width,int height) { return fit(width,height,WorldClip.NONE); }
     /** Display-only fit within the current clip; source samples and clipping stay unchanged. */
@@ -115,8 +120,7 @@ public final class GlNoiseView implements AutoCloseable {
     }
     /** Display-only retry; source/CPU/upload failures require resubmission. */
     public long redraw() {
-        current();if(!sourceReady||scene==null||camera==null)throw new GlFailure(GlFailure.Code.STATE,"Complete current scalar scene/camera required to redraw");long next=nextView();var waiting=displayStatus(next);viewRevision=next;dirty=true;status=waiting;
-        try { releaseFrame();return next; }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
+        current();if(!sourceReady||scene==null||camera==null)throw new GlFailure(GlFailure.Code.STATE,"Complete current scalar scene/camera required to redraw");return changeView(camera,width,height,clip);
     }
     /** Retry a failed source upload from exact prepared data, preserving the source token and display settings. */
     public boolean retryUpload(long expectedDataRevision,NoiseSurface source) {
@@ -161,7 +165,7 @@ public final class GlNoiseView implements AutoCloseable {
             if(upload!=null&&status.phase()==Phase.UPLOADING) { upload.step(budget,()->false);if(upload.ready()) { scene=upload.take();upload.close();upload=null;sourceReady=true;dirty=true;state(Phase.WAITING_VIEW); } }
             if(!sourceReady||scene==null||camera==null||!dirty)return status;
             if(completed!=null)throw new GlFailure(GlFailure.Code.STATE,"Untaken scalar frame survived view invalidation");
-            var frame=GlNoiseFrame.render(renderer,viewRevision,scene,camera,width,height,clip,()->false);
+            var frame=drawFrame();
             try { var ready=new Status(dataRevision,viewRevision,Phase.FRAME_READY,status.context(),List.of(),Optional.empty(),"");completed=frame;dirty=false;status=ready; }
             catch(RuntimeException|Error failure) { try { frame.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }return status;
         }catch(RuntimeException|Error failure) { failed(failure);throw failure; }
@@ -170,7 +174,20 @@ public final class GlNoiseView implements AutoCloseable {
         current();if(!sourceReady||expectedDataRevision!=dataRevision||expectedViewRevision!=viewRevision||status.phase()!=Phase.FRAME_READY||completed==null||completed.info().revision()!=viewRevision)return Optional.empty();
         var value=Optional.of(completed);var delivered=new Status(dataRevision,viewRevision,Phase.DELIVERED,status.context(),List.of(),Optional.empty(),"");completed=null;status=delivered;return value;
     }
-    private void releaseFrame() { if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error failure) { if(completed.closed())completed=null;throw failure; } }
+    private GlNoiseFrame drawFrame() {
+        if(pendingFrame==null)pendingFrame=GlNoiseFrame.prepare(renderer,viewRevision,scene,camera,width,height,clip,GlCullingMode.HIERARCHY);GlNoiseFrame result=null;
+        try { result=pendingFrame.render(()->false);releasePrepared();return result; }
+        catch(RuntimeException|Error failure) {
+            if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { releasePrepared(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+        }
+    }
+    private void releasePrepared() { if(pendingFrame!=null)try { pendingFrame.close();pendingFrame=null; }catch(RuntimeException|Error failure) { if(!pendingFrame.ownsResources())pendingFrame=null;throw failure; } }
+    private void releaseFrame() {
+        Throwable failure=null;try { releasePrepared(); }catch(RuntimeException|Error error) { failure=error; }
+        if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.closed())completed=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
+    }
     private void releaseRecolorSource() { if(recolorSource!=null)try { recolorSource.close();recolorSource=null; }catch(RuntimeException|Error failure) { if(recolorSource.closed())recolorSource=null;throw failure; } }
     private void releaseDisplay() {
         Throwable failure=null;try { releaseFrame(); }catch(RuntimeException|Error error) { failure=error; }
