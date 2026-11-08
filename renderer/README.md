@@ -1,6 +1,6 @@
 # Renderer foundation
 
-**Current verification (2026-11-08):** Full/default compilation passes (144/106 files). All 163 prepared renderer groups (109 CPU/context-free, 54 GPU) remain unexecuted. [World uploads now admit complete storage](../renderer-gl/WORLD-STORAGE-ADMISSION.md) before replacing accepted work. Renderer completion, genuine Windows/native/GPU validation and final integration remain pending.
+**Current verification:** Full/default compilation passes (144/106 files). All 166 prepared renderer groups (109 CPU/context-free, 57 GPU) remain unexecuted. [World uploads now admit complete storage](../renderer-gl/WORLD-STORAGE-ADMISSION.md) before replacing accepted work. Renderer completion, genuine Windows/native/GPU validation and final integration remain pending.
 
 Java 25 library, separate from the editor and generation engine. UI implementation and automated validation finished before this stage; see [UI-VALIDATION.md](../docs/UI-VALIDATION.md).
 
@@ -429,3 +429,5 @@ The [prepared world GPU groups](../renderer-gl/WORLD-GPU-VALIDATION.md) now conn
 [Implicit section culling](../renderer-gl/SECTION-CULLING.md) now rejects or accepts contiguous groups from the verified section grid before individual bounds tests, reusing existing offsets and prefix storage. Linear and disabled reference modes retain the original leaf predicate, and frame receipts expose actual section work. Both compilation sets pass (144/106 files); all 160 prepared groups (109 CPU/context-free, 51 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
 
 [Complete world upload admission](../renderer-gl/WORLD-STORAGE-ADMISSION.md) now reserves known geometry/material/marker/atlas storage and copy-framebuffer slots before accepting a replacement revision. Capacity rejection preserves earlier queued work and completed views; unused destinations refund immediately, while started storage retains fenced ownership. Both compilation sets pass (144/106 files); all 163 prepared groups (109 CPU/context-free, 54 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
+
+[Complete atlas update admission](../renderer-gl/ATLAS-STORAGE-ADMISSION.md) now reserves every changed texture, copy framebuffer and eventual output-frame journal before accepting a replacement revision. Unused pages refund independently of started pages, while exact atlas clocks/pixels and earlier queue output remain protected on capacity rejection. Both compilation sets pass (144/106 files); all 166 prepared groups (109 CPU/context-free, 57 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.

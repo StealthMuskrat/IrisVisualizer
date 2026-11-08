@@ -12,12 +12,12 @@ public final class GlAtlasUpload implements AutoCloseable {
     public record Progress(Phase phase,int completedPages,int changedPages,long copiedBytes,long totalCopyBytes,long uploadedBytes,long totalUploadBytes) {}
     public record Step(Progress progress,int copiedBytes,int uploadedBytes,long storageBytes,int actions,int workUnits,long elapsedNanoseconds) {}
     private final GlScene scene;private final GlDevice device;private final Object expectedToken;private final int changedCount;private final long totalCopy,totalUpload;
-    private AtlasFramePlan plan;private GlAtlasFrame source,completed;private GlDevice.Allocation work,framebuffer,pendingPage;
+    private AtlasFramePlan plan;private GlAtlasFrame source,completed;private GlDevice.Allocation work,framebuffer;private GlAtlasFrame.Prepared output;
     private List<GlAtlasFrame.Page> pages;private final List<GlAtlasFrame.Page> owned;private Phase phase=Phase.VALIDATING;
     private int validation,pageCursor,copyRow,patchCursor,patchRow;private long copied,uploaded;
-    private GlAtlasUpload(GlAtlasFrame original,AtlasFramePlan plan,GlAtlasFrame source,GlDevice.Allocation work) {
-        scene=original.scene();device=scene.device;expectedToken=original.token();this.plan=plan;this.source=source;this.work=work;
-        changedCount=plan.changedPages().size();totalCopy=plan.copiedBytes();totalUpload=plan.update().bytes();pages=new ArrayList<>(source.pages());owned=new ArrayList<>(changedCount);
+    private GlAtlasUpload(GlAtlasFrame original,AtlasFramePlan plan,GlAtlasFrame source,GlDevice.Allocation work,GlDevice.Allocation framebuffer,GlAtlasFrame.Prepared output,List<GlAtlasFrame.Page> pages,List<GlAtlasFrame.Page> owned) {
+        scene=original.scene();device=scene.device;expectedToken=original.token();this.plan=plan;this.source=source;this.work=work;this.framebuffer=framebuffer;this.output=output;
+        changedCount=plan.changedPages().size();totalCopy=plan.copiedBytes();totalUpload=plan.update().bytes();this.pages=pages;this.owned=owned;
     }
     /** Metadata/liveness checks only; no source retain, allocation journal or GPU storage is created. */
     static void validate(GlAtlasFrame current,AtlasFramePlan plan) {
@@ -27,10 +27,23 @@ public final class GlAtlasUpload implements AutoCloseable {
     }
     public static GlAtlasUpload begin(GlAtlasFrame current,AtlasFramePlan plan) {
         validate(current,plan);var scene=current.scene();var device=scene.device;
-        GlAtlasFrame source=null;GlDevice.Allocation work=null;
+        for(int index:plan.changedPages()) {
+            var image=plan.raster().orElseThrow().pages().get(index);
+            if(image.width()>device.maximumTextureSize()||image.height()>device.maximumTextureSize()||image.width()*4>device.limits().stagingBytes()||plan.patches(index).isEmpty())throw new GlFailure(GlFailure.Code.CAPABILITY,"Changed atlas page exceeds admitted dimensions or has no patches");
+        }
+        GlAtlasFrame source=null;GlDevice.Allocation work=null,framebuffer=null,pending=null;GlAtlasFrame.Prepared output=null;var owned=new ArrayList<GlAtlasFrame.Page>(plan.changedPages().size());
         try {
-            work=device.reserve(0,plan.extraCpuBytes(),0,0,0,0,0,0,0,null);work.retained=plan;source=current.retain();device.depend(work,source.journal());return new GlAtlasUpload(current,plan,source,work);
+            work=device.reserve(0,plan.extraCpuBytes(),0,0,0,0,0,0,0,null);work.retained=plan;source=current.retain();device.depend(work,source.journal());output=GlAtlasFrame.prepare(scene);var pages=new ArrayList<>(source.pages());
+            if(!plan.changedPages().isEmpty()) { framebuffer=device.reserveStorage(0,0,0,0,0,1,0,0,0);device.depend(framebuffer,source.journal()); }
+            for(int index:plan.changedPages()) {
+                var image=plan.raster().orElseThrow().pages().get(index);pending=device.reserveStorage(image.bytes(),0,0,1,0,0,0,0,0);var page=new GlAtlasFrame.Page(pending,0,image,true);owned.add(page);pending=null;pages.set(index,page);
+            }
+            return new GlAtlasUpload(current,plan,source,work,framebuffer,output,pages,owned);
         }catch(RuntimeException|Error failure) {
+            if(output!=null)try { output.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(pending!=null)try { release(device,pending); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            for(int i=0;i<owned.size();i++)try { owned.get(i).release(device); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            if(framebuffer!=null)try { release(device,framebuffer); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(work!=null)try { device.retire(work); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
             if(source!=null)try { source.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
@@ -52,7 +65,7 @@ public final class GlAtlasUpload implements AutoCloseable {
     public boolean ready() { return phase==Phase.READY; }
     GlAtlasFrame readyFrame() { device.current();if(!ready()||completed==null)throw new GlFailure(GlFailure.Code.STATE,"No complete atlas frame is available");return completed; }
     Object expectedToken() { return expectedToken; }
-    boolean ownsResources() { return work!=null||framebuffer!=null||pendingPage!=null||source!=null||completed!=null||!owned.isEmpty(); }
+    boolean ownsResources() { return work!=null||framebuffer!=null||output!=null||source!=null||completed!=null||!owned.isEmpty(); }
     private static void check(BooleanSupplier cancelled) { if(cancelled.getAsBoolean())throw new CancellationException("GPU atlas update cancelled"); }
     public Step step(GlUploadBudget budget,BooleanSupplier cancelled) {
         Objects.requireNonNull(budget);Objects.requireNonNull(cancelled);device.current();if(phase==Phase.READY)return new Step(progress(),0,0,0,0,0,0);
@@ -75,11 +88,10 @@ public final class GlAtlasUpload implements AutoCloseable {
                             if(image.width()>device.maximumTextureSize()||image.height()>device.maximumTextureSize()||image.width()*4>device.limits().stagingBytes()||plan.patches(index).isEmpty())throw new GlFailure(GlFailure.Code.CAPABILITY,"Changed atlas page exceeds admitted dimensions or has no patches");
                         } else phase=changedCount==0?Phase.FINISHING:Phase.READ_FRAMEBUFFER;
                     }
-                    case READ_FRAMEBUFFER -> { framebuffer=device.reserve(0,0,0,0,0,1,0,0,0,null);device.depend(framebuffer,source.journal());framebuffer.framebuffers[0]=glGenFramebuffers();device.check("atlas copy framebuffer");phase=Phase.STORAGE; }
+                    case READ_FRAMEBUFFER -> { device.beginStorage(framebuffer);framebuffer.framebuffers[0]=glGenFramebuffers();device.check("atlas copy framebuffer");phase=Phase.STORAGE; }
                     case STORAGE -> {
                         int index=plan.changedPages().get(pageCursor);var image=plan.raster().orElseThrow().pages().get(index);
-                        pendingPage=device.reserve(image.bytes(),0,0,1,0,0,0,0,0,null);device.moveCpu(work,pendingPage,image.bytes(),image);
-                        var page=new GlAtlasFrame.Page(pendingPage,0,image,true);owned.add(page);pendingPage=null;pages.set(index,page);
+                        var page=pages.get(index);device.moveCpu(work,page.allocation,image.bytes(),image);device.beginStorage(page.allocation);
                         page.allocation.textures[0]=glGenTextures();glBindTexture(GL_TEXTURE_2D,page.allocation.textures[0]);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_BASE_LEVEL,0);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,0);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,image.width(),image.height(),0,GL_RGBA,GL_UNSIGNED_BYTE,0L);device.check("copy-on-write atlas storage");storage+=image.bytes();copyRow=0;patchCursor=0;patchRow=0;phase=Phase.COPY_ROWS;
                     }
                     case COPY_ROWS -> {
@@ -100,7 +112,7 @@ public final class GlAtlasUpload implements AutoCloseable {
                         int bytes=rows*patch.rowBytes();var stage=device.staging();stage.limit(bytes);stage.put(patch.pixels().pixels().slice(patchRow*patch.rowBytes(),bytes));stage.flip();glBindTexture(GL_TEXTURE_2D,pages.get(index).texture(device));glTexSubImage2D(GL_TEXTURE_2D,0,patch.x(),patch.y()+patchRow,patch.pixels().width(),rows,GL_RGBA,GL_UNSIGNED_BYTE,stage);device.check("bounded atlas patch rows");uploadedNow+=bytes;uploaded+=bytes;patchRow+=rows;
                         if(patchRow==patch.pixels().height()) { patchCursor++;patchRow=0;if(patchCursor==plan.patches(index).size()) { pageCursor++;phase=pageCursor==changedCount?Phase.FINISHING:Phase.STORAGE; } }
                     }
-                    case FINISHING -> { if(copied!=totalCopy||uploaded!=totalUpload||owned.size()!=changedCount||work.cpu!=plan.update().bytes())throw new GlFailure(GlFailure.Code.STATE,"GPU atlas update does not match its complete CPU plan");device.check("complete GPU atlas update");finish=true; }
+                    case FINISHING -> { if(copied!=totalCopy||uploaded!=totalUpload||pageCursor!=changedCount||owned.size()!=changedCount||work.cpu!=plan.update().bytes())throw new GlFailure(GlFailure.Code.STATE,"GPU atlas update does not match its complete CPU plan");device.check("complete GPU atlas update");finish=true; }
                     default -> throw new GlFailure(GlFailure.Code.STATE,"Unexpected GPU atlas phase");
                 }
                 units++;if(gpu)actions++;if(finish)break;
@@ -110,7 +122,7 @@ public final class GlAtlasUpload implements AutoCloseable {
             if(state!=null)try { state.close(); }
             catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); }
         }
-        if(finish) { check(cancelled);completed=GlAtlasFrame.create(scene,plan.raster().orElseThrow(),pages);releaseWork();phase=Phase.READY; }
+        if(finish) { check(cancelled);completed=output.finish(plan.raster().orElseThrow(),pages);output=null;releaseWork();phase=Phase.READY; }
         return new Step(progress(),copiedNow,uploadedNow,storage,actions,units,System.nanoTime()-start);
     }
     public GlAtlasFrame take(GlAtlasFrame current) {
@@ -119,25 +131,27 @@ public final class GlAtlasUpload implements AutoCloseable {
     }
     private void releaseWork() {
         Throwable failure=null;
-        if(framebuffer!=null)try { device.retire(framebuffer);framebuffer=null; }catch(RuntimeException|Error error) { if(framebuffer.retired||framebuffer.released)framebuffer=null;failure=error; }
-        if(work!=null)try { device.retire(work);work=null; }catch(RuntimeException|Error error) { if(work.retired||work.released)work=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
-        if(source!=null)try { source.close();source=null; }catch(RuntimeException|Error error) { if(source.closedOrReleased())source=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
-        if(pendingPage!=null)try { device.retire(pendingPage);pendingPage=null; }catch(RuntimeException|Error error) { if(pendingPage.retired||pendingPage.released)pendingPage=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(output!=null)try { output.close();output=null; }catch(RuntimeException|Error error) { if(!output.ownsResources())output=null;failure=error; }
         for(int i=0;i<owned.size();) {
             var page=owned.get(i);
             try { page.release(device);owned.remove(i); }
             catch(RuntimeException|Error error) { if(page.references==0)owned.remove(i);else i++;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
         }
-        if(work==null) { plan=null;if(pages!=null)pages.clear();pages=null; }
+        if(pages!=null) { pages.clear();pages=null; }
+        if(framebuffer!=null)try { release(device,framebuffer);framebuffer=null; }catch(RuntimeException|Error error) { if(framebuffer.retired||framebuffer.released)framebuffer=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(work!=null)try { device.retire(work);work=null; }catch(RuntimeException|Error error) { if(work.retired||work.released)work=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(source!=null)try { source.close();source=null; }catch(RuntimeException|Error error) { if(source.closedOrReleased())source=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
+        if(work==null)plan=null;
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
+    private static void release(GlDevice device,GlDevice.Allocation allocation) { if(allocation.unstartedStorage)device.discardUnstarted(allocation);else device.retire(allocation); }
     private void dispose(Phase terminal) {
         Throwable failure=null;try { releaseWork(); }catch(RuntimeException|Error error) { failure=error; }
         if(completed!=null)try { completed.close();completed=null; }catch(RuntimeException|Error error) { if(completed.closedOrReleased())completed=null;if(failure==null)failure=error;else if(error!=failure)failure.addSuppressed(error); }
         phase=terminal;if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;
     }
     private boolean nativeReleased() {
-        if(work!=null&&!work.released||framebuffer!=null&&!framebuffer.released||pendingPage!=null&&!pendingPage.released||source!=null&&!source.closedOrReleased()||completed!=null&&!completed.closedOrReleased())return false;
+        if(work!=null&&!work.released||framebuffer!=null&&!framebuffer.released||output!=null&&output.ownsResources()||source!=null&&!source.closedOrReleased()||completed!=null&&!completed.closedOrReleased())return false;
         for(int i=0;i<owned.size();i++)if(!owned.get(i).allocation.released)return false;return true;
     }
     @Override public void close() { if(phase==Phase.TAKEN||phase==Phase.CLOSED&&!ownsResources())return;if(!nativeReleased())device.current();dispose(Phase.CLOSED); }

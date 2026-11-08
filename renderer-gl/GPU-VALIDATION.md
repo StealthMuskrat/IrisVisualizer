@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06; updated 2026-11-08. `GlGpuContracts` contains 54 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 109 prepared, unexecuted groups, making 163 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06; updated 2026-11-08. `GlGpuContracts` contains 57 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 109 prepared, unexecuted groups, making 166 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -96,3 +96,5 @@ The GPU harness is an initial real-driver path. The new [synthetic world groups]
 [Implicit world section culling](SECTION-CULLING.md) adds the 51st GPU group for hierarchy/linear/disabled pixels and original submission receipts, marker/empty/transparent sections, bounded work, legacy constructor compatibility and draw admission recovery. All 160 prepared groups remain unexecuted; full/default compilation covers 144/106 files.
 
 [Complete world upload admission](WORLD-STORAGE-ADMISSION.md) adds three GPU groups for full/material-copy CPU/GPU/object footprints, exact-budget cancellation/closure, original pixels and traffic, five queue states, connected READY views, owned lighting and partial copy-framebuffer setup rollback under device limits. The report guard requires 54 GPU groups; all 163 prepared groups remain unexecuted. Both compilation sets pass (144/106 files).
+
+[Complete atlas update admission](ATLAS-STORAGE-ADMISSION.md) adds three GPU groups for complete changed-page/frame/framebuffer admission, exact shared/device boundaries, partial storage cancellation, queue token/output preservation and metadata-only updates. The report guard requires 57 GPU groups; all 166 prepared groups remain unexecuted. Full/default compilation covers 144/106 files.

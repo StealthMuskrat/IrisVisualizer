@@ -9,7 +9,7 @@ public final class GlAtlasFrame implements AutoCloseable {
         final GlDevice.Allocation allocation;final int slot;final RgbaImage pixels;final boolean owned;int references=1;
         Page(GlDevice.Allocation allocation,int slot,RgbaImage pixels,boolean owned) { this.allocation=allocation;this.slot=slot;this.pixels=pixels;this.owned=owned; }
         void retain(GlDevice device) { device.live(allocation);if(references<1||references>=65536)throw new GlFailure(GlFailure.Code.STATE,"Invalid atlas page ownership");references++; }
-        void release(GlDevice device) { if(!allocation.released)device.current();if(references<1)throw new GlFailure(GlFailure.Code.STATE,"Atlas page was released twice");if(--references==0&&owned)device.retire(allocation); }
+        void release(GlDevice device) { if(!allocation.released)device.current();if(references<1)throw new GlFailure(GlFailure.Code.STATE,"Atlas page was released twice");if(--references==0&&owned) { if(allocation.unstartedStorage)device.discardUnstarted(allocation);else device.retire(allocation); } }
         int texture(GlDevice device) { device.live(allocation);if(references<1)throw new GlFailure(GlFailure.Code.STATE,"Atlas page is no longer owned");return allocation.textures[slot]; }
     }
     final GlDevice device;private final Object token=new Object();private GlDevice.Allocation journal;
@@ -30,17 +30,40 @@ public final class GlAtlasFrame implements AutoCloseable {
         }
         return frame;
     }
-    static GlAtlasFrame create(GlScene scene,AtlasRaster raster,List<Page> pages) {
-        var device=scene.device;scene.live();
+    private static void validate(GlScene scene,AtlasRaster raster,List<Page> pages) {
+        scene.live();
         if(raster.requiresPlaceholder()||raster.layout()!=scene.cpuScene().layout()||pages.size()!=raster.pages().size())throw new GlFailure(GlFailure.Code.STALE,"Atlas frame does not match its original scene/layout");
-        GlDevice.Allocation journal=null;int retained=0;
+    }
+    /** Admission for the eventual immutable frame; no page ownership or native storage is installed yet. */
+    static final class Prepared implements AutoCloseable {
+        private final GlScene scene;private GlDevice.Allocation journal;
+        private Prepared(GlScene scene,GlDevice.Allocation journal) { this.scene=scene;this.journal=journal; }
+        GlAtlasFrame finish(AtlasRaster raster,List<Page> pages) {
+            scene.device.current();if(journal==null)throw new GlFailure(GlFailure.Code.STATE,"Atlas frame admission was already consumed");
+            var admitted=journal;journal=null;return create(scene,raster,pages,admitted);
+        }
+        boolean ownsResources() { return journal!=null&&!journal.released; }
+        @Override public void close() {
+            if(journal!=null)try { scene.device.retire(journal); }finally { if(journal.retired||journal.released)journal=null; }
+        }
+    }
+    static Prepared prepare(GlScene scene) {
+        scene.live();var device=scene.device;GlDevice.Allocation journal=null;
+        try { journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,scene.allocation);return new Prepared(scene,journal); }
+        catch(RuntimeException|Error failure) { if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure; }
+    }
+    static GlAtlasFrame create(GlScene scene,AtlasRaster raster,List<Page> pages) {
+        validate(scene,raster,pages);try(var prepared=prepare(scene)) { return prepared.finish(raster,pages); }
+    }
+    private static GlAtlasFrame create(GlScene scene,AtlasRaster raster,List<Page> pages,GlDevice.Allocation journal) {
+        var device=scene.device;int retained=0;
         try {
-            journal=device.reserve(0,0,0,0,0,0,0,0,0,null);device.depend(journal,scene.allocation);
-            for(int i=0;i<pages.size();i++) { var page=pages.get(i);if(page.pixels!=raster.pages().get(i))throw new GlFailure(GlFailure.Code.STATE,"Atlas page CPU/GPU ownership disagrees");page.retain(device);retained++;if(page.owned)device.depend(journal,page.allocation); }
+            device.live(journal);validate(scene,raster,pages);
+            for(int i=0;i<pages.size();i++) { var page=pages.get(i);if(page.pixels!=raster.pages().get(i)||page.allocation.unstartedStorage)throw new GlFailure(GlFailure.Code.STATE,"Atlas page CPU/GPU ownership or storage is incomplete");page.retain(device);retained++;if(page.owned)device.depend(journal,page.allocation); }
             var frame=new GlAtlasFrame(scene,raster,pages,journal);journal.retained=raster;return frame;
         }catch(RuntimeException|Error failure) {
             releasePages(device,pages,retained,failure);
-            if(journal!=null)try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
+            try { device.retire(journal); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
     }
     /** Preserve an earlier setup error while visiting every retained or temporary page owner. */

@@ -1,6 +1,6 @@
 # Prepared world rendering GPU contracts
 
-Prepared 2026-11-06; updated 2026-11-08. Synthetic world uploads and completed-image rendering remain part of the explicit Windows harness. All sources compile; **no assertion or GPU operation has run**. The harness contains 54 GPU groups alongside 109 CPU/context-free groups: 163 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06; updated 2026-11-08. Synthetic world uploads and completed-image rendering remain part of the explicit Windows harness. All sources compile; **no assertion or GPU operation has run**. The harness contains 57 GPU groups alongside 109 CPU/context-free groups: 166 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
 
 ## Synthetic fixture boundary
 
@@ -45,3 +45,5 @@ The synthetic world cases still require real Windows GPU execution. They do not 
 [Implicit section culling](SECTION-CULLING.md) adds a prepared irregular full XYZ hierarchy/linear/disabled GPU comparison, retaining source identity, transparent ordering, marker coverage and completed output under draw-budget rejection. All 160 groups (109 context-free, 51 GPU) remain unexecuted; full/default source compilation passes (144/106 files).
 
 [Complete world upload admission](WORLD-STORAGE-ADMISSION.md) prepares full/material-copy storage, complete initial counters, source/lighting ownership, exact shared and device boundaries, framebuffer rollback, queue/view recovery and original differential pixels. All 163 groups remain unexecuted; full/default compilation covers 144/106 files.
+
+[Complete atlas update admission](ATLAS-STORAGE-ADMISSION.md) prepares multi-page full/partial/no-change updates, output-journal reservation, byte-exact page/copy/patch receipts, previous queue delivery and partial-start cleanup. All 166 groups remain unexecuted; full/default compilation covers 144/106 files.

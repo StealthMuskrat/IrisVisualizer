@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-08. The four CPU/context-free harnesses contain 109 prepared groups: 23 renderer CPU, 48 world CPU, 17 animation and 21 display math. The separate GPU harness contains 54 groups, for 163 overall. All 144 full renderer/validation sources and the 106-file dependency-free set compile; no group has been executed. Renderer implementation remains in progress, and execution is deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-08. The four CPU/context-free harnesses contain 109 prepared groups: 23 renderer CPU, 48 world CPU, 17 animation and 21 display math. The separate GPU harness contains 57 groups, for 166 overall. All 144 full renderer/validation sources and the 106-file dependency-free set compile; no group has been executed. Renderer implementation remains in progress, and execution is deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -95,3 +95,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Implicit world section culling](../renderer-gl/SECTION-CULLING.md) adds two context-free groups and one GPU group. The five harnesses now prepare 160 groups: 23 renderer CPU, 48 world CPU, 17 animation, 21 display math and 51 GPU. Both compilation sets pass (144/106 files); none has executed.
 
 [Complete world upload admission](../renderer-gl/WORLD-STORAGE-ADMISSION.md) adds three GPU groups; CPU/context-free coverage remains at 109. All 163 groups are prepared and unexecuted, and both source sets compile (144/106 files).
+
+[Complete atlas update admission](../renderer-gl/ATLAS-STORAGE-ADMISSION.md) adds three GPU groups; CPU/context-free coverage remains at 109. All 166 groups remain unexecuted, and both source sets compile (144/106 files).

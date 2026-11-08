@@ -40,6 +40,11 @@ public final class WorldGpuFixture implements AutoCloseable {
     }
     public static WorldGpuFixture animated(boolean interpolate) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture animated(boolean interpolate,int frameTicks) { return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,frameTicks)),new int[]{0},1,1,WorldModels.Kind.MESH); }
+    /** Eight original sprites span multiple pages; either every page or just the first animated slot changes. */
+    public static WorldGpuFixture animatedPages(boolean interpolate,boolean all) {
+        var materials=new ArrayList<Material>();int[] assignments=new int[8];for(int i=0;i<8;i++) { materials.add(new Material(0xff0000ff,false,all||i==0,interpolate,false));assignments[i]=i; }
+        return build(materials,assignments,8,1,WorldModels.Kind.MESH);
+    }
     public static WorldGpuFixture animatedRectangle(int pattern,boolean interpolate) { if(pattern<1||pattern>3)throw new IllegalArgumentException("Invalid synthetic pattern");return build(List.of(new Material(0xff0000ff,false,true,interpolate,false,2,pattern)),new int[]{0},1,1,WorldModels.Kind.MESH); }
     public static WorldGpuFixture empty() { return build(List.of(new Material(0xffffffff,false,false,false,false)),new int[]{0},1,1,WorldModels.Kind.EMPTY); }
     /** Irregular full XYZ coverage: 3 by 2 by 3 sections, with original mesh/marker/empty identities. */
