@@ -146,8 +146,12 @@ public final class GlDevice implements AutoCloseable {
     void live(Allocation allocation) { current();if(allocation.retired||allocation.released)throw new GlFailure(GlFailure.Code.STATE,"GPU resource is retired or released"); }
     /** Admit complete known storage before ownership acceptance; no native names or commands are created. */
     Allocation reserveStorage(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders) {
-        if(gpu<=0||(long)buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders<=0)throw new IllegalArgumentException("Storage admission requires payload and object slots");
-        var allocation=reserve(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,null);allocation.unstartedStorage=true;return allocation;
+        return reserveStorage(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,null);
+    }
+    /** A CPU scene lease is safe to refund with proven never-started storage; framebuffer slots need no payload bytes. */
+    Allocation reserveStorage(long gpu,long cpu,int buffers,int textures,int vaos,int framebuffers,int renderbuffers,int programs,int shaders,WorldScene.Result owner) {
+        if(gpu<0||(long)buffers+textures+vaos+framebuffers+renderbuffers+programs+shaders<=0)throw new IllegalArgumentException("Storage admission requires nonnegative payload and object slots");
+        var allocation=reserve(gpu,cpu,buffers,textures,vaos,framebuffers,renderbuffers,programs,shaders,owner);allocation.unstartedStorage=true;return allocation;
     }
     /** One-way transition before the first native storage operation, even if no handle is returned. */
     void beginStorage(Allocation allocation) {
@@ -188,7 +192,7 @@ public final class GlDevice implements AutoCloseable {
     /** Only explicitly admitted, never-started storage can refund CPU payload and source pins without a fence. */
     void discardUnstarted(Allocation allocation) {
         if(allocation.released)return;live(allocation);if(!allocations.contains(allocation))throw new GlFailure(GlFailure.Code.STATE,"Reservation belongs to another device");
-        if(!allocation.unstartedStorage||allocation.dependents!=0||allocation.owner!=null||allocation.fence!=0||allocation.transferFence!=0)throw new GlFailure(GlFailure.Code.STATE,"Only never-started storage without dependents can be discarded");
+        if(!allocation.unstartedStorage||allocation.dependents!=0||allocation.fence!=0||allocation.transferFence!=0)throw new GlFailure(GlFailure.Code.STATE,"Only never-started storage without dependents can be discarded");
         for(int group=0;group<7;group++)for(int name:nameArray(allocation,group))if(name!=0)throw new GlFailure(GlFailure.Code.STATE,"Started GPU storage cannot be discarded");
         try { release(allocation);removeAllocation(allocation); }
         catch(RuntimeException|Error failure) { allocation.retired=true;allocation.quarantined=true;throw failure; }

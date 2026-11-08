@@ -20,16 +20,19 @@ public final class GlUpload implements AutoCloseable {
     }
     private static final int CHUNK_BYTES=65536;
     private record Materials(WorldTint tint,WorldLighting lighting,AtlasRaster raster) {}
+    private static long gpuBytes(WorldScene scene,AtlasRaster raster,WorldLighting lighting) {
+        return (long)scene.usage().faces()*(MeshPacket.PACKED_BYTES_PER_QUAD+16+(lighting==null?0:48))+(long)scene.usage().markers()*12+raster.rgbaBytes();
+    }
     private final GlRenderer renderer;private final GlDevice device;private final WorldSnapshot.Source source;
     private final int totalSections,totalFaces,materialWords,materialBytes;private final long totalBytes,totalCopyBytes,gpuBytes;
     private GlScene geometrySource;private GlAtlasFrame atlasSource;private AtlasRaster raster;private GlDevice.Allocation framebuffer;
     private WorldScene scene;private WorldTint tint;private WorldLighting lighting;private int translucentFaces,tintedFaces;private GlDevice.Allocation allocation;private GlScene completed;private final List<GlScene.Section> sections;
     private Phase phase=Phase.VALIDATING;private int validatedSection,validatedFace,validatedPage,geometryCount,markerSections;
     private long markerBytes,uploadedBytes,copiedBytes;private int page,pageRow,section,bufferSlot,vaoSlot,geometryVao,markerVao,vertexBuffer,materialBuffer,indexBuffer,markerBuffer,vertexWordOffset,materialWordOffset,indexOffset,markerOffset;
-    private GlUpload(GlRenderer renderer,WorldScene scene,WorldTint tint,WorldLighting lighting,GlDevice.Allocation allocation,GlScene geometrySource,GlAtlasFrame atlasSource,AtlasRaster raster) {
+    private GlUpload(GlRenderer renderer,WorldScene scene,WorldTint tint,WorldLighting lighting,GlDevice.Allocation allocation,GlDevice.Allocation framebuffer,GlScene geometrySource,GlAtlasFrame atlasSource,AtlasRaster raster) {
         this.renderer=renderer;device=renderer.device;this.scene=scene;this.tint=tint;this.lighting=lighting;this.allocation=allocation;materialWords=lighting==null?1:4;materialBytes=materialWords*4;this.geometrySource=geometrySource;this.atlasSource=atlasSource;this.raster=raster;source=scene.snapshot().source();
         // CPU meshBytes also includes face bounds/translucent centers; only packed geometry reaches GPU storage.
-        totalSections=scene.sections().size();totalFaces=scene.usage().faces();gpuBytes=(long)totalFaces*(MeshPacket.PACKED_BYTES_PER_QUAD+16+(lighting==null?0:48))+(long)scene.usage().markers()*12+raster.rgbaBytes();totalCopyBytes=geometrySource==null?0:(long)totalFaces*MeshPacket.PACKED_BYTES_PER_QUAD+(long)scene.usage().markers()*12+raster.rgbaBytes();totalBytes=gpuBytes-totalCopyBytes;sections=new ArrayList<>(totalSections);
+        totalSections=scene.sections().size();totalFaces=scene.usage().faces();gpuBytes=gpuBytes(scene,raster,lighting);totalCopyBytes=geometrySource==null?0:(long)totalFaces*MeshPacket.PACKED_BYTES_PER_QUAD+(long)scene.usage().markers()*12+raster.rgbaBytes();totalBytes=gpuBytes-totalCopyBytes;this.framebuffer=framebuffer;sections=new ArrayList<>(totalSections);
     }
     /** Fresh nonnull leases transfer on every outcome; re-transferring a device-owned lease is rejected intact. */
     public static GlUpload begin(GlRenderer renderer,WorldScene.Result owner) { return begin(renderer,owner,null); }
@@ -89,15 +92,23 @@ public final class GlUpload implements AutoCloseable {
     }
     public static GlUpload begin(GlRenderer renderer,WorldScene.Result owner,WorldTint tint,WorldLighting lighting) { return begin(renderer,owner,tint,lighting,null,null); }
     private static GlUpload begin(GlRenderer renderer,WorldScene.Result owner,WorldTint tint,WorldLighting lighting,GlScene geometrySource,GlAtlasFrame atlasSource) {
-        Objects.requireNonNull(renderer);Objects.requireNonNull(owner);var device=renderer.device;GlDevice.Allocation allocation=null;boolean alreadyOwned=false;
+        Objects.requireNonNull(renderer);Objects.requireNonNull(owner);var device=renderer.device;GlDevice.Allocation allocation=null,framebuffer=null;boolean alreadyOwned=false;
         try {
             alreadyOwned=device.ownsCpu(owner);if(alreadyOwned)throw new GlFailure(GlFailure.Code.STATE,"This CPU result lease was already transferred to the device");
             tint=validate(renderer,owner,tint,lighting);var scene=owner.scene().orElseThrow();var raster=atlasSource!=null?atlasSource.raster():geometrySource!=null?geometrySource.raster():scene.raster();long extra=0;
             if(raster.requiresPlaceholder()||raster.layout()!=scene.layout()||raster.pages().size()!=scene.raster().pages().size())throw new GlFailure(GlFailure.Code.STALE,"Material atlas must match the exact original scene layout");
-            for(int page=0;page<raster.pages().size();page++)if(raster.pages().get(page)!=scene.raster().pages().get(page))extra+=raster.pages().get(page).bytes();
-            allocation=device.reserve(0,scene.usage().knownPayloadBytes()+extra+(tint==null?0:tint.bytes())+(lighting==null?0:lighting.bytes()),0,0,0,0,0,0,0,owner);allocation.retained=new Materials(tint,lighting,raster);device.depend(allocation,renderer.allocation);return new GlUpload(renderer,scene,tint,lighting,allocation,geometrySource,atlasSource,raster);
+            for(int page=0;page<raster.pages().size();page++) {
+                var image=raster.pages().get(page);if(image!=scene.raster().pages().get(page))extra+=image.bytes();
+                if(image.width()>device.maximumTextureSize()||image.height()>device.maximumTextureSize()||image.width()*4>device.limits().stagingBytes())throw new GlFailure(GlFailure.Code.CAPABILITY,"Atlas exceeds hardware or bounded row-staging dimensions");
+            }
+            var usage=scene.usage();long cpu=usage.knownPayloadBytes()+extra+(tint==null?0:tint.bytes())+(lighting==null?0:lighting.bytes()),gpu=gpuBytes(scene,raster,lighting);int buffers=usage.faceSections()*3+usage.markerSections(),textures=raster.pages().size(),vaos=usage.faceSections()+usage.markerSections();
+            allocation=buffers+textures+vaos==0?device.reserve(0,cpu,0,0,0,0,0,0,0,owner):device.reserveStorage(gpu,cpu,buffers,textures,vaos,0,0,0,0,owner);
+            allocation.retained=new Materials(tint,lighting,raster);device.depend(allocation,renderer.allocation);
+            if(geometrySource!=null&&!raster.pages().isEmpty())framebuffer=device.reserveStorage(0,0,0,0,0,1,0,0,0);
+            return new GlUpload(renderer,scene,tint,lighting,allocation,framebuffer,geometrySource,atlasSource,raster);
         }catch(RuntimeException|Error failure) {
-            try { if(allocation==null) { if(!alreadyOwned)owner.close(); }else device.retire(allocation); }
+            if(framebuffer!=null)try { release(device,framebuffer); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }
+            try { if(allocation==null) { if(!alreadyOwned)owner.close(); }else release(device,allocation); }
             catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }throw failure;
         }
     }
@@ -126,14 +137,16 @@ public final class GlUpload implements AutoCloseable {
             units:while(work<budget.workUnits()&&(work==0||System.nanoTime()-start<budget.nanoseconds())) {
                 check(cancelled);boolean gpu=gpuPhase();if(gpu&&actions>=budget.actions())break;
                 if(gpu&&state==null) { state=new GlTransferState(device);GlTransferState.unpack();glActiveTexture(GL_TEXTURE0);glBindSampler(0,0); }
+                if(gpu&&phase!=Phase.READ_FRAMEBUFFER&&allocation.unstartedStorage)device.beginStorage(allocation);
                 int transferred=0,copy=0;
                 switch(phase) {
                     case VALIDATING -> validateUnit();
                     case RESERVING -> {
                         if(validatedFace!=totalFaces||translucentFaces!=scene.usage().translucentFaces()||tintedFaces!=scene.usage().tintedFaces()||markerBytes!=(long)scene.usage().markers()*12)throw new GlFailure(GlFailure.Code.STATE,"Upload validation counts disagree with the CPU scene");
-                        device.expand(allocation,gpuBytes,geometryCount*3+markerSections,raster.pages().size(),geometryCount+markerSections);phase=raster.pages().isEmpty()?Phase.SECTION:geometrySource==null?Phase.TEXTURE_STORAGE:Phase.READ_FRAMEBUFFER;
+                        if(allocation.gpu!=gpuBytes||allocation.buffers.length!=geometryCount*3+markerSections||allocation.textures.length!=raster.pages().size()||allocation.vaos.length!=geometryCount+markerSections)throw new GlFailure(GlFailure.Code.STATE,"Validated world storage differs from complete admission");
+                        phase=raster.pages().isEmpty()?Phase.SECTION:geometrySource==null?Phase.TEXTURE_STORAGE:Phase.READ_FRAMEBUFFER;
                     }
-                    case READ_FRAMEBUFFER -> { framebuffer=device.reserve(0,0,0,0,0,1,0,0,0,null);framebuffer.framebuffers[0]=glGenFramebuffers();device.check("world atlas copy framebuffer");phase=Phase.TEXTURE_STORAGE; }
+                    case READ_FRAMEBUFFER -> { device.beginStorage(framebuffer);framebuffer.framebuffers[0]=glGenFramebuffers();device.check("world atlas copy framebuffer");phase=Phase.TEXTURE_STORAGE; }
                     case TEXTURE_STORAGE -> {
                         var image=raster.pages().get(page);allocation.textures[page]=glGenTextures();glBindTexture(GL_TEXTURE_2D,allocation.textures[page]);
                         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_BASE_LEVEL,0);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,0);
@@ -225,7 +238,8 @@ public final class GlUpload implements AutoCloseable {
         }catch(RuntimeException|Error error) { failure=error;throw error; }
         finally { try { glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,0,0);device.check("world atlas source detachment"); }catch(RuntimeException|Error cleanup) { if(failure==null)throw cleanup;if(cleanup!=failure)failure.addSuppressed(cleanup); } }
     }
-    private void releaseFramebuffer() { if(framebuffer!=null)try { device.retire(framebuffer); }finally { if(framebuffer.retired||framebuffer.released)framebuffer=null; } }
+    private static void release(GlDevice device,GlDevice.Allocation allocation) { if(allocation.unstartedStorage)device.discardUnstarted(allocation);else device.retire(allocation); }
+    private void releaseFramebuffer() { if(framebuffer!=null)try { release(device,framebuffer); }finally { if(framebuffer.retired||framebuffer.released)framebuffer=null; } }
     private void releaseSource() {
         Throwable failure=null;
         if(atlasSource!=null)try { atlasSource.close();atlasSource=null; }catch(RuntimeException|Error cleanup) { if(atlasSource.closedOrReleased())atlasSource=null;failure=cleanup; }
@@ -247,7 +261,7 @@ public final class GlUpload implements AutoCloseable {
     }
     private void dispose(Phase terminal) {
         Throwable failure=null;try { releaseFramebuffer(); }catch(RuntimeException|Error error) { failure=error; }
-        try { if(allocation!=null)device.retire(allocation); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
+        try { if(allocation!=null)release(device,allocation); }catch(RuntimeException|Error error) { if(failure==null)failure=error;else if(failure!=error)failure.addSuppressed(error); }
         finally { if(allocation==null||allocation.retired||allocation.released) { allocation=null;scene=null;raster=null;tint=null;lighting=null;completed=null;sections.clear(); }phase=terminal; }
         try { releaseSource(); }catch(RuntimeException|Error cleanup) { if(failure==null)failure=cleanup;else if(cleanup!=failure)failure.addSuppressed(cleanup); }
         if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;

@@ -1,5 +1,7 @@
 # OpenGL backend
 
+**Current verification (2026-11-08):** Full/default compilation passes (144/106 files). All 163 prepared renderer groups (109 CPU/context-free, 54 GPU) remain unexecuted. [World uploads now admit complete storage](WORLD-STORAGE-ADMISSION.md) before replacing accepted work. Renderer completion, genuine Windows/native/GPU validation and final integration remain pending.
+
 Java 25 / LWJGL **3.4.1**, matching the editor's existing dependency version. This separate library adds forty-one Java sources to the 85-source CPU renderer. All 126 sources compile against the pinned LWJGL classes. No OpenGL context, shader compilation, upload, draw, fence, state-restoration or visible Windows test has been executed for this implementation batch. Renderer tests remain deferred until the stage is implemented; unsupported previews remain disabled.
 
 Compile the library with a Java 25 JDK:
@@ -356,3 +358,5 @@ Completed-frame background index requests now inherit [prepared picking-size rec
 [Scalar, map and image frame admission](DIRECT-FRAME-ADMISSION.md) now reserves complete known frame/target payload before native storage, including scalar draw scratch reused by the renderer. Budget rejection and pre-storage cancellation refund unused reservations without fences; callback gates and independently retained earlier images remain intact. Both compilation sets pass (144/106 files); all 157 prepared groups (107 CPU/context-free, 50 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
 
 [Implicit section culling](SECTION-CULLING.md) now rejects or accepts contiguous groups from the verified section grid before individual bounds tests, reusing existing offsets and prefix storage. Linear and disabled reference modes retain the original leaf predicate, and frame receipts expose actual section work. Both compilation sets pass (144/106 files); all 160 prepared groups (109 CPU/context-free, 51 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.
+
+[Complete world upload admission](WORLD-STORAGE-ADMISSION.md) now reserves known geometry/material/marker/atlas storage and copy-framebuffer slots before accepting a replacement revision. Capacity rejection preserves earlier queued work and completed views; unused destinations refund immediately, while started storage retains fenced ownership. Both compilation sets pass (144/106 files); all 163 prepared groups (109 CPU/context-free, 54 GPU) remain unexecuted. Genuine Windows/native/GPU validation and final integration remain pending.

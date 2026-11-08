@@ -1,6 +1,6 @@
 # Prepared world rendering GPU contracts
 
-Prepared 2026-11-06. Five new `GlGpuContracts` groups extend the explicit Windows harness from shader-only world coverage to actual synthetic world uploads and completed-image rendering. All sources compile; **no assertion or GPU operation has run**. The harness now has 32 GPU groups alongside 87 CPU/context-free groups: 119 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06; updated 2026-11-08. Synthetic world uploads and completed-image rendering remain part of the explicit Windows harness. All sources compile; **no assertion or GPU operation has run**. The harness contains 54 GPU groups alongside 109 CPU/context-free groups: 163 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
 
 ## Synthetic fixture boundary
 
@@ -43,3 +43,5 @@ The synthetic world cases still require real Windows GPU execution. They do not 
 [Original-range picking hierarchy](../renderer/PICKING-RANGE-HIERARCHY.md) extends the existing shared-culling GPU group with completed-frame tree/linear-group/exhaustive comparison, exact displayed atlas/clip controls, original state identity and atomic query-budget failure. Current totals are 115 prepared, unexecuted groups (83 CPU/context-free, 32 GPU); compilation covers 143/105 full/default files. Native/GPU validation and final integration remain pending.
 
 [Implicit section culling](SECTION-CULLING.md) adds a prepared irregular full XYZ hierarchy/linear/disabled GPU comparison, retaining source identity, transparent ordering, marker coverage and completed output under draw-budget rejection. All 160 groups (109 context-free, 51 GPU) remain unexecuted; full/default source compilation passes (144/106 files).
+
+[Complete world upload admission](WORLD-STORAGE-ADMISSION.md) prepares full/material-copy storage, complete initial counters, source/lighting ownership, exact shared and device boundaries, framebuffer rollback, queue/view recovery and original differential pixels. All 163 groups remain unexecuted; full/default compilation covers 144/106 files.

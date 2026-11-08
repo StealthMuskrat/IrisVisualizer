@@ -30,7 +30,7 @@ Started transfers use normal fenced retirement and remain fully charged until ac
 
 Scalar recoloring independently retains exact source GPU geometry after destination admission. It still copies eight geometry bytes and transfers four color bytes per rectangle; full upload still transfers all twelve bytes. Source release follows queued-copy ordering and normal fenced retirement. Destination scenes own complete storage without GPU ancestry chains. Owned CPU surface overloads retain matching-coordinator input admission through destination admission and consume the fresh wrapper on rejection. Empty scalar scenes require no GPU allowance and preserve complete original sample/style receipts.
 
-Admission cannot guarantee driver allocation success and does not account for all JVM/driver overhead. World uploads retain their separate incremental validation and storage expansion. No original identity, requested extent, configured height, native/asset readiness or unsupported-preview gate changes.
+Admission cannot guarantee driver allocation success and does not account for all JVM/driver overhead. [World uploads now admit their complete storage separately](WORLD-STORAGE-ADMISSION.md), retaining incremental validation without later capacity expansion. No original identity, requested extent, configured height, native/asset readiness or unsupported-preview gate changes.
 
 ## Prepared verification and current status
 

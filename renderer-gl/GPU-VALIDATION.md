@@ -1,6 +1,6 @@
 # Prepared Windows OpenGL stage validation
 
-Prepared 2026-11-06; updated 2026-11-07. `GlGpuContracts` contains 51 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 109 prepared, unexecuted groups, making 160 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06; updated 2026-11-08. `GlGpuContracts` contains 54 synthetic GPU groups. Java 25/LWJGL compilation passes for all 144 renderer/validation sources. **None of these groups has been executed**. The four CPU/context-free suites contain 109 prepared, unexecuted groups, making 163 across five harnesses. Renderer implementation and genuine native/GPU validation remain pending. Unsupported previews stay disabled.
 
 ## Build and execution gates
 
@@ -94,3 +94,5 @@ The GPU harness is an initial real-driver path. The new [synthetic world groups]
 [Scalar, map and image frame admission](DIRECT-FRAME-ADMISSION.md) adds two groups for budget rejection before native target storage, all four cancellation gates, callback exception identity/cleanup, exact complete-peak rendering and immutable earlier output. The completion guard requires all 50 registered GPU groups. Full/default compilation passes (144/106 files); all 157 prepared groups remain unexecuted.
 
 [Implicit world section culling](SECTION-CULLING.md) adds the 51st GPU group for hierarchy/linear/disabled pixels and original submission receipts, marker/empty/transparent sections, bounded work, legacy constructor compatibility and draw admission recovery. All 160 prepared groups remain unexecuted; full/default compilation covers 144/106 files.
+
+[Complete world upload admission](WORLD-STORAGE-ADMISSION.md) adds three GPU groups for full/material-copy CPU/GPU/object footprints, exact-budget cancellation/closure, original pixels and traffic, five queue states, connected READY views, owned lighting and partial copy-framebuffer setup rollback under device limits. The report guard requires 54 GPU groups; all 163 prepared groups remain unexecuted. Both compilation sets pass (144/106 files).
