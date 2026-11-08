@@ -27,7 +27,7 @@ After admission succeeds, the controller accepts the next view revision, release
 
 Map viewport configuration while source preparation is pending retains its earlier policy and admits a frame once its upload is complete. Explicit source invalidation, accepted source replacement and controller closure abandon pending frame preparations. Caller-transferred older frames remain independently owned and immutable. Histogram/source identity, original image dimensions, native samples and colorization/decode receipts remain unchanged.
 
-The affected controllers are the 2D native-map and original-image views. [Scalar navigation now has its own complete admission path](SCALAR-NAVIGATION-ADMISSION.md); world navigation keeps its existing policy. Driver, host-state restoration and Java metadata allocation can still fail after capacity admission; those failures retain the existing display-failure and explicit-redraw behavior. No native sampling, CPU colorization, decoding or source upload is scheduled by navigation.
+The affected controllers are the 2D native-map and original-image views. [Scalar navigation now has its own complete admission path](SCALAR-NAVIGATION-ADMISSION.md); [world navigation now admits late-bound frame/order storage](WORLD-NAVIGATION-ADMISSION.md). Driver, host-state restoration and Java metadata allocation can still fail after capacity admission; those failures retain the existing display-failure and explicit-redraw behavior. No native sampling, CPU colorization, decoding or source upload is scheduled by navigation.
 
 ## Prepared validation and current scope
 

@@ -180,6 +180,11 @@ public final class GlDevice implements AutoCloseable {
         if(from==to||bytes<0||bytes>from.cpu||to.cpu!=0||to.retained!=null)throw new GlFailure(GlFailure.Code.STATE,"Invalid CPU payload reservation transfer");
         from.cpu-=bytes;to.cpu=bytes;to.retained=retained;
     }
+    /** Refund an unused CPU upper reservation; growth is never permitted. */
+    void shrinkCpu(Allocation allocation,long bytes) {
+        live(allocation);if(!allocations.contains(allocation)||bytes<0||bytes>allocation.cpu)throw new GlFailure(GlFailure.Code.STATE,"Invalid CPU reservation shrink");
+        long released=allocation.cpu-bytes;admit(gpuBytes+cpuBytes-released+limits.stagingBytes());allocation.cpu=bytes;cpuBytes-=released;
+    }
     void retire(Allocation allocation) {
         if(allocation.released)return;current();if(allocation.retired)return;
         // Every allocation has a journal, including CPU-only preflight and failed uploads.

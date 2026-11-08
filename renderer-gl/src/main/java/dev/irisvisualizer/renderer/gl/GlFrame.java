@@ -57,16 +57,26 @@ public final class GlFrame implements AutoCloseable {
     }
     /** Internal one-shot owner; all known frame payload is admitted before storage or obsolete callbacks. */
     static final class Prepared implements AutoCloseable {
-        private final GlRenderer renderer;private final long revision;private final GlCamera camera;private final int width,height;private final WorldClip clip;private final GlCullingMode mode;
+        private final GlRenderer renderer;private long revision;private final GlCamera camera;private final int width,height;private final WorldClip clip;private final GlCullingMode mode;
         private GlScene scene;private GlAtlasFrame atlas;private GlDrawPlan order;private GlDevice.Allocation journal,scratch;private GlTarget target;private boolean used,closed;
         private Prepared(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,GlCullingMode mode,GlDevice.Allocation journal,GlDevice.Allocation scratch,GlTarget target) {
             this.renderer=renderer;this.revision=revision;this.scene=scene;this.atlas=atlas;this.order=order;this.camera=camera;this.width=width;this.height=height;this.clip=clip;this.mode=mode;this.journal=journal;this.scratch=scratch;this.target=target;
         }
         GlFrame render(BooleanSupplier obsolete) {
-            Objects.requireNonNull(obsolete);if(used||closed)throw new GlFailure(GlFailure.Code.STATE,"Frame preparation is already used or closed");used=true;var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();
+            return render(atlas,order,obsolete);
+        }
+        GlFrame render(GlAtlasFrame atlas,GlDrawPlan order,BooleanSupplier obsolete) {
+            Objects.requireNonNull(obsolete);if(used||closed)throw new GlFailure(GlFailure.Code.STATE,"Frame preparation is already used or closed");used=true;var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();long extra=extraCpu(cpu,raster);
+            if(extra>journal.cpu)throw new GlFailure(GlFailure.Code.STATE,"Displayed atlas exceeds the admitted frame reservation");renderer.device.shrinkCpu(journal,extra);journal.retained=raster;
             current(obsolete);target.initialize();current(obsolete);var stats=renderer.renderAdmittedFrame(scene,atlas,order,target,camera,clip,mode,scratch);scratch=null;current(obsolete);
             var info=new Info(UUID.randomUUID(),revision,cpu.snapshot().source(),camera,width,height,raster.tick(),raster.partialTick(),stats,clip,scene.lightingInfo(),Optional.of(WorldVisualReport.receipt(cpu)));var result=new GlFrame(new Shared(renderer.device,journal,target,info));journal=null;target=null;return result;
         }
+        void retarget(long next) { renderer.device.current();if(used||closed||next<revision)throw new GlFailure(GlFailure.Code.STATE,"Invalid prepared frame revision");revision=next; }
+        void require(GlRenderer expected,long next,GlFrameQueue.Request request) {
+            renderer.device.current();if(used||closed||renderer!=expected||revision!=next||scene!=request.scene()||!camera.equals(request.camera())||width!=request.width()||height!=request.height()||!clip.equals(request.clip())||mode!=GlCullingMode.HIERARCHY)throw new GlFailure(GlFailure.Code.STALE,"Frame admission differs from requested world/view");
+            var raster=validate(renderer,scene,request.atlas().orElse(null),request.order().orElse(null),camera,width,height);if(extraCpu(scene.cpuScene(),raster)>journal.cpu)throw new GlFailure(GlFailure.Code.STATE,"Atlas differs from complete frame admission");
+        }
+        boolean ownsResources() { return journal!=null||scratch!=null||target!=null; }
         @Override public void close() {
             closed=true;var device=renderer.device;Throwable failure=null;
             if(journal!=null)try { device.retire(journal);journal=null; }catch(RuntimeException|Error error) { if(journal.retired||journal.released)journal=null;failure=error; }
@@ -77,7 +87,17 @@ public final class GlFrame implements AutoCloseable {
     }
     static Prepared prepare(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,GlCullingMode mode) {
         Objects.requireNonNull(clip);Objects.requireNonNull(mode);if(revision<1)throw new IllegalArgumentException("Invalid frame revision");var raster=validate(renderer,scene,atlas,order,camera,width,height);var cpu=scene.cpuScene();var device=renderer.device;
-        long extraCpu=0;for(int page=0;page<raster.pages().size();page++)if(raster.pages().get(page)!=cpu.raster().pages().get(page))extraCpu+=raster.pages().get(page).bytes();
+        return admit(renderer,revision,scene,atlas,order,camera,width,height,clip,mode,extraCpu(cpu,raster),raster);
+    }
+    private static long extraCpu(WorldScene cpu,AtlasRaster raster) { long bytes=0;for(int page=0;page<raster.pages().size();page++)if(raster.pages().get(page)!=cpu.raster().pages().get(page))bytes+=raster.pages().get(page).bytes();return bytes; }
+    /** Admit before order preparation or atlas adoption; every layout page can be replaced independently. */
+    static Prepared reserve(GlRenderer renderer,long revision,GlScene scene,GlCamera camera,int width,int height,WorldClip clip) {
+        Objects.requireNonNull(renderer);Objects.requireNonNull(scene);Objects.requireNonNull(camera);Objects.requireNonNull(clip);if(revision<1)throw new IllegalArgumentException("Invalid frame revision");renderer.device.live(renderer.allocation);
+        if(scene.device!=renderer.device)throw new GlFailure(GlFailure.Code.CONTEXT,"Frame reservation requires the renderer device");scene.live();camera.matrix((double)width/height);camera.requireSceneRange(scene.cpuScene());GlTarget.validate(renderer.device,width,height);
+        return admit(renderer,revision,scene,null,null,camera,width,height,clip,GlCullingMode.HIERARCHY,scene.raster().rgbaBytes(),null);
+    }
+    private static Prepared admit(GlRenderer renderer,long revision,GlScene scene,GlAtlasFrame atlas,GlDrawPlan order,GlCamera camera,int width,int height,WorldClip clip,GlCullingMode mode,long extraCpu,AtlasRaster raster) {
+        var cpu=scene.cpuScene();var device=renderer.device;
         WorldScene.Result owner=null;GlDevice.Allocation journal=null,scratch=null;GlTarget target=null;
         try {
             owner=scene.retainCpuScene();journal=device.reserve(0,extraCpu,0,0,0,0,0,0,0,owner);owner=null;journal.retained=raster;device.depend(journal,scene.allocation);

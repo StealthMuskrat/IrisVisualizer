@@ -1,6 +1,6 @@
 # Prepared CPU renderer validation
 
-Prepared 2026-11-04; updated 2026-11-08. The four CPU/context-free harnesses contain 109 prepared groups: 23 renderer CPU, 48 world CPU, 17 animation and 21 display math. The separate GPU harness contains 63 groups, for 172 overall. All 144 full renderer/validation sources and the 106-file dependency-free set compile; no group has been executed. Renderer implementation remains in progress, and execution is deferred under the repository workflow. Unsupported previews remain disabled.
+Prepared 2026-11-04; updated 2026-11-08. The four CPU/context-free harnesses contain 109 prepared groups: 23 renderer CPU, 48 world CPU, 17 animation and 21 display math. The separate GPU harness contains 66 groups, for 175 overall. All 144 full renderer/validation sources and the 106-file dependency-free set compile; no group has been executed. Renderer implementation remains in progress, and execution is deferred under the repository workflow. Unsupported previews remain disabled.
 
 ## Compile now, execute at stage validation
 
@@ -101,3 +101,5 @@ The separate [Windows GPU harness](../renderer-gl/GPU-VALIDATION.md) adds 18 pre
 [Admitted map/image navigation](../renderer-gl/CANVAS-NAVIGATION-ADMISSION.md) adds three GPU groups; CPU/context-free coverage remains at 109. All 169 groups remain unexecuted, and both source sets compile (144/106 files).
 
 [Admitted scalar navigation](../renderer-gl/SCALAR-NAVIGATION-ADMISSION.md) adds three GPU groups; CPU/context-free coverage remains at 109. All 172 groups remain unexecuted, and both source sets compile (144/106 files).
+
+[Admitted world navigation](../renderer-gl/WORLD-NAVIGATION-ADMISSION.md) adds three GPU groups; CPU/context-free coverage remains at 109. All 175 groups remain unexecuted, and both source sets compile (144/106 files).

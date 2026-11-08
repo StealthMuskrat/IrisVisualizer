@@ -1,6 +1,6 @@
 # Prepared world rendering GPU contracts
 
-Prepared 2026-11-06; updated 2026-11-08. Synthetic world uploads and completed-image rendering remain part of the explicit Windows harness. All sources compile; **no assertion or GPU operation has run**. The harness contains 63 GPU groups alongside 109 CPU/context-free groups: 172 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
+Prepared 2026-11-06; updated 2026-11-08. Synthetic world uploads and completed-image rendering remain part of the explicit Windows harness. All sources compile; **no assertion or GPU operation has run**. The harness contains 66 GPU groups alongside 109 CPU/context-free groups: 175 prepared, unexecuted groups across five harnesses. Renderer implementation, native/GPU validation and final integration remain pending. Unsupported previews stay disabled.
 
 ## Synthetic fixture boundary
 
@@ -47,3 +47,5 @@ The synthetic world cases still require real Windows GPU execution. They do not 
 [Complete world upload admission](WORLD-STORAGE-ADMISSION.md) prepares full/material-copy storage, complete initial counters, source/lighting ownership, exact shared and device boundaries, framebuffer rollback, queue/view recovery and original differential pixels. All 163 groups remain unexecuted; full/default compilation covers 144/106 files.
 
 [Complete atlas update admission](ATLAS-STORAGE-ADMISSION.md) prepares multi-page full/partial/no-change updates, output-journal reservation, byte-exact page/copy/patch receipts, previous queue delivery and partial-start cleanup. All 166 groups remain unexecuted; full/default compilation covers 144/106 files.
+
+[Admitted world navigation](WORLD-NAVIGATION-ADMISSION.md) prepares late-bound targets/orders, worker and device capacity rejection, original pixels/receipts, pending sort reuse, animated atlas retokening and material refresh/invalidation cleanup. All 175 prepared groups remain unexecuted; full/default compilation covers 144/106 files.

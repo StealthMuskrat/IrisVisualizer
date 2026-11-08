@@ -36,10 +36,18 @@ public final class GlFrameQueue implements AutoCloseable {
     public boolean render(long next,Request request,BooleanSupplier obsolete) {
         Objects.requireNonNull(request);Objects.requireNonNull(obsolete);current();if(next<1)throw new IllegalArgumentException("Invalid frame revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
         GlFrame.validate(renderer,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height());var changed=new Status(next,Phase.RENDERING,Optional.of(request.scene().cpuScene().snapshot().source()),Optional.empty(),Optional.empty(),"");
+        return renderAdmitted(next,request,obsolete,GlFrame.prepare(renderer,next,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height(),request.clip(),GlCullingMode.HIERARCHY),changed);
+    }
+    /** Borrow an exact unused admission; successful token acceptance consumes it on every outcome. */
+    boolean renderPrepared(long next,Request request,BooleanSupplier obsolete,GlFrame.Prepared prepared) {
+        Objects.requireNonNull(request);Objects.requireNonNull(obsolete);Objects.requireNonNull(prepared);current();if(next<1)throw new IllegalArgumentException("Invalid frame revision");if(next<revision||next==revision&&status.phase()!=Phase.WAITING)return false;
+        prepared.require(renderer,next,request);var changed=new Status(next,Phase.RENDERING,Optional.of(request.scene().cpuScene().snapshot().source()),Optional.empty(),Optional.empty(),"");return renderAdmitted(next,request,obsolete,prepared,changed);
+    }
+    private boolean renderAdmitted(long next,Request request,BooleanSupplier obsolete,GlFrame.Prepared prepared,Status changed) {
         boolean accepted=false;GlFrame result=null;
-        try(var prepared=GlFrame.prepare(renderer,next,request.scene(),request.atlas().orElse(null),request.order().orElse(null),request.camera(),request.width(),request.height(),request.clip(),GlCullingMode.HIERARCHY)) {
+        try(prepared) {
             accepted=true;revision=next;rendering=true;status=changed;releaseOwned();if(obsolete.getAsBoolean())throw new CancellationException("Completed frame request is obsolete");
-            result=prepared.render(obsolete);
+            result=prepared.render(request.atlas().orElse(null),request.order().orElse(null),obsolete);
             if(obsolete.getAsBoolean())throw new CancellationException("Completed frame became obsolete before queue adoption");var ready=new Status(revision,Phase.READY,status.source(),Optional.of(result.info()),Optional.empty(),"");completed=result;result=null;status=ready;return true;
         }catch(RuntimeException|Error failure) { if(result!=null)try { result.close(); }catch(RuntimeException|Error cleanup) { if(cleanup!=failure)failure.addSuppressed(cleanup); }if(accepted)failed(failure);throw failure; }
         finally { if(accepted)rendering=false; }

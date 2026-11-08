@@ -28,7 +28,7 @@ After admission succeeds, the controller accepts the next view revision and reta
 
 Clip configuration before a camera is available, and camera configuration while source preparation is pending, retain their metadata-only behavior. A frame is admitted when both the complete source and camera are available. Explicit source invalidation, accepted source replacement and closure abandon pending preparations. Supplied native values, configured volume height, inclusion/meshing policy, histogram ownership and source identity are unchanged. Navigation schedules no generation, meshing, recoloring or source upload.
 
-Caller-held older images and full-source histograms remain independent of controller navigation and invalidation. Capacity admission does not guarantee successful driver allocation, host-state restoration or Java metadata allocation; those errors retain the display-failure/redraw policy. These changes cover the scalar controller; world-view navigation retains its existing policy.
+Caller-held older images and full-source histograms remain independent of controller navigation and invalidation. Capacity admission does not guarantee successful driver allocation, host-state restoration or Java metadata allocation; those errors retain the display-failure/redraw policy. These changes cover the scalar controller; [world navigation now has its own late-bound frame/order admission](WORLD-NAVIGATION-ADMISSION.md).
 
 ## Prepared validation
 

@@ -60,3 +60,5 @@ Two new GPU groups prepare separate fresh/reused immutable frames with different
 All 134 prepared groups remain unexecuted. Production inventory remains 138 files: 94 CPU and 44 GL, plus five harnesses and one fixture. No PowerShell/Gradle task or renderer/native/GPU execution ran for this batch.
 
 [Shared section-origin precision](PRECISION-PREFLIGHT.md) now exposes the complete partition proof on `WorldScene` for order reuse, direct sorting and GPU preflight. Direct sorting rejects unsupported anchors before key/depth arrays or section traversal, retaining its defensive per-section checks. Existing canonical depth keys, exact normalized-direction equality, receipts and budgets are unchanged. All 152 prepared renderer groups remain unexecuted.
+
+[World navigation admission](WORLD-NAVIGATION-ADMISSION.md) now holds complete frame storage and any required destination order journal before accepting a changed view. New sort admission precedes old-view invalidation, compatible pending orders remain reusable, and actual atlas binding refunds unused upper CPU allowance. All 175 groups remain unexecuted; full/default compilation covers 144/106 files.
